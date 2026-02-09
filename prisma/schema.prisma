@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id               String             @id @default(cuid())
+  name             String
+  slug             String             @unique
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  memberships      Membership[]
+  workspaceModules WorkspaceModule[]
+  roles            Role[]
+  userRoles        UserRole[]
+  branding         WorkspaceBranding?
+  auditLogs        AuditLog[]
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  userRoles    UserRole[]
+  auditLogs    AuditLog[]   @relation("AuditActor")
+}
+
+model Membership {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Module {
+  id               String            @id @default(cuid())
+  key              String            @unique
+  name             String
+  description      String?
+  isCore           Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workspaceModules WorkspaceModule[]
+  permissions      Permission[]
+}
+
+model WorkspaceModule {
+  id          String    @id @default(cuid())
+  workspaceId String
+  moduleId    String
+  enabled     Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  module      Module    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, moduleId])
+  @@index([workspaceId])
+  @@index([moduleId])
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  workspaceId     String
+  name            String
+  description     String?
+  isSystem        Boolean          @default(false)
+  isSuperadmin    Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  key             String           @unique
+  moduleId        String?
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  module          Module?          @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  rolePermissions RolePermission[]
+
+  @@index([moduleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model UserRole {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  roleId      String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId, roleId])
+  @@index([workspaceId, userId])
+  @@index([roleId])
+}
+
+model WorkspaceBranding {
+  id             String    @id @default(cuid())
+  workspaceId    String    @unique
+  workspaceName  String?
+  logoUrl        String?
+  primaryColor   String    @default("#0d6efd")
+  secondaryColor String    @default("#6c757d")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  actorUserId String?
+  action      String
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorUser   User?     @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId])
+  @@index([action])
+}
