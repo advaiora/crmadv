@@ -136,6 +136,7 @@ model WorkspaceBranding {
   workspaceId    String    @unique
   workspaceName  String?
   logoUrl        String?
+  supportEmail   String?
   primaryColor   String    @default("#0d6efd")
   secondaryColor String    @default("#6c757d")
   createdAt      DateTime  @default(now())

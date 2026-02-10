@@ -8,6 +8,10 @@ import { requireModuleEnabled } from './guards/requireModule.js';
 import { requirePermission } from './guards/requirePermission.js';
 import { requireWorkspace } from './guards/requireWorkspace.js';
 import { prisma } from './prisma.js';
+import meRoute from './routes/me.route.js';
+import workspaceBrandingRoute from './routes/workspace-branding.route.js';
+import workspaceModulesRoute from './routes/workspace-modules.route.js';
+import workspaceRolesRoute from './routes/workspace-roles.route.js';
 
 const app = Fastify({
   logger: true,
@@ -25,6 +29,11 @@ app.setErrorHandler((error, request, reply) => {
 app.setNotFoundHandler((_request, reply) =>
   fail(reply, 404, 'NOT_FOUND', 'Resource not found'),
 );
+
+void app.register(meRoute);
+void app.register(workspaceBrandingRoute);
+void app.register(workspaceModulesRoute);
+void app.register(workspaceRolesRoute);
 
 app.get('/health', async (_request, reply) => {
   try {

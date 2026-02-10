@@ -26,6 +26,9 @@ export const forbidden = (message: string, details?: ErrorDetails) =>
 export const notFound = (message: string, details?: ErrorDetails) =>
   new HttpError(404, 'NOT_FOUND', message, details);
 
+export const conflict = (message: string, details?: ErrorDetails) =>
+  new HttpError(409, 'CONFLICT', message, details);
+
 export const internalServerError = (message = 'Internal server error', details?: ErrorDetails) =>
   new HttpError(500, 'INTERNAL_SERVER_ERROR', message, details);
 
