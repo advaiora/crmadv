@@ -11,6 +11,7 @@ import { prisma } from './prisma.js';
 import meRoute from './routes/me.route.js';
 import workspaceBrandingRoute from './routes/workspace-branding.route.js';
 import workspaceModulesRoute from './routes/workspace-modules.route.js';
+import workspaceQuotesRoute from './routes/workspace-quotes.route.js';
 import workspaceRolesRoute from './routes/workspace-roles.route.js';
 
 const app = Fastify({
@@ -33,6 +34,7 @@ app.setNotFoundHandler((_request, reply) =>
 void app.register(meRoute);
 void app.register(workspaceBrandingRoute);
 void app.register(workspaceModulesRoute);
+void app.register(workspaceQuotesRoute);
 void app.register(workspaceRolesRoute);
 
 app.get('/health', async (_request, reply) => {

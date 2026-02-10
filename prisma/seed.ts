@@ -40,6 +40,8 @@ const PERMISSIONS = [
   { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Override checklist gates' },
   { key: 'quotes.view', moduleKey: 'quotes', description: 'View quotes' },
   { key: 'quotes.create', moduleKey: 'quotes', description: 'Create quotes' },
+  { key: 'quotes.edit', moduleKey: 'quotes', description: 'Edit quotes' },
+  { key: 'quotes.delete', moduleKey: 'quotes', description: 'Delete quotes' },
   { key: 'quotes.send', moduleKey: 'quotes', description: 'Send quotes' },
   { key: 'quotes.accept', moduleKey: 'quotes', description: 'Accept quotes' },
   { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Manage quote templates' },
