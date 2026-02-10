@@ -13,6 +13,16 @@ enum QuoteStatus {
   accepted
 }
 
+enum QuoteEmailLogType {
+  send
+  resend
+}
+
+enum EmailSendStatus {
+  success
+  fail
+}
+
 model Workspace {
   id               String             @id @default(cuid())
   name             String
@@ -20,11 +30,13 @@ model Workspace {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   memberships      Membership[]
+  clients          Client[]
   workspaceModules WorkspaceModule[]
   roles            Role[]
   userRoles        UserRole[]
   branding         WorkspaceBranding?
   quotes           Quote[]
+  quoteEmailLogs   QuoteEmailLog[]
   auditLogs        AuditLog[]
 }
 
@@ -53,6 +65,23 @@ model Membership {
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
+}
+
+model Client {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  email       String?
+  phone       String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quotes      Quote[]
+
+  @@index([workspaceId, name])
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
 }
 
 model Module {
@@ -164,7 +193,9 @@ model Quote {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client      Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
   lines       QuoteLine[]
+  emailLogs   QuoteEmailLog[]
 
   @@index([workspaceId, status])
 }
@@ -179,6 +210,30 @@ model QuoteLine {
   order     Int?
   quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
+  @@index([quoteId])
+}
+
+model QuoteEmailLog {
+  id                String           @id @default(cuid())
+  workspaceId       String
+  quoteId           String
+  type              QuoteEmailLogType
+  toMasked          String
+  ccCount           Int              @default(0)
+  bccCount          Int              @default(0)
+  subject           String?
+  downloadName      String?
+  provider          String
+  providerMessageId String?
+  status            EmailSendStatus
+  errorCode         String?
+  errorMessage      String?          @db.VarChar(300)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  workspace         Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quote             Quote            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, quoteId, createdAt])
   @@index([quoteId])
 }
 
