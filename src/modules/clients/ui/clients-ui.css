@@ -614,6 +614,8 @@
     background: var(--clients-pagination-bg);
     box-shadow: var(--clients-pagination-shadow);
     backdrop-filter: blur(8px);
+    width: fit-content;
+    margin-left: auto;
 }
 
 .clients-pagination-status {

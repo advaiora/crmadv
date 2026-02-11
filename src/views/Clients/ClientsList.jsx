@@ -308,11 +308,7 @@ const ClientsList = () => {
   };
 
   const togglePresetTagInModal = (presetTag) => {
-    setTagEditorTags((prev) =>
-      hasTag(prev, presetTag)
-        ? prev.filter((tag) => tag.toLowerCase() !== presetTag.toLowerCase())
-        : [...prev, presetTag],
-    );
+    setTagEditorTags((prev) => (hasTag(prev, presetTag) ? prev.filter((tag) => tag.toLowerCase() !== presetTag.toLowerCase()) : [...prev, presetTag]));
   };
 
   const removeTagInModal = (tagToRemove) => {
@@ -357,25 +353,13 @@ const ClientsList = () => {
       <div className="clients-tags clients-list-tags">
         {visibleTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
         {visibleTags.map((tag) => (
-          <span
-            key={`${client.id}-${tag}`}
-            className="badge clients-tag-badge"
-            style={getTagBadgeStyle(tag)}
-          >
+          <span key={`${client.id}-${tag}`} className="badge clients-tag-badge" style={getTagBadgeStyle(tag)}>
             {tag}
           </span>
         ))}
-        {remainingCount > 0 && (
-          <span className="badge bg-light text-muted border">+{remainingCount}</span>
-        )}
+        {remainingCount > 0 && <span className="badge bg-light text-muted border">+{remainingCount}</span>}
         {canEdit && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-secondary"
-            className="clients-tag-edit-btn"
-            onClick={() => openTagsModal(client)}
-          >
+          <Button type="button" size="sm" variant="outline-secondary" className="clients-tag-edit-btn" onClick={() => openTagsModal(client)}>
             Modifica tag
           </Button>
         )}
@@ -446,13 +430,7 @@ const ClientsList = () => {
                   </>
                 }
               />
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="d-none"
-                onChange={(event) => void onImportFileChange(event)}
-              />
+              <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="d-none" onChange={(event) => void onImportFileChange(event)} />
 
               <ClientFiltersBar
                 searchValue={searchValue}
@@ -505,11 +483,7 @@ const ClientsList = () => {
               )}
 
               {actionMessage && (
-                <Alert
-                  variant={actionMessage.variant}
-                  dismissible
-                  onClose={() => setActionMessage(null)}
-                >
+                <Alert variant={actionMessage.variant} dismissible onClose={() => setActionMessage(null)}>
                   <div>{actionMessage.text}</div>
                   {Array.isArray(actionMessage.errors) && actionMessage.errors.length > 0 && (
                     <div className="mt-2 small">
@@ -652,9 +626,7 @@ const ClientsList = () => {
                   <Modal.Title>Modifica tag cliente</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                  <p className="mb-2 small text-muted">
-                    {tagEditorClient ? `Cliente: ${tagEditorClient.name}` : ""}
-                  </p>
+                  <p className="mb-2 small text-muted">{tagEditorClient ? `Cliente: ${tagEditorClient.name}` : ""}</p>
 
                   {tagEditorError && (
                     <Alert variant="danger" className="py-2 px-3 mb-3">
@@ -665,11 +637,7 @@ const ClientsList = () => {
                   <div className="clients-tags mb-3">
                     {tagEditorTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
                     {tagEditorTags.map((tag) => (
-                      <span
-                        key={`modal-tag-${tag}`}
-                        className="badge clients-tag-badge"
-                        style={getTagBadgeStyle(tag)}
-                      >
+                      <span key={`modal-tag-${tag}`} className="badge clients-tag-badge" style={getTagBadgeStyle(tag)}>
                         {tag}
                         <button
                           type="button"
@@ -717,12 +685,7 @@ const ClientsList = () => {
                         placeholder="Nuovo tag"
                         disabled={tagEditorSaving}
                       />
-                      <Button
-                        type="button"
-                        variant="outline-secondary"
-                        onClick={addCustomTagInModal}
-                        disabled={tagEditorSaving || !tagEditorDraft.trim()}
-                      >
+                      <Button type="button" variant="outline-secondary" onClick={addCustomTagInModal} disabled={tagEditorSaving || !tagEditorDraft.trim()}>
                         Aggiungi
                       </Button>
                     </div>
