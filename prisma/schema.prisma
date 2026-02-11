@@ -28,34 +28,52 @@ enum ClientType {
   company
 }
 
+enum ChecklistInstanceStatus {
+  active
+  completed
+  archived
+}
+
+enum ChecklistItemState {
+  pending
+  completed
+  not_applicable
+}
+
 model Workspace {
-  id               String             @id @default(cuid())
-  name             String
-  slug             String             @unique
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  memberships      Membership[]
-  clients          Client[]
-  workspaceModules WorkspaceModule[]
-  roles            Role[]
-  userRoles        UserRole[]
-  branding         WorkspaceBranding?
-  quotes           Quote[]
-  quoteEmailLogs   QuoteEmailLog[]
-  auditLogs        AuditLog[]
+  id                     String                  @id @default(cuid())
+  name                   String
+  slug                   String                  @unique
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  memberships            Membership[]
+  clients                Client[]
+  workspaceModules       WorkspaceModule[]
+  roles                  Role[]
+  userRoles              UserRole[]
+  branding               WorkspaceBranding?
+  quotes                 Quote[]
+  quoteEmailLogs         QuoteEmailLog[]
+  auditLogs              AuditLog[]
+  checklistTemplates     ChecklistTemplate[]
+  checklistTemplateItems ChecklistTemplateItem[]
+  stageChecklistRules    StageChecklistRule[]
+  checklistInstances     ChecklistInstance[]
+  checklistInstanceItems ChecklistInstanceItem[]
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String?
-  passwordHash String?
-  role         String       @default("member")
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  memberships  Membership[]
-  userRoles    UserRole[]
-  auditLogs    AuditLog[]   @relation("AuditActor")
+  id                      String                  @id @default(cuid())
+  email                   String                  @unique
+  name                    String?
+  passwordHash            String?
+  role                    String                  @default("member")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  memberships             Membership[]
+  userRoles               UserRole[]
+  auditLogs               AuditLog[]              @relation("AuditActor")
+  completedChecklistItems ChecklistInstanceItem[]
 }
 
 model Membership {
@@ -74,7 +92,7 @@ model Membership {
 }
 
 model Client {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   workspaceId String
   type        ClientType @default(person)
   name        String
@@ -88,16 +106,112 @@ model Client {
   province    String?
   country     String?
   notes       String?
-  tags        String[]  @default([])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tags        String[]   @default([])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   quotes      Quote[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
   @@index([workspaceId, updatedAt])
+}
+
+model ChecklistTemplate {
+  id          String                  @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  isArchived  Boolean                 @default(false)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items       ChecklistTemplateItem[]
+  stageRules  StageChecklistRule[]
+  instances   ChecklistInstance[]
+
+  @@index([workspaceId, name])
+}
+
+model ChecklistTemplateItem {
+  id               String                  @id @default(cuid())
+  workspaceId      String
+  templateId       String
+  title            String
+  description      String?
+  sortOrder        Int                     @default(0)
+  isRequired       Boolean                 @default(true)
+  requiresEvidence Boolean                 @default(false)
+  isCritical       Boolean                 @default(false)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  workspace        Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template         ChecklistTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  instanceItems    ChecklistInstanceItem[]
+
+  @@index([templateId, sortOrder])
+  @@index([workspaceId])
+}
+
+model StageChecklistRule {
+  id                  String            @id @default(cuid())
+  workspaceId         String
+  pipelineStageId     String
+  checklistTemplateId String
+  isBlocking          Boolean           @default(true)
+  autoCreateInstance  Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  checklistTemplate   ChecklistTemplate @relation(fields: [checklistTemplateId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, pipelineStageId])
+  @@index([workspaceId])
+}
+
+model ChecklistInstance {
+  id                  String                  @id @default(cuid())
+  workspaceId         String
+  projectId           String
+  pipelineStageId     String?
+  checklistTemplateId String
+  status              ChecklistInstanceStatus @default(active)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  workspace           Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  checklistTemplate   ChecklistTemplate       @relation(fields: [checklistTemplateId], references: [id], onDelete: Restrict)
+  items               ChecklistInstanceItem[]
+
+  @@unique([workspaceId, projectId, pipelineStageId, checklistTemplateId])
+  @@index([workspaceId, projectId])
+}
+
+model ChecklistInstanceItem {
+  id                       String                @id @default(cuid())
+  workspaceId              String
+  instanceId               String
+  templateItemId           String
+  titleSnapshot            String
+  isRequiredSnapshot       Boolean
+  requiresEvidenceSnapshot Boolean
+  isCriticalSnapshot       Boolean
+  sortOrderSnapshot        Int
+  state                    ChecklistItemState    @default(pending)
+  evidenceNote             String?
+  evidenceUrl              String?
+  notApplicableReason      String?
+  completedAt              DateTime?
+  completedByUserId        String?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  workspace                Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instance                 ChecklistInstance     @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  templateItem             ChecklistTemplateItem @relation(fields: [templateItemId], references: [id], onDelete: Restrict)
+  completedByUser          User?                 @relation(fields: [completedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([instanceId, sortOrderSnapshot])
+  @@index([workspaceId])
 }
 
 model Module {
@@ -197,19 +311,19 @@ model WorkspaceBranding {
 }
 
 model Quote {
-  id          String      @id @default(cuid())
+  id          String          @id @default(cuid())
   workspaceId String
   clientId    String?
   clientName  String
   clientEmail String?
   clientPhone String?
-  status      QuoteStatus @default(draft)
-  total       Decimal     @db.Decimal(12, 2)
+  status      QuoteStatus     @default(draft)
+  total       Decimal         @db.Decimal(12, 2)
   notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client      Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client      Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
   lines       QuoteLine[]
   emailLogs   QuoteEmailLog[]
 
@@ -230,24 +344,24 @@ model QuoteLine {
 }
 
 model QuoteEmailLog {
-  id                String           @id @default(cuid())
+  id                String            @id @default(cuid())
   workspaceId       String
   quoteId           String
   type              QuoteEmailLogType
   toMasked          String
-  ccCount           Int              @default(0)
-  bccCount          Int              @default(0)
+  ccCount           Int               @default(0)
+  bccCount          Int               @default(0)
   subject           String?
   downloadName      String?
   provider          String
   providerMessageId String?
   status            EmailSendStatus
   errorCode         String?
-  errorMessage      String?          @db.VarChar(300)
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  workspace         Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  quote             Quote            @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  errorMessage      String?           @db.VarChar(300)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quote             Quote             @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, quoteId, createdAt])
   @@index([quoteId])

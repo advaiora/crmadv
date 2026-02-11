@@ -1,0 +1,611 @@
+{
+  "info": {
+    "name": "Checklists Gate - Fase 5 Hardening",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Setup - Disable checklists module",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/workspaces/{{workspaceId}}/modules",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"modules\": [\n    { \"key\": \"checklists\", \"enabled\": false }\n  ]\n}"
+        },
+        "description": "Helper per il test 5.3. Richiede permesso modules.manage."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Setup - Enable checklists module",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/workspaces/{{workspaceId}}/modules",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"modules\": [\n    { \"key\": \"checklists\", \"enabled\": true }\n  ]\n}"
+        },
+        "description": "Helper di ripristino dopo il test 5.3."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.1 - 401 Missing auth headers",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/checklists/templates"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 401', function () { pm.response.to.have.status(401); });",
+              "pm.test('error code UNAUTHORIZED', function () { pm.expect(json.error.code).to.eql('UNAUTHORIZED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.2 - 400 Missing workspace header",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+              "pm.test('error code BAD_REQUEST', function () { pm.expect(json.error.code).to.eql('BAD_REQUEST'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.3 - 403 Module disabled",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates",
+        "description": "Prerequisito: esegui prima 'Setup - Disable checklists module'."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+              "pm.test('error code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.4 - 403 Missing permission",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-user-id", "value": "{{limitedUserId}}" },
+          { "key": "x-user-email", "value": "{{limitedUserEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates",
+        "description": "Usa un utente senza permission checklists.view."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+              "pm.test('error code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.5 - Create template",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{templateName}}\",\n  \"description\": \"Checklist onboarding sito\",\n  \"items\": [\n    {\n      \"title\": \"Raccolta credenziali\",\n      \"description\": \"Accessi principali\",\n      \"sortOrder\": 0,\n      \"isRequired\": true,\n      \"requiresEvidence\": true,\n      \"isCritical\": true\n    }\n  ]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+              "pm.test('template created', function () { pm.expect(json.data.template.id).to.be.a('string'); });",
+              "pm.collectionVariables.set('templateId', json.data.template.id);",
+              "if (json.data.template.items && json.data.template.items.length > 0) {",
+              "  pm.collectionVariables.set('templateItemId', json.data.template.items[0].id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.6 - Duplicate template name",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{templateName}}\",\n  \"description\": \"Duplicato\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 409', function () { pm.response.to.have.status(409); });",
+              "pm.test('error code DUPLICATE_TEMPLATE_NAME', function () { pm.expect(json.error.code).to.eql('DUPLICATE_TEMPLATE_NAME'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.7.1 - Create item",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates/{{templateId}}/items",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Conferma contenuti\",\n  \"description\": \"Materiale definitivo\",\n  \"isRequired\": true,\n  \"requiresEvidence\": false,\n  \"isCritical\": false\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 201', function () { pm.response.to.have.status(201); });",
+              "pm.collectionVariables.set('templateItemId2', json.data.item.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.7.2 - Reorder items",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates/{{templateId}}/items/reorder",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderedItemIds\": [\"{{templateItemId2}}\", \"{{templateItemId}}\"]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('sortOrder normalized', function () {",
+              "  pm.expect(json.data.items[0].sortOrder).to.eql(0);",
+              "  pm.expect(json.data.items[1].sortOrder).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.8 - Reorder mismatch",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates/{{templateId}}/items/reorder",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderedItemIds\": [\"{{templateItemId}}\"]\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+              "pm.test('error code REORDER_MISMATCH', function () { pm.expect(json.error.code).to.eql('REORDER_MISMATCH'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.9 - Create instance for project",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/projects/{{projectId}}/checklists",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"checklistTemplateId\": \"{{templateId}}\",\n  \"pipelineStageId\": \"{{pipelineStageId}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 201 or 200', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+              "pm.collectionVariables.set('instanceId', json.data.id);",
+              "const evidenceItem = (json.data.items || []).find((item) => item.requiresEvidence === true) || (json.data.items || [])[0];",
+              "if (evidenceItem) { pm.collectionVariables.set('requiredEvidenceItemId', evidenceItem.id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.10 - Duplicate instance idempotent",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/projects/{{projectId}}/checklists",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"checklistTemplateId\": \"{{templateId}}\",\n  \"pipelineStageId\": \"{{pipelineStageId}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('same instance reused', function () {",
+              "  const previous = pm.collectionVariables.get('instanceId');",
+              "  pm.expect(json.data.id).to.eql(previous);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.11 - Complete requiresEvidence without evidence",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/items/{{requiredEvidenceItemId}}/complete",
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 400', function () { pm.response.to.have.status(400); });",
+              "pm.test('error code EVIDENCE_REQUIRED', function () { pm.expect(json.error.code).to.eql('EVIDENCE_REQUIRED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.12 - Complete item OK",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/items/{{requiredEvidenceItemId}}/complete",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"evidenceNote\": \"ok\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('state completed', function () { pm.expect(json.data.item.state).to.eql('completed'); });",
+              "pm.test('completedAt present', function () { pm.expect(json.data.item.completedAt).to.be.a('string'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.13 - Complete item again",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/checklists/items/{{requiredEvidenceItemId}}/complete",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"evidenceNote\": \"second try\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 409', function () { pm.response.to.have.status(409); });",
+              "pm.test('error code ITEM_ALREADY_COMPLETED', function () { pm.expect(json.error.code).to.eql('ITEM_ALREADY_COMPLETED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.14 - Gate blocks moveStage",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/projects/{{projectId}}/move-stage",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"toStageId\": \"{{gatedStageId}}\"\n}"
+        },
+        "description": "Prerequisiti: stage con StageChecklistRule bloccante e checklist required non soddisfatta."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 409', function () { pm.response.to.have.status(409); });",
+              "pm.test('error code CHECKLIST_GATE_BLOCKED', function () { pm.expect(json.error.code).to.eql('CHECKLIST_GATE_BLOCKED'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.15 - Override gate without permission",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-user-id", "value": "{{limitedUserId}}" },
+          { "key": "x-user-email", "value": "{{limitedUserEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/projects/{{projectId}}/move-stage",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"toStageId\": \"{{gatedStageId}}\",\n  \"overrideGate\": true,\n  \"overrideReason\": \"Motivazione override valida\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 403', function () { pm.response.to.have.status(403); });",
+              "pm.test('error code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.16 - Override gate with permission",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{workspaceId}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/projects/{{projectId}}/move-stage",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"toStageId\": \"{{gatedStageId}}\",\n  \"overrideGate\": true,\n  \"overrideReason\": \"Motivo lungo almeno 10 caratteri\"\n}"
+        },
+        "description": "Verificare audit event checklists.gate.override su DB/AuditLog."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('gate overridden true', function () { pm.expect(json.data.gate.overridden).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5.17 - Cross-workspace access returns 404",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "x-user-id", "value": "{{userId}}" },
+          { "key": "x-user-email", "value": "{{userEmail}}" },
+          { "key": "x-workspace-id", "value": "{{otherWorkspaceId}}" }
+        ],
+        "url": "{{baseUrl}}/checklists/templates/{{templateId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('status 404', function () { pm.response.to.have.status(404); });",
+              "pm.test('error code NOT_FOUND', function () { pm.expect(json.error.code).to.eql('NOT_FOUND'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "userId", "value": "" },
+    { "key": "userEmail", "value": "" },
+    { "key": "workspaceId", "value": "" },
+    { "key": "limitedUserId", "value": "" },
+    { "key": "limitedUserEmail", "value": "" },
+    { "key": "otherWorkspaceId", "value": "" },
+    { "key": "templateName", "value": "Onboarding sito" },
+    { "key": "templateId", "value": "" },
+    { "key": "templateItemId", "value": "" },
+    { "key": "templateItemId2", "value": "" },
+    { "key": "projectId", "value": "" },
+    { "key": "pipelineStageId", "value": "" },
+    { "key": "gatedStageId", "value": "" },
+    { "key": "instanceId", "value": "" },
+    { "key": "requiredEvidenceItemId", "value": "" }
+  ]
+}

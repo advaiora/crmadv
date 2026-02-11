@@ -16,6 +16,9 @@ import workspaceModulesRoute from './routes/workspace-modules.route.js';
 import workspaceQuotesRoute from './routes/workspace-quotes.route.js';
 import workspaceRolesRoute from './routes/workspace-roles.route.js';
 import clientsRoute from './modules/clients/routes.js';
+import workspaceChecklistsRoute from './modules/checklists/routes/workspace-checklists.route.js';
+import workspaceChecklistInstancesRoute from './modules/checklists/routes/workspace-checklist-instances.route.js';
+import workspaceProjectsRoute from './modules/projects/routes/workspace-projects.route.js';
 
 const app = Fastify({
   logger: true,
@@ -74,6 +77,9 @@ void app.register(workspaceModulesRoute);
 void app.register(workspaceQuotesRoute);
 void app.register(workspaceRolesRoute);
 void app.register(clientsRoute);
+void app.register(workspaceChecklistsRoute);
+void app.register(workspaceChecklistInstancesRoute);
+void app.register(workspaceProjectsRoute);
 
 app.get('/health', async (_request, reply) => {
   try {
