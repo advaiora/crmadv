@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Placeholder, Row, Table } from "react-bootstrap";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Button, Card, Col, Form, Modal, Placeholder, Row, Table } from "react-bootstrap";
 import { Link, useHistory, useLocation } from "react-router-dom";
-import { Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
 import ClientsModuleGate from "../../modules/clients/ui/ClientsModuleGate";
-import { deleteClient, listClients } from "../../modules/clients/ui/clientApi";
-import { CLIENTS_PAGE_SIZE_OPTIONS, CLIENTS_PERMISSIONS, CLIENTS_SORT_OPTIONS } from "../../modules/clients/ui/constants";
+import { deleteClient, exportClients, importClients, listClients, updateClient } from "../../modules/clients/ui/clientApi";
+import { CLIENTS_PAGE_SIZE_OPTIONS, CLIENTS_PERMISSIONS, CLIENTS_PRESET_TAGS, CLIENTS_SORT_OPTIONS } from "../../modules/clients/ui/constants";
 import { ClientActionsMenu, ClientAvatar, ClientEmptyState, ClientFiltersBar, ClientTypeBadge, PageHeader } from "../../modules/clients/ui/components";
 import { getClientTypeLabel, getTagBadgeStyle } from "../../modules/clients/ui/helpers";
 import "../../modules/clients/ui/clients-ui.css";
@@ -32,6 +32,7 @@ const parsePageSize = (value) => {
 };
 
 const getSortLabel = (sort) => CLIENTS_SORT_OPTIONS.find((option) => option.value === sort)?.label || "Aggiornati di recente";
+const hasTag = (tags, tagValue) => tags.some((tag) => tag.toLowerCase() === tagValue.toLowerCase());
 
 const ClientsList = () => {
   const history = useHistory();
@@ -46,7 +47,16 @@ const ClientsList = () => {
 
   const [searchValue, setSearchValue] = useState(activeQuery);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [tagEditorClient, setTagEditorClient] = useState(null);
+  const [tagEditorTags, setTagEditorTags] = useState([]);
+  const [tagEditorDraft, setTagEditorDraft] = useState("");
+  const [tagEditorSaving, setTagEditorSaving] = useState(false);
+  const [tagEditorError, setTagEditorError] = useState("");
   const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] = useState(null);
+  const fileInputRef = useRef(null);
   const [clientsData, setClientsData] = useState({
     items: [],
     pageInfo: {
@@ -171,6 +181,89 @@ const ClientsList = () => {
     }
   };
 
+  const triggerImport = () => {
+    if (!fileInputRef.current || importing) {
+      return;
+    }
+
+    fileInputRef.current.click();
+  };
+
+  const onImportFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImporting(true);
+    setError("");
+    setActionMessage(null);
+
+    try {
+      const csv = await file.text();
+      const result = await importClients({
+        csv,
+        dryRun: false,
+      });
+
+      const summary = result.summary || {};
+      const failedRows = Number(summary.failedRows || 0);
+      const createdRows = Number(summary.createdRows || 0);
+      const totalRows = Number(summary.totalRows || 0);
+      const errorsPreview = Array.isArray(summary.errors) ? summary.errors.slice(0, 5) : [];
+
+      setActionMessage({
+        variant: failedRows > 0 ? "warning" : "success",
+        text: `Import completato: ${createdRows} creati, ${failedRows} falliti su ${totalRows} righe.`,
+        errors: errorsPreview,
+      });
+
+      await loadClients();
+    } catch (importError) {
+      setError(importError?.message || "Errore durante importazione clienti.");
+    } finally {
+      setImporting(false);
+      event.target.value = "";
+    }
+  };
+
+  const onExportClients = async () => {
+    if (exporting) {
+      return;
+    }
+
+    setExporting(true);
+    setError("");
+    setActionMessage(null);
+
+    try {
+      const { blob, filename } = await exportClients({
+        query: activeQuery || undefined,
+        sort: activeSort,
+        type: activeType !== "all" ? activeType : undefined,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+
+      setActionMessage({
+        variant: "success",
+        text: `Export completato: file ${filename} scaricato.`,
+        errors: [],
+      });
+    } catch (exportError) {
+      setError(exportError?.message || "Errore durante esportazione clienti.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const goToPage = (nextPage) => {
     updateRouteQuery({
       query: activeQuery || undefined,
@@ -181,17 +274,88 @@ const ClientsList = () => {
     });
   };
 
-  const renderClientTags = (client, maxVisible = 3) => {
-    const tags = Array.isArray(client?.tags) ? client.tags.filter(Boolean) : [];
-    if (tags.length === 0) {
-      return <span className="text-muted small">Nessun tag</span>;
+  const updateClientTagsInState = useCallback((clientId, tags) => {
+    setClientsData((prev) => ({
+      ...prev,
+      items: prev.items.map((entry) =>
+        entry.id === clientId
+          ? {
+              ...entry,
+              tags,
+            }
+          : entry,
+      ),
+    }));
+  }, []);
+
+  const openTagsModal = (client) => {
+    setTagEditorClient(client);
+    setTagEditorTags(Array.isArray(client.tags) ? client.tags.filter(Boolean) : []);
+    setTagEditorDraft("");
+    setTagEditorError("");
+  };
+
+  const closeTagsModal = (force = false) => {
+    const shouldForceClose = force === true;
+    if (tagEditorSaving && !shouldForceClose) {
+      return;
     }
 
+    setTagEditorClient(null);
+    setTagEditorTags([]);
+    setTagEditorDraft("");
+    setTagEditorError("");
+  };
+
+  const togglePresetTagInModal = (presetTag) => {
+    setTagEditorTags((prev) =>
+      hasTag(prev, presetTag)
+        ? prev.filter((tag) => tag.toLowerCase() !== presetTag.toLowerCase())
+        : [...prev, presetTag],
+    );
+  };
+
+  const removeTagInModal = (tagToRemove) => {
+    setTagEditorTags((prev) => prev.filter((tag) => tag !== tagToRemove));
+  };
+
+  const addCustomTagInModal = () => {
+    const normalized = tagEditorDraft.trim();
+    if (!normalized) {
+      return;
+    }
+
+    setTagEditorTags((prev) => (hasTag(prev, normalized) ? prev : [...prev, normalized]));
+    setTagEditorDraft("");
+  };
+
+  const saveTagsFromModal = async () => {
+    if (!tagEditorClient) {
+      return;
+    }
+
+    setTagEditorSaving(true);
+    setTagEditorError("");
+
+    try {
+      await updateClient(tagEditorClient.id, { tags: tagEditorTags });
+      updateClientTagsInState(tagEditorClient.id, tagEditorTags);
+      closeTagsModal(true);
+    } catch (updateError) {
+      setTagEditorError(updateError?.message || "Errore durante aggiornamento tag cliente.");
+    } finally {
+      setTagEditorSaving(false);
+    }
+  };
+
+  const renderClientTags = (client, maxVisible = 3, canEdit = false) => {
+    const tags = Array.isArray(client?.tags) ? client.tags.filter(Boolean) : [];
     const visibleTags = tags.slice(0, maxVisible);
     const remainingCount = tags.length - visibleTags.length;
 
     return (
       <div className="clients-tags clients-list-tags">
+        {visibleTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
         {visibleTags.map((tag) => (
           <span
             key={`${client.id}-${tag}`}
@@ -203,6 +367,17 @@ const ClientsList = () => {
         ))}
         {remainingCount > 0 && (
           <span className="badge bg-light text-muted border">+{remainingCount}</span>
+        )}
+        {canEdit && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-secondary"
+            className="clients-tag-edit-btn"
+            onClick={() => openTagsModal(client)}
+          >
+            Modifica tag
+          </Button>
         )}
       </div>
     );
@@ -250,18 +425,33 @@ const ClientsList = () => {
                         Nuovo cliente
                       </Button>
                     )}
-                    <Button variant="outline-secondary" disabled className="d-inline-flex align-items-center gap-2">
+                    <Button
+                      variant="outline-secondary"
+                      disabled={!canCreate || importing}
+                      onClick={triggerImport}
+                      className="d-inline-flex align-items-center gap-2 clients-import-export-btn"
+                    >
                       <Upload size={15} />
-                      Importa
-                      <small className="opacity-75">(coming soon)</small>
+                      {importing ? "Importazione..." : "Importa CSV"}
                     </Button>
-                    <Button variant="outline-secondary" disabled className="d-inline-flex align-items-center gap-2">
+                    <Button
+                      variant="outline-secondary"
+                      disabled={exporting}
+                      onClick={() => void onExportClients()}
+                      className="d-inline-flex align-items-center gap-2 clients-import-export-btn"
+                    >
                       <Download size={15} />
-                      Esporta
-                      <small className="opacity-75">(coming soon)</small>
+                      {exporting ? "Esportazione..." : "Esporta CSV"}
                     </Button>
                   </>
                 }
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="d-none"
+                onChange={(event) => void onImportFileChange(event)}
               />
 
               <ClientFiltersBar
@@ -314,6 +504,25 @@ const ClientsList = () => {
                 </Alert>
               )}
 
+              {actionMessage && (
+                <Alert
+                  variant={actionMessage.variant}
+                  dismissible
+                  onClose={() => setActionMessage(null)}
+                >
+                  <div>{actionMessage.text}</div>
+                  {Array.isArray(actionMessage.errors) && actionMessage.errors.length > 0 && (
+                    <div className="mt-2 small">
+                      {actionMessage.errors.map((entry) => (
+                        <div key={`${entry.row}-${entry.message}`}>
+                          Riga {entry.row}: {entry.message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Alert>
+              )}
+
               <Card className="clients-list-card card-border mb-3">
                 <Card.Body className="py-2">
                   <div className="table-responsive d-none d-md-block">
@@ -339,11 +548,6 @@ const ClientsList = () => {
                                   <ClientAvatar name={client.name} type={client.type} />
                                   <div>
                                     <p className="clients-row-name">{client.name}</p>
-                                    <div className="clients-row-meta">
-                                      {client.email || "Email non impostata"}
-                                      {" - "}
-                                      {client.phone || "Telefono non impostato"}
-                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -352,7 +556,7 @@ const ClientsList = () => {
                               </td>
                               <td>{client.email || <span className="text-muted">-</span>}</td>
                               <td>{client.phone || <span className="text-muted">-</span>}</td>
-                              <td>{renderClientTags(client, 3)}</td>
+                              <td>{renderClientTags(client, 3, canEdit)}</td>
                               <td className="text-end">
                                 <ClientActionsMenu
                                   client={client}
@@ -424,7 +628,7 @@ const ClientsList = () => {
                           </div>
                           <div className="d-flex justify-content-between align-items-center mt-3">
                             <ClientTypeBadge type={client.type} />
-                            <div className="clients-mobile-tags">{renderClientTags(client, 2)}</div>
+                            <div className="clients-mobile-tags">{renderClientTags(client, 2, canEdit)}</div>
                           </div>
                           <div className="text-muted clients-mobile-meta mt-2">{client.phone || "Telefono non impostato"}</div>
                         </div>
@@ -443,6 +647,97 @@ const ClientsList = () => {
                 />
               )}
 
+              <Modal show={Boolean(tagEditorClient)} onHide={() => closeTagsModal(false)} centered dialogClassName="clients-tags-modal">
+                <Modal.Header closeButton={!tagEditorSaving}>
+                  <Modal.Title>Modifica tag cliente</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                  <p className="mb-2 small text-muted">
+                    {tagEditorClient ? `Cliente: ${tagEditorClient.name}` : ""}
+                  </p>
+
+                  {tagEditorError && (
+                    <Alert variant="danger" className="py-2 px-3 mb-3">
+                      {tagEditorError}
+                    </Alert>
+                  )}
+
+                  <div className="clients-tags mb-3">
+                    {tagEditorTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
+                    {tagEditorTags.map((tag) => (
+                      <span
+                        key={`modal-tag-${tag}`}
+                        className="badge clients-tag-badge"
+                        style={getTagBadgeStyle(tag)}
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          className="clients-tag-remove-btn"
+                          onClick={() => removeTagInModal(tag)}
+                          disabled={tagEditorSaving}
+                          aria-label={`Rimuovi tag ${tag}`}
+                        >
+                          &times;
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="clients-tag-presets mb-3">
+                    {CLIENTS_PRESET_TAGS.map((presetTag) => (
+                      <Button
+                        key={`modal-preset-${presetTag}`}
+                        type="button"
+                        variant={hasTag(tagEditorTags, presetTag) ? "primary" : "outline-secondary"}
+                        size="sm"
+                        className="clients-tag-preset-btn"
+                        onClick={() => togglePresetTagInModal(presetTag)}
+                        disabled={tagEditorSaving}
+                      >
+                        {presetTag}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <Form.Group>
+                    <Form.Label className="small mb-1">Aggiungi tag personalizzato</Form.Label>
+                    <div className="input-group input-group-sm">
+                      <Form.Control
+                        value={tagEditorDraft}
+                        onChange={(event) => setTagEditorDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter") {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          addCustomTagInModal();
+                        }}
+                        placeholder="Nuovo tag"
+                        disabled={tagEditorSaving}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline-secondary"
+                        onClick={addCustomTagInModal}
+                        disabled={tagEditorSaving || !tagEditorDraft.trim()}
+                      >
+                        Aggiungi
+                      </Button>
+                    </div>
+                  </Form.Group>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="outline-secondary" onClick={() => closeTagsModal(false)} disabled={tagEditorSaving}>
+                    Annulla
+                  </Button>
+                  <Button variant="primary" onClick={() => void saveTagsFromModal()} disabled={tagEditorSaving}>
+                    {tagEditorSaving ? "Salvataggio..." : "Salva tag"}
+                  </Button>
+                </Modal.Footer>
+              </Modal>
+
               <Row className="align-items-center mt-3 gy-2">
                 <Col md={6}>
                   <div className="text-muted small">
@@ -451,16 +746,18 @@ const ClientsList = () => {
                   </div>
                 </Col>
                 <Col md={6}>
-                  <div className="d-flex justify-content-md-end align-items-center gap-2">
+                  <div className="clients-pagination-wrap d-flex justify-content-md-end align-items-center">
                     <Button
                       variant="outline-secondary"
                       size="sm"
                       onClick={() => goToPage(activePage - 1)}
                       disabled={!clientsData.pageInfo.hasPrevPage || loading}
+                      className="clients-pagination-btn"
+                      aria-label="Pagina precedente"
                     >
-                      Previous
+                      <ChevronLeft size={15} />
                     </Button>
-                    <span className="small text-muted">
+                    <span className="small clients-pagination-status">
                       Pagina {clientsData.pageInfo.page} di {paginationTotalPages}
                     </span>
                     <Button
@@ -468,8 +765,10 @@ const ClientsList = () => {
                       size="sm"
                       onClick={() => goToPage(activePage + 1)}
                       disabled={!clientsData.pageInfo.hasNextPage || loading}
+                      className="clients-pagination-btn"
+                      aria-label="Pagina successiva"
                     >
-                      Next
+                      <ChevronRight size={15} />
                     </Button>
                   </div>
                 </Col>

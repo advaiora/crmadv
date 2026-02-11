@@ -474,15 +474,15 @@ const Body = () => {
                             className="swiper-carousel tweeter-carousel"
                         >
                             <SwiperSlide>
-                                <p className="tweet">Lorem ipsum dolor sit, amet consectetur adipisicing elit. A hic magni rem consectetur iure? Suscipit esse totam id sed! Nostrum. <a href="#demo" data-expanded-url="#demo" target=" _blank" title="#title" data-scribe="element:url"><span>https://</span>demo.de<span>&nbsp;</span></a>
+                                <div className="tweet">Lorem ipsum dolor sit, amet consectetur adipisicing elit. A hic magni rem consectetur iure? Suscipit esse totam id sed! Nostrum. <a href="#demo" data-expanded-url="#demo" target=" _blank" title="#title" data-scribe="element:url"><span>https://</span>demo.de<span>&nbsp;</span></a>
                                     <p className="timePosted"><a href="#demo">Posted on Jan 9, 2022</a></p>
-                                </p>
+                                </div>
                             </SwiperSlide>
                             <SwiperSlide>
-                                <p className="tweet">Lorem ipsum dolor sit amet consectetur, adipisicing elit. Rem, dicta!<br /><br />
+                                <div className="tweet">Lorem ipsum dolor sit amet consectetur, adipisicing elit. Rem, dicta!<br /><br />
                                     Lorem ipsum dolor sit amet, consectetur adipisicing elit. Reiciendis natus molestias quas voluptas at atque doloremque odit doloribus tempora perferendis ratione dolorum ea eligendi enim est, culpa rerum quo sunt, ex tempore accusamus in assumenda fuga quibusdam!
                                     <p className="timePosted"><a href="#demo">Posted on Jan 11, 2022</a></p>
-                                </p>
+                                </div>
 
                             </SwiperSlide>
                         </Swiper>

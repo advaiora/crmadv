@@ -49,6 +49,7 @@
     "font-awesome": "^4.7.0",
     "framer-motion": "^12.23.26",
     "frappe-gantt": "^1.0.4",
+    "libphonenumber-js": "^1.12.36",
     "lightgallery": "^2.9.0",
     "lucide-react": "^0.563.0",
     "moment": "^2.30.1",

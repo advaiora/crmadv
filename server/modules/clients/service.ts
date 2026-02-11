@@ -1,7 +1,10 @@
 import type { ClientType } from '@prisma/client';
 import type { FastifyRequest } from 'fastify';
 import { audit } from '../../audit/audit.js';
-import { badRequest, notFound } from '../../core/errors.js';
+import { badRequest, isHttpError, notFound } from '../../core/errors.js';
+import { validateAndNormalizePhone } from '../../../core/utils/phone.js';
+import { buildPhoneFieldSchema, PHONE_INVALID_MESSAGE } from './clients.schema.js';
+import { detectCsvDelimiter, parseCsvRows, stringifyCsv } from './csv.js';
 import {
   clientsRepository,
   type ClientSortDirection,
@@ -15,7 +18,6 @@ const MAX_PAGE_SIZE = 100;
 const MAX_SEARCH_LENGTH = 120;
 const MAX_NAME_LENGTH = 160;
 const MAX_EMAIL_LENGTH = 320;
-const MAX_PHONE_LENGTH = 60;
 const MAX_VAT_LENGTH = 40;
 const MAX_TAX_CODE_LENGTH = 40;
 const MAX_ADDRESS_LENGTH = 120;
@@ -26,6 +28,23 @@ const MAX_TAG_LENGTH = 40;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const SORT_FIELDS: ClientSortField[] = ['name', 'createdAt', 'updatedAt'];
+const CSV_HEADER_COLUMNS = [
+  'type',
+  'name',
+  'email',
+  'phone',
+  'vatNumber',
+  'taxCode',
+  'street',
+  'city',
+  'zip',
+  'province',
+  'country',
+  'notes',
+  'tags',
+] as const;
+const MAX_IMPORT_ERRORS = 100;
+const TAG_CELL_SEPARATOR = '|';
 
 const ADDRESS_FIELDS = ['street', 'city', 'zip', 'province', 'country'] as const;
 const CLIENT_BODY_FIELDS = [
@@ -42,9 +61,11 @@ const CLIENT_BODY_FIELDS = [
 
 type AddressField = (typeof ADDRESS_FIELDS)[number];
 type ClientBodyField = (typeof CLIENT_BODY_FIELDS)[number];
+type CsvHeaderColumn = (typeof CSV_HEADER_COLUMNS)[number];
 
 type ClientListFilters = {
   query?: string;
+  type?: ClientType;
   page: number;
   pageSize: number;
   sortField: ClientSortField;
@@ -66,8 +87,66 @@ type ClientWritePayload = {
 } & ClientAddress;
 
 type ClientPatchPayload = Partial<ClientWritePayload>;
+type ImportClientsBody = {
+  csv: string;
+  dryRun?: boolean;
+};
+type ClientImportError = {
+  row: number;
+  message: string;
+};
+type ClientImportRow = {
+  row: number;
+  payload: ClientWritePayload;
+};
+type CsvImportHeaderCell = {
+  raw: string;
+  canonical: CsvHeaderColumn | null;
+};
 
 type ClientRecord = NonNullable<Awaited<ReturnType<typeof clientsRepository.findById>>>;
+
+const CSV_IMPORT_IGNORED_HEADERS = new Set(['id', 'status', 'stato']);
+const CSV_IMPORT_HEADER_ALIAS_MAP: Record<string, CsvHeaderColumn> = {
+  type: 'type',
+  clienttype: 'type',
+  tipocliente: 'type',
+  name: 'name',
+  companyname: 'name',
+  contactname: 'name',
+  ragionesociale: 'name',
+  nominativo: 'name',
+  email: 'email',
+  mail: 'email',
+  phone: 'phone',
+  telefono: 'phone',
+  vatnumber: 'vatNumber',
+  vat: 'vatNumber',
+  vatnumberit: 'vatNumber',
+  piva: 'vatNumber',
+  partitaiva: 'vatNumber',
+  taxcode: 'taxCode',
+  codicefiscale: 'taxCode',
+  street: 'street',
+  address: 'street',
+  via: 'street',
+  city: 'city',
+  citta: 'city',
+  comune: 'city',
+  zip: 'zip',
+  cap: 'zip',
+  postalcode: 'zip',
+  postcode: 'zip',
+  province: 'province',
+  provincia: 'province',
+  country: 'country',
+  nazione: 'country',
+  countrycode: 'country',
+  notes: 'notes',
+  note: 'notes',
+  tags: 'tags',
+  tag: 'tags',
+};
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -188,6 +267,24 @@ const normalizeEmail = (value: unknown, fieldName: string) => {
   }
 
   return lowered;
+};
+
+const normalizePhoneForStorage = (phone: string | null, country?: string | null) => {
+  if (!phone) {
+    return null;
+  }
+
+  const schemaResult = buildPhoneFieldSchema(country ?? undefined).safeParse(phone);
+  if (!schemaResult.success) {
+    throw badRequest(schemaResult.error.issues[0]?.message ?? PHONE_INVALID_MESSAGE);
+  }
+
+  const normalized = validateAndNormalizePhone(phone, country ?? undefined);
+  if (!normalized.isValid || !normalized.e164) {
+    throw badRequest(PHONE_INVALID_MESSAGE);
+  }
+
+  return normalized.e164;
 };
 
 const normalizeTags = (value: unknown, fieldName: string) => {
@@ -320,6 +417,180 @@ const parseAddressPatch = (value: unknown): Partial<ClientAddress> => {
   return patch;
 };
 
+const parseOptionalClientTypeFilter = (value: unknown): ClientType | undefined => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (value !== 'person' && value !== 'company') {
+    throw badRequest('type must be person or company');
+  }
+
+  return value;
+};
+
+const parseImportBody = (body: unknown): ImportClientsBody => {
+  if (!isObject(body)) {
+    throw badRequest('Body must be a JSON object');
+  }
+
+  const unknownFields = Object.keys(body).filter((key) => key !== 'csv' && key !== 'dryRun');
+  if (unknownFields.length > 0) {
+    throw badRequest('Body contains unknown fields', {
+      unknownFields: unknownFields.sort(),
+    });
+  }
+
+  if (typeof body.csv !== 'string') {
+    throw badRequest('csv must be a string');
+  }
+
+  const csv = body.csv.replace(/^\uFEFF/, '').trim();
+  if (!csv) {
+    throw badRequest('csv cannot be empty');
+  }
+
+  if (body.dryRun !== undefined && typeof body.dryRun !== 'boolean') {
+    throw badRequest('dryRun must be a boolean');
+  }
+
+  return {
+    csv,
+    dryRun: body.dryRun ?? false,
+  };
+};
+
+const normalizeImportHeaderToken = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+
+const assertCsvColumns = (header: string[]) => {
+  const normalized = header.map((column) => column.trim());
+  const unique = new Set<string>();
+  const unknownColumns: string[] = [];
+  const mapped: CsvImportHeaderCell[] = normalized.map((column) => {
+    const token = normalizeImportHeaderToken(column);
+    if (!token) {
+      return {
+        raw: column,
+        canonical: null,
+      };
+    }
+
+    const canonical = CSV_IMPORT_HEADER_ALIAS_MAP[token];
+    if (canonical) {
+      unique.add(canonical);
+      return {
+        raw: column,
+        canonical,
+      };
+    }
+
+    if (CSV_IMPORT_IGNORED_HEADERS.has(token)) {
+      return {
+        raw: column,
+        canonical: null,
+      };
+    }
+
+    unknownColumns.push(column);
+    return {
+      raw: column,
+      canonical: null,
+    };
+  });
+
+  if (unknownColumns.length > 0 && unique.size === 0) {
+    throw badRequest('CSV header contains unknown columns', {
+      unknownColumns: Array.from(new Set(unknownColumns)).sort(),
+      acceptedColumns: [...CSV_HEADER_COLUMNS],
+    });
+  }
+
+  if (!unique.has('name')) {
+    throw badRequest('CSV header must include "name" column');
+  }
+
+  return mapped;
+};
+
+const isEmptyCsvRow = (row: string[]) => row.every((cell) => !cell || cell.trim().length === 0);
+
+const parseTagsCell = (value: string | undefined) => {
+  if (!value) {
+    return [] as string[];
+  }
+
+  return value
+    .split(/[|;]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const toImportBodyFromCsvRow = (header: CsvImportHeaderCell[], row: string[]) => {
+  const byColumn = new Map<string, string>();
+  header.forEach((column, index) => {
+    if (!column.canonical) {
+      return;
+    }
+
+    const cellValue = row[index] ?? '';
+    const existing = byColumn.get(column.canonical);
+    if (existing && existing.trim().length > 0) {
+      return;
+    }
+
+    byColumn.set(column.canonical, cellValue);
+  });
+
+  const type = byColumn.get('type')?.trim();
+  const name = byColumn.get('name') ?? '';
+  const email = byColumn.get('email') ?? '';
+  const phone = byColumn.get('phone') ?? '';
+  const vatNumber = byColumn.get('vatNumber') ?? '';
+  const taxCode = byColumn.get('taxCode') ?? '';
+  const notes = byColumn.get('notes') ?? '';
+  const tags = parseTagsCell(byColumn.get('tags'));
+
+  return {
+    ...(type ? { type } : {}),
+    name,
+    email,
+    phone,
+    vatNumber,
+    taxCode,
+    notes,
+    tags,
+    address: {
+      street: byColumn.get('street') ?? '',
+      city: byColumn.get('city') ?? '',
+      zip: byColumn.get('zip') ?? '',
+      province: byColumn.get('province') ?? '',
+      country: byColumn.get('country') ?? '',
+    },
+  };
+};
+
+const toExportCsvRow = (record: ClientRecord) => [
+  record.type,
+  record.name,
+  record.email ?? '',
+  record.phone ?? '',
+  record.vatNumber ?? '',
+  record.taxCode ?? '',
+  record.street ?? '',
+  record.city ?? '',
+  record.zip ?? '',
+  record.province ?? '',
+  record.country ?? '',
+  record.notes ?? '',
+  record.tags.join(TAG_CELL_SEPARATOR),
+];
+
 const arraysAreEqual = (left: string[], right: string[]) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
@@ -410,9 +681,11 @@ export const clientsService = {
         normalizedQuery = trimmed;
       }
     }
+    const type = parseOptionalClientTypeFilter(query.type);
 
     return {
       query: normalizedQuery,
+      type,
       page,
       pageSize,
       sortField,
@@ -428,6 +701,7 @@ export const clientsService = {
     assertNoUnknownFields(body, CLIENT_BODY_FIELDS);
 
     const address = parseAddressCreate(body.address);
+    const rawPhone = normalizeOptionalString(body.phone, 'phone');
 
     return {
       type: parseClientType(body.type, 'type', { defaultValue: 'person' }),
@@ -435,9 +709,7 @@ export const clientsService = {
         maxLength: MAX_NAME_LENGTH,
       }),
       email: normalizeEmail(body.email, 'email'),
-      phone: normalizeOptionalString(body.phone, 'phone', {
-        maxLength: MAX_PHONE_LENGTH,
-      }),
+      phone: normalizePhoneForStorage(rawPhone, address.country),
       vatNumber: normalizeOptionalString(body.vatNumber, 'vatNumber', {
         maxLength: MAX_VAT_LENGTH,
       }),
@@ -475,9 +747,7 @@ export const clientsService = {
     }
 
     if ('phone' in body) {
-      patch.phone = normalizeOptionalString(body.phone, 'phone', {
-        maxLength: MAX_PHONE_LENGTH,
-      });
+      patch.phone = normalizeOptionalString(body.phone, 'phone');
     }
 
     if ('vatNumber' in body) {
@@ -537,6 +807,7 @@ export const clientsService = {
     const result = await clientsRepository.listClients({
       workspaceId,
       query: filters.query,
+      type: filters.type,
       page: filters.page,
       pageSize: filters.pageSize,
       sortField: filters.sortField,
@@ -557,6 +828,7 @@ export const clientsService = {
       },
       filters: {
         query: filters.query ?? null,
+        type: filters.type ?? null,
         sort: filters.sort,
       },
     };
@@ -565,6 +837,166 @@ export const clientsService = {
   async getClient(workspaceId: string, clientId: string) {
     const client = await this.requireClient(workspaceId, clientId);
     return mapClient(client);
+  },
+
+  parseExportFilters(query: unknown) {
+    const parsed = this.parseListFilters(query);
+
+    return {
+      query: parsed.query,
+      type: parsed.type,
+      sortField: parsed.sortField,
+      sortDirection: parsed.sortDirection,
+      sort: parsed.sort,
+    };
+  },
+
+  async exportClientsCsv(workspaceId: string, query: unknown) {
+    const filters = this.parseExportFilters(query);
+    const clients = await clientsRepository.listForExport({
+      workspaceId,
+      query: filters.query,
+      type: filters.type,
+      sortField: filters.sortField,
+      sortDirection: filters.sortDirection,
+    });
+
+    const delimiter = ',';
+    const csv = stringifyCsv(
+      [
+        [...CSV_HEADER_COLUMNS],
+        ...clients.map((client) => toExportCsvRow(client)),
+      ],
+      delimiter,
+    );
+
+    const dateToken = new Date().toISOString().slice(0, 10);
+    return {
+      csv,
+      filename: `clients-export-${dateToken}.csv`,
+      totalRows: clients.length,
+      filters: {
+        query: filters.query ?? null,
+        type: filters.type ?? null,
+        sort: filters.sort,
+      },
+    };
+  },
+
+  async importClientsFromCsv(input: {
+    workspaceId: string;
+    actorUserId: string;
+    body: unknown;
+    request: FastifyRequest;
+  }) {
+    const parsedBody = parseImportBody(input.body);
+    const delimiter = detectCsvDelimiter(parsedBody.csv);
+    let rows: string[][];
+
+    try {
+      rows = parseCsvRows(parsedBody.csv, delimiter);
+    } catch (error) {
+      throw badRequest('CSV is malformed', {
+        reason: error instanceof Error ? error.message : 'unknown',
+      });
+    }
+
+    if (rows.length === 0) {
+      throw badRequest('CSV has no rows');
+    }
+
+    const header = assertCsvColumns(rows[0]);
+    const dataRows = rows
+      .slice(1)
+      .map((row, index) => ({
+        row: index + 2,
+        values: row,
+      }))
+      .filter((entry) => !isEmptyCsvRow(entry.values));
+
+    if (dataRows.length === 0) {
+      throw badRequest('CSV has no data rows');
+    }
+
+    const validRows: ClientImportRow[] = [];
+    const errors: ClientImportError[] = [];
+    let failedRowsCount = 0;
+
+    dataRows.forEach((entry) => {
+      const rowBody = toImportBodyFromCsvRow(header, entry.values);
+      try {
+        const payload = this.parseCreatePayload(rowBody);
+        validRows.push({
+          row: entry.row,
+          payload,
+        });
+      } catch (error) {
+        failedRowsCount += 1;
+
+        if (errors.length < MAX_IMPORT_ERRORS && isHttpError(error)) {
+          errors.push({
+            row: entry.row,
+            message: error.message,
+          });
+          return;
+        }
+
+        if (errors.length < MAX_IMPORT_ERRORS) {
+          errors.push({
+            row: entry.row,
+            message: 'Unexpected validation error',
+          });
+        }
+      }
+    });
+
+    let createdRows = 0;
+
+    if (!parsedBody.dryRun) {
+      for (const entry of validRows) {
+        try {
+          await clientsRepository.create(input.workspaceId, entry.payload);
+          createdRows += 1;
+        } catch (error) {
+          failedRowsCount += 1;
+          if (errors.length < MAX_IMPORT_ERRORS) {
+            errors.push({
+              row: entry.row,
+              message: error instanceof Error ? error.message : 'Failed to persist row',
+            });
+          }
+        }
+      }
+    }
+
+    const failedRows = failedRowsCount;
+
+    await audit.log({
+      event: 'clients.import',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      entityType: 'Client',
+      metadata: {
+        dryRun: parsedBody.dryRun,
+        totalRows: dataRows.length,
+        validRows: validRows.length,
+        createdRows,
+        failedRows,
+      },
+      request: input.request,
+    });
+
+    return {
+      summary: {
+        delimiter,
+        dryRun: parsedBody.dryRun,
+        totalRows: dataRows.length,
+        validRows: validRows.length,
+        createdRows,
+        failedRows,
+        errors,
+      },
+    };
   },
 
   async createClient(input: {
@@ -619,6 +1051,14 @@ export const clientsService = {
   }) {
     const current = await this.requireClient(input.workspaceId, input.clientId);
     const patch = this.parsePatchPayload(input.body);
+    if ('phone' in patch && patch.phone) {
+      const countryForPhone =
+        typeof patch.country === 'string' || patch.country === null
+          ? patch.country
+          : current.country;
+      patch.phone = normalizePhoneForStorage(patch.phone, countryForPhone);
+    }
+
     const updated = await clientsRepository.update(
       input.workspaceId,
       this.parseClientId(input.clientId),

@@ -14,8 +14,11 @@ import {
 } from 'lucide-react';
 import { CLIENTS_PRESET_TAGS } from './constants';
 import { getClientNameLabel, getTagBadgeStyle } from './helpers';
+import { validateAndNormalizePhone } from '../../../../core/utils/phone';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_ERROR_MESSAGE = 'Inserisci una email valida.';
+const PHONE_ERROR_MESSAGE = 'Inserisci un numero di telefono valido.';
 
 const createDefaultFormValues = () => ({
     type: 'person',
@@ -68,7 +71,7 @@ const normalizeOptional = (value) => {
     return normalized.length > 0 ? normalized : null;
 };
 
-const validateForm = (values) => {
+const validateForm = (values, phoneValidationResult) => {
     const errors = {};
 
     if (!values.name.trim()) {
@@ -77,7 +80,12 @@ const validateForm = (values) => {
 
     const email = values.email.trim().toLowerCase();
     if (email && !EMAIL_REGEX.test(email)) {
-        errors.email = 'Inserisci una email valida.';
+        errors.email = EMAIL_ERROR_MESSAGE;
+    }
+
+    const phone = values.phone.trim();
+    if (phone && !phoneValidationResult.isValid) {
+        errors.phone = PHONE_ERROR_MESSAGE;
     }
 
     return errors;
@@ -102,6 +110,9 @@ const ClientForm = ({
     }));
     const [tagInput, setTagInput] = useState('');
     const [errors, setErrors] = useState({});
+    const [emailTouched, setEmailTouched] = useState(false);
+    const [phoneTouched, setPhoneTouched] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
 
     useEffect(() => {
         if (!initialValues) {
@@ -116,15 +127,46 @@ const ClientForm = ({
                 ...(initialValues.address || {}),
             },
         });
+        setErrors({});
+        setEmailTouched(false);
+        setPhoneTouched(false);
+        setSubmitAttempted(false);
     }, [initialValues]);
 
     const nameLabel = useMemo(() => getClientNameLabel(formValues.type), [formValues.type]);
+    const trimmedEmail = formValues.email.trim().toLowerCase();
+    const liveEmailError = trimmedEmail && !EMAIL_REGEX.test(trimmedEmail)
+        ? EMAIL_ERROR_MESSAGE
+        : '';
+    const shouldShowEmailError = Boolean(liveEmailError) && (emailTouched || submitAttempted);
+    const emailErrorMessage = errors.email || (shouldShowEmailError ? liveEmailError : '');
+    const trimmedPhone = formValues.phone.trim();
+    const phoneValidation = useMemo(() => {
+        if (!trimmedPhone) {
+            return { isValid: false };
+        }
+
+        return validateAndNormalizePhone(trimmedPhone, formValues.address.country);
+    }, [trimmedPhone, formValues.address.country]);
+    const livePhoneError = trimmedPhone && !phoneValidation.isValid
+        ? PHONE_ERROR_MESSAGE
+        : '';
+    const shouldShowPhoneError = Boolean(livePhoneError) && (phoneTouched || submitAttempted);
+    const phoneErrorMessage = errors.phone || (shouldShowPhoneError ? livePhoneError : '');
+    const shouldShowPhonePreview = Boolean(trimmedPhone) && phoneValidation.isValid;
 
     const updateField = (field, value) => {
         setFormValues((prev) => ({
             ...prev,
             [field]: value,
         }));
+
+        if (field === 'phone') {
+            setSubmitAttempted(false);
+        }
+        if (field === 'email') {
+            setSubmitAttempted(false);
+        }
 
         if (errors[field]) {
             setErrors((prev) => {
@@ -143,6 +185,15 @@ const ClientForm = ({
                 [field]: value,
             },
         }));
+
+        if (field === 'country' && errors.phone) {
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next.phone;
+                return next;
+            });
+            setSubmitAttempted(false);
+        }
     };
 
     const addTag = (tagValue = tagInput) => {
@@ -189,8 +240,9 @@ const ClientForm = ({
 
     const handleSubmit = async (event) => {
         event.preventDefault();
+        setSubmitAttempted(true);
 
-        const validationErrors = validateForm(formValues);
+        const validationErrors = validateForm(formValues, phoneValidation);
         setErrors(validationErrors);
         if (Object.keys(validationErrors).length > 0) {
             return;
@@ -232,7 +284,7 @@ const ClientForm = ({
                                     <Button
                                         type="button"
                                         variant={formValues.type === 'person' ? 'primary' : 'outline-secondary'}
-                                        className="d-inline-flex align-items-center gap-2"
+                                        className="d-inline-flex align-items-center gap-2 clients-type-toggle-btn"
                                         onClick={() => updateField('type', 'person')}
                                         disabled={loading}
                                     >
@@ -242,7 +294,7 @@ const ClientForm = ({
                                     <Button
                                         type="button"
                                         variant={formValues.type === 'company' ? 'primary' : 'outline-secondary'}
-                                        className="d-inline-flex align-items-center gap-2"
+                                        className="d-inline-flex align-items-center gap-2 clients-type-toggle-btn"
                                         onClick={() => updateField('type', 'company')}
                                         disabled={loading}
                                     >
@@ -287,13 +339,14 @@ const ClientForm = ({
                                         type="email"
                                         value={formValues.email}
                                         onChange={(event) => updateField('email', event.target.value)}
-                                        isInvalid={Boolean(errors.email)}
+                                        onBlur={() => setEmailTouched(true)}
+                                        isInvalid={Boolean(emailErrorMessage)}
                                         disabled={loading}
                                         placeholder="nome@azienda.it"
                                     />
                                 </InputGroup>
-                                <Form.Control.Feedback type="invalid" className={errors.email ? 'd-block' : ''}>
-                                    {errors.email}
+                                <Form.Control.Feedback type="invalid" className={emailErrorMessage ? 'd-block' : ''}>
+                                    {emailErrorMessage}
                                 </Form.Control.Feedback>
                             </Form.Group>
                         </Col>
@@ -307,10 +360,20 @@ const ClientForm = ({
                                     <Form.Control
                                         value={formValues.phone}
                                         onChange={(event) => updateField('phone', event.target.value)}
+                                        onBlur={() => setPhoneTouched(true)}
+                                        isInvalid={Boolean(phoneErrorMessage)}
                                         disabled={loading}
                                         placeholder="+39 ..."
                                     />
                                 </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={phoneErrorMessage ? 'd-block' : ''}>
+                                    {phoneErrorMessage}
+                                </Form.Control.Feedback>
+                                {shouldShowPhonePreview && (
+                                    <Form.Text className="text-muted d-block mt-1">
+                                        Verra salvato come: {phoneValidation.e164}
+                                    </Form.Text>
+                                )}
                             </Form.Group>
                         </Col>
                     </Row>
@@ -407,6 +470,7 @@ const ClientForm = ({
                                         value={formValues.address.country}
                                         onChange={(event) => updateAddressField('country', event.target.value)}
                                         disabled={loading}
+                                        placeholder="ISO2 (es. IT)"
                                     />
                                 </Form.Group>
                             </Col>

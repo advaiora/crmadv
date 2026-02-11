@@ -8,8 +8,15 @@ import { clientsService } from './service.js';
 
 type ClientsListQuery = {
   query?: string;
+  type?: string;
   page?: string;
   pageSize?: string;
+  sort?: string;
+};
+
+type ClientsExportQuery = {
+  query?: string;
+  type?: string;
   sort?: string;
 };
 
@@ -45,6 +52,27 @@ const clientsRoute: FastifyPluginAsync = async (app) => {
       },
       201,
     );
+  });
+
+  app.post<{ Body: unknown }>('/clients/import', async (request, reply) => {
+    const { user, workspace } = await ensureClientsAccess(request, CLIENTS_PERMISSIONS.create);
+    const result = await clientsService.importClientsFromCsv({
+      workspaceId: workspace.id,
+      actorUserId: user.id,
+      body: request.body,
+      request,
+    });
+
+    return ok(reply, result);
+  });
+
+  app.get<{ Querystring: ClientsExportQuery }>('/clients/export', async (request, reply) => {
+    const { workspace } = await ensureClientsAccess(request, CLIENTS_PERMISSIONS.view);
+    const result = await clientsService.exportClientsCsv(workspace.id, request.query);
+
+    reply.header('Content-Type', 'text/csv; charset=utf-8');
+    reply.header('Content-Disposition', `attachment; filename=\"${result.filename}\"`);
+    return reply.send(result.csv);
   });
 
   app.get<{ Params: ClientParams }>('/clients/:id', async (request, reply) => {

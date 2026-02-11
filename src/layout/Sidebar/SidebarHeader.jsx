@@ -4,17 +4,12 @@ import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { Link } from 'react-router-dom';
 import { ArrowBarToLeft } from 'tabler-icons-react';
 import { Button } from 'react-bootstrap';
-import { useTheme } from '../../utils/theme-provider/theme-provider';
 
 //Images
-import logo from '../../assets/img/brand-sm.svg';
-import jampackImg from '../../assets/img/Jampack.svg';
-import jampackImgDark from '../../assets/img/jampack-dark.svg';
+import advaioraLogoWhite from '../../assets/img/AdvaioraLogo-White.png';
 
 
 const SidebarHeader = ({ navCollapsed, toggleCollapsedNav }) => {
-
-    const { theme } = useTheme();
 
     const toggleSidebar = () => {
         toggleCollapsedNav(!navCollapsed);
@@ -24,8 +19,8 @@ const SidebarHeader = ({ navCollapsed, toggleCollapsedNav }) => {
         <div className="menu-header">
             <span>
                 <Link className="navbar-brand" to="/">
-                    <img className="brand-img img-fluid" src={logo} alt="brand" />
-                    {theme === "light" ? <img className="brand-img img-fluid logo-light" src={jampackImg} alt="brand" /> : <img className="brand-img img-fluid logo-dark" src={jampackImgDark} alt="brand" />}
+                    <img className="brand-img img-fluid advaiora-logo-mark" src={advaioraLogoWhite} alt="Advaiora logo" />
+                    <img className="brand-img img-fluid advaiora-logo-expanded" src={advaioraLogoWhite} alt="Advaiora logo" />
                 </Link>
                 <Button id="tggl-btn" variant="flush-dark" onClick={toggleSidebar} className="btn-icon btn-rounded flush-soft-hover navbar-toggle">
                     <span className="icon">

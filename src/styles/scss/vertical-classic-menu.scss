@@ -193,10 +193,42 @@ Project:	Jampack
 				justify-content: space-between;
 
 				.navbar-brand {
-					.brand-img {
-						&:last-child {
-							margin-left: 0.5rem;
-						}
+					display: flex;
+					align-items: center;
+					min-width: 0;
+					position: relative;
+					overflow: hidden;
+					height: 34px;
+					width: clamp(128px, 9.5vw, 172px);
+					@include transition(width 0.24s cubic-bezier(0.4, 0, 0.2, 1));
+
+					.advaiora-logo-mark {
+						position: absolute;
+						left: 0;
+						top: 50%;
+						width: 34px;
+						max-width: 34px;
+						height: auto;
+						object-fit: contain;
+						opacity: 0;
+						pointer-events: none;
+						will-change: opacity, transform;
+						@include transform(translateY(-50%) scale(0.96));
+						@include transition(all 0.22s ease);
+					}
+
+					.advaiora-logo-expanded {
+						position: absolute;
+						left: 0;
+						top: 50%;
+						width: clamp(128px, 9.5vw, 172px);
+						max-width: 100%;
+						height: auto;
+						object-fit: contain;
+						opacity: 1;
+						will-change: opacity, transform;
+						@include transform(translateY(-50%) scale(1));
+						@include transition(all 0.22s ease);
 					}
 				}
 			}
@@ -285,7 +317,9 @@ Project:	Jampack
 				// added for hide toggle button in react version
 				.menu-header {
 					.navbar-toggle {
-						filter: blur(100px);
+						opacity: 0;
+						pointer-events: none;
+						@include transition(opacity 0.2s ease);
 					}
 				}
 
@@ -323,10 +357,16 @@ Project:	Jampack
 				.menu-header {
 					>span {
 						.navbar-brand {
-							.brand-img {
-								&:last-child {
-									display: none;
-								}
+							width: 34px;
+
+							.advaiora-logo-mark {
+								opacity: 1;
+								@include transform(translateY(-50%) scale(1));
+							}
+
+							.advaiora-logo-expanded {
+								opacity: 0;
+								@include transform(translateY(-50%) scale(0.96));
 							}
 						}
 					}
@@ -344,7 +384,8 @@ Project:	Jampack
 					// added for remove blur from toggle button in react version
 					.menu-header {
 						.navbar-toggle {
-							filter: none
+							opacity: 1;
+							pointer-events: auto;
 						}
 					}
 
@@ -384,10 +425,16 @@ Project:	Jampack
 					.menu-header {
 						>span {
 							.navbar-brand {
-								.brand-img {
-									&:last-child {
-										display: inline;
-									}
+								width: clamp(128px, 9.5vw, 172px);
+
+								.advaiora-logo-mark {
+									opacity: 0;
+									@include transform(translateY(-50%) scale(0.96));
+								}
+
+								.advaiora-logo-expanded {
+									opacity: 1;
+									@include transform(translateY(-50%) scale(1));
 								}
 							}
 						}

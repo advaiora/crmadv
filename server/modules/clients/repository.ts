@@ -7,8 +7,17 @@ export type ClientSortDirection = 'asc' | 'desc';
 type ListClientsInput = {
   workspaceId: string;
   query?: string;
+  type?: ClientType;
   page: number;
   pageSize: number;
+  sortField: ClientSortField;
+  sortDirection: ClientSortDirection;
+};
+
+type ExportClientsInput = {
+  workspaceId: string;
+  query?: string;
+  type?: ClientType;
   sortField: ClientSortField;
   sortDirection: ClientSortDirection;
 };
@@ -79,6 +88,7 @@ export const clientsRepository = {
     const skip = (input.page - 1) * input.pageSize;
     const where: Prisma.ClientWhereInput = {
       workspaceId: input.workspaceId,
+      ...(input.type ? { type: input.type } : {}),
       ...(input.query ? buildSearchWhere(input.query) : {}),
     };
 
@@ -104,6 +114,25 @@ export const clientsRepository = {
       items,
       total,
     };
+  },
+
+  listForExport(input: ExportClientsInput) {
+    const where: Prisma.ClientWhereInput = {
+      workspaceId: input.workspaceId,
+      ...(input.type ? { type: input.type } : {}),
+      ...(input.query ? buildSearchWhere(input.query) : {}),
+    };
+
+    const orderBy: Prisma.ClientOrderByWithRelationInput[] = [
+      { [input.sortField]: input.sortDirection },
+      { id: input.sortDirection },
+    ];
+
+    return prisma.client.findMany({
+      where,
+      select: clientSelect,
+      orderBy,
+    });
   },
 
   findById(workspaceId: string, id: string) {
