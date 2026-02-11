@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -69,6 +70,8 @@ const ROLES = [
 ] as const;
 
 async function main() {
+  const superadminPasswordHash = await bcrypt.hash('admin123', 10);
+
   const workspace = await prisma.workspace.upsert({
     where: { slug: 'demo' },
     update: { name: 'Demo' },
@@ -77,11 +80,31 @@ async function main() {
 
   const superadminUser = await prisma.user.upsert({
     where: { email: 'superadmin@demo.local' },
-    update: { name: 'Demo Superadmin' },
+    update: {
+      name: 'Demo Superadmin',
+      passwordHash: superadminPasswordHash,
+      role: 'superadmin',
+    },
     create: {
       email: 'superadmin@demo.local',
       name: 'Demo Superadmin',
-      passwordHash: 'change-me',
+      passwordHash: superadminPasswordHash,
+      role: 'superadmin',
+    },
+  });
+
+  const adminLoginUser = await prisma.user.upsert({
+    where: { email: 'admin@test.com' },
+    update: {
+      name: 'Admin Test',
+      passwordHash: superadminPasswordHash,
+      role: 'superadmin',
+    },
+    create: {
+      email: 'admin@test.com',
+      name: 'Admin Test',
+      passwordHash: superadminPasswordHash,
+      role: 'superadmin',
     },
   });
 
@@ -93,6 +116,18 @@ async function main() {
     create: {
       workspaceId: workspace.id,
       userId: superadminUser.id,
+      status: 'active',
+    },
+  });
+
+  await prisma.membership.upsert({
+    where: {
+      workspaceId_userId: { workspaceId: workspace.id, userId: adminLoginUser.id },
+    },
+    update: { status: 'active' },
+    create: {
+      workspaceId: workspace.id,
+      userId: adminLoginUser.id,
       status: 'active',
     },
   });
@@ -223,6 +258,22 @@ async function main() {
     },
   });
 
+  await prisma.userRole.upsert({
+    where: {
+      workspaceId_userId_roleId: {
+        workspaceId: workspace.id,
+        userId: adminLoginUser.id,
+        roleId: superadminRole.id,
+      },
+    },
+    update: {},
+    create: {
+      workspaceId: workspace.id,
+      userId: adminLoginUser.id,
+      roleId: superadminRole.id,
+    },
+  });
+
   await prisma.workspaceBranding.upsert({
     where: { workspaceId: workspace.id },
     update: {
@@ -268,6 +319,7 @@ async function main() {
   console.log('Seed completed');
   console.log(`Workspace: ${workspace.slug}`);
   console.log(`User: ${superadminUser.email}`);
+  console.log(`User: ${adminLoginUser.email}`);
   console.log(`Modules: ${MODULES.length}`);
   console.log(`Permissions: ${PERMISSIONS.length}`);
 }

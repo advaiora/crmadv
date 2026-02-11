@@ -1,14 +1,111 @@
-/* eslint-disable react-hooks/rules-of-hooks */
-import React, { useState } from 'react';
-import { Button, Card, Nav } from 'react-bootstrap';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Nav } from 'react-bootstrap';
 import SimpleBar from 'simplebar-react';
 import { connect } from 'react-redux';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
-import { NavLink, useRouteMatch } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import SidebarHeader from './SidebarHeader';
 import { SidebarMenu } from './SidebarMenu';
 import classNames from 'classnames';
 import { useWindowWidth } from '@react-hook/window-size';
+import { useWorkspaceAccess } from '../../hooks/useWorkspaceAccess';
+import { hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
+
+const isExternalPath = (path) => typeof path === 'string' && /^https?:\/\//i.test(path);
+
+const isPathActive = (currentPath, targetPath) => {
+    if (!targetPath || isExternalPath(targetPath)) {
+        return false;
+    }
+
+    if (currentPath === targetPath) {
+        return true;
+    }
+
+    return currentPath.startsWith(`${targetPath}/`);
+};
+
+const hasActivePath = (items, currentPath) => {
+    if (!Array.isArray(items) || items.length === 0) {
+        return false;
+    }
+
+    return items.some((item) => (
+        isPathActive(currentPath, item.path) ||
+        (Array.isArray(item.childrens) && hasActivePath(item.childrens, currentPath))
+    ));
+};
+
+const getActiveMenuState = (groups, currentPath) => {
+    for (const group of groups) {
+        for (const menu of group.contents) {
+            if (!Array.isArray(menu.childrens)) {
+                continue;
+            }
+
+            const menuMatches = isPathActive(currentPath, menu.path) || hasActivePath(menu.childrens, currentPath);
+            if (!menuMatches) {
+                continue;
+            }
+
+            const subMenu = menu.childrens.find((item) => (
+                Array.isArray(item.childrens) &&
+                (isPathActive(currentPath, item.path) || hasActivePath(item.childrens, currentPath))
+            ));
+
+            return {
+                menuName: menu.name,
+                subMenuName: subMenu?.name,
+            };
+        }
+    }
+
+    return {
+        menuName: undefined,
+        subMenuName: undefined,
+    };
+};
+
+const canRenderMenuEntry = (entry, access) => {
+    if (entry.requiredModule && !hasModuleEnabled(access, entry.requiredModule)) {
+        return false;
+    }
+
+    if (entry.requiredPermission && !hasPermission(access, entry.requiredPermission)) {
+        return false;
+    }
+
+    return true;
+};
+
+const filterMenuEntries = (entries, access) => {
+    if (!Array.isArray(entries) || entries.length === 0) {
+        return [];
+    }
+
+    return entries.reduce((accumulator, entry) => {
+        if (!canRenderMenuEntry(entry, access)) {
+            return accumulator;
+        }
+
+        const nextEntry = { ...entry };
+        if (Array.isArray(entry.childrens)) {
+            const filteredChildren = filterMenuEntries(entry.childrens, access);
+            if (filteredChildren.length === 0) {
+                if (!entry.path) {
+                    return accumulator;
+                }
+
+                delete nextEntry.childrens;
+            } else {
+                nextEntry.childrens = filteredChildren;
+            }
+        }
+
+        accumulator.push(nextEntry);
+        return accumulator;
+    }, []);
+};
 
 const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
 
@@ -16,27 +113,43 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
     const [activeSubMenu, setActiveSubMenu] = useState();
 
     const windowWidth = useWindowWidth();
+    const location = useLocation();
+    const { access } = useWorkspaceAccess();
 
-    const handleClick = (menuName) => {
+    const menuGroups = useMemo(
+        () =>
+            SidebarMenu.filter((group) => group.group !== 'Documentation')
+                .map((group) => ({
+                    ...group,
+                    contents: filterMenuEntries(group.contents, access),
+                }))
+                .filter((group) => group.contents.length > 0),
+        [access]
+    );
+
+    useEffect(() => {
+        const { menuName, subMenuName } = getActiveMenuState(menuGroups, location.pathname);
         setActiveMenu(menuName);
+        setActiveSubMenu(subMenuName);
+    }, [location.pathname, menuGroups]);
+
+    const handleLeafClick = () => {
         if (windowWidth <= 1199) {
             toggleCollapsedNav(false);
         }
-        // if (activeMenu !== 'Dashboard' && windowWidth >= 1200) {
-        //     toggleCollapsedNav(true);
-        // }
-        // else if (windowWidth <= 1199) {
-        //     toggleCollapsedNav(false);
-        // }
+    };
 
-        // if (menuName === 'Dashboard') {
-        //     toggleCollapsedNav(false);
-        // }
-    }
+    const handleMenuToggle = (menuName) => {
+        setActiveMenu((currentMenu) => (currentMenu === menuName ? undefined : menuName));
+    };
+
+    const handleSubMenuToggle = (subMenuName) => {
+        setActiveSubMenu((currentSubMenu) => (currentSubMenu === subMenuName ? undefined : subMenuName));
+    };
 
     const backDropToggle = () => {
         toggleCollapsedNav(!navCollapsed);
-    }
+    };
 
     return (
         <>
@@ -46,7 +159,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                 {/* Main Menu */}
                 <SimpleBar className="nicescroll-bar">
                     <div className="menu-content-wrap">
-                        {SidebarMenu.map((routes, index) => (
+                        {menuGroups.map((routes, index) => (
                             <React.Fragment key={index}>
                                 <div className="menu-group" >
                                     {routes.group && <div className="nav-header" >
@@ -54,12 +167,12 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                     </div>}
                                     {routes.contents.map((menus, idx) => (
                                         <Nav bsPrefix="navbar-nav" className="flex-column" key={idx}>
-                                            <Nav.Item className={classNames({ "active": useRouteMatch(menus.path) })}  >
+                                            <Nav.Item className={classNames({ active: isPathActive(location.pathname, menus.path) || hasActivePath(menus.childrens, location.pathname) })}  >
                                                 {
                                                     menus.childrens
                                                         ?
                                                         <>
-                                                            <Nav.Link data-bs-toggle="collapse" data-bs-target={`#${menus.id}`} aria-expanded={activeMenu === menus.name ? "true" : "false"} onClick={() => setActiveMenu(menus.name)} >
+                                                            <Nav.Link aria-expanded={activeMenu === menus.name ? "true" : "false"} onClick={() => handleMenuToggle(menus.name)} >
                                                                 <span className={classNames("nav-icon-wrap", { "position-relative": menus.iconBadge })}>
                                                                     {menus.iconBadge && menus.iconBadge}
                                                                     <span className="svg-icon">
@@ -73,15 +186,17 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                 {menus.badge && menus.badge}
                                                             </Nav.Link>
 
-                                                            {/* <Collapse in={open}> */}
                                                             <ul id={menus.id} className={classNames("nav flex-column nav-children", { "collapse": activeMenu !== menus.name })}>
                                                                 <li className="nav-item">
                                                                     <ul className="nav flex-column">
                                                                         {menus.childrens.map((subMenu, indx) => (
                                                                             subMenu.childrens
                                                                                 ?
-                                                                                <li className="nav-item" key={indx} >
-                                                                                    <Nav.Link as={NavLink} to={subMenu.path} className="nav-link" data-bs-toggle="collapse" data-bs-target={`#${subMenu.id}`} aria-expanded={activeSubMenu === subMenu.name ? "true" : "false"} onClick={() => setActiveSubMenu(subMenu.name)}>
+                                                                                <li className={classNames("nav-item", { active: isPathActive(location.pathname, subMenu.path) || hasActivePath(subMenu.childrens, location.pathname) })} key={indx} >
+                                                                                    <Nav.Link href={`#${subMenu.id}`} className="nav-link" aria-expanded={activeSubMenu === subMenu.name ? "true" : "false"} onClick={(event) => {
+                                                                                        event.preventDefault();
+                                                                                        handleSubMenuToggle(subMenu.name);
+                                                                                    }}>
                                                                                         <span className="nav-link-text">
                                                                                             {subMenu.name}
                                                                                         </span>
@@ -92,7 +207,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                                             <li className="nav-item">
                                                                                                 <ul className="nav flex-column">
                                                                                                     <li className="nav-item">
-                                                                                                        <Nav.Link as={NavLink} to={childrenPath.path} onClick={handleClick}>
+                                                                                                        <Nav.Link as={NavLink} to={childrenPath.path} onClick={handleLeafClick}>
                                                                                                             <span className="nav-link-text">
                                                                                                                 {childrenPath.name}
                                                                                                             </span>
@@ -106,7 +221,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                                 </li>
                                                                                 :
                                                                                 <li className="nav-item" key={indx}>
-                                                                                    <Nav.Link as={NavLink} to={subMenu.path} onClick={handleClick}>
+                                                                                    <Nav.Link as={NavLink} to={subMenu.path} onClick={handleLeafClick}>
                                                                                         <span className="nav-link-text">
                                                                                             {subMenu.name}
                                                                                         </span>
@@ -116,15 +231,13 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                     </ul>
                                                                 </li>
                                                             </ul>
-                                                            {/* </Collapse> */}
-
                                                         </>
                                                         :
                                                         <>
                                                             {
-                                                                (routes.group === "Documentation")
+                                                                isExternalPath(menus.path)
                                                                     ?
-                                                                    <a className="nav-link" href={menus.path}  >
+                                                                    <a className="nav-link" href={menus.path} target="_blank" rel="noreferrer" >
                                                                         <span className="nav-icon-wrap">
                                                                             <span className="svg-icon">
                                                                                 {menus.icon}
@@ -134,7 +247,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                         {menus.badge && menus.badge}
                                                                     </a>
                                                                     :
-                                                                    <Nav.Link as={NavLink} exact={true} activeClassName="active" to={menus.path} onClick={() => handleClick(menus.name)} >
+                                                                    <Nav.Link as={NavLink} exact={true} activeClassName="active" to={menus.path} onClick={handleLeafClick} >
                                                                         <span className="nav-icon-wrap">
                                                                             <span className="svg-icon">
                                                                                 {menus.icon}
@@ -153,14 +266,6 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                 <div className="menu-gap" />
                             </React.Fragment>
                         ))}
-
-                        <Card bg="orange-light-5" className="callout card-flush  text-center w-220p mx-auto">
-                            <Card.Body>
-                                <h5 className="h5">Quickly Build Applications</h5>
-                                <Card.Text className="p-sm">Exclusively for webapps Based on Bootstrap</Card.Text>
-                                <Button variant="primary" href="https://jampack.hencework.com/documentation/introduction" target="_blank" rel="noreferrer" className="btn-block">Go Jampack Doc</Button>
-                            </Card.Body>
-                        </Card>
                     </div>
                 </SimpleBar>
                 {/* /Main Menu */}

@@ -83,3 +83,15 @@ Business (MVP 1):
   - requirePermission
   - enforcement workspace scope
 - Test per Vault solo quando introdotto (MVP 2).
+
+## 10) Clients MVP decisions (2026-02-11)
+- `clients` module implemented with standard structure:
+  - `server/modules/clients/repository.ts`
+  - `server/modules/clients/service.ts`
+  - `server/modules/clients/policies.ts`
+  - `server/modules/clients/routes.ts`
+  - `src/modules/clients/ui/*`
+- Address is stored as flat nullable columns on `Client` (`street`, `city`, `zip`, `province`, `country`) and mapped as nested `address` DTO in API responses.
+- Tags are stored as `String[]` (`TEXT[]` in PostgreSQL) to keep MVP simple and avoid extra relations.
+- API path is `/clients` (workspace resolved from `x-workspace-id` or `x-workspace-slug`) to stay coherent with current Fastify routes.
+- UI module gating uses data from `/me`: menu item is hidden if module `clients` is disabled; route pages show "Modulo non attivo" instead of failing.

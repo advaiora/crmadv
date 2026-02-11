@@ -12,6 +12,22 @@ type CreateAuditLogInput = {
   userAgent?: string;
 };
 
+const auditListSelect = {
+  id: true,
+  action: true,
+  entityType: true,
+  entityId: true,
+  metadata: true,
+  createdAt: true,
+  actorUser: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+} as const;
+
 export const auditRepository = {
   create(input: CreateAuditLogInput) {
     return prisma.auditLog.create({
@@ -28,6 +44,19 @@ export const auditRepository = {
       select: {
         id: true,
       },
+    });
+  },
+
+  listRecentByWorkspace(workspaceId: string, limit = 6) {
+    return prisma.auditLog.findMany({
+      where: {
+        workspaceId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: Math.max(1, Math.min(limit, 20)),
+      select: auditListSelect,
     });
   },
 };

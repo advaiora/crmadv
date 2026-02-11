@@ -1,74 +1,197 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import SimpleBar from 'simplebar-react';
-import { AlignLeft, Bell, Calendar, CheckSquare, Clock, CreditCard, Inbox, Plus, Search, Settings, Tag } from 'react-feather';
+import { AlignLeft, Bell, CheckSquare, CreditCard, Inbox, Search, Settings, Tag } from 'react-feather';
 import { Button, Container, Dropdown, Form, InputGroup, Nav, Navbar } from 'react-bootstrap';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { connect } from 'react-redux';
-import { Link } from 'react-router-dom';
-// import CustomInput from './CustomInput';
+import { Link, useHistory } from 'react-router-dom';
 import classNames from 'classnames';
 import { motion } from 'framer-motion';
 import HkBadge from '../../components/@hk-badge/@hk-badge';
+import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
+import { fetchWorkspaceAccess } from '../../utils/workspaceAccess';
+import { useSession } from '../../hooks/useSession';
 
-//Images
-import avatar2 from '../../assets/img/avatar2.jpg';
+// Images
 import avatar3 from '../../assets/img/avatar3.jpg';
 import avatar4 from '../../assets/img/avatar4.jpg';
-import avatar10 from '../../assets/img/avatar10.jpg';
 import avatar12 from '../../assets/img/avatar12.jpg';
-import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
 
+const ACTION_LABELS = {
+    'me.view': 'Profilo e permessi visualizzati',
+    'quotes.email.send': 'Email preventivo inviata',
+    'quotes.email.resend': 'Email preventivo reinviata',
+    'quotes.create': 'Preventivo creato',
+    'quotes.update': 'Preventivo aggiornato',
+    'quotes.delete': 'Preventivo eliminato',
+    'clients.create': 'Cliente creato',
+    'clients.update': 'Cliente aggiornato',
+    'clients.delete': 'Cliente eliminato',
+    'roles.assign': 'Ruolo assegnato',
+    'roles.update': 'Ruolo aggiornato',
+    'roles.create': 'Ruolo creato',
+    'roles.delete': 'Ruolo eliminato',
+    'modules.enable': 'Modulo attivato',
+    'modules.disable': 'Modulo disattivato',
+    'branding.update': 'Branding workspace aggiornato',
+};
 
+const prettifyAction = (action) => {
+    if (!action || typeof action !== 'string') {
+        return 'Attivita registrata';
+    }
+
+    return ACTION_LABELS[action] || action.replaceAll('.', ' ');
+};
+
+const formatActivityTime = (isoDate) => {
+    if (!isoDate) {
+        return '';
+    }
+
+    const parsedDate = new Date(isoDate);
+    if (Number.isNaN(parsedDate.getTime())) {
+        return '';
+    }
+
+    return parsedDate.toLocaleString('it-IT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+const buildInitials = (value) => {
+    if (!value || typeof value !== 'string') {
+        return 'U';
+    }
+
+    const words = value
+        .trim()
+        .split(' ')
+        .filter(Boolean);
+
+    if (words.length === 0) {
+        return 'U';
+    }
+
+    if (words.length === 1) {
+        return words[0].slice(0, 2).toUpperCase();
+    }
+
+    return `${words[0][0]}${words[1][0]}`.toUpperCase();
+};
 
 const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
-
+    const history = useHistory();
+    const { logout } = useSession();
     const [showDropdown, setShowDropdown] = useState(false);
-    const [searchValue, setSearchValue] = useState("")
+    const [searchValue, setSearchValue] = useState('');
+    const [navbarData, setNavbarData] = useState(null);
+    const [loadingNavbarData, setLoadingNavbarData] = useState(false);
+    const [navbarDataError, setNavbarDataError] = useState('');
 
-    const CloseSearchInput = () => {
-        setSearchValue("");
+    const closeSearchInput = () => {
+        setSearchValue('');
         setShowDropdown(false);
-    }
+    };
 
     const pageVariants = {
         initial: {
             opacity: 0,
-            y: 10
+            y: 10,
         },
         open: {
             opacity: 1,
-            y: 0
+            y: 0,
         },
         close: {
             opacity: 0,
-            y: 10
-        }
+            y: 10,
+        },
     };
 
+    const loadNavbarData = useCallback(async () => {
+        setLoadingNavbarData(true);
+        setNavbarDataError('');
 
+        try {
+            const data = await fetchWorkspaceAccess();
+            setNavbarData(data);
+        } catch (error) {
+            setNavbarData(null);
+            setNavbarDataError(error?.message || 'Errore durante il caricamento della navbar.');
+        } finally {
+            setLoadingNavbarData(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadNavbarData();
+    }, [loadNavbarData]);
+
+    const handleSignOut = (event) => {
+        event.preventDefault();
+        logout();
+        setNavbarData(null);
+        setNavbarDataError('');
+        history.push('/login');
+    };
+
+    const recentActivity = navbarData?.recentActivity || [];
+    const roles = navbarData?.roles || [];
+    const permissions = navbarData?.permissions || [];
+    const user = navbarData?.user;
+    const workspace = navbarData?.workspace;
+
+    const notificationCount = recentActivity.length;
+    const userDisplayName = user?.name || user?.email || 'Utente';
+    const userEmail = user?.email || '-';
+    const workspaceName = workspace?.name || 'Workspace';
+    const userInitials = useMemo(() => buildInitials(userDisplayName), [userDisplayName]);
 
     return (
-        <Navbar expand="xl" className="hk-navbar navbar-light fixed-top" >
+        <Navbar expand="xl" className="hk-navbar navbar-light fixed-top">
             <Container fluid>
                 {/* Start Nav */}
                 <div className="nav-start-wrap">
-                    <Button variant="flush-dark" onClick={() => toggleCollapsedNav(!navCollapsed)} className="btn-icon btn-rounded flush-soft-hover navbar-toggle d-xl-none">
+                    <Button
+                        variant="flush-dark"
+                        onClick={() => toggleCollapsedNav(!navCollapsed)}
+                        className="btn-icon btn-rounded flush-soft-hover navbar-toggle d-xl-none"
+                    >
                         <span className="icon">
                             <span className="feather-icon"><AlignLeft /></span>
                         </span>
                     </Button>
                     {/* Search */}
-                    <Dropdown as={Form} className="navbar-search" show={showDropdown} autoClose={() => setShowDropdown(!showDropdown)} >
+                    <Dropdown as={Form} className="navbar-search" show={showDropdown} autoClose="outside">
                         <Dropdown.Toggle as="div" className="no-caret bg-transparent">
-                            <Button variant="flush-dark" className="btn-icon btn-rounded flush-soft-hover  d-xl-none" onClick={() => setShowDropdown(!showDropdown)} >
+                            <Button
+                                variant="flush-dark"
+                                className="btn-icon btn-rounded flush-soft-hover d-xl-none"
+                                onClick={() => setShowDropdown(!showDropdown)}
+                            >
                                 <span className="icon">
                                     <span className="feather-icon"><Search /></span>
                                 </span>
                             </Button>
                             <InputGroup className="d-xl-flex d-none">
                                 <span className="input-affix-wrapper input-search affix-border">
-                                    <Form.Control type="text" className="bg-transparent" data-navbar-search-close="false" placeholder="Search..." aria-label="Search" onFocus={() => setShowDropdown(true)} onBlur={() => setShowDropdown(false)} value={searchValue} onChange={e => setSearchValue(e.target.value)} />
-                                    <span className="input-suffix" onClick={() => setSearchValue("")} >
+                                    <Form.Control
+                                        type="text"
+                                        className="bg-transparent"
+                                        data-navbar-search-close="false"
+                                        placeholder="Search..."
+                                        aria-label="Search"
+                                        onFocus={() => setShowDropdown(true)}
+                                        onBlur={() => setShowDropdown(false)}
+                                        value={searchValue}
+                                        onChange={(e) => setSearchValue(e.target.value)}
+                                    />
+                                    <span className="input-suffix" onClick={() => setSearchValue('')}>
                                         <span>/</span>
                                         <span className="btn-input-clear">
                                             <i className="bi bi-x-circle-fill" />
@@ -80,19 +203,28 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                 </span>
                             </InputGroup>
                         </Dropdown.Toggle>
-                        <Dropdown.Menu as={motion.div}
+                        <Dropdown.Menu
+                            as={motion.div}
                             initial="initial"
-                            animate={showDropdown ? "open" : "close"}
+                            animate={showDropdown ? 'open' : 'close'}
                             variants={pageVariants}
                             transition={{ duration: 0.3 }}
-                            className={classNames("p-0")}
+                            className={classNames('p-0')}
                         >
                             {/* Mobile Search */}
                             <Dropdown.Item className="d-xl-none bg-transparent">
                                 <InputGroup className="mobile-search">
                                     <span className="input-affix-wrapper input-search">
-                                        <Form.Control type="text" placeholder="Search..." aria-label="Search" value={searchValue} onChange={e => setSearchValue(e.target.value)} onFocus={() => setShowDropdown(true)} autoFocus />
-                                        <span className="input-suffix" onClick={CloseSearchInput} >
+                                        <Form.Control
+                                            type="text"
+                                            placeholder="Search..."
+                                            aria-label="Search"
+                                            value={searchValue}
+                                            onChange={(e) => setSearchValue(e.target.value)}
+                                            onFocus={() => setShowDropdown(true)}
+                                            autoFocus
+                                        />
+                                        <span className="input-suffix" onClick={closeSearchInput}>
                                             <span className="btn-input-clear">
                                                 <i className="bi bi-x-circle-fill" />
                                             </span>
@@ -103,53 +235,13 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                     </span>
                                 </InputGroup>
                             </Dropdown.Item>
-                            {/*/ Mobile Search */}
+                            {/* /Mobile Search */}
                             <SimpleBar className="dropdown-body p-2">
                                 <Dropdown.Header>Recent Search</Dropdown.Header>
                                 <Dropdown.Item className="bg-transparent">
-                                    <HkBadge bg="secondary" soft pill className="me-1" >React</HkBadge>
-                                    <HkBadge bg="secondary" soft pill className="me-1" >Node JS</HkBadge>
+                                    <HkBadge bg="secondary" soft pill className="me-1">React</HkBadge>
+                                    <HkBadge bg="secondary" soft pill className="me-1">Node JS</HkBadge>
                                     <HkBadge bg="secondary" soft pill>SCSS</HkBadge>
-                                </Dropdown.Item>
-                                <Dropdown.Divider as="div" />
-                                <Dropdown.Header>Help</Dropdown.Header>
-                                <Dropdown.Item as={Link} to="#">
-                                    <div className="media align-items-center">
-                                        <div className="media-head me-2">
-                                            <div className="avatar avatar-icon avatar-xs avatar-soft-light avatar-rounded">
-                                                <span className="initial-wrap">
-                                                    <span className="svg-icon">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="icon icon-tabler icon-tabler-corner-down-right" width={24} height={24} viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                                            <path d="M6 6v6a3 3 0 0 0 3 3h10l-4 -4m0 8l4 -4" />
-                                                        </svg>
-                                                    </span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="media-body">
-                                            How to setup theme?
-                                        </div>
-                                    </div>
-                                </Dropdown.Item>
-                                <Dropdown.Item as={Link} to="#">
-                                    <div className="media align-items-center">
-                                        <div className="media-head me-2">
-                                            <div className="avatar avatar-icon avatar-xs avatar-soft-light avatar-rounded">
-                                                <span className="initial-wrap">
-                                                    <span className="svg-icon">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="icon icon-tabler icon-tabler-corner-down-right" width={24} height={24} viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round">
-                                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                                            <path d="M6 6v6a3 3 0 0 0 3 3h10l-4 -4m0 8l4 -4" />
-                                                        </svg>
-                                                    </span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="media-body">
-                                            View detail documentation
-                                        </div>
-                                    </div>
                                 </Dropdown.Item>
                                 <Dropdown.Divider as="div" />
                                 <Dropdown.Header>Users</Dropdown.Header>
@@ -160,9 +252,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                                 <img src={avatar3} alt="user" className="avatar-img" />
                                             </div>
                                         </div>
-                                        <div className="media-body">
-                                            Sarah Jone
-                                        </div>
+                                        <div className="media-body">Sarah Jone</div>
                                     </div>
                                 </Dropdown.Item>
                                 <Dropdown.Item as={Link} to="#">
@@ -172,9 +262,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                                 <span className="initial-wrap">J</span>
                                             </div>
                                         </div>
-                                        <div className="media-body">
-                                            Joe Jackson
-                                        </div>
+                                        <div className="media-body">Joe Jackson</div>
                                     </div>
                                 </Dropdown.Item>
                                 <Dropdown.Item as={Link} to="#">
@@ -184,9 +272,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                                 <img src={avatar4} alt="user" className="avatar-img" />
                                             </div>
                                         </div>
-                                        <div className="media-body">
-                                            Maria Richard
-                                        </div>
+                                        <div className="media-body">Maria Richard</div>
                                     </div>
                                 </Dropdown.Item>
                             </SimpleBar>
@@ -202,26 +288,39 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                 {/* End Nav */}
                 <div className="nav-end-wrap">
                     <Nav className="navbar-nav flex-row">
-                        <Nav.Item className='ms-2'>
+                        <Nav.Item className="ms-2">
                             <ThemeSwitcher />
                         </Nav.Item>
                         <Nav.Item>
                             <Button variant="flush-dark" as={Link} to="/apps/email" className="btn-icon btn-rounded flush-soft-hover">
                                 <span className="icon">
-                                    <span className=" position-relative">
+                                    <span className="position-relative">
                                         <span className="feather-icon"><Inbox /></span>
-                                        <HkBadge bg="primary" soft pill size="sm" className="position-top-end-overflow-1" >4</HkBadge>
+                                        {notificationCount > 0 && (
+                                            <HkBadge bg="primary" soft pill size="sm" className="position-top-end-overflow-1">
+                                                {notificationCount}
+                                            </HkBadge>
+                                        )}
                                     </span>
                                 </span>
                             </Button>
                         </Nav.Item>
                         <Nav.Item>
-                            <Dropdown className="dropdown-notifications">
+                            <Dropdown
+                                className="dropdown-notifications"
+                                onToggle={(show) => {
+                                    if (show) {
+                                        void loadNavbarData();
+                                    }
+                                }}
+                            >
                                 <Dropdown.Toggle variant="flush-dark" className="btn-icon btn-rounded flush-soft-hover no-caret">
                                     <span className="icon">
                                         <span className="position-relative">
                                             <span className="feather-icon"><Bell /></span>
-                                            <HkBadge bg="success" indicator className="position-top-end-overflow-1" />
+                                            {notificationCount > 0 && (
+                                                <HkBadge bg="success" indicator className="position-top-end-overflow-1" />
+                                            )}
                                         </span>
                                     </span>
                                 </Dropdown.Toggle>
@@ -234,121 +333,51 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                             </span>
                                         </Button>
                                     </Dropdown.Header>
-                                    <SimpleBar className="dropdown-body  p-2">
-                                        <Dropdown.Item>
-                                            <div className="media">
-                                                <div className="media-head">
-                                                    <div className="avatar avatar-rounded avatar-sm">
-                                                        <img src={avatar2} alt="user" className="avatar-img" />
-                                                    </div>
-                                                </div>
-                                                <div className="media-body">
-                                                    <div>
-                                                        <div className="notifications-text">Morgan Freeman accepted your invitation to join the team</div>
-                                                        <div className="notifications-info">
-                                                            <HkBadge bg="success" soft >Collaboration</HkBadge>
-                                                            <div className="notifications-time">Today, 10:14 PM</div>
+                                    <SimpleBar className="dropdown-body p-2">
+                                        {loadingNavbarData && (
+                                            <div className="px-2 py-3 fs-7 text-muted">Caricamento notifiche...</div>
+                                        )}
+                                        {!loadingNavbarData && navbarDataError && (
+                                            <div className="px-2 py-3 fs-7 text-danger">{navbarDataError}</div>
+                                        )}
+                                        {!loadingNavbarData && !navbarDataError && recentActivity.length === 0 && (
+                                            <div className="px-2 py-3 fs-7 text-muted">Nessuna attivita recente.</div>
+                                        )}
+                                        {!loadingNavbarData && !navbarDataError && recentActivity.map((item) => {
+                                            const actorName = item?.actor?.name || item?.actor?.email;
+                                            const notificationText = actorName
+                                                ? `${prettifyAction(item.action)} - ${actorName}`
+                                                : prettifyAction(item.action);
+
+                                            return (
+                                                <Dropdown.Item key={item.id}>
+                                                    <div className="media">
+                                                        <div className="media-head">
+                                                            <div className="avatar avatar-icon avatar-sm avatar-soft-light avatar-rounded">
+                                                                <span className="initial-wrap">
+                                                                    <span className="feather-icon"><Bell /></span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="media-body">
+                                                            <div>
+                                                                <div className="notifications-text">{notificationText}</div>
+                                                                <div className="notifications-info">
+                                                                    {item.entityType && (
+                                                                        <HkBadge bg="secondary" soft>{item.entityType}</HkBadge>
+                                                                    )}
+                                                                    <div className="notifications-time">{formatActivityTime(item.createdAt)}</div>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        </Dropdown.Item>
-                                        <Dropdown.Item>
-                                            <div className="media">
-                                                <div className="media-head">
-                                                    <div className="avatar  avatar-icon avatar-sm avatar-success avatar-rounded">
-                                                        <span className="initial-wrap">
-                                                            <span className="feather-icon"><Inbox /> </span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="media-body">
-                                                    <div>
-                                                        <div className="notifications-text">New message received from Alan Rickman</div>
-                                                        <div className="notifications-info">
-                                                            <div className="notifications-time">Today, 7:51 AM</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Dropdown.Item>
-                                        <Dropdown.Item>
-                                            <div className="media">
-                                                <div className="media-head">
-                                                    <div className="avatar  avatar-icon avatar-sm avatar-pink avatar-rounded">
-                                                        <span className="initial-wrap">
-                                                            <span className="feather-icon"><Clock /></span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="media-body">
-                                                    <div>
-                                                        <div className="notifications-text">You have a follow up with Jampack Head on Friday, Dec 19 at 9:30 am</div>
-                                                        <div className="notifications-info">
-                                                            <div className="notifications-time">Yesterday, 9:25 PM</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Dropdown.Item>
-                                        <Dropdown.Item>
-                                            <div className="media">
-                                                <div className="media-head">
-                                                    <div className="avatar avatar-sm avatar-rounded">
-                                                        <img src={avatar3} alt="user" className="avatar-img" />
-                                                    </div>
-                                                </div>
-                                                <div className="media-body">
-                                                    <div>
-                                                        <div className="notifications-text">Application of Sarah Williams is waiting for your approval</div>
-                                                        <div className="notifications-info">
-                                                            <div className="notifications-time">Today 10:14 PM</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Dropdown.Item>
-                                        <Dropdown.Item>
-                                            <div className="media">
-                                                <div className="media-head">
-                                                    <div className="avatar avatar-sm avatar-rounded">
-                                                        <img src={avatar10} alt="user" className="avatar-img" />
-                                                    </div>
-                                                </div>
-                                                <div className="media-body">
-                                                    <div>
-                                                        <div className="notifications-text">Winston Churchil shared a document with you</div>
-                                                        <div className="notifications-info">
-                                                            <HkBadge bg="violet" soft >File Manager</HkBadge>
-                                                            <div className="notifications-time">2 Oct, 2021</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Dropdown.Item>
-                                        <Dropdown.Item>
-                                            <div className="media">
-                                                <div className="media-head">
-                                                    <div className="avatar  avatar-icon avatar-sm avatar-danger avatar-rounded">
-                                                        <span className="initial-wrap">
-                                                            <span className="feather-icon"><Calendar /></span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="media-body">
-                                                    <div>
-                                                        <div className="notifications-text">Last 2 days left for the project to be completed</div>
-                                                        <div className="notifications-info">
-                                                            <HkBadge bg="orange" soft >Updates</HkBadge>
-                                                            <div className="notifications-time">14 Sep, 2021</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </Dropdown.Item>
+                                                </Dropdown.Item>
+                                            );
+                                        })}
                                     </SimpleBar>
                                     <div className="dropdown-footer">
-                                        <Link to="#"><u>View all notifications</u>
+                                        <Link to="/apps/email">
+                                            <u>Vai alla inbox</u>
                                         </Link>
                                     </div>
                                 </Dropdown.Menu>
@@ -366,63 +395,29 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                         <div className="media">
                                             <div className="media-head me-2">
                                                 <div className="avatar avatar-primary avatar-sm avatar-rounded">
-                                                    <span className="initial-wrap">Hk</span>
+                                                    <span className="initial-wrap">{userInitials}</span>
                                                 </div>
                                             </div>
                                             <div className="media-body">
-                                                <Dropdown>
-                                                    <Dropdown.Toggle as={Link} to="#" className="d-block fw-medium text-dark">Hencework</Dropdown.Toggle>
-                                                    <Dropdown.Menu align="end">
-                                                        <div className="p-2">
-                                                            <div className="media align-items-center active-user mb-3">
-                                                                <div className="media-head me-2">
-                                                                    <div className="avatar avatar-primary avatar-xs avatar-rounded">
-                                                                        <span className="initial-wrap">Hk</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="media-body">
-                                                                    <Link to="#" className="d-flex link-dark">Hencework <i className="ri-checkbox-circle-fill fs-7 text-primary ms-1" />
-                                                                    </Link>
-                                                                    <Link to="#" className="d-block fs-8 link-secondary">
-                                                                        <u>Manage your account</u>
-                                                                    </Link>
-                                                                </div>
-                                                            </div>
-                                                            <div className="media align-items-center mb-3">
-                                                                <div className="media-head me-2">
-                                                                    <div className="avatar avatar-xs avatar-rounded">
-                                                                        <img src={avatar12} alt="user" className="avatar-img" />
-                                                                    </div>
-                                                                </div>
-                                                                <div className="media-body">
-                                                                    <Link to="#" className="d-block link-dark">Jampack Team</Link>
-                                                                    <Link to="#" className="d-block fs-8 link-secondary">contact@hencework.com</Link>
-                                                                </div>
-                                                            </div>
-                                                            <Button variant="outline-light" size="sm" className="btn-block">
-                                                                <span>
-                                                                    <span className="icon">
-                                                                        <span className="feather-icon">
-                                                                            <Plus />
-                                                                        </span>
-                                                                    </span>
-                                                                    <span>Add Account</span></span>
-                                                            </Button>
-                                                        </div>
-                                                    </Dropdown.Menu>
-                                                </Dropdown>
-                                                <div className="fs-7">contact@hencework.com</div>
-                                                <Link to="#" className="d-block fs-8 link-secondary">
+                                                <span className="d-block fw-medium text-dark">{userDisplayName}</span>
+                                                <div className="fs-7">{userEmail}</div>
+                                                <div className="fs-8 text-muted">{workspaceName}</div>
+                                                <Link to="#" onClick={handleSignOut} className="d-block fs-8 link-secondary mt-1">
                                                     <u>Sign Out</u>
                                                 </Link>
                                             </div>
                                         </div>
                                     </div>
                                     <Dropdown.Divider as="div" />
-                                    <Dropdown.Item as={Link} to="/pages/profile" >Profile</Dropdown.Item>
+                                    <Dropdown.Item as={Link} to="/pages/profile">Profile</Dropdown.Item>
+                                    <Dropdown.Item as={Link} to="/pages/account">Account</Dropdown.Item>
                                     <Dropdown.Item>
-                                        <span className="me-2">Offers</span>
-                                        <span className="badge badge-sm badge-soft-pink">2</span>
+                                        <span className="me-2">Ruoli</span>
+                                        <span className="badge badge-sm badge-soft-success">{roles.length}</span>
+                                    </Dropdown.Item>
+                                    <Dropdown.Item>
+                                        <span className="me-2">Permessi</span>
+                                        <span className="badge badge-sm badge-soft-pink">{permissions.length}</span>
                                     </Dropdown.Item>
                                     <Dropdown.Divider as="div" />
                                     <h6 className="dropdown-header">Manage Account</h6>
@@ -452,12 +447,8 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                         <span>Raise a ticket</span>
                                     </Dropdown.Item>
                                     <Dropdown.Divider as="div" />
-                                    <Dropdown.Item>
-                                        Terms &amp; Conditions
-                                    </Dropdown.Item>
-                                    <Dropdown.Item>
-                                        Help &amp; Support
-                                    </Dropdown.Item>
+                                    <Dropdown.Item>Terms &amp; Conditions</Dropdown.Item>
+                                    <Dropdown.Item>Help &amp; Support</Dropdown.Item>
                                 </Dropdown.Menu>
                             </Dropdown>
                         </Nav.Item>
@@ -466,12 +457,12 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                 {/* /End Nav */}
             </Container>
         </Navbar>
-    )
-}
+    );
+};
 
 const mapStateToProps = ({ theme }) => {
     const { navCollapsed } = theme;
-    return { navCollapsed }
+    return { navCollapsed };
 };
 
 export default connect(mapStateToProps, { toggleCollapsedNav })(TopNav);

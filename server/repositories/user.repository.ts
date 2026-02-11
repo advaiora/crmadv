@@ -4,6 +4,15 @@ const userSelect = {
   id: true,
   email: true,
   name: true,
+  role: true,
+} as const;
+
+const loginUserSelect = {
+  id: true,
+  email: true,
+  name: true,
+  role: true,
+  passwordHash: true,
 } as const;
 
 export const userRepository = {
@@ -18,6 +27,13 @@ export const userRepository = {
     return prisma.user.findUnique({
       where: { email: email.toLowerCase() },
       select: userSelect,
+    });
+  },
+
+  findByEmailForLogin(email: string) {
+    return prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: loginUserSelect,
     });
   },
 };

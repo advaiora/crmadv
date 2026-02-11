@@ -1,119 +1,169 @@
-import React, { useState } from 'react';
-import { Button, Col, Container, Form, InputGroup, Row } from 'react-bootstrap';
-import { ExternalLink } from 'react-feather';
+import React, { useMemo, useState } from 'react';
+import { z } from 'zod';
+import { Alert, Button, Card, Col, Container, Form, Row, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-
-//Images
-import jampackImg from '../../../../assets/img/logo-light.svg';
-import jampackImgDark from '../../../../assets/img/logo-dark.svg';
-import logoutImg from '../../../../assets/img/macaroni-logged-out.png';
+import { apiPost, ApiRequestError } from '../../../../utils/apiClient';
+import { useSession } from '../../../../hooks/useSession';
 import { useTheme } from '../../../../utils/theme-provider/theme-provider';
+import logoLight from '../../../../assets/img/logo-light.svg';
+import logoDark from '../../../../assets/img/logo-dark.svg';
 
-const Login = (props) => {
-    const [userName, setUserName] = useState("");
-    const [password, setPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
+const loginSchema = z.object({
+    email: z.string().trim().email('Email non valida'),
+    password: z.string().min(6, 'La password deve avere almeno 6 caratteri'),
+});
 
+const Login = ({ history }) => {
     const { theme } = useTheme();
+    const { login } = useSession();
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        props.history.push("/");
-    }
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
+    const [loading, setLoading] = useState(false);
+
+    const logo = useMemo(() => (theme === 'light' ? logoLight : logoDark), [theme]);
+
+    const clearFieldError = (fieldName) => {
+        if (!fieldErrors[fieldName]) {
+            return;
+        }
+
+        setFieldErrors((currentErrors) => {
+            const nextErrors = { ...currentErrors };
+            delete nextErrors[fieldName];
+            return nextErrors;
+        });
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setError('');
+
+        const parsed = loginSchema.safeParse({
+            email,
+            password,
+        });
+
+        if (!parsed.success) {
+            const issues = parsed.error.flatten().fieldErrors;
+            setFieldErrors({
+                ...(issues.email?.[0] ? { email: issues.email[0] } : {}),
+                ...(issues.password?.[0] ? { password: issues.password[0] } : {}),
+            });
+            return;
+        }
+
+        setFieldErrors({});
+        setLoading(true);
+
+        try {
+            const result = await apiPost(
+                '/auth/login',
+                {
+                    email: parsed.data.email,
+                    password: parsed.data.password,
+                },
+                { skipAuthHeaders: true },
+            );
+
+            login({
+                userId: result.id,
+                userEmail: result.email,
+                userRole: result.role,
+            });
+
+            history.push('/dashboard');
+        } catch (requestError) {
+            if (requestError instanceof ApiRequestError && requestError.status === 401) {
+                setError('Credenziali non valide');
+            } else {
+                setError(requestError?.message || 'Errore durante il login');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
-        <div className="hk-pg-wrapper py-0" >
+        <div className="hk-pg-wrapper py-0">
             <div className="hk-pg-body py-0">
-                <Container fluid>
-                    <Row className="auth-split">
-                        <Col xl={5} lg={6} md={7} className="position-relative mx-auto">
-                            <div className="auth-content flex-column pt-8 pb-md-8 pb-13">
-                                <div className="text-center mb-7">
-                                    <Link to="/" className="navbar-brand me-0">
-                                        {theme === "light" ? <img src={jampackImg} alt="brand" className="brand-img d-inline-block" /> : <img src={jampackImgDark} alt="brand" className="brand-img d-inline-block" />}
-                                    </Link>
-                                </div>
-                                <Form className="w-100" onSubmit={e => handleSubmit(e)} >
-                                    <Row>
-                                        <Col xl={7} sm={10} className="mx-auto">
-                                            <div className="text-center mb-4">
-                                                <h4>Sign in to your account</h4>
-                                                <p>There are many variations of passages of Lorem Ipsum available, in some form, by injected humour</p>
-                                            </div>
-                                            <Row className="gx-3">
-                                                <Col as={Form.Group} lg={12} className="mb-3" >
-                                                    <div className="form-label-group">
-                                                        <Form.Label>User Name</Form.Label>
-                                                    </div>
-                                                    <Form.Control placeholder="Enter username or email ID" type="text" value={userName} onChange={e => setUserName(e.target.value)} />
-                                                </Col>
-                                                <Col as={Form.Group} lg={12} className="mb-3" >
-                                                    <div className="form-label-group">
-                                                        <Form.Label>Password</Form.Label>
-                                                        <Link to="#" className="fs-7 fw-medium">Forgot Password ?</Link>
-                                                    </div>
-                                                    <InputGroup className="password-check">
-                                                        <span className="input-affix-wrapper affix-wth-text">
-                                                            <Form.Control placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} type={showPassword ? "text" : "password"} />
-                                                            <Link to="#" className="input-suffix text-primary text-uppercase fs-8 fw-medium" onClick={() => setShowPassword(!showPassword)} >
-                                                                {showPassword
-                                                                    ?
-                                                                    <span>Hide</span>
-                                                                    :
-                                                                    <span>Show</span>
-                                                                }
-                                                            </Link>
-                                                        </span>
-                                                    </InputGroup>
-                                                </Col>
-                                            </Row>
-                                            <div className="d-flex justify-content-center">
-                                                <Form.Check id="logged_in" className="form-check-sm mb-3" >
-                                                    <Form.Check.Input type="checkbox" defaultChecked />
-                                                    <Form.Check.Label className="text-muted fs-7">Keep me logged in</Form.Check.Label>
-                                                </Form.Check>
-                                            </div>
-                                            <Button variant="primary" type="submit" className="btn-uppercase btn-block">Login</Button>
-                                            <p className="p-xs mt-2 text-center">New to Jampack? <Link to="#"><u>Create new account</u></Link></p>
-                                            <Link to="#" className="d-block extr-link text-center mt-4">
-                                                <span className="feather-icon">
-                                                    <ExternalLink />
+                <Container fluid className="min-vh-100 d-flex align-items-center justify-content-center">
+                    <Row className="w-100 justify-content-center">
+                        <Col xl={4} lg={5} md={7}>
+                            <Card className="card-border shadow-sm">
+                                <Card.Body className="p-4 p-md-5">
+                                    <div className="text-center mb-4">
+                                        <Link to="/" className="navbar-brand me-0">
+                                            <img src={logo} alt="brand" className="brand-img d-inline-block" />
+                                        </Link>
+                                        <h4 className="mt-3 mb-1">Accedi</h4>
+                                        <p className="text-muted mb-0">Inserisci email e password</p>
+                                    </div>
+
+                                    {error && (
+                                        <Alert variant="danger" className="py-2">
+                                            {error}
+                                        </Alert>
+                                    )}
+
+                                    <Form onSubmit={handleSubmit}>
+                                        <Form.Group className="mb-3">
+                                            <Form.Label>Email</Form.Label>
+                                            <Form.Control
+                                                type="email"
+                                                value={email}
+                                                onChange={(event) => {
+                                                    setEmail(event.target.value);
+                                                    clearFieldError('email');
+                                                }}
+                                                isInvalid={Boolean(fieldErrors.email)}
+                                                placeholder="admin@test.com"
+                                                autoComplete="email"
+                                            />
+                                            <Form.Control.Feedback type="invalid">
+                                                {fieldErrors.email}
+                                            </Form.Control.Feedback>
+                                        </Form.Group>
+
+                                        <Form.Group className="mb-4">
+                                            <Form.Label>Password</Form.Label>
+                                            <Form.Control
+                                                type="password"
+                                                value={password}
+                                                onChange={(event) => {
+                                                    setPassword(event.target.value);
+                                                    clearFieldError('password');
+                                                }}
+                                                isInvalid={Boolean(fieldErrors.password)}
+                                                placeholder="Inserisci password"
+                                                autoComplete="current-password"
+                                            />
+                                            <Form.Control.Feedback type="invalid">
+                                                {fieldErrors.password}
+                                            </Form.Control.Feedback>
+                                        </Form.Group>
+
+                                        <Button type="submit" className="w-100" disabled={loading}>
+                                            {loading ? (
+                                                <span className="d-inline-flex align-items-center">
+                                                    <Spinner animation="border" size="sm" className="me-2" />
+                                                    Accesso in corso...
                                                 </span>
-                                                <u className="text-muted">Send feedback to our help forum</u>
-                                            </Link>
-                                        </Col>
-                                    </Row>
-                                </Form>
-                            </div>
-                            {/* Page Footer */}
-                            <div className="hk-footer border-0">
-                                <Container fluid as="footer" className="footer">
-                                    <Row>
-                                        <div className="col-xl-8 text-center">
-                                            <p className="footer-text pb-0"><span className="copy-text">Jampack © {new Date().getFullYear()} All rights reserved.</span> <a href="#some" target="_blank">Privacy Policy</a><span className="footer-link-sep">|</span><a href="#some" target="_blank">T&amp;C</a><span className="footer-link-sep">|</span><a href="#some" target="_blank">System Status</a></p>
-                                        </div>
-                                    </Row>
-                                </Container>
-                            </div>
-                        </Col>
-                        <Col xl={7} lg={6} md={5} sm={10} className="d-md-block d-none position-relative bg-primary-light-5">
-                            <div className="auth-content flex-column text-center py-8">
-                                <Row>
-                                    <Col xxl={7} xl={8} lg={11} className="mx-auto">
-                                        <h2 className="mb-4">Meet all new Pro Jampack 2.0</h2>
-                                        <p>There are many variations of passages of Lorem Ipsum available, passages of Lorem Ipsum available, in some form, by injected.</p>
-                                        <Button variant="flush-primary" className="btn-uppercase mt-2">Take Tour</Button>
-                                    </Col>
-                                </Row>
-                                <img src={logoutImg} className="img-fluid w-sm-50 mt-7" alt="login" />
-                            </div>
-                            <p className="p-xs credit-text opacity-55">All illustration are powered by <Link to="#" href="https://icons8.com/ouch/" target="_blank" rel="noreferrer" className="text-light"><u>Icons8</u></Link></p>
+                                            ) : (
+                                                'Accedi'
+                                            )}
+                                        </Button>
+                                    </Form>
+                                </Card.Body>
+                            </Card>
                         </Col>
                     </Row>
                 </Container>
             </div>
         </div>
-    )
-}
+    );
+};
 
-export default Login
+export default Login;

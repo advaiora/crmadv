@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { Prisma } from '@prisma/client';
 import { audit } from './audit/audit.js';
 import { readHeaderValue } from './auth/devAuth.js';
 import { isHttpError } from './core/errors.js';
@@ -9,18 +10,53 @@ import { requirePermission } from './guards/requirePermission.js';
 import { requireWorkspace } from './guards/requireWorkspace.js';
 import { prisma } from './prisma.js';
 import meRoute from './routes/me.route.js';
+import authRoute from './routes/auth.route.js';
 import workspaceBrandingRoute from './routes/workspace-branding.route.js';
 import workspaceModulesRoute from './routes/workspace-modules.route.js';
 import workspaceQuotesRoute from './routes/workspace-quotes.route.js';
 import workspaceRolesRoute from './routes/workspace-roles.route.js';
+import clientsRoute from './modules/clients/routes.js';
 
 const app = Fastify({
   logger: true,
 });
 
 app.setErrorHandler((error, request, reply) => {
+  const isDev = process.env.NODE_ENV !== 'production';
+
   if (isHttpError(error)) {
     return fail(reply, error.statusCode, error.code, error.message, error.details);
+  }
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') {
+    const meta = (error.meta ?? {}) as Record<string, unknown>;
+    const column = typeof meta.column === 'string' ? meta.column : null;
+    const model = typeof meta.modelName === 'string' ? meta.modelName : null;
+
+    request.log.error(
+      {
+        reqId: request.id,
+        err: error,
+        prismaCode: error.code,
+        column,
+        model,
+      },
+      'Prisma schema mismatch / invalid field',
+    );
+
+    return fail(
+      reply,
+      400,
+      'BAD_REQUEST',
+      'Invalid field in database schema',
+      isDev
+        ? {
+            prismaCode: 'P2022',
+            column,
+            model,
+          }
+        : undefined,
+    );
   }
 
   request.log.error(error, 'Unhandled server error');
@@ -32,10 +68,12 @@ app.setNotFoundHandler((_request, reply) =>
 );
 
 void app.register(meRoute);
+void app.register(authRoute);
 void app.register(workspaceBrandingRoute);
 void app.register(workspaceModulesRoute);
 void app.register(workspaceQuotesRoute);
 void app.register(workspaceRolesRoute);
+void app.register(clientsRoute);
 
 app.get('/health', async (_request, reply) => {
   try {

@@ -8,6 +8,10 @@ import ChatGroups from "../views/Chat/Groups";
 import ContactCards from "../views/Contact/ContactCards";
 import ContactList from "../views/Contact/ContactList";
 import EditContact from "../views/Contact/EditContact";
+import ClientDetail from "../views/Clients/ClientDetail";
+import ClientEdit from "../views/Clients/ClientEdit";
+import ClientsList from "../views/Clients/ClientsList";
+import ClientNew from "../views/Clients/ClientNew";
 import Dashboard from "../views/Dashboard";
 import Email from "../views/Email";
 import GridView from "../views/FileManager/GridView";
@@ -61,6 +65,10 @@ export const routes = [
     { path: 'apps/contacts/contact-list', exact: true, component: ContactList },
     { path: 'apps/contacts/contact-cards', exact: true, component: ContactCards },
     { path: 'apps/contacts/edit-contact', exact: true, component: EditContact },
+    { path: 'apps/clients', exact: true, component: ClientsList },
+    { path: 'apps/clients/new', exact: true, component: ClientNew },
+    { path: 'apps/clients/:id/edit', exact: true, component: ClientEdit },
+    { path: 'apps/clients/:id', exact: true, component: ClientDetail },
     { path: 'apps/file-manager/list-view', exact: true, component: ListView },
     { path: 'apps/file-manager/grid-view', exact: true, component: GridView },
     { path: 'apps/gallery', exact: true, component: Gallery },
