@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Accordion, Button, Card, Col, Form, InputGroup, Row } from 'react-bootstrap';
+import { Button, Card, Col, Form, InputGroup, Row } from 'react-bootstrap';
 import {
     Building2,
+    FileText,
+    Flag,
+    Hash,
     Mail,
+    Map,
     MapPin,
     Phone,
     Plus,
@@ -380,104 +384,159 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <Accordion defaultActiveKey={['fiscal', 'address']} alwaysOpen className="mb-3">
-                <Accordion.Item eventKey="fiscal" className="card-border mb-3 overflow-hidden">
-                    <Accordion.Header>
-                        <span className="d-inline-flex align-items-center gap-2">
-                            <ReceiptText size={16} />
-                            Sezione 3 - Dati fiscali
-                        </span>
-                    </Accordion.Header>
-                    <Accordion.Body>
-                        <Row className="g-3">
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>P.IVA</Form.Label>
+            <Card className="card-border mb-3">
+                <Card.Header className="bg-transparent py-3">
+                    <h6 className="mb-0">Sezione 3 - Dati fiscali</h6>
+                </Card.Header>
+                <Card.Body>
+                    <Row className="g-3">
+                        <Col md={6}>
+                            <Form.Group>
+                                <Form.Label>P.IVA</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <ReceiptText size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.vatNumber}
                                         onChange={(event) => updateField('vatNumber', event.target.value)}
+                                        isInvalid={Boolean(errors.vatNumber)}
                                         disabled={loading}
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                                <Form.Group>
-                                    <Form.Label>Codice fiscale</Form.Label>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.vatNumber ? 'd-block' : ''}>
+                                    {errors.vatNumber}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                            <Form.Group>
+                                <Form.Label>Codice fiscale</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <FileText size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.taxCode}
                                         onChange={(event) => updateField('taxCode', event.target.value)}
+                                        isInvalid={Boolean(errors.taxCode)}
                                         disabled={loading}
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Accordion.Body>
-                </Accordion.Item>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.taxCode ? 'd-block' : ''}>
+                                    {errors.taxCode}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Card.Body>
+            </Card>
 
-                <Accordion.Item eventKey="address" className="card-border mb-3 overflow-hidden">
-                    <Accordion.Header>
-                        <span className="d-inline-flex align-items-center gap-2">
-                            <MapPin size={16} />
-                            Sezione 4 - Indirizzo
-                        </span>
-                    </Accordion.Header>
-                    <Accordion.Body>
-                        <Row className="g-3">
-                            <Col md={8}>
-                                <Form.Group>
-                                    <Form.Label>Via</Form.Label>
+            <Card className="card-border mb-3">
+                <Card.Header className="bg-transparent py-3">
+                    <h6 className="mb-0">Sezione 4 - Indirizzo</h6>
+                </Card.Header>
+                <Card.Body>
+                    <Row className="g-3">
+                        <Col md={8}>
+                            <Form.Group>
+                                <Form.Label>Via</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <MapPin size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.address.street}
                                         onChange={(event) => updateAddressField('street', event.target.value)}
+                                        isInvalid={Boolean(errors.street)}
                                         disabled={loading}
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label>CAP</Form.Label>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.street ? 'd-block' : ''}>
+                                    {errors.street}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>CAP</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <Hash size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.address.zip}
                                         onChange={(event) => updateAddressField('zip', event.target.value)}
+                                        isInvalid={Boolean(errors.zip)}
                                         disabled={loading}
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label>Citta</Form.Label>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.zip ? 'd-block' : ''}>
+                                    {errors.zip}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Citta</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <Building2 size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.address.city}
                                         onChange={(event) => updateAddressField('city', event.target.value)}
+                                        isInvalid={Boolean(errors.city)}
                                         disabled={loading}
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label>Provincia</Form.Label>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.city ? 'd-block' : ''}>
+                                    {errors.city}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Provincia</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <Map size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.address.province}
                                         onChange={(event) => updateAddressField('province', event.target.value)}
+                                        isInvalid={Boolean(errors.province)}
                                         disabled={loading}
                                     />
-                                </Form.Group>
-                            </Col>
-                            <Col md={4}>
-                                <Form.Group>
-                                    <Form.Label>Paese</Form.Label>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.province ? 'd-block' : ''}>
+                                    {errors.province}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                        <Col md={4}>
+                            <Form.Group>
+                                <Form.Label>Paese</Form.Label>
+                                <InputGroup>
+                                    <InputGroup.Text>
+                                        <Flag size={15} />
+                                    </InputGroup.Text>
                                     <Form.Control
                                         value={formValues.address.country}
                                         onChange={(event) => updateAddressField('country', event.target.value)}
+                                        isInvalid={Boolean(errors.country)}
                                         disabled={loading}
                                         placeholder="ISO2 (es. IT)"
                                     />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-                    </Accordion.Body>
-                </Accordion.Item>
-            </Accordion>
+                                </InputGroup>
+                                <Form.Control.Feedback type="invalid" className={errors.country ? 'd-block' : ''}>
+                                    {errors.country}
+                                </Form.Control.Feedback>
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Card.Body>
+            </Card>
 
             <Card className="card-border mb-3">
                 <Card.Header className="bg-transparent py-3">
