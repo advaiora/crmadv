@@ -36,8 +36,10 @@ const PERMISSIONS = [
   { key: 'projects.delete', moduleKey: 'projects', description: 'Delete projects' },
   { key: 'projects.move_stage', moduleKey: 'projects', description: 'Move projects between stages' },
   { key: 'checklists.view', moduleKey: 'checklists', description: 'View checklists' },
-  { key: 'checklists.manage_templates', moduleKey: 'checklists', description: 'Manage checklist templates' },
-  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Complete checklist items' },
+  { key: 'checklists.create', moduleKey: 'checklists', description: 'Create checklist templates' },
+  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Edit checklist templates and items' },
+  { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archive checklist templates and delete items' },
+  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Complete checklist instance items' },
   { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Override checklist gates' },
   { key: 'quotes.view', moduleKey: 'quotes', description: 'View quotes' },
   { key: 'quotes.create', moduleKey: 'quotes', description: 'Create quotes' },
@@ -288,6 +290,137 @@ async function main() {
       secondaryColor: '#6c757d',
     },
   });
+
+  const prePublishingTemplate = await prisma.checklistTemplate.upsert({
+    where: {
+      workspaceId_name: {
+        workspaceId: workspace.id,
+        name: 'Pre Pubblicazione',
+      },
+    },
+    update: {
+      description: 'Checklist demo per verifiche finali prima della pubblicazione',
+      isArchived: false,
+    },
+    create: {
+      workspaceId: workspace.id,
+      name: 'Pre Pubblicazione',
+      description: 'Checklist demo per verifiche finali prima della pubblicazione',
+      isArchived: false,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const checklistItems = [
+    {
+      title: 'Controllo SEO',
+      isRequired: true,
+      requiresEvidenceSnapshot: false,
+      isCriticalSnapshot: false,
+    },
+    {
+      title: 'Screenshot finale',
+      isRequired: true,
+      requiresEvidenceSnapshot: true,
+      isCriticalSnapshot: false,
+    },
+    {
+      title: 'Conferma cliente',
+      isRequired: false,
+      requiresEvidenceSnapshot: false,
+      isCriticalSnapshot: false,
+    },
+  ] as const;
+
+  for (let index = 0; index < checklistItems.length; index += 1) {
+    const item = checklistItems[index];
+
+    await prisma.checklistTemplateItem.upsert({
+      where: {
+        workspaceId_templateId_sortOrder: {
+          workspaceId: workspace.id,
+          templateId: prePublishingTemplate.id,
+          sortOrder: index,
+        },
+      },
+      update: {
+        title: item.title,
+        isRequired: item.isRequired,
+        requiresEvidenceSnapshot: item.requiresEvidenceSnapshot,
+        isCriticalSnapshot: item.isCriticalSnapshot,
+      },
+      create: {
+        workspaceId: workspace.id,
+        templateId: prePublishingTemplate.id,
+        title: item.title,
+        sortOrder: index,
+        isRequired: item.isRequired,
+        requiresEvidenceSnapshot: item.requiresEvidenceSnapshot,
+        isCriticalSnapshot: item.isCriticalSnapshot,
+      },
+    });
+  }
+
+  const gatedStageName = 'Stage Gate Demo';
+  const demoProjectName = 'Project Gate Demo';
+
+  const existingGatedStage = await prisma.pipelineStage.findFirst({
+    where: {
+      workspaceId: workspace.id,
+      name: gatedStageName,
+    },
+    select: { id: true },
+  });
+
+  const gatedStage = existingGatedStage
+    ? await prisma.pipelineStage.update({
+        where: { id: existingGatedStage.id },
+        data: {
+          sortOrder: 0,
+          isGated: true,
+          gateChecklistTemplateId: prePublishingTemplate.id,
+          autoCreateInstance: true,
+        },
+        select: { id: true },
+      })
+    : await prisma.pipelineStage.create({
+        data: {
+          workspaceId: workspace.id,
+          name: gatedStageName,
+          sortOrder: 0,
+          isGated: true,
+          gateChecklistTemplateId: prePublishingTemplate.id,
+          autoCreateInstance: true,
+        },
+        select: { id: true },
+      });
+
+  const existingDemoProject = await prisma.project.findFirst({
+    where: {
+      workspaceId: workspace.id,
+      name: demoProjectName,
+    },
+    select: { id: true },
+  });
+
+  if (existingDemoProject) {
+    await prisma.project.update({
+      where: { id: existingDemoProject.id },
+      data: {
+        pipelineStageId: gatedStage.id,
+      },
+    });
+  } else {
+    await prisma.project.create({
+      data: {
+        workspaceId: workspace.id,
+        name: demoProjectName,
+        pipelineStageId: gatedStage.id,
+      },
+    });
+  }
 
   const bootstrapAlreadyLogged = await prisma.auditLog.findFirst({
     where: {

@@ -28,18 +28,6 @@ enum ClientType {
   company
 }
 
-enum ChecklistInstanceStatus {
-  active
-  completed
-  archived
-}
-
-enum ChecklistItemState {
-  pending
-  completed
-  not_applicable
-}
-
 model Workspace {
   id                     String                  @id @default(cuid())
   name                   String
@@ -52,12 +40,13 @@ model Workspace {
   roles                  Role[]
   userRoles              UserRole[]
   branding               WorkspaceBranding?
+  projects               Project[]
+  pipelineStages         PipelineStage[]
   quotes                 Quote[]
   quoteEmailLogs         QuoteEmailLog[]
   auditLogs              AuditLog[]
   checklistTemplates     ChecklistTemplate[]
   checklistTemplateItems ChecklistTemplateItem[]
-  stageChecklistRules    StageChecklistRule[]
   checklistInstances     ChecklistInstance[]
   checklistInstanceItems ChecklistInstanceItem[]
 }
@@ -118,73 +107,93 @@ model Client {
   @@index([workspaceId, updatedAt])
 }
 
-model ChecklistTemplate {
-  id          String                  @id @default(cuid())
-  workspaceId String
-  name        String
-  description String?
-  isArchived  Boolean                 @default(false)
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
-  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  items       ChecklistTemplateItem[]
-  stageRules  StageChecklistRule[]
-  instances   ChecklistInstance[]
+model Project {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  name            String
+  pipelineStageId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipelineStage   PipelineStage? @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, name])
+  @@index([workspaceId, pipelineStageId])
+  @@index([workspaceId, updatedAt])
+}
+
+model PipelineStage {
+  id                      String             @id @default(cuid())
+  workspaceId             String
+  name                    String
+  sortOrder               Int                @default(0)
+  isGated                 Boolean            @default(false)
+  gateChecklistTemplateId String?
+  autoCreateInstance      Boolean            @default(true)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  workspace               Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  gateChecklistTemplate   ChecklistTemplate? @relation("PipelineStageGateTemplate", fields: [gateChecklistTemplateId], references: [id], onDelete: Restrict)
+  projects                Project[]
+
+  @@index([workspaceId, name])
+  @@index([workspaceId, sortOrder])
+  @@index([workspaceId, isGated])
+}
+
+model ChecklistTemplate {
+  id                  String                  @id @default(cuid())
+  workspaceId         String
+  name                String                  @db.VarChar(80)
+  description         String?                 @db.VarChar(500)
+  isArchived          Boolean                 @default(false)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  workspace           Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items               ChecklistTemplateItem[]
+  instances           ChecklistInstance[]
+  gatedPipelineStages PipelineStage[]         @relation("PipelineStageGateTemplate")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
 }
 
 model ChecklistTemplateItem {
-  id               String                  @id @default(cuid())
-  workspaceId      String
-  templateId       String
-  title            String
-  description      String?
-  sortOrder        Int                     @default(0)
-  isRequired       Boolean                 @default(true)
-  requiresEvidence Boolean                 @default(false)
-  isCritical       Boolean                 @default(false)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  workspace        Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  template         ChecklistTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  instanceItems    ChecklistInstanceItem[]
+  id                       String                  @id @default(cuid())
+  workspaceId              String
+  templateId               String
+  title                    String                  @db.VarChar(120)
+  description              String?                 @db.VarChar(500)
+  sortOrder                Int                     @default(0)
+  isRequired               Boolean                 @default(true)
+  requiresEvidenceSnapshot Boolean                 @default(false)
+  isCriticalSnapshot       Boolean                 @default(false)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  workspace                Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template                 ChecklistTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  instanceItems            ChecklistInstanceItem[]
 
-  @@index([templateId, sortOrder])
-  @@index([workspaceId])
-}
-
-model StageChecklistRule {
-  id                  String            @id @default(cuid())
-  workspaceId         String
-  pipelineStageId     String
-  checklistTemplateId String
-  isBlocking          Boolean           @default(true)
-  autoCreateInstance  Boolean           @default(true)
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  checklistTemplate   ChecklistTemplate @relation(fields: [checklistTemplateId], references: [id], onDelete: Cascade)
-
-  @@unique([workspaceId, pipelineStageId])
-  @@index([workspaceId])
+  @@unique([workspaceId, templateId, sortOrder])
+  @@index([workspaceId, templateId])
 }
 
 model ChecklistInstance {
   id                  String                  @id @default(cuid())
   workspaceId         String
   projectId           String
-  pipelineStageId     String?
+  pipelineStageId     String
   checklistTemplateId String
-  status              ChecklistInstanceStatus @default(active)
+  status              String                  @default("active") @db.VarChar(20)
   createdAt           DateTime                @default(now())
   updatedAt           DateTime                @updatedAt
   workspace           Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  checklistTemplate   ChecklistTemplate       @relation(fields: [checklistTemplateId], references: [id], onDelete: Restrict)
+  template            ChecklistTemplate       @relation(fields: [checklistTemplateId], references: [id], onDelete: Restrict)
   items               ChecklistInstanceItem[]
 
   @@unique([workspaceId, projectId, pipelineStageId, checklistTemplateId])
   @@index([workspaceId, projectId])
+  @@index([workspaceId, pipelineStageId])
 }
 
 model ChecklistInstanceItem {
@@ -192,15 +201,15 @@ model ChecklistInstanceItem {
   workspaceId              String
   instanceId               String
   templateItemId           String
-  titleSnapshot            String
+  titleSnapshot            String                @db.VarChar(120)
   isRequiredSnapshot       Boolean
   requiresEvidenceSnapshot Boolean
   isCriticalSnapshot       Boolean
-  sortOrderSnapshot        Int
-  state                    ChecklistItemState    @default(pending)
-  evidenceNote             String?
-  evidenceUrl              String?
-  notApplicableReason      String?
+  sortOrderSnapshot        Int                   @default(0)
+  state                    String                @default("pending") @db.VarChar(20)
+  evidenceNote             String?               @db.VarChar(1000)
+  evidenceUrl              String?               @db.VarChar(500)
+  notApplicableReason      String?               @db.VarChar(500)
   completedAt              DateTime?
   completedByUserId        String?
   createdAt                DateTime              @default(now())
@@ -210,8 +219,9 @@ model ChecklistInstanceItem {
   templateItem             ChecklistTemplateItem @relation(fields: [templateItemId], references: [id], onDelete: Restrict)
   completedByUser          User?                 @relation(fields: [completedByUserId], references: [id], onDelete: SetNull)
 
-  @@index([instanceId, sortOrderSnapshot])
-  @@index([workspaceId])
+  @@unique([workspaceId, instanceId, templateItemId])
+  @@index([workspaceId, instanceId])
+  @@index([workspaceId, instanceId, sortOrderSnapshot])
 }
 
 model Module {
