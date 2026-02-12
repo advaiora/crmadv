@@ -1,17 +1,19 @@
-import { Prisma, type ChecklistInstanceStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../../audit/audit.js';
-import { HttpError, badRequest, conflict, notFound } from '../../core/errors.js';
+import { HttpError, badRequest, notFound } from '../../core/errors.js';
+import { requirePermission } from '../../guards/requirePermission.js';
+import { prisma } from '../../prisma.js';
 import {
   checklistsRepository,
   type ChecklistInstanceItemRecord,
+  type ChecklistInstanceItemWithInstanceRecord,
+  type ChecklistInstanceSummaryRecord,
   type ChecklistInstanceWithItemsRecord,
-  type StageChecklistRuleRecord,
   type ChecklistTemplateItemRecord,
-  type ChecklistTemplateRecord,
+  type ChecklistTemplateSummaryRecord,
   type ChecklistTemplateWithItemsRecord,
-  type CreateTemplateItemInput,
 } from './checklists.repository.js';
 
 const MAX_TEMPLATE_NAME_LENGTH = 80;
@@ -20,7 +22,10 @@ const MAX_DESCRIPTION_LENGTH = 500;
 const MAX_EVIDENCE_NOTE_LENGTH = 1000;
 const MAX_EVIDENCE_URL_LENGTH = 500;
 const MIN_NOT_APPLICABLE_REASON_LENGTH = 5;
-const MIN_OVERRIDE_REASON_LENGTH = 10;
+const MIN_GATE_OVERRIDE_REASON_LENGTH = 10;
+const MAX_GATE_OVERRIDE_REASON_LENGTH = 500;
+const MAX_GATE_OVERRIDE_REASON_AUDIT_LENGTH = 120;
+const CHECKLISTS_OVERRIDE_GATE_PERMISSION = 'checklists.override_gate';
 
 const idSchema = z.string().trim().min(1);
 
@@ -46,14 +51,8 @@ const booleanQuerySchema = z.preprocess((value) => {
 
 const listTemplatesQuerySchema = z
   .object({
-    includeItems: booleanQuerySchema.optional().default(false),
-    archived: booleanQuerySchema.optional().default(false),
-  })
-  .strict();
-
-const getTemplateQuerySchema = z
-  .object({
-    includeItems: booleanQuerySchema.optional().default(true),
+    q: z.string().trim().min(1).max(MAX_TEMPLATE_NAME_LENGTH).optional(),
+    isArchived: booleanQuerySchema.optional(),
   })
   .strict();
 
@@ -61,10 +60,9 @@ const createTemplateItemSchema = z
   .object({
     title: z.string().trim().min(2).max(MAX_ITEM_TITLE_LENGTH),
     description: z.string().trim().max(MAX_DESCRIPTION_LENGTH).optional(),
-    sortOrder: z.number().int().min(0).optional(),
     isRequired: z.boolean().optional(),
-    requiresEvidence: z.boolean().optional(),
-    isCritical: z.boolean().optional(),
+    requiresEvidenceSnapshot: z.boolean().optional(),
+    isCriticalSnapshot: z.boolean().optional(),
   })
   .strict();
 
@@ -100,20 +98,18 @@ const updateTemplateItemBodySchema = z
   .object({
     title: z.string().trim().min(2).max(MAX_ITEM_TITLE_LENGTH).optional(),
     description: z.union([z.string().trim().max(MAX_DESCRIPTION_LENGTH), z.null()]).optional(),
-    sortOrder: z.number().int().min(0).optional(),
     isRequired: z.boolean().optional(),
-    requiresEvidence: z.boolean().optional(),
-    isCritical: z.boolean().optional(),
+    requiresEvidenceSnapshot: z.boolean().optional(),
+    isCriticalSnapshot: z.boolean().optional(),
   })
   .strict()
   .superRefine((value, context) => {
     if (
       value.title === undefined &&
       value.description === undefined &&
-      value.sortOrder === undefined &&
       value.isRequired === undefined &&
-      value.requiresEvidence === undefined &&
-      value.isCritical === undefined
+      value.requiresEvidenceSnapshot === undefined &&
+      value.isCriticalSnapshot === undefined
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -141,7 +137,7 @@ const reorderTemplateItemsBodySchema = z
 const createChecklistInstanceBodySchema = z
   .object({
     checklistTemplateId: idSchema,
-    pipelineStageId: idSchema.optional(),
+    pipelineStageId: idSchema,
   })
   .strict();
 
@@ -155,10 +151,19 @@ const optionalTrimmedString = (maxLength: number) =>
     return normalized.length > 0 ? normalized : undefined;
   }, z.string().trim().max(maxLength).optional());
 
+const optionalEvidenceUrlSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}, z.string().url().max(MAX_EVIDENCE_URL_LENGTH).optional());
+
 const completeChecklistItemBodySchema = z
   .object({
     evidenceNote: optionalTrimmedString(MAX_EVIDENCE_NOTE_LENGTH),
-    evidenceUrl: optionalTrimmedString(MAX_EVIDENCE_URL_LENGTH).pipe(z.string().url().optional()),
+    evidenceUrl: optionalEvidenceUrlSchema,
   })
   .strict();
 
@@ -212,83 +217,68 @@ const normalizePatchString = (value: string | null | undefined) => {
   return normalized || null;
 };
 
+const mapTemplateSummary = (record: ChecklistTemplateSummaryRecord) => ({
+  id: record.id,
+  name: record.name,
+  description: record.description,
+  isArchived: record.isArchived,
+  itemsCount: record._count.items,
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+});
+
 const mapTemplateItem = (record: ChecklistTemplateItemRecord) => ({
   id: record.id,
-  workspaceId: record.workspaceId,
-  templateId: record.templateId,
   title: record.title,
   description: record.description,
   sortOrder: record.sortOrder,
   isRequired: record.isRequired,
-  requiresEvidence: record.requiresEvidence,
-  isCritical: record.isCritical,
-  createdAt: record.createdAt,
-  updatedAt: record.updatedAt,
-});
-
-const mapTemplate = (record: ChecklistTemplateRecord) => ({
-  id: record.id,
-  workspaceId: record.workspaceId,
-  name: record.name,
-  description: record.description,
-  isArchived: record.isArchived,
-  createdAt: record.createdAt,
-  updatedAt: record.updatedAt,
+  requiresEvidenceSnapshot: record.requiresEvidenceSnapshot,
+  isCriticalSnapshot: record.isCriticalSnapshot,
 });
 
 const mapTemplateWithItems = (record: ChecklistTemplateWithItemsRecord) => ({
-  ...mapTemplate(record),
+  id: record.id,
+  name: record.name,
+  description: record.description,
+  isArchived: record.isArchived,
   items: record.items.map((item) => mapTemplateItem(item)),
 });
 
-const mapChecklistInstanceItem = (record: ChecklistInstanceItemRecord) => ({
+const mapChecklistInstanceItem = (
+  record: ChecklistInstanceItemRecord | ChecklistInstanceItemWithInstanceRecord,
+) => ({
   id: record.id,
-  workspaceId: record.workspaceId,
-  instanceId: record.instanceId,
   templateItemId: record.templateItemId,
   title: record.titleSnapshot,
-  state: record.state,
-  isRequired: record.isRequiredSnapshot,
-  requiresEvidence: record.requiresEvidenceSnapshot,
-  isCritical: record.isCriticalSnapshot,
   sortOrder: record.sortOrderSnapshot,
+  isRequired: record.isRequiredSnapshot,
+  requiresEvidenceSnapshot: record.requiresEvidenceSnapshot,
+  isCriticalSnapshot: record.isCriticalSnapshot,
+  state: record.state,
   evidenceNote: record.evidenceNote,
   evidenceUrl: record.evidenceUrl,
   notApplicableReason: record.notApplicableReason,
   completedAt: record.completedAt,
   completedByUserId: record.completedByUserId,
-  createdAt: record.createdAt,
-  updatedAt: record.updatedAt,
 });
 
 const mapChecklistInstance = (record: ChecklistInstanceWithItemsRecord) => ({
   id: record.id,
-  workspaceId: record.workspaceId,
-  projectId: record.projectId,
-  pipelineStageId: record.pipelineStageId,
   checklistTemplateId: record.checklistTemplateId,
-  templateName: record.checklistTemplate.name,
+  pipelineStageId: record.pipelineStageId,
   status: record.status,
   createdAt: record.createdAt,
-  updatedAt: record.updatedAt,
   items: record.items.map((item) => mapChecklistInstanceItem(item)),
 });
 
-const createGateBlockedError = (input: {
-  projectId: string;
-  toStageId: string;
-  checklistInstanceId: string | null;
-  missingRequiredItemIds: string[];
-  reason?: string;
-}) =>
-  new HttpError(409, 'CHECKLIST_GATE_BLOCKED', 'Checklist gate not satisfied', {
-    projectId: input.projectId,
-    toStageId: input.toStageId,
-    checklistInstanceId: input.checklistInstanceId,
-    missingRequiredCount: input.missingRequiredItemIds.length,
-    missingRequiredItemIds: input.missingRequiredItemIds,
-    ...(input.reason ? { reason: input.reason } : {}),
-  });
+const mapChecklistInstanceSummary = (record: ChecklistInstanceSummaryRecord) => ({
+  id: record.id,
+  checklistTemplateId: record.checklistTemplateId,
+  pipelineStageId: record.pipelineStageId,
+  status: record.status,
+  createdAt: record.createdAt,
+});
 
 const createDuplicateTemplateNameError = (name: string) =>
   new HttpError(409, 'DUPLICATE_TEMPLATE_NAME', 'Checklist template name already exists in this workspace', {
@@ -308,80 +298,119 @@ const createEvidenceRequiredError = () =>
     requiresEvidence: true,
   });
 
+const createTemplateArchivedError = (templateId: string) =>
+  new HttpError(400, 'TEMPLATE_ARCHIVED', 'Checklist template is archived', {
+    templateId,
+  });
+
 const createItemAlreadyCompletedError = () =>
   new HttpError(409, 'ITEM_ALREADY_COMPLETED', 'Checklist item is already completed');
 
-const createDuplicateInstanceError = (input: {
-  projectId: string;
-  pipelineStageId: string | null;
-  checklistTemplateId: string;
+const createGateBlockedError = (details: {
+  instanceId: string | null;
+  templateId: string;
+  missingRequiredItemIds: string[];
 }) =>
-  new HttpError(409, 'DUPLICATE_INSTANCE', 'Checklist instance already exists for this project and stage', input);
+  new HttpError(409, 'CHECKLIST_GATE_BLOCKED', 'Checklist gate blocked', details);
 
-const getUnsatisfiedRequiredItemIds = (items: ChecklistInstanceItemRecord[]) => {
-  const unsatisfied: string[] = [];
-
-  items.forEach((item) => {
-    if (!item.isRequiredSnapshot) {
-      return;
-    }
-
-    if (item.state === 'completed') {
-      if (item.requiresEvidenceSnapshot && !item.evidenceNote && !item.evidenceUrl) {
-        unsatisfied.push(item.id);
-      }
-      return;
-    }
-
-    if (item.state === 'not_applicable') {
-      const normalizedReason = item.notApplicableReason?.trim() ?? '';
-      if (normalizedReason.length < MIN_NOT_APPLICABLE_REASON_LENGTH) {
-        unsatisfied.push(item.id);
-      }
-      return;
-    }
-
-    unsatisfied.push(item.id);
-  });
-
-  return unsatisfied;
-};
-
-const resolveChecklistInstanceStatusFromItems = (
-  items: ChecklistInstanceItemRecord[],
-): ChecklistInstanceStatus =>
-  getUnsatisfiedRequiredItemIds(items).length === 0 ? 'completed' : 'active';
-
-const toCreateTemplateItem = (
-  item: z.infer<typeof createTemplateItemSchema>,
-  fallbackSortOrder: number,
-): CreateTemplateItemInput => ({
-  title: item.title,
-  description: normalizeOptionalString(item.description),
-  sortOrder: item.sortOrder ?? fallbackSortOrder,
-  isRequired: item.isRequired ?? true,
-  requiresEvidence: item.requiresEvidence ?? false,
-  isCritical: item.isCritical ?? false,
-});
-
-export type EnforceGateForStageTransitionInput = {
+type ChecklistInstanceLookup = {
   workspaceId: string;
   projectId: string;
-  toStageId: string;
-  overrideGate: boolean;
-  overrideReason: string | null;
-  actorUserId: string;
-  request: FastifyRequest;
+  pipelineStageId: string;
+  checklistTemplateId: string;
 };
 
-export type EnforceGateForStageTransitionResult = {
-  enforced: boolean;
-  blocked: boolean;
-  overridden: boolean;
-  ruleId: string | null;
-  checklistInstanceId: string | null;
-  missingRequiredItemIds: string[];
+type EnsureChecklistInstanceResult = {
+  created: boolean;
+  instance: ChecklistInstanceWithItemsRecord | null;
 };
+
+const ensureChecklistInstance = async (input: {
+  lookup: ChecklistInstanceLookup;
+  autoCreateInstance: boolean;
+  tx?: Prisma.TransactionClient;
+}): Promise<EnsureChecklistInstanceResult> => {
+  const existing = await checklistsRepository.findChecklistInstanceByUnique(input.lookup, input.tx);
+  if (existing) {
+    return { created: false, instance: existing };
+  }
+
+  if (!input.autoCreateInstance) {
+    return { created: false, instance: null };
+  }
+
+  try {
+    const created = await checklistsRepository.createChecklistInstanceWithItems(
+      input.lookup,
+      input.tx,
+    );
+
+    return {
+      created: true,
+      instance: created ?? null,
+    };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const concurrent = await checklistsRepository.findChecklistInstanceByUnique(
+      input.lookup,
+      input.tx,
+    );
+
+    return {
+      created: false,
+      instance: concurrent ?? null,
+    };
+  }
+};
+
+const validateOverrideReason = (reason: string | null) => {
+  const normalized = reason?.trim() ?? '';
+  if (normalized.length < MIN_GATE_OVERRIDE_REASON_LENGTH) {
+    throw badRequest(
+      `overrideReason must be at least ${MIN_GATE_OVERRIDE_REASON_LENGTH} characters`,
+    );
+  }
+
+  if (normalized.length > MAX_GATE_OVERRIDE_REASON_LENGTH) {
+    throw badRequest(
+      `overrideReason must be at most ${MAX_GATE_OVERRIDE_REASON_LENGTH} characters`,
+    );
+  }
+
+  return normalized;
+};
+
+const validateGateForInstance = async (input: {
+  workspaceId: string;
+  instanceId: string | null;
+  tx?: Prisma.TransactionClient;
+}) => {
+  if (!input.instanceId) {
+    return {
+      ok: false,
+      missingRequiredItemIds: [] as string[],
+    };
+  }
+
+  const missingRequiredItemIds = await checklistsRepository.listMissingRequiredItemIds(
+    input.workspaceId,
+    input.instanceId,
+    input.tx,
+  );
+
+  return {
+    ok: missingRequiredItemIds.length === 0,
+    missingRequiredItemIds,
+  };
+};
+
+const truncateOverrideReasonForAudit = (reason: string) =>
+  reason.length <= MAX_GATE_OVERRIDE_REASON_AUDIT_LENGTH
+    ? reason
+    : reason.slice(0, MAX_GATE_OVERRIDE_REASON_AUDIT_LENGTH);
 
 export const checklistsService = {
   parseTemplateId(rawTemplateId: string) {
@@ -407,88 +436,48 @@ export const checklistsService = {
   parseListTemplatesQuery(query: unknown) {
     return parseWithSchema(
       listTemplatesQuerySchema,
-      query ?? {},
-      'Invalid checklist templates query',
+      query,
+      'Invalid template list query params',
     );
   },
 
-  parseGetTemplateQuery(query: unknown) {
-    return parseWithSchema(getTemplateQuerySchema, query ?? {}, 'Invalid template query');
-  },
-
   parseCreateTemplateBody(body: unknown) {
-    const parsed = parseWithSchema(
+    return parseWithSchema(
       createTemplateBodySchema,
       body,
       'Invalid checklist template payload',
     );
-
-    return {
-      name: parsed.name,
-      description: normalizeOptionalString(parsed.description),
-      items: (parsed.items ?? []).map((item, index) => toCreateTemplateItem(item, index)),
-    };
   },
 
   parseUpdateTemplateBody(body: unknown) {
-    const parsed = parseWithSchema(
+    return parseWithSchema(
       updateTemplateBodySchema,
       body,
-      'Invalid checklist template patch payload',
+      'Invalid checklist template update payload',
     );
-
-    return {
-      ...(parsed.name !== undefined ? { name: parsed.name } : {}),
-      ...(parsed.description !== undefined
-        ? { description: normalizePatchString(parsed.description) }
-        : {}),
-      ...(parsed.isArchived !== undefined ? { isArchived: parsed.isArchived } : {}),
-    };
   },
 
   parseCreateTemplateItemBody(body: unknown) {
-    const parsed = parseWithSchema(
+    return parseWithSchema(
       createTemplateItemSchema,
       body,
       'Invalid checklist template item payload',
     );
-
-    return {
-      title: parsed.title,
-      description: normalizeOptionalString(parsed.description),
-      sortOrder: parsed.sortOrder,
-      isRequired: parsed.isRequired ?? true,
-      requiresEvidence: parsed.requiresEvidence ?? false,
-      isCritical: parsed.isCritical ?? false,
-    };
   },
 
   parseUpdateTemplateItemBody(body: unknown) {
-    const parsed = parseWithSchema(
+    return parseWithSchema(
       updateTemplateItemBodySchema,
       body,
-      'Invalid checklist template item patch payload',
+      'Invalid checklist template item update payload',
     );
-
-    return {
-      ...(parsed.title !== undefined ? { title: parsed.title } : {}),
-      ...(parsed.description !== undefined
-        ? { description: normalizePatchString(parsed.description) }
-        : {}),
-      ...(parsed.sortOrder !== undefined ? { sortOrder: parsed.sortOrder } : {}),
-      ...(parsed.isRequired !== undefined ? { isRequired: parsed.isRequired } : {}),
-      ...(parsed.requiresEvidence !== undefined
-        ? { requiresEvidence: parsed.requiresEvidence }
-        : {}),
-      ...(parsed.isCritical !== undefined ? { isCritical: parsed.isCritical } : {}),
-    };
   },
 
   parseReorderTemplateItemsBody(body: unknown) {
     return parseWithSchema(
       reorderTemplateItemsBodySchema,
       body,
-      'Invalid checklist template item reorder payload',
+      'Invalid reorder payload',
     );
   },
 
@@ -512,7 +501,7 @@ export const checklistsService = {
     return parseWithSchema(
       markChecklistItemNotApplicableBodySchema,
       body,
-      'Invalid checklist item not applicable payload',
+      'Invalid checklist item not-applicable payload',
     );
   },
 
@@ -539,30 +528,12 @@ export const checklistsService = {
 
   async requireChecklistInstanceItem(workspaceId: string, rawItemId: string) {
     const itemId = this.parseChecklistInstanceItemId(rawItemId);
-    const item = await checklistsRepository.findChecklistInstanceItemById(
-      workspaceId,
-      itemId,
-    );
+    const item = await checklistsRepository.findChecklistInstanceItemById(workspaceId, itemId);
     if (!item) {
-      throw notFound('Checklist instance item not found');
+      throw notFound('Checklist item not found');
     }
 
     return item;
-  },
-
-  async syncChecklistInstanceStatus(workspaceId: string, instanceId: string) {
-    const instance = await checklistsRepository.findChecklistInstanceById(workspaceId, instanceId);
-    if (!instance || instance.status === 'archived') {
-      return;
-    }
-
-    const items = await checklistsRepository.listChecklistInstanceItems(workspaceId, instanceId);
-    const nextStatus = resolveChecklistInstanceStatusFromItems(items);
-    if (instance.status === nextStatus) {
-      return;
-    }
-
-    await checklistsRepository.updateChecklistInstanceStatus(workspaceId, instanceId, nextStatus);
   },
 
   async ensureProjectBelongsToWorkspace(workspaceId: string, projectId: string) {
@@ -571,125 +542,86 @@ export const checklistsService = {
       projectId,
     );
 
-    // Project model is not yet part of Prisma schema in this repository.
-    // If DB has no "Project" table yet, validation is deferred to upcoming projects module.
-    if (existsInWorkspace === false) {
+    if (!existsInWorkspace) {
       throw notFound('Project not found');
     }
   },
 
   async ensurePipelineStageBelongsToWorkspace(
     workspaceId: string,
-    pipelineStageId: string | undefined,
+    pipelineStageId: string,
   ) {
-    if (!pipelineStageId) {
-      return;
-    }
-
     const existsInWorkspace = await checklistsRepository.pipelineStageExistsInWorkspace(
       workspaceId,
       pipelineStageId,
     );
 
-    // PipelineStage model is not yet part of Prisma schema in this repository.
-    if (existsInWorkspace === false) {
+    if (!existsInWorkspace) {
       throw notFound('Pipeline stage not found');
     }
   },
 
-  async ensureChecklistInstanceForStageRule(input: {
-    workspaceId: string;
-    projectId: string;
-    toStageId: string;
-    rule: StageChecklistRuleRecord;
-  }) {
-    const instanceLookup = {
-      workspaceId: input.workspaceId,
-      projectId: input.projectId,
-      pipelineStageId: input.toStageId,
-      checklistTemplateId: input.rule.checklistTemplateId,
-    };
-
-    const existing = await checklistsRepository.findChecklistInstanceForStageRule(instanceLookup);
-    if (existing) {
-      return existing;
-    }
-
-    if (!input.rule.autoCreateInstance) {
-      return null;
-    }
-
-    try {
-      return await checklistsRepository.createChecklistInstanceWithItems({
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        pipelineStageId: input.toStageId,
-        checklistTemplateId: input.rule.checklistTemplateId,
-      });
-    } catch (error) {
-      if (!isUniqueConstraintError(error)) {
-        throw error;
-      }
-
-      const afterRace = await checklistsRepository.findChecklistInstanceForStageRule(instanceLookup);
-      if (afterRace) {
-        return afterRace;
-      }
-
-      throw conflict('Checklist instance already exists for this project and stage', {
-        projectId: input.projectId,
-        pipelineStageId: input.toStageId,
-        checklistTemplateId: input.rule.checklistTemplateId,
-      });
-    }
+  async recalculateInstanceStatus(workspaceId: string, instanceId: string) {
+    return checklistsRepository.recalculateChecklistInstanceStatus(workspaceId, instanceId);
   },
 
   async listTemplates(workspaceId: string, query: unknown) {
-    const filters = this.parseListTemplatesQuery(query);
+    const parsed = this.parseListTemplatesQuery(query);
+    const templates = await checklistsRepository.listTemplates({
+      workspaceId,
+      q: parsed.q?.trim(),
+      isArchived: parsed.isArchived,
+    });
 
-    if (filters.includeItems) {
-      const templates = await checklistsRepository.listTemplatesWithItems(
-        workspaceId,
-        filters.archived,
-      );
-      return {
-        items: templates.map((template) => mapTemplateWithItems(template)),
-      };
+    return templates.map((template) => mapTemplateSummary(template));
+  },
+
+  async getTemplate(workspaceId: string, rawTemplateId: string) {
+    const templateId = this.parseTemplateId(rawTemplateId);
+    const template = await checklistsRepository.findTemplateByIdWithItems(workspaceId, templateId);
+    if (!template) {
+      throw notFound('Checklist template not found');
     }
 
-    const templates = await checklistsRepository.listTemplates(
-      workspaceId,
-      filters.archived,
-    );
-    return {
-      items: templates.map((template) => mapTemplate(template)),
-    };
+    return mapTemplateWithItems(template);
   },
 
   async createTemplate(input: {
     workspaceId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
     const payload = this.parseCreateTemplateBody(input.body);
+    const items = payload.items ?? [];
 
-    const existingTemplate = await checklistsRepository.findTemplateByName(
-      input.workspaceId,
-      payload.name,
-    );
-    if (existingTemplate) {
-      throw createDuplicateTemplateNameError(payload.name);
-    }
-
-    let createdTemplate: ChecklistTemplateWithItemsRecord;
     try {
-      createdTemplate = await checklistsRepository.createTemplateWithItems({
+      const created = await checklistsRepository.createTemplateWithItems({
         workspaceId: input.workspaceId,
         name: payload.name,
-        description: payload.description,
-        items: payload.items,
+        description: normalizeOptionalString(payload.description),
+        items: items.map((item) => ({
+          title: item.title,
+          description: normalizeOptionalString(item.description),
+          isRequired: item.isRequired ?? true,
+          requiresEvidenceSnapshot: item.requiresEvidenceSnapshot ?? false,
+          isCriticalSnapshot: item.isCriticalSnapshot ?? false,
+        })),
       });
+
+      await audit.log({
+        event: 'checklists.template.create',
+        actorUserId: input.actorUserId,
+        workspaceId: input.workspaceId,
+        entityType: 'ChecklistTemplate',
+        entityId: created.id,
+        metadata: {
+          templateId: created.id,
+        },
+        request: input.request,
+      });
+
+      return mapTemplateWithItems(created);
     } catch (error) {
       if (isUniqueConstraintError(error)) {
         throw createDuplicateTemplateNameError(payload.name);
@@ -697,42 +629,6 @@ export const checklistsService = {
 
       throw error;
     }
-
-    await audit.log({
-      event: 'checklists.template.create',
-      actorUserId: input.actorUserId,
-      workspaceId: input.workspaceId,
-      entityType: 'ChecklistTemplate',
-      entityId: createdTemplate.id,
-      metadata: {
-        templateId: createdTemplate.id,
-        itemCount: createdTemplate.items.length,
-      },
-      request: input.request,
-    });
-
-    return mapTemplateWithItems(createdTemplate);
-  },
-
-  async getTemplate(workspaceId: string, rawTemplateId: string, query: unknown) {
-    const templateId = this.parseTemplateId(rawTemplateId);
-    const parsedQuery = this.parseGetTemplateQuery(query);
-
-    if (parsedQuery.includeItems) {
-      const template = await checklistsRepository.findTemplateByIdWithItems(workspaceId, templateId);
-      if (!template) {
-        throw notFound('Checklist template not found');
-      }
-
-      return mapTemplateWithItems(template);
-    }
-
-    const template = await checklistsRepository.findTemplateById(workspaceId, templateId);
-    if (!template) {
-      throw notFound('Checklist template not found');
-    }
-
-    return mapTemplate(template);
   },
 
   async updateTemplate(input: {
@@ -740,55 +636,55 @@ export const checklistsService = {
     templateId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
-    const currentTemplate = await this.requireTemplate(input.workspaceId, input.templateId);
     const payload = this.parseUpdateTemplateBody(input.body);
+    const templateId = this.parseTemplateId(input.templateId);
 
-    if (payload.name !== undefined) {
-      const conflictingTemplate = await checklistsRepository.findTemplateByName(
-        input.workspaceId,
-        payload.name,
-      );
-      if (conflictingTemplate && conflictingTemplate.id !== currentTemplate.id) {
-        throw createDuplicateTemplateNameError(payload.name);
-      }
-    }
-
-    let updatedTemplate: ChecklistTemplateRecord | null;
-    try {
-      updatedTemplate = await checklistsRepository.updateTemplate(
-        input.workspaceId,
-        currentTemplate.id,
-        payload,
-      );
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        throw createDuplicateTemplateNameError(payload.name ?? currentTemplate.name);
-      }
-
-      throw error;
-    }
-
-    if (!updatedTemplate) {
+    const current = await checklistsRepository.findTemplateByIdWithItems(
+      input.workspaceId,
+      templateId,
+    );
+    if (!current) {
       throw notFound('Checklist template not found');
     }
 
-    const changedFields: string[] = [];
-    if (payload.name !== undefined && payload.name !== currentTemplate.name) {
-      changedFields.push('name');
+    const nextName = payload.name;
+    const nextDescription = normalizePatchString(payload.description);
+    const nextArchived = payload.isArchived;
+
+    const fieldsChanged: string[] = [];
+    if (nextName !== undefined && nextName !== current.name) {
+      fieldsChanged.push('name');
     }
-    if (
-      payload.description !== undefined &&
-      payload.description !== currentTemplate.description
-    ) {
-      changedFields.push('description');
+    if (nextDescription !== undefined && nextDescription !== current.description) {
+      fieldsChanged.push('description');
     }
-    if (
-      payload.isArchived !== undefined &&
-      payload.isArchived !== currentTemplate.isArchived
-    ) {
-      changedFields.push('isArchived');
+    if (nextArchived !== undefined && nextArchived !== current.isArchived) {
+      fieldsChanged.push('isArchived');
+    }
+
+    let updated = current;
+    if (fieldsChanged.length > 0) {
+      try {
+        const result = await checklistsRepository.updateTemplate(input.workspaceId, templateId, {
+          ...(nextName !== undefined ? { name: nextName } : {}),
+          ...(nextDescription !== undefined ? { description: nextDescription } : {}),
+          ...(nextArchived !== undefined ? { isArchived: nextArchived } : {}),
+        });
+
+        if (!result) {
+          throw notFound('Checklist template not found');
+        }
+
+        updated = result;
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          throw createDuplicateTemplateNameError(nextName ?? current.name);
+        }
+
+        throw error;
+      }
     }
 
     await audit.log({
@@ -796,39 +692,38 @@ export const checklistsService = {
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'ChecklistTemplate',
-      entityId: updatedTemplate.id,
+      entityId: templateId,
       metadata: {
-        templateId: updatedTemplate.id,
-        fields: changedFields,
+        templateId,
+        fieldsChanged,
       },
       request: input.request,
     });
 
-    return mapTemplate(updatedTemplate);
+    return mapTemplateWithItems(updated);
   },
 
   async archiveTemplate(input: {
     workspaceId: string;
     templateId: string;
     actorUserId: string;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
-    // MVP choice: DELETE archives templates via soft-delete (isArchived = true).
-    const template = await this.requireTemplate(input.workspaceId, input.templateId);
-    const archived = await checklistsRepository.archiveTemplate(input.workspaceId, template.id);
-    if (archived.count === 0) {
-      throw notFound('Checklist template not found');
-    }
+    const templateId = this.parseTemplateId(input.templateId);
+    await this.requireTemplate(input.workspaceId, templateId);
+
+    await checklistsRepository.updateTemplate(input.workspaceId, templateId, {
+      isArchived: true,
+    });
 
     await audit.log({
       event: 'checklists.template.archive',
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'ChecklistTemplate',
-      entityId: template.id,
+      entityId: templateId,
       metadata: {
-        templateId: template.id,
-        wasArchived: template.isArchived,
+        templateId,
       },
       request: input.request,
     });
@@ -839,24 +734,26 @@ export const checklistsService = {
     templateId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
-    const template = await this.requireTemplate(input.workspaceId, input.templateId);
+    const templateId = this.parseTemplateId(input.templateId);
     const payload = this.parseCreateTemplateItemBody(input.body);
-    const nextSortOrder =
-      payload.sortOrder ??
-      (await checklistsRepository.getNextSortOrder(input.workspaceId, template.id));
+
+    await this.requireTemplate(input.workspaceId, templateId);
 
     const createdItem = await checklistsRepository.createTemplateItem({
       workspaceId: input.workspaceId,
-      templateId: template.id,
+      templateId,
       title: payload.title,
-      description: payload.description,
-      sortOrder: nextSortOrder,
-      isRequired: payload.isRequired,
-      requiresEvidence: payload.requiresEvidence,
-      isCritical: payload.isCritical,
+      description: normalizeOptionalString(payload.description),
+      isRequired: payload.isRequired ?? true,
+      requiresEvidenceSnapshot: payload.requiresEvidenceSnapshot ?? false,
+      isCriticalSnapshot: payload.isCriticalSnapshot ?? false,
     });
+
+    if (!createdItem) {
+      throw notFound('Checklist template not found');
+    }
 
     await audit.log({
       event: 'checklists.template_item.create',
@@ -865,7 +762,7 @@ export const checklistsService = {
       entityType: 'ChecklistTemplateItem',
       entityId: createdItem.id,
       metadata: {
-        templateId: template.id,
+        templateId,
         itemId: createdItem.id,
       },
       request: input.request,
@@ -880,58 +777,62 @@ export const checklistsService = {
     itemId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
-    const currentItem = await this.requireTemplateItem(
-      input.workspaceId,
-      input.templateId,
-      input.itemId,
-    );
+    const templateId = this.parseTemplateId(input.templateId);
+    const itemId = this.parseTemplateItemId(input.itemId);
     const payload = this.parseUpdateTemplateItemBody(input.body);
 
-    const updatedItem = await checklistsRepository.updateTemplateItem(
-      input.workspaceId,
-      currentItem.templateId,
-      currentItem.id,
-      payload,
-    );
-    if (!updatedItem) {
-      throw notFound('Checklist template item not found');
+    const currentItem = await this.requireTemplateItem(input.workspaceId, templateId, itemId);
+
+    const nextTitle = payload.title;
+    const nextDescription = normalizePatchString(payload.description);
+    const nextRequired = payload.isRequired;
+    const nextRequiresEvidence = payload.requiresEvidenceSnapshot;
+    const nextCritical = payload.isCriticalSnapshot;
+
+    const fieldsChanged: string[] = [];
+    if (nextTitle !== undefined && nextTitle !== currentItem.title) {
+      fieldsChanged.push('title');
+    }
+    if (nextDescription !== undefined && nextDescription !== currentItem.description) {
+      fieldsChanged.push('description');
+    }
+    if (nextRequired !== undefined && nextRequired !== currentItem.isRequired) {
+      fieldsChanged.push('isRequired');
+    }
+    if (
+      nextRequiresEvidence !== undefined &&
+      nextRequiresEvidence !== currentItem.requiresEvidenceSnapshot
+    ) {
+      fieldsChanged.push('requiresEvidenceSnapshot');
+    }
+    if (nextCritical !== undefined && nextCritical !== currentItem.isCriticalSnapshot) {
+      fieldsChanged.push('isCriticalSnapshot');
     }
 
-    const changedFields: string[] = [];
-    if (payload.title !== undefined && payload.title !== currentItem.title) {
-      changedFields.push('title');
-    }
-    if (
-      payload.description !== undefined &&
-      payload.description !== currentItem.description
-    ) {
-      changedFields.push('description');
-    }
-    if (
-      payload.sortOrder !== undefined &&
-      payload.sortOrder !== currentItem.sortOrder
-    ) {
-      changedFields.push('sortOrder');
-    }
-    if (
-      payload.isRequired !== undefined &&
-      payload.isRequired !== currentItem.isRequired
-    ) {
-      changedFields.push('isRequired');
-    }
-    if (
-      payload.requiresEvidence !== undefined &&
-      payload.requiresEvidence !== currentItem.requiresEvidence
-    ) {
-      changedFields.push('requiresEvidence');
-    }
-    if (
-      payload.isCritical !== undefined &&
-      payload.isCritical !== currentItem.isCritical
-    ) {
-      changedFields.push('isCritical');
+    let updatedItem = currentItem;
+    if (fieldsChanged.length > 0) {
+      const result = await checklistsRepository.updateTemplateItem(
+        input.workspaceId,
+        templateId,
+        itemId,
+        {
+          ...(nextTitle !== undefined ? { title: nextTitle } : {}),
+          ...(nextDescription !== undefined ? { description: nextDescription } : {}),
+          ...(nextRequired !== undefined ? { isRequired: nextRequired } : {}),
+          ...(nextRequiresEvidence !== undefined
+            ? { requiresEvidenceSnapshot: nextRequiresEvidence }
+            : {}),
+          ...(nextCritical !== undefined ? { isCriticalSnapshot: nextCritical } : {}),
+        },
+      );
+
+      if (!result) {
+        throw notFound('Checklist template item not found');
+      }
+
+      updatedItem = result;
     }
 
     await audit.log({
@@ -939,11 +840,11 @@ export const checklistsService = {
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'ChecklistTemplateItem',
-      entityId: updatedItem.id,
+      entityId: itemId,
       metadata: {
-        templateId: updatedItem.templateId,
-        itemId: updatedItem.id,
-        fields: changedFields,
+        templateId,
+        itemId,
+        fieldsChanged,
       },
       request: input.request,
     });
@@ -956,32 +857,28 @@ export const checklistsService = {
     templateId: string;
     itemId: string;
     actorUserId: string;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
-    const item = await this.requireTemplateItem(
-      input.workspaceId,
-      input.templateId,
-      input.itemId,
-    );
+    const templateId = this.parseTemplateId(input.templateId);
+    const itemId = this.parseTemplateItemId(input.itemId);
 
-    const deleted = await checklistsRepository.deleteTemplateItem(
+    await this.requireTemplateItem(input.workspaceId, templateId, itemId);
+
+    await checklistsRepository.deleteTemplateItemAndCompact(
       input.workspaceId,
-      item.templateId,
-      item.id,
+      templateId,
+      itemId,
     );
-    if (deleted.count === 0) {
-      throw notFound('Checklist template item not found');
-    }
 
     await audit.log({
       event: 'checklists.template_item.delete',
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'ChecklistTemplateItem',
-      entityId: item.id,
+      entityId: itemId,
       metadata: {
-        templateId: item.templateId,
-        itemId: item.id,
+        templateId,
+        itemId,
       },
       request: input.request,
     });
@@ -992,30 +889,33 @@ export const checklistsService = {
     templateId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
-    const template = await this.requireTemplate(input.workspaceId, input.templateId);
+    const templateId = this.parseTemplateId(input.templateId);
     const payload = this.parseReorderTemplateItemsBody(input.body);
-    const currentItemIds = (await checklistsRepository.listTemplateItemIds(
+
+    await this.requireTemplate(input.workspaceId, templateId);
+
+    const currentIds = (await checklistsRepository.listTemplateItemIds(
       input.workspaceId,
-      template.id,
+      templateId,
     )).map((item) => item.id);
 
-    const incomingItemIds = payload.orderedItemIds;
-    const currentItemIdSet = new Set(currentItemIds);
-    const incomingItemIdSet = new Set(incomingItemIds);
-    const missingItemIds = currentItemIds.filter((itemId) => !incomingItemIdSet.has(itemId));
-    const unknownItemIds = incomingItemIds.filter((itemId) => !currentItemIdSet.has(itemId));
+    const expected = new Set(currentIds);
+    const received = new Set(payload.orderedItemIds);
 
-    const hasExactMatch =
-      currentItemIds.length === incomingItemIds.length &&
-      missingItemIds.length === 0 &&
-      unknownItemIds.length === 0;
+    const missingItemIds = currentIds.filter((itemId) => !received.has(itemId));
+    const unknownItemIds = payload.orderedItemIds.filter((itemId) => !expected.has(itemId));
 
-    if (!hasExactMatch) {
+    const hasMismatch =
+      currentIds.length !== payload.orderedItemIds.length ||
+      missingItemIds.length > 0 ||
+      unknownItemIds.length > 0;
+
+    if (hasMismatch) {
       throw createReorderMismatchError({
-        expectedCount: currentItemIds.length,
-        receivedCount: incomingItemIds.length,
+        expectedCount: currentIds.length,
+        receivedCount: payload.orderedItemIds.length,
         missingItemIds,
         unknownItemIds,
       });
@@ -1023,8 +923,8 @@ export const checklistsService = {
 
     const reorderedItems = await checklistsRepository.reorderTemplateItems(
       input.workspaceId,
-      template.id,
-      incomingItemIds,
+      templateId,
+      payload.orderedItemIds,
     );
 
     await audit.log({
@@ -1032,16 +932,19 @@ export const checklistsService = {
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'ChecklistTemplate',
-      entityId: template.id,
+      entityId: templateId,
       metadata: {
-        templateId: template.id,
-        itemCount: reorderedItems.length,
+        templateId,
+        orderedItemIds: payload.orderedItemIds,
       },
       request: input.request,
     });
 
     return {
-      items: reorderedItems.map((item) => mapTemplateItem(item)),
+      items: reorderedItems.map((item) => ({
+        id: item.id,
+        sortOrder: item.sortOrder,
+      })),
     };
   },
 
@@ -1050,21 +953,26 @@ export const checklistsService = {
     projectId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
     const projectId = this.parseProjectId(input.projectId);
     const payload = this.parseCreateChecklistInstanceBody(input.body);
     const checklistTemplateId = this.parseTemplateId(payload.checklistTemplateId);
-    const pipelineStageId = payload.pipelineStageId
-      ? this.parsePipelineStageId(payload.pipelineStageId)
-      : null;
+    const pipelineStageId = this.parsePipelineStageId(payload.pipelineStageId);
 
     await this.ensureProjectBelongsToWorkspace(input.workspaceId, projectId);
-    await this.ensurePipelineStageBelongsToWorkspace(
+    await this.ensurePipelineStageBelongsToWorkspace(input.workspaceId, pipelineStageId);
+
+    const template = await checklistsRepository.findTemplateById(
       input.workspaceId,
-      pipelineStageId ?? undefined,
+      checklistTemplateId,
     );
-    await this.requireTemplate(input.workspaceId, checklistTemplateId);
+    if (!template) {
+      throw notFound('Checklist template not found');
+    }
+    if (template.isArchived) {
+      throw createTemplateArchivedError(template.id);
+    }
 
     const lookup = {
       workspaceId: input.workspaceId,
@@ -1073,60 +981,18 @@ export const checklistsService = {
       checklistTemplateId,
     };
 
-    const duplicate = await checklistsRepository.findChecklistInstanceByUnique(lookup);
-    if (duplicate) {
-      return {
-        created: false,
-        instance: {
-          id: duplicate.id,
-          projectId: duplicate.projectId,
-          checklistTemplateId: duplicate.checklistTemplateId,
-          items: duplicate.items.map((item) => mapChecklistInstanceItem(item)),
-        },
-      };
-    }
+    const ensured = await ensureChecklistInstance({
+      lookup,
+      autoCreateInstance: true,
+    });
 
-    let created: ChecklistInstanceWithItemsRecord;
-    try {
-      created = await checklistsRepository.createChecklistInstanceWithItems({
-        workspaceId: input.workspaceId,
-        projectId,
-        pipelineStageId,
-        checklistTemplateId,
-      });
-    } catch (error) {
-      if (isUniqueConstraintError(error)) {
-        const existing = await checklistsRepository.findChecklistInstanceByUnique(lookup);
-        if (existing) {
-          return {
-            created: false,
-            instance: {
-              id: existing.id,
-              projectId: existing.projectId,
-              checklistTemplateId: existing.checklistTemplateId,
-              items: existing.items.map((item) => mapChecklistInstanceItem(item)),
-            },
-          };
-        }
-
-        throw createDuplicateInstanceError({
-          projectId,
-          pipelineStageId,
-          checklistTemplateId,
-        });
-      }
-
-      throw error;
+    if (!ensured.instance) {
+      throw notFound('Checklist instance not found');
     }
 
     return {
-      created: true,
-      instance: {
-        id: created.id,
-        projectId: created.projectId,
-        checklistTemplateId: created.checklistTemplateId,
-        items: created.items.map((item) => mapChecklistInstanceItem(item)),
-      },
+      created: ensured.created,
+      instance: mapChecklistInstance(ensured.instance),
     };
   },
 
@@ -1140,7 +1006,7 @@ export const checklistsService = {
     );
 
     return {
-      items: instances.map((instance) => mapChecklistInstance(instance)),
+      items: instances.map((instance) => mapChecklistInstanceSummary(instance)),
     };
   },
 
@@ -1149,75 +1015,54 @@ export const checklistsService = {
     itemId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
     const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
     const payload = this.parseCompleteChecklistItemBody(input.body);
 
-    if (item.state === 'completed') {
+    if (item.state !== 'pending') {
       throw createItemAlreadyCompletedError();
     }
 
-    const nextEvidenceNote =
-      payload.evidenceNote !== undefined
-        ? normalizeOptionalString(payload.evidenceNote)
-        : item.evidenceNote;
-    const nextEvidenceUrl =
-      payload.evidenceUrl !== undefined
-        ? normalizeOptionalString(payload.evidenceUrl)
-        : item.evidenceUrl;
+    const evidenceNote = normalizeOptionalString(payload.evidenceNote);
+    const evidenceUrl = normalizeOptionalString(payload.evidenceUrl);
 
-    if (item.requiresEvidenceSnapshot && !nextEvidenceNote && !nextEvidenceUrl) {
+    if (item.requiresEvidenceSnapshot && !evidenceNote && !evidenceUrl) {
       throw createEvidenceRequiredError();
     }
 
-    const updated = await checklistsRepository.updateChecklistInstanceItemIfState(
-      input.workspaceId,
-      item.id,
-      'pending',
-      {
-        state: 'completed',
-        completedAt: new Date(),
-        completedByUserId: input.actorUserId,
-        notApplicableReason: null,
-        ...(payload.evidenceNote !== undefined ? { evidenceNote: nextEvidenceNote } : {}),
-        ...(payload.evidenceUrl !== undefined ? { evidenceUrl: nextEvidenceUrl } : {}),
-      },
-    );
-    if (!updated) {
-      const current = await checklistsRepository.findChecklistInstanceItemById(
-        input.workspaceId,
-        item.id,
-      );
-      if (!current) {
-        throw notFound('Checklist instance item not found');
-      }
-      if (current.state === 'completed') {
-        throw createItemAlreadyCompletedError();
-      }
+    const updated = await checklistsRepository.completeChecklistItemFromPending({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+      evidenceNote,
+      evidenceUrl,
+      completedByUserId: input.actorUserId,
+    });
 
-      throw conflict('Checklist item is not in pending state');
+    if (!updated.updated) {
+      if (!updated.current) {
+        throw notFound('Checklist item not found');
+      }
+      throw createItemAlreadyCompletedError();
     }
 
-    if (updated.isCriticalSnapshot) {
+    if (updated.item.isCriticalSnapshot) {
       await audit.log({
         event: 'checklists.item.complete',
         actorUserId: input.actorUserId,
         workspaceId: input.workspaceId,
         entityType: 'ChecklistInstanceItem',
-        entityId: updated.id,
+        entityId: updated.item.id,
         metadata: {
-          itemId: updated.id,
-          instanceId: updated.instanceId,
-          isCritical: true,
+          instanceId: updated.item.instanceId,
+          itemId: updated.item.id,
+          projectId: updated.item.instance.projectId,
         },
         request: input.request,
       });
     }
 
-    await this.syncChecklistInstanceStatus(input.workspaceId, updated.instanceId);
-
-    return mapChecklistInstanceItem(updated);
+    return mapChecklistInstanceItem(updated.item);
   },
 
   async markChecklistItemNotApplicable(input: {
@@ -1225,178 +1070,183 @@ export const checklistsService = {
     itemId: string;
     actorUserId: string;
     body: unknown;
-    request: FastifyRequest;
+    request?: FastifyRequest;
   }) {
     const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
     const payload = this.parseMarkChecklistItemNotApplicableBody(input.body);
 
-    if (item.state === 'completed') {
+    if (item.state !== 'pending') {
       throw createItemAlreadyCompletedError();
     }
 
-    const updated = await checklistsRepository.updateChecklistInstanceItemIfState(
-      input.workspaceId,
-      item.id,
-      'pending',
-      {
-        state: 'not_applicable',
-        notApplicableReason: payload.reason,
-        completedAt: null,
-        completedByUserId: null,
-      },
-    );
-    if (!updated) {
-      const current = await checklistsRepository.findChecklistInstanceItemById(
-        input.workspaceId,
-        item.id,
-      );
-      if (!current) {
-        throw notFound('Checklist instance item not found');
-      }
-      if (current.state === 'completed') {
-        throw createItemAlreadyCompletedError();
-      }
+    const updated = await checklistsRepository.markChecklistItemNotApplicableFromPending({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+      reason: payload.reason.trim(),
+      completedByUserId: input.actorUserId,
+    });
 
-      throw conflict('Checklist item is not in pending state');
+    if (!updated.updated) {
+      if (!updated.current) {
+        throw notFound('Checklist item not found');
+      }
+      throw createItemAlreadyCompletedError();
     }
 
-    if (updated.isCriticalSnapshot) {
+    if (updated.item.isCriticalSnapshot) {
       await audit.log({
         event: 'checklists.item.not_applicable',
         actorUserId: input.actorUserId,
         workspaceId: input.workspaceId,
         entityType: 'ChecklistInstanceItem',
-        entityId: updated.id,
+        entityId: updated.item.id,
         metadata: {
-          itemId: updated.id,
-          instanceId: updated.instanceId,
-          isCritical: true,
+          instanceId: updated.item.instanceId,
+          itemId: updated.item.id,
+          projectId: updated.item.instance.projectId,
         },
         request: input.request,
       });
     }
 
-    await this.syncChecklistInstanceStatus(input.workspaceId, updated.instanceId);
-
-    return mapChecklistInstanceItem(updated);
+    return mapChecklistInstanceItem(updated.item);
   },
 
   async resetChecklistItem(input: {
     workspaceId: string;
     itemId: string;
   }) {
-    const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
-    const updated = await checklistsRepository.updateChecklistInstanceItem(
-      input.workspaceId,
-      item.id,
-      {
-        state: 'pending',
-        evidenceNote: null,
-        evidenceUrl: null,
-        notApplicableReason: null,
-        completedAt: null,
-        completedByUserId: null,
-      },
-    );
-    if (!updated) {
-      throw notFound('Checklist instance item not found');
+    const itemId = this.parseChecklistInstanceItemId(input.itemId);
+    const resetItem = await checklistsRepository.resetChecklistItem(input.workspaceId, itemId);
+    if (!resetItem) {
+      throw notFound('Checklist item not found');
     }
 
-    await this.syncChecklistInstanceStatus(input.workspaceId, updated.instanceId);
-
-    return mapChecklistInstanceItem(updated);
+    return mapChecklistInstanceItem(resetItem);
   },
 
-  async enforceGateForStageTransition(
-    input: EnforceGateForStageTransitionInput,
-  ): Promise<EnforceGateForStageTransitionResult> {
-    const workspaceId = input.workspaceId;
-    const projectId = this.parseProjectId(input.projectId);
-    const toStageId = this.parsePipelineStageId(input.toStageId);
-
-    const rule = await checklistsRepository.findBlockingStageChecklistRule(
-      workspaceId,
-      toStageId,
-    );
-    if (!rule) {
+  async enforceGateForStageTransition(input: {
+    workspaceId: string;
+    projectId: string;
+    toStageId: string;
+    overrideGate: boolean;
+    overrideReason: string | null;
+    actorUserId: string;
+    request?: FastifyRequest;
+    stageConfig: {
+      isGated: boolean;
+      gateChecklistTemplateId: string | null;
+      autoCreateInstance: boolean;
+    };
+  }) {
+    if (!input.stageConfig.isGated) {
       return {
         enforced: false,
-        blocked: false,
         overridden: false,
         ruleId: null,
         checklistInstanceId: null,
-        missingRequiredItemIds: [],
+        missingRequiredItemIds: [] as string[],
       };
     }
 
-    const checklistInstance = await this.ensureChecklistInstanceForStageRule({
-      workspaceId,
-      projectId,
-      toStageId,
-      rule,
-    });
-
-    if (!checklistInstance) {
-      throw createGateBlockedError({
-        projectId,
-        toStageId,
-        checklistInstanceId: null,
-        missingRequiredItemIds: [],
-        reason: 'missing_instance',
+    const templateId = input.stageConfig.gateChecklistTemplateId;
+    if (!templateId) {
+      throw badRequest('Gated pipeline stage is misconfigured', {
+        toStageId: input.toStageId,
+        reason: 'gateChecklistTemplateId is required when isGated=true',
       });
     }
 
-    const missingRequiredItemIds = getUnsatisfiedRequiredItemIds(checklistInstance.items);
-    if (missingRequiredItemIds.length === 0) {
+    const transactionalGateState = await prisma.$transaction(async (tx) => {
+      const template = await checklistsRepository.findActiveTemplateById(
+        input.workspaceId,
+        templateId,
+        tx,
+      );
+
+      if (!template) {
+        throw badRequest('Gated pipeline stage template is invalid', {
+          toStageId: input.toStageId,
+          templateId,
+          reason: 'Template not found in workspace or archived',
+        });
+      }
+
+      const lookup = {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        pipelineStageId: input.toStageId,
+        checklistTemplateId: template.id,
+      };
+
+      const ensured = await ensureChecklistInstance({
+        lookup,
+        autoCreateInstance: input.stageConfig.autoCreateInstance,
+        tx,
+      });
+
+      const gateValidation = await validateGateForInstance({
+        workspaceId: input.workspaceId,
+        instanceId: ensured.instance?.id ?? null,
+        tx,
+      });
+
+      return {
+        templateId: template.id,
+        instanceId: ensured.instance?.id ?? null,
+        missingRequiredItemIds: gateValidation.missingRequiredItemIds,
+        gateOk: gateValidation.ok,
+      };
+    });
+
+    if (!transactionalGateState.gateOk) {
+      if (!input.overrideGate) {
+        throw createGateBlockedError({
+          instanceId: transactionalGateState.instanceId,
+          templateId: transactionalGateState.templateId,
+          missingRequiredItemIds: transactionalGateState.missingRequiredItemIds,
+        });
+      }
+
+      const normalizedReason = validateOverrideReason(input.overrideReason);
+      await requirePermission(
+        input.actorUserId,
+        input.workspaceId,
+        CHECKLISTS_OVERRIDE_GATE_PERMISSION,
+      );
+
+      await audit.log({
+        event: 'checklists.gate.override',
+        actorUserId: input.actorUserId,
+        workspaceId: input.workspaceId,
+        entityType: 'Project',
+        entityId: input.projectId,
+        metadata: {
+          projectId: input.projectId,
+          toStageId: input.toStageId,
+          instanceId: transactionalGateState.instanceId,
+          templateId: transactionalGateState.templateId,
+          missingRequiredItemIds: transactionalGateState.missingRequiredItemIds,
+          overrideReason: truncateOverrideReasonForAudit(normalizedReason),
+        },
+        request: input.request,
+      });
+
       return {
         enforced: true,
-        blocked: false,
-        overridden: false,
-        ruleId: rule.id,
-        checklistInstanceId: checklistInstance.id,
-        missingRequiredItemIds: [],
+        overridden: true,
+        ruleId: input.toStageId,
+        checklistInstanceId: transactionalGateState.instanceId,
+        missingRequiredItemIds: transactionalGateState.missingRequiredItemIds,
       };
     }
-
-    if (!input.overrideGate) {
-      throw createGateBlockedError({
-        projectId,
-        toStageId,
-        checklistInstanceId: checklistInstance.id,
-        missingRequiredItemIds,
-      });
-    }
-
-    const normalizedOverrideReason = input.overrideReason?.trim() ?? '';
-    if (normalizedOverrideReason.length < MIN_OVERRIDE_REASON_LENGTH) {
-      throw badRequest('overrideReason is required when overrideGate=true', {
-        minLength: MIN_OVERRIDE_REASON_LENGTH,
-      });
-    }
-
-    await audit.log({
-      event: 'checklists.gate.override',
-      actorUserId: input.actorUserId,
-      workspaceId,
-      entityType: 'Project',
-      entityId: projectId,
-      metadata: {
-        toStageId,
-        ruleId: rule.id,
-        instanceId: checklistInstance.id,
-        reason: normalizedOverrideReason,
-        missingRequiredItemIds,
-      },
-      request: input.request,
-    });
 
     return {
       enforced: true,
-      blocked: false,
-      overridden: true,
-      ruleId: rule.id,
-      checklistInstanceId: checklistInstance.id,
-      missingRequiredItemIds,
+      overridden: false,
+      ruleId: input.toStageId,
+      checklistInstanceId: transactionalGateState.instanceId,
+      missingRequiredItemIds: [] as string[],
     };
   },
 };

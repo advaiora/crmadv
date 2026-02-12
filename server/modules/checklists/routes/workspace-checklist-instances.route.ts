@@ -20,7 +20,7 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.completeItem,
+        CHECKLISTS_PERMISSIONS.create,
       );
 
       const instance = await checklistsService.createChecklistInstance({
@@ -48,9 +48,7 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
         request.params.projectId,
       );
 
-      return ok(reply, {
-        items: result.items,
-      });
+      return ok(reply, result.items);
     },
   );
 
@@ -70,9 +68,7 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
         request,
       });
 
-      return ok(reply, {
-        item,
-      });
+      return ok(reply, item);
     },
   );
 
@@ -92,9 +88,7 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
         request,
       });
 
-      return ok(reply, {
-        item,
-      });
+      return ok(reply, item);
     },
   );
 
@@ -111,9 +105,7 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
         itemId: request.params.itemId,
       });
 
-      return ok(reply, {
-        item,
-      });
+      return ok(reply, item);
     },
   );
 };

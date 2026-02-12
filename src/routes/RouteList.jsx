@@ -24,6 +24,9 @@ import CreateInvoice from "../views/Invoices/CreateInvoice";
 import InvoiceList from "../views/Invoices/InvoiceList";
 import InvoiceTemplates from "../views/Invoices/InvoiceTemplates";
 import PreviewInvoice from "../views/Invoices/PreviewInvoice";
+import ProjectDetail from "../views/Projects/ProjectDetail";
+import ProjectPipelineSettings from "../views/Projects/ProjectPipelineSettings";
+import ProjectsHome from "../views/Projects/ProjectsBoard";
 import KanbanBoard from "../views/Scrumboard/KanbanBoard/Index";
 import Pipeline from "../views/Scrumboard/Pipeline";
 import ProjectsBoard from "../views/Scrumboard/ProjectsBoard";
@@ -69,6 +72,9 @@ export const routes = [
     { path: 'apps/clients/new', exact: true, component: ClientNew },
     { path: 'apps/clients/:id/edit', exact: true, component: ClientEdit },
     { path: 'apps/clients/:id', exact: true, component: ClientDetail },
+    { path: 'projects', exact: true, component: ProjectsHome },
+    { path: 'projects/settings/pipeline', exact: true, component: ProjectPipelineSettings },
+    { path: 'projects/:id', exact: true, component: ProjectDetail },
     { path: 'apps/file-manager/list-view', exact: true, component: ListView },
     { path: 'apps/file-manager/grid-view', exact: true, component: GridView },
     { path: 'apps/gallery', exact: true, component: Gallery },

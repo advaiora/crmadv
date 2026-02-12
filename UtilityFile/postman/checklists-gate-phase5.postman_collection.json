@@ -19,7 +19,7 @@
           "mode": "raw",
           "raw": "{\n  \"modules\": [\n    { \"key\": \"checklists\", \"enabled\": false }\n  ]\n}"
         },
-        "description": "Helper per il test 5.3. Richiede permesso modules.manage."
+        "description": "Helper per test 5.3. Richiede modules.manage."
       },
       "event": [
         {
@@ -48,7 +48,7 @@
           "mode": "raw",
           "raw": "{\n  \"modules\": [\n    { \"key\": \"checklists\", \"enabled\": true }\n  ]\n}"
         },
-        "description": "Helper di ripristino dopo il test 5.3."
+        "description": "Helper di ripristino modulo checklists."
       },
       "event": [
         {
@@ -77,7 +77,12 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 401', function () { pm.response.to.have.status(401); });",
-              "pm.test('error code UNAUTHORIZED', function () { pm.expect(json.error.code).to.eql('UNAUTHORIZED'); });"
+              "pm.test('code UNAUTHORIZED', function () { pm.expect(json.error.code).to.eql('UNAUTHORIZED'); });",
+              "pm.test('message', function () { pm.expect(json.error.message).to.eql('Authentication headers are missing'); });",
+              "pm.test('expected headers', function () {",
+              "  pm.expect(json.error.details.expected).to.include('x-user-id');",
+              "  pm.expect(json.error.details.expected).to.include('x-user-email');",
+              "});"
             ]
           }
         }
@@ -101,7 +106,8 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 400', function () { pm.response.to.have.status(400); });",
-              "pm.test('error code BAD_REQUEST', function () { pm.expect(json.error.code).to.eql('BAD_REQUEST'); });"
+              "pm.test('code BAD_REQUEST', function () { pm.expect(json.error.code).to.eql('BAD_REQUEST'); });",
+              "pm.test('message', function () { pm.expect(json.error.message).to.eql('Workspace header is required'); });"
             ]
           }
         }
@@ -117,7 +123,7 @@
           { "key": "x-workspace-id", "value": "{{workspaceId}}" }
         ],
         "url": "{{baseUrl}}/checklists/templates",
-        "description": "Prerequisito: esegui prima 'Setup - Disable checklists module'."
+        "description": "Eseguire prima Setup - Disable checklists module."
       },
       "event": [
         {
@@ -127,7 +133,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 403', function () { pm.response.to.have.status(403); });",
-              "pm.test('error code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
+              "pm.test('code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
             ]
           }
         }
@@ -143,7 +149,7 @@
           { "key": "x-workspace-id", "value": "{{workspaceId}}" }
         ],
         "url": "{{baseUrl}}/checklists/templates",
-        "description": "Usa un utente senza permission checklists.view."
+        "description": "Utente membro workspace ma senza permission checklists.view."
       },
       "event": [
         {
@@ -153,7 +159,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 403', function () { pm.response.to.have.status(403); });",
-              "pm.test('error code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
+              "pm.test('code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
             ]
           }
         }
@@ -172,10 +178,19 @@
         "url": "{{baseUrl}}/checklists/templates",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"name\": \"{{templateName}}\",\n  \"description\": \"Checklist onboarding sito\",\n  \"items\": [\n    {\n      \"title\": \"Raccolta credenziali\",\n      \"description\": \"Accessi principali\",\n      \"sortOrder\": 0,\n      \"isRequired\": true,\n      \"requiresEvidence\": true,\n      \"isCritical\": true\n    }\n  ]\n}"
+          "raw": "{\n  \"name\": \"{{templateName}}\",\n  \"description\": \"Checklist onboarding sito\",\n  \"items\": [\n    {\n      \"title\": \"Raccolta credenziali\",\n      \"description\": \"Accessi principali\",\n      \"isRequired\": true,\n      \"requiresEvidenceSnapshot\": true,\n      \"isCriticalSnapshot\": true\n    }\n  ]\n}"
         }
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('templateName', 'Onboarding sito ' + Date.now());"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
@@ -183,10 +198,10 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 201', function () { pm.response.to.have.status(201); });",
-              "pm.test('template created', function () { pm.expect(json.data.template.id).to.be.a('string'); });",
-              "pm.collectionVariables.set('templateId', json.data.template.id);",
-              "if (json.data.template.items && json.data.template.items.length > 0) {",
-              "  pm.collectionVariables.set('templateItemId', json.data.template.items[0].id);",
+              "pm.test('template id', function () { pm.expect(json.data.id).to.be.a('string'); });",
+              "pm.collectionVariables.set('templateId', json.data.id);",
+              "if (json.data.items && json.data.items.length > 0) {",
+              "  pm.collectionVariables.set('templateItemId', json.data.items[0].id);",
               "}"
             ]
           }
@@ -217,7 +232,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 409', function () { pm.response.to.have.status(409); });",
-              "pm.test('error code DUPLICATE_TEMPLATE_NAME', function () { pm.expect(json.error.code).to.eql('DUPLICATE_TEMPLATE_NAME'); });"
+              "pm.test('code DUPLICATE_TEMPLATE_NAME', function () { pm.expect(json.error.code).to.eql('DUPLICATE_TEMPLATE_NAME'); });"
             ]
           }
         }
@@ -236,7 +251,7 @@
         "url": "{{baseUrl}}/checklists/templates/{{templateId}}/items",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"title\": \"Conferma contenuti\",\n  \"description\": \"Materiale definitivo\",\n  \"isRequired\": true,\n  \"requiresEvidence\": false,\n  \"isCritical\": false\n}"
+          "raw": "{\n  \"title\": \"Conferma contenuti\",\n  \"description\": \"Materiale definitivo\",\n  \"isRequired\": true,\n  \"requiresEvidenceSnapshot\": false,\n  \"isCriticalSnapshot\": false\n}"
         }
       },
       "event": [
@@ -247,7 +262,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 201', function () { pm.response.to.have.status(201); });",
-              "pm.collectionVariables.set('templateItemId2', json.data.item.id);"
+              "pm.collectionVariables.set('templateItemId2', json.data.id);"
             ]
           }
         }
@@ -277,7 +292,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 200', function () { pm.response.to.have.status(200); });",
-              "pm.test('sortOrder normalized', function () {",
+              "pm.test('sort normalized', function () {",
               "  pm.expect(json.data.items[0].sortOrder).to.eql(0);",
               "  pm.expect(json.data.items[1].sortOrder).to.eql(1);",
               "});"
@@ -310,7 +325,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 400', function () { pm.response.to.have.status(400); });",
-              "pm.test('error code REORDER_MISMATCH', function () { pm.expect(json.error.code).to.eql('REORDER_MISMATCH'); });"
+              "pm.test('code REORDER_MISMATCH', function () { pm.expect(json.error.code).to.eql('REORDER_MISMATCH'); });"
             ]
           }
         }
@@ -341,8 +356,10 @@
               "const json = pm.response.json();",
               "pm.test('status 201 or 200', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
               "pm.collectionVariables.set('instanceId', json.data.id);",
-              "const evidenceItem = (json.data.items || []).find((item) => item.requiresEvidence === true) || (json.data.items || [])[0];",
-              "if (evidenceItem) { pm.collectionVariables.set('requiredEvidenceItemId', evidenceItem.id); }"
+              "const evidenceItem = (json.data.items || []).find((item) => item.requiresEvidenceSnapshot === true) || (json.data.items || [])[0];",
+              "if (evidenceItem) {",
+              "  pm.collectionVariables.set('requiredEvidenceItemId', evidenceItem.id);",
+              "}"
             ]
           }
         }
@@ -372,9 +389,8 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 200', function () { pm.response.to.have.status(200); });",
-              "pm.test('same instance reused', function () {",
-              "  const previous = pm.collectionVariables.get('instanceId');",
-              "  pm.expect(json.data.id).to.eql(previous);",
+              "pm.test('same instance', function () {",
+              "  pm.expect(json.data.id).to.eql(pm.collectionVariables.get('instanceId'));",
               "});"
             ]
           }
@@ -405,7 +421,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 400', function () { pm.response.to.have.status(400); });",
-              "pm.test('error code EVIDENCE_REQUIRED', function () { pm.expect(json.error.code).to.eql('EVIDENCE_REQUIRED'); });"
+              "pm.test('code EVIDENCE_REQUIRED', function () { pm.expect(json.error.code).to.eql('EVIDENCE_REQUIRED'); });"
             ]
           }
         }
@@ -435,8 +451,8 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 200', function () { pm.response.to.have.status(200); });",
-              "pm.test('state completed', function () { pm.expect(json.data.item.state).to.eql('completed'); });",
-              "pm.test('completedAt present', function () { pm.expect(json.data.item.completedAt).to.be.a('string'); });"
+              "pm.test('state completed', function () { pm.expect(json.data.state).to.eql('completed'); });",
+              "pm.test('completedAt present', function () { pm.expect(json.data.completedAt).to.be.a('string'); });"
             ]
           }
         }
@@ -466,7 +482,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 409', function () { pm.response.to.have.status(409); });",
-              "pm.test('error code ITEM_ALREADY_COMPLETED', function () { pm.expect(json.error.code).to.eql('ITEM_ALREADY_COMPLETED'); });"
+              "pm.test('code ITEM_ALREADY_COMPLETED', function () { pm.expect(json.error.code).to.eql('ITEM_ALREADY_COMPLETED'); });"
             ]
           }
         }
@@ -487,7 +503,7 @@
           "mode": "raw",
           "raw": "{\n  \"toStageId\": \"{{gatedStageId}}\"\n}"
         },
-        "description": "Prerequisiti: stage con StageChecklistRule bloccante e checklist required non soddisfatta."
+        "description": "Prerequisito: lo stage di destinazione deve avere isGated=true e gateChecklistTemplateId valorizzato."
       },
       "event": [
         {
@@ -497,7 +513,8 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 409', function () { pm.response.to.have.status(409); });",
-              "pm.test('error code CHECKLIST_GATE_BLOCKED', function () { pm.expect(json.error.code).to.eql('CHECKLIST_GATE_BLOCKED'); });"
+              "pm.test('code CHECKLIST_GATE_BLOCKED', function () { pm.expect(json.error.code).to.eql('CHECKLIST_GATE_BLOCKED'); });",
+              "pm.test('missingRequiredItemIds array', function () { pm.expect(json.error.details.missingRequiredItemIds).to.be.an('array'); });"
             ]
           }
         }
@@ -517,7 +534,8 @@
         "body": {
           "mode": "raw",
           "raw": "{\n  \"toStageId\": \"{{gatedStageId}}\",\n  \"overrideGate\": true,\n  \"overrideReason\": \"Motivazione override valida\"\n}"
-        }
+        },
+        "description": "L'utente deve avere projects.move_stage ma NON checklists.override_gate."
       },
       "event": [
         {
@@ -527,7 +545,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 403', function () { pm.response.to.have.status(403); });",
-              "pm.test('error code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
+              "pm.test('code FORBIDDEN', function () { pm.expect(json.error.code).to.eql('FORBIDDEN'); });"
             ]
           }
         }
@@ -548,7 +566,7 @@
           "mode": "raw",
           "raw": "{\n  \"toStageId\": \"{{gatedStageId}}\",\n  \"overrideGate\": true,\n  \"overrideReason\": \"Motivo lungo almeno 10 caratteri\"\n}"
         },
-        "description": "Verificare audit event checklists.gate.override su DB/AuditLog."
+        "description": "Verificare audit event checklists.gate.override su AuditLog."
       },
       "event": [
         {
@@ -573,7 +591,8 @@
           { "key": "x-user-email", "value": "{{userEmail}}" },
           { "key": "x-workspace-id", "value": "{{otherWorkspaceId}}" }
         ],
-        "url": "{{baseUrl}}/checklists/templates/{{templateId}}"
+        "url": "{{baseUrl}}/checklists/templates/{{templateId}}",
+        "description": "Usare un workspace differente in cui l'utente e membro ma la risorsa non esiste."
       },
       "event": [
         {
@@ -583,7 +602,7 @@
             "exec": [
               "const json = pm.response.json();",
               "pm.test('status 404', function () { pm.response.to.have.status(404); });",
-              "pm.test('error code NOT_FOUND', function () { pm.expect(json.error.code).to.eql('NOT_FOUND'); });"
+              "pm.test('code NOT_FOUND', function () { pm.expect(json.error.code).to.eql('NOT_FOUND'); });"
             ]
           }
         }
@@ -598,7 +617,7 @@
     { "key": "limitedUserId", "value": "" },
     { "key": "limitedUserEmail", "value": "" },
     { "key": "otherWorkspaceId", "value": "" },
-    { "key": "templateName", "value": "Onboarding sito" },
+    { "key": "templateName", "value": "" },
     { "key": "templateId", "value": "" },
     { "key": "templateItemId", "value": "" },
     { "key": "templateItemId2", "value": "" },

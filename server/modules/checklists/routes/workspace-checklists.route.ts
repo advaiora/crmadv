@@ -7,12 +7,8 @@ import {
 import { checklistsService } from '../checklists.service.js';
 
 type ListTemplatesQuery = {
-  includeItems?: string;
-  archived?: string;
-};
-
-type GetTemplateQuery = {
-  includeItems?: string;
+  q?: string;
+  isArchived?: string;
 };
 
 type TemplateParams = {
@@ -24,10 +20,6 @@ type TemplateItemParams = {
   itemId: string;
 };
 
-type TemplateOnlyParams = {
-  templateId: string;
-};
-
 const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: ListTemplatesQuery }>(
     '/checklists/templates',
@@ -37,36 +29,12 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
         CHECKLISTS_PERMISSIONS.view,
       );
 
-      const result = await checklistsService.listTemplates(workspace.id, request.query);
-      return ok(reply, {
-        items: result.items,
-      });
+      const templates = await checklistsService.listTemplates(workspace.id, request.query);
+      return ok(reply, templates);
     },
   );
 
-  app.post<{ Body: unknown }>('/checklists/templates', async (request, reply) => {
-    const { user, workspace } = await ensureChecklistsAccess(
-      request,
-      CHECKLISTS_PERMISSIONS.manageTemplates,
-    );
-
-    const template = await checklistsService.createTemplate({
-      workspaceId: workspace.id,
-      actorUserId: user.id,
-      body: request.body,
-      request,
-    });
-
-    return ok(
-      reply,
-      {
-        template,
-      },
-      201,
-    );
-  });
-
-  app.get<{ Params: TemplateParams; Querystring: GetTemplateQuery }>(
+  app.get<{ Params: TemplateParams }>(
     '/checklists/templates/:id',
     async (request, reply) => {
       const { workspace } = await ensureChecklistsAccess(
@@ -77,21 +45,34 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
       const template = await checklistsService.getTemplate(
         workspace.id,
         request.params.id,
-        request.query,
       );
 
-      return ok(reply, {
-        template,
-      });
+      return ok(reply, template);
     },
   );
+
+  app.post<{ Body: unknown }>('/checklists/templates', async (request, reply) => {
+    const { user, workspace } = await ensureChecklistsAccess(
+      request,
+      CHECKLISTS_PERMISSIONS.create,
+    );
+
+    const template = await checklistsService.createTemplate({
+      workspaceId: workspace.id,
+      actorUserId: user.id,
+      body: request.body,
+      request,
+    });
+
+    return ok(reply, template, 201);
+  });
 
   app.patch<{ Params: TemplateParams; Body: unknown }>(
     '/checklists/templates/:id',
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.manageTemplates,
+        CHECKLISTS_PERMISSIONS.edit,
       );
 
       const template = await checklistsService.updateTemplate({
@@ -102,9 +83,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
         request,
       });
 
-      return ok(reply, {
-        template,
-      });
+      return ok(reply, template);
     },
   );
 
@@ -113,7 +92,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.manageTemplates,
+        CHECKLISTS_PERMISSIONS.delete,
       );
 
       await checklistsService.archiveTemplate({
@@ -128,29 +107,23 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.post<{ Params: TemplateOnlyParams; Body: unknown }>(
-    '/checklists/templates/:templateId/items',
+  app.post<{ Params: TemplateParams; Body: unknown }>(
+    '/checklists/templates/:id/items',
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.manageTemplates,
+        CHECKLISTS_PERMISSIONS.edit,
       );
 
       const item = await checklistsService.createTemplateItem({
         workspaceId: workspace.id,
-        templateId: request.params.templateId,
+        templateId: request.params.id,
         actorUserId: user.id,
         body: request.body,
         request,
       });
 
-      return ok(
-        reply,
-        {
-          item,
-        },
-        201,
-      );
+      return ok(reply, item, 201);
     },
   );
 
@@ -159,7 +132,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.manageTemplates,
+        CHECKLISTS_PERMISSIONS.edit,
       );
 
       const item = await checklistsService.updateTemplateItem({
@@ -171,9 +144,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
         request,
       });
 
-      return ok(reply, {
-        item,
-      });
+      return ok(reply, item);
     },
   );
 
@@ -182,7 +153,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.manageTemplates,
+        CHECKLISTS_PERMISSIONS.delete,
       );
 
       await checklistsService.deleteTemplateItem({
@@ -198,25 +169,23 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.post<{ Params: TemplateOnlyParams; Body: unknown }>(
-    '/checklists/templates/:templateId/items/reorder',
+  app.post<{ Params: TemplateParams; Body: unknown }>(
+    '/checklists/templates/:id/items/reorder',
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.manageTemplates,
+        CHECKLISTS_PERMISSIONS.edit,
       );
 
       const result = await checklistsService.reorderTemplateItems({
         workspaceId: workspace.id,
-        templateId: request.params.templateId,
+        templateId: request.params.id,
         actorUserId: user.id,
         body: request.body,
         request,
       });
 
-      return ok(reply, {
-        items: result.items,
-      });
+      return ok(reply, result);
     },
   );
 };

@@ -72,21 +72,24 @@ export const SidebarMenu = [
                 id: "ops_projects",
                 name: 'Progetti',
                 icon: <Icons.LayoutKanban />,
-                path: '/apps/taskboard',
+                path: '/projects',
+                requiredModule: 'projects',
+                requiredPermission: 'projects.view',
                 childrens: [
                     {
-                        name: 'Board Progetti',
-                        path: '/apps/taskboard/projects-board',
+                        name: 'Board',
+                        path: '/projects',
                         grp_name: "apps",
                     },
                     {
-                        name: 'Kanban',
-                        path: '/apps/taskboard/kanban-board',
+                        name: 'Dettaglio (demo)',
+                        path: '/projects/demo-project',
                         grp_name: "apps",
                     },
                     {
-                        name: 'Pipeline',
-                        path: '/apps/taskboard/pipeline',
+                        name: 'Impostazioni Pipeline',
+                        path: '/projects/settings/pipeline',
+                        requiredPermission: 'projects.edit',
                         grp_name: "apps",
                     },
                 ]

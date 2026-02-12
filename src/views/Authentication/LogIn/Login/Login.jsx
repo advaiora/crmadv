@@ -20,9 +20,9 @@ const Login = ({ history }) => {
     const [fieldErrors, setFieldErrors] = useState({});
     const [loading, setLoading] = useState(false);
 
-    const leftPanelBackground = 'var(--primary, #0f172a)';
-    const leftPanelTextColor = 'var(--primary-foreground, #111111)';
-    const rightPanelBackground = 'var(--hk-menu-bg, #2563eb)';
+    const leftPanelBackground = 'var(--hk-menu-bg, #2563eb)';
+    const leftPanelTextColor = '#ffffff';
+    const rightPanelBackground = 'var(--primary, #facc15)';
     const rightPanelTextColor = '#ffffff';
 
     const clearFieldError = (fieldName) => {
@@ -101,11 +101,13 @@ const Login = ({ history }) => {
                             }}
                         >
                             <div style={{ width: '100%', maxWidth: 420 }}>
-                                <Card className="card-border shadow-sm">
+                                <Card className="border-0 bg-transparent shadow-none">
                                     <Card.Body className="p-4 p-md-5">
                                         <div className="text-center mb-4">
                                             <h4 className="mt-1 mb-1">Accedi</h4>
-                                            <p className="text-muted mb-0">Inserisci email e password</p>
+                                            <p className="mb-0" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                                                Inserisci email e password
+                                            </p>
                                         </div>
 
                                         {error && (
@@ -181,7 +183,7 @@ const Login = ({ history }) => {
                             <div className="text-center px-4 w-100">
                                 <Link
                                     to="/"
-                                    className="d-inline-flex align-items-center justify-content-center p-4 rounded-4 bg-white shadow-sm"
+                                    className="d-inline-flex align-items-center justify-content-center p-2"
                                 >
                                     <img
                                         src={AdvaioraLogoBlack}

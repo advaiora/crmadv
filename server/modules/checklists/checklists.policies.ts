@@ -8,7 +8,9 @@ export const CHECKLISTS_MODULE_KEY = 'checklists';
 
 export const CHECKLISTS_PERMISSIONS = {
   view: 'checklists.view',
-  manageTemplates: 'checklists.manage_templates',
+  create: 'checklists.create',
+  edit: 'checklists.edit',
+  delete: 'checklists.delete',
   completeItem: 'checklists.complete_item',
 } as const;
 

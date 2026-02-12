@@ -10,8 +10,6 @@ export const PROJECTS_PERMISSIONS = {
   moveStage: 'projects.move_stage',
 } as const;
 
-export const CHECKLISTS_OVERRIDE_PERMISSION = 'checklists.override_gate';
-
 export const ensureProjectsMoveStageAccess = async (request: FastifyRequest) => {
   const user = await requireAuth(request);
   const workspace = await requireWorkspace(request, user.id);
@@ -20,8 +18,3 @@ export const ensureProjectsMoveStageAccess = async (request: FastifyRequest) => 
 
   return { user, workspace };
 };
-
-export const ensureChecklistsOverridePermission = async (
-  userId: string,
-  workspaceId: string,
-) => requirePermission(userId, workspaceId, CHECKLISTS_OVERRIDE_PERMISSION);

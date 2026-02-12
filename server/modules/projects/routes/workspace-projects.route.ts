@@ -1,9 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { ok } from '../../../core/response.js';
-import {
-  ensureChecklistsOverridePermission,
-  ensureProjectsMoveStageAccess,
-} from '../projects.policies.js';
+import { ensureProjectsMoveStageAccess } from '../projects.policies.js';
 import { projectsService } from '../projects.service.js';
 
 type ProjectParams = {
@@ -16,10 +13,6 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsMoveStageAccess(request);
       const payload = projectsService.parseMoveStageBody(request.body);
-
-      if (payload.overrideGate) {
-        await ensureChecklistsOverridePermission(user.id, workspace.id);
-      }
 
       const result = await projectsService.moveStage({
         workspaceId: workspace.id,

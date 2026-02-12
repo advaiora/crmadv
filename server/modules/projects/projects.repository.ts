@@ -7,6 +7,14 @@ export type ProjectStageRecord = {
   pipelineStageId: string | null;
 };
 
+export type PipelineStageGateRecord = {
+  id: string;
+  workspaceId: string;
+  isGated: boolean;
+  gateChecklistTemplateId: string | null;
+  autoCreateInstance: boolean;
+};
+
 const PROJECT_TABLE = 'Project';
 const PIPELINE_STAGE_TABLE = 'PipelineStage';
 
@@ -55,7 +63,13 @@ export const projectsRepository = {
 
     const [projectColumnsReady, pipelineStageColumnsReady] = await Promise.all([
       tableHasColumns(PROJECT_TABLE, ['id', 'workspaceId', 'pipelineStageId']),
-      tableHasColumns(PIPELINE_STAGE_TABLE, ['id', 'workspaceId']),
+      tableHasColumns(PIPELINE_STAGE_TABLE, [
+        'id',
+        'workspaceId',
+        'isGated',
+        'gateChecklistTemplateId',
+        'autoCreateInstance',
+      ]),
     ]);
 
     return projectColumnsReady && pipelineStageColumnsReady;
@@ -73,16 +87,21 @@ export const projectsRepository = {
     return rows[0] ?? null;
   },
 
-  async stageExistsInWorkspace(workspaceId: string, stageId: string) {
-    const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
-      SELECT "id"
+  async findStageById(workspaceId: string, stageId: string) {
+    const rows = await prisma.$queryRaw<PipelineStageGateRecord[]>(Prisma.sql`
+      SELECT
+        "id",
+        "workspaceId",
+        "isGated",
+        "gateChecklistTemplateId",
+        "autoCreateInstance"
       FROM "PipelineStage"
       WHERE "id" = ${stageId}
       AND "workspaceId" = ${workspaceId}
       LIMIT 1
     `);
 
-    return rows.length > 0;
+    return rows[0] ?? null;
   },
 
   async moveProjectToStage(workspaceId: string, projectId: string, toStageId: string) {

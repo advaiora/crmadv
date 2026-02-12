@@ -6,6 +6,7 @@ import { checklistsService } from '../checklists/checklists.service.js';
 import { projectsRepository } from './projects.repository.js';
 
 const MIN_OVERRIDE_REASON_LENGTH = 10;
+const MAX_OVERRIDE_REASON_LENGTH = 500;
 
 const idSchema = z.string().trim().min(1);
 
@@ -13,7 +14,7 @@ const moveStageBodySchema = z
   .object({
     toStageId: idSchema,
     overrideGate: z.boolean().optional().default(false),
-    overrideReason: z.string().trim().optional(),
+    overrideReason: z.string().trim().max(MAX_OVERRIDE_REASON_LENGTH).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -84,7 +85,13 @@ export const projectsService = {
         requiredTables: ['Project', 'PipelineStage'],
         requiredColumns: {
           Project: ['id', 'workspaceId', 'pipelineStageId'],
-          PipelineStage: ['id', 'workspaceId'],
+          PipelineStage: [
+            'id',
+            'workspaceId',
+            'isGated',
+            'gateChecklistTemplateId',
+            'autoCreateInstance',
+          ],
         },
       });
     }
@@ -92,22 +99,23 @@ export const projectsService = {
     const projectId = this.parseProjectId(input.projectId);
     const payload = input.payload;
 
-    const stageExists = await projectsRepository.stageExistsInWorkspace(
-      input.workspaceId,
-      payload.toStageId,
-    );
-    if (!stageExists) {
-      throw notFound('Pipeline stage not found');
-    }
-
     const project = await projectsRepository.findProjectById(input.workspaceId, projectId);
     if (!project) {
       throw notFound('Project not found');
     }
 
-    // Transaction choice (MVP): gate instance auto-create/validation and stage update
-    // are executed as sequential guarded operations across module boundaries.
-    // Unique constraints + optimistic checks keep the flow concurrency-safe.
+    const toStage = await projectsRepository.findStageById(
+      input.workspaceId,
+      payload.toStageId,
+    );
+    if (!toStage) {
+      throw notFound('Pipeline stage not found');
+    }
+
+    // Transaction choice (MVP): checklist ensure+validate runs in one transaction,
+    // then project stage update runs in a separate write.
+    // This is intentionally not fully atomic across modules, but remains concurrency-safe
+    // via unique constraints and guarded workspace-scoped reads.
     const gate = await checklistsService.enforceGateForStageTransition({
       workspaceId: input.workspaceId,
       projectId,
@@ -116,6 +124,11 @@ export const projectsService = {
       overrideReason: payload.overrideReason,
       actorUserId: input.actorUserId,
       request: input.request,
+      stageConfig: {
+        isGated: toStage.isGated,
+        gateChecklistTemplateId: toStage.gateChecklistTemplateId,
+        autoCreateInstance: toStage.autoCreateInstance,
+      },
     });
 
     const movedProject = await projectsRepository.moveProjectToStage(

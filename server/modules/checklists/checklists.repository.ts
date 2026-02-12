@@ -1,33 +1,37 @@
-import { Prisma, type ChecklistInstanceStatus, type ChecklistItemState } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
+
+const PROJECT_TABLE = 'Project';
+const PIPELINE_STAGE_TABLE = 'PipelineStage';
+
+const templateSummarySelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
+  id: true,
+  name: true,
+  description: true,
+  isArchived: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: {
+    select: {
+      items: true,
+    },
+  },
+});
 
 const templateItemSelect = Prisma.validator<Prisma.ChecklistTemplateItemSelect>()({
   id: true,
-  workspaceId: true,
-  templateId: true,
   title: true,
   description: true,
   sortOrder: true,
   isRequired: true,
-  requiresEvidence: true,
-  isCritical: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-const templateSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
-  id: true,
-  workspaceId: true,
-  name: true,
-  description: true,
-  isArchived: true,
+  requiresEvidenceSnapshot: true,
+  isCriticalSnapshot: true,
   createdAt: true,
   updatedAt: true,
 });
 
 const templateWithItemsSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
   id: true,
-  workspaceId: true,
   name: true,
   description: true,
   isArchived: true,
@@ -39,7 +43,18 @@ const templateWithItemsSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>
   },
 });
 
-const instanceItemSelect = Prisma.validator<Prisma.ChecklistInstanceItemSelect>()({
+const templateGateSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
+  id: true,
+  workspaceId: true,
+  isArchived: true,
+});
+
+const itemOrderSelect = Prisma.validator<Prisma.ChecklistTemplateItemSelect>()({
+  id: true,
+  sortOrder: true,
+});
+
+const checklistInstanceItemSelect = Prisma.validator<Prisma.ChecklistInstanceItemSelect>()({
   id: true,
   workspaceId: true,
   instanceId: true,
@@ -59,7 +74,7 @@ const instanceItemSelect = Prisma.validator<Prisma.ChecklistInstanceItemSelect>(
   updatedAt: true,
 });
 
-const instanceSelect = Prisma.validator<Prisma.ChecklistInstanceSelect>()({
+const checklistInstanceWithItemsSelect = Prisma.validator<Prisma.ChecklistInstanceSelect>()({
   id: true,
   workspaceId: true,
   projectId: true,
@@ -68,93 +83,107 @@ const instanceSelect = Prisma.validator<Prisma.ChecklistInstanceSelect>()({
   status: true,
   createdAt: true,
   updatedAt: true,
-});
-
-const instanceWithItemsAndTemplateSelect = Prisma.validator<Prisma.ChecklistInstanceSelect>()({
-  ...instanceSelect,
-  checklistTemplate: {
-    select: {
-      id: true,
-      name: true,
-    },
-  },
   items: {
-    select: instanceItemSelect,
+    select: checklistInstanceItemSelect,
     orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
   },
 });
 
-const stageChecklistRuleSelect = Prisma.validator<Prisma.StageChecklistRuleSelect>()({
+const checklistInstanceSummarySelect = Prisma.validator<Prisma.ChecklistInstanceSelect>()({
   id: true,
-  workspaceId: true,
-  pipelineStageId: true,
   checklistTemplateId: true,
-  isBlocking: true,
-  autoCreateInstance: true,
+  pipelineStageId: true,
+  status: true,
   createdAt: true,
-  updatedAt: true,
 });
 
-export type ChecklistTemplateRecord = Prisma.ChecklistTemplateGetPayload<{
-  select: typeof templateSelect;
+const checklistInstanceItemWithInstanceSelect =
+  Prisma.validator<Prisma.ChecklistInstanceItemSelect>()({
+    ...checklistInstanceItemSelect,
+    instance: {
+      select: {
+        id: true,
+        workspaceId: true,
+        projectId: true,
+        pipelineStageId: true,
+        checklistTemplateId: true,
+        status: true,
+      },
+    },
+  });
+
+export type ChecklistTemplateSummaryRecord = Prisma.ChecklistTemplateGetPayload<{
+  select: typeof templateSummarySelect;
 }>;
 
 export type ChecklistTemplateWithItemsRecord = Prisma.ChecklistTemplateGetPayload<{
   select: typeof templateWithItemsSelect;
 }>;
 
+export type ChecklistTemplateGateRecord = Prisma.ChecklistTemplateGetPayload<{
+  select: typeof templateGateSelect;
+}>;
+
 export type ChecklistTemplateItemRecord = Prisma.ChecklistTemplateItemGetPayload<{
   select: typeof templateItemSelect;
 }>;
 
-export type ChecklistInstanceRecord = Prisma.ChecklistInstanceGetPayload<{
-  select: typeof instanceSelect;
+export type ChecklistTemplateItemOrderRecord = Prisma.ChecklistTemplateItemGetPayload<{
+  select: typeof itemOrderSelect;
+}>;
+
+export type ChecklistInstanceSummaryRecord = Prisma.ChecklistInstanceGetPayload<{
+  select: typeof checklistInstanceSummarySelect;
 }>;
 
 export type ChecklistInstanceWithItemsRecord = Prisma.ChecklistInstanceGetPayload<{
-  select: typeof instanceWithItemsAndTemplateSelect;
+  select: typeof checklistInstanceWithItemsSelect;
 }>;
 
 export type ChecklistInstanceItemRecord = Prisma.ChecklistInstanceItemGetPayload<{
-  select: typeof instanceItemSelect;
+  select: typeof checklistInstanceItemSelect;
 }>;
 
-export type StageChecklistRuleRecord = Prisma.StageChecklistRuleGetPayload<{
-  select: typeof stageChecklistRuleSelect;
+export type ChecklistInstanceItemWithInstanceRecord = Prisma.ChecklistInstanceItemGetPayload<{
+  select: typeof checklistInstanceItemWithInstanceSelect;
 }>;
 
-export type CreateTemplateItemInput = {
+type CreateTemplateItemInput = {
   title: string;
   description: string | null;
-  sortOrder: number;
   isRequired: boolean;
-  requiresEvidence: boolean;
-  isCritical: boolean;
+  requiresEvidenceSnapshot: boolean;
+  isCriticalSnapshot: boolean;
 };
 
-export type UpdateTemplateInput = {
+type UpdateTemplateInput = {
   name?: string;
   description?: string | null;
   isArchived?: boolean;
 };
 
-export type UpdateTemplateItemInput = {
+type UpdateTemplateItemInput = {
   title?: string;
   description?: string | null;
-  sortOrder?: number;
   isRequired?: boolean;
-  requiresEvidence?: boolean;
-  isCritical?: boolean;
+  requiresEvidenceSnapshot?: boolean;
+  isCriticalSnapshot?: boolean;
 };
 
-export type UpdateInstanceItemInput = {
-  state?: ChecklistItemState;
-  evidenceNote?: string | null;
-  evidenceUrl?: string | null;
-  notApplicableReason?: string | null;
-  completedAt?: Date | null;
-  completedByUserId?: string | null;
-};
+const templateWhereByWorkspaceAndId = (workspaceId: string, templateId: string) => ({
+  workspaceId,
+  id: templateId,
+});
+
+const itemWhereByWorkspaceTemplateAndId = (
+  workspaceId: string,
+  templateId: string,
+  itemId: string,
+) => ({
+  workspaceId,
+  templateId,
+  id: itemId,
+});
 
 const tableExists = async (tableName: string) => {
   const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
@@ -183,62 +212,147 @@ const tableHasColumn = async (tableName: string, columnName: string) => {
   return rows[0]?.exists === true;
 };
 
-export const checklistsRepository = {
-  listTemplates(workspaceId: string, isArchived: boolean) {
-    return prisma.checklistTemplate.findMany({
-      where: {
-        workspaceId,
-        isArchived,
-      },
-      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
-      select: templateSelect,
-    });
-  },
+const tableHasColumns = async (tableName: string, columns: readonly string[]) => {
+  const exists = await tableExists(tableName);
+  if (!exists) {
+    return false;
+  }
 
-  listTemplatesWithItems(workspaceId: string, isArchived: boolean) {
+  const checks = await Promise.all(columns.map((columnName) => tableHasColumn(tableName, columnName)));
+  return checks.every(Boolean);
+};
+
+const recalculateChecklistInstanceStatusInTx = async (
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  instanceId: string,
+) => {
+  const pendingRequiredCount = await tx.checklistInstanceItem.count({
+    where: {
+      workspaceId,
+      instanceId,
+      isRequiredSnapshot: true,
+      state: {
+        notIn: ['completed', 'not_applicable'],
+      },
+    },
+  });
+
+  const nextStatus = pendingRequiredCount === 0 ? 'completed' : 'active';
+
+  await tx.checklistInstance.updateMany({
+    where: {
+      workspaceId,
+      id: instanceId,
+    },
+    data: {
+      status: nextStatus,
+    },
+  });
+
+  return nextStatus;
+};
+
+const createChecklistInstanceWithItemsInTx = async (
+  tx: Prisma.TransactionClient,
+  input: {
+    workspaceId: string;
+    projectId: string;
+    pipelineStageId: string;
+    checklistTemplateId: string;
+  },
+) => {
+  const created = await tx.checklistInstance.create({
+    data: {
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      pipelineStageId: input.pipelineStageId,
+      checklistTemplateId: input.checklistTemplateId,
+      status: 'active',
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  const templateItems = await tx.checklistTemplateItem.findMany({
+    where: {
+      workspaceId: input.workspaceId,
+      templateId: input.checklistTemplateId,
+    },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      title: true,
+      sortOrder: true,
+      isRequired: true,
+      requiresEvidenceSnapshot: true,
+      isCriticalSnapshot: true,
+    },
+  });
+
+  if (templateItems.length > 0) {
+    await tx.checklistInstanceItem.createMany({
+      data: templateItems.map((templateItem) => ({
+        workspaceId: input.workspaceId,
+        instanceId: created.id,
+        templateItemId: templateItem.id,
+        titleSnapshot: templateItem.title,
+        isRequiredSnapshot: templateItem.isRequired,
+        requiresEvidenceSnapshot: templateItem.requiresEvidenceSnapshot,
+        isCriticalSnapshot: templateItem.isCriticalSnapshot,
+        sortOrderSnapshot: templateItem.sortOrder,
+        state: 'pending',
+      })),
+    });
+  }
+
+  await recalculateChecklistInstanceStatusInTx(tx, input.workspaceId, created.id);
+
+  return tx.checklistInstance.findFirst({
+    where: {
+      workspaceId: input.workspaceId,
+      id: created.id,
+    },
+    select: checklistInstanceWithItemsSelect,
+  });
+};
+
+export const checklistsRepository = {
+  listTemplates(input: {
+    workspaceId: string;
+    q?: string;
+    isArchived?: boolean;
+  }) {
     return prisma.checklistTemplate.findMany({
       where: {
-        workspaceId,
-        isArchived,
+        workspaceId: input.workspaceId,
+        ...(input.q
+          ? {
+              name: {
+                contains: input.q,
+                mode: 'insensitive',
+              },
+            }
+          : {}),
+        ...(input.isArchived === undefined ? {} : { isArchived: input.isArchived }),
       },
       orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
-      select: templateWithItemsSelect,
+      select: templateSummarySelect,
     });
   },
 
   findTemplateById(workspaceId: string, templateId: string) {
     return prisma.checklistTemplate.findFirst({
-      where: {
-        id: templateId,
-        workspaceId,
-      },
-      select: templateSelect,
+      where: templateWhereByWorkspaceAndId(workspaceId, templateId),
+      select: templateSummarySelect,
     });
   },
 
   findTemplateByIdWithItems(workspaceId: string, templateId: string) {
     return prisma.checklistTemplate.findFirst({
-      where: {
-        id: templateId,
-        workspaceId,
-      },
+      where: templateWhereByWorkspaceAndId(workspaceId, templateId),
       select: templateWithItemsSelect,
-    });
-  },
-
-  findTemplateByName(workspaceId: string, name: string) {
-    return prisma.checklistTemplate.findFirst({
-      where: {
-        workspaceId,
-        name: {
-          equals: name,
-          mode: 'insensitive',
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-      },
     });
   },
 
@@ -248,151 +362,133 @@ export const checklistsRepository = {
     description: string | null;
     items: CreateTemplateItemInput[];
   }) {
-    return prisma.$transaction((tx) =>
-      tx.checklistTemplate.create({
+    return prisma.checklistTemplate.create({
+      data: {
+        workspaceId: input.workspaceId,
+        name: input.name,
+        description: input.description,
+        ...(input.items.length === 0
+          ? {}
+          : {
+              items: {
+                create: input.items.map((item, index) => ({
+                  workspaceId: input.workspaceId,
+                  title: item.title,
+                  description: item.description,
+                  sortOrder: index,
+                  isRequired: item.isRequired,
+                  requiresEvidenceSnapshot: item.requiresEvidenceSnapshot,
+                  isCriticalSnapshot: item.isCriticalSnapshot,
+                })),
+              },
+            }),
+      },
+      select: templateWithItemsSelect,
+    });
+  },
+
+  updateTemplate(workspaceId: string, templateId: string, data: UpdateTemplateInput) {
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.checklistTemplate.findFirst({
+        where: templateWhereByWorkspaceAndId(workspaceId, templateId),
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return null;
+      }
+
+      await tx.checklistTemplate.update({
+        where: { id: existing.id },
+        data,
+      });
+
+      return tx.checklistTemplate.findFirst({
+        where: templateWhereByWorkspaceAndId(workspaceId, templateId),
+        select: templateWithItemsSelect,
+      });
+    });
+  },
+
+  async createTemplateItem(input: {
+    workspaceId: string;
+    templateId: string;
+    title: string;
+    description: string | null;
+    isRequired: boolean;
+    requiresEvidenceSnapshot: boolean;
+    isCriticalSnapshot: boolean;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const template = await tx.checklistTemplate.findFirst({
+        where: templateWhereByWorkspaceAndId(input.workspaceId, input.templateId),
+        select: { id: true },
+      });
+
+      if (!template) {
+        return null;
+      }
+
+      const maxSortOrder = await tx.checklistTemplateItem.aggregate({
+        where: {
+          workspaceId: input.workspaceId,
+          templateId: input.templateId,
+        },
+        _max: {
+          sortOrder: true,
+        },
+      });
+
+      const nextSortOrder = (maxSortOrder._max.sortOrder ?? -1) + 1;
+
+      return tx.checklistTemplateItem.create({
         data: {
           workspaceId: input.workspaceId,
-          name: input.name,
+          templateId: input.templateId,
+          title: input.title,
           description: input.description,
-          ...(input.items.length > 0
-            ? {
-                items: {
-                  create: input.items.map((item) => ({
-                    workspaceId: input.workspaceId,
-                    title: item.title,
-                    description: item.description,
-                    sortOrder: item.sortOrder,
-                    isRequired: item.isRequired,
-                    requiresEvidence: item.requiresEvidence,
-                    isCritical: item.isCritical,
-                  })),
-                },
-              }
-            : {}),
+          sortOrder: nextSortOrder,
+          isRequired: input.isRequired,
+          requiresEvidenceSnapshot: input.requiresEvidenceSnapshot,
+          isCriticalSnapshot: input.isCriticalSnapshot,
         },
-        select: templateWithItemsSelect,
-      }),
-    );
-  },
-
-  listTemplateItems(workspaceId: string, templateId: string) {
-    return prisma.checklistTemplateItem.findMany({
-      where: {
-        workspaceId,
-        templateId,
-      },
-      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-      select: templateItemSelect,
-    });
-  },
-
-  async updateTemplate(workspaceId: string, templateId: string, data: UpdateTemplateInput) {
-    const updated = await prisma.checklistTemplate.updateMany({
-      where: {
-        id: templateId,
-        workspaceId,
-      },
-      data,
-    });
-
-    if (updated.count === 0) {
-      return null;
-    }
-
-    return this.findTemplateById(workspaceId, templateId);
-  },
-
-  archiveTemplate(workspaceId: string, templateId: string) {
-    return prisma.checklistTemplate.updateMany({
-      where: {
-        id: templateId,
-        workspaceId,
-      },
-      data: {
-        isArchived: true,
-      },
+        select: templateItemSelect,
+      });
     });
   },
 
   findTemplateItemById(workspaceId: string, templateId: string, itemId: string) {
     return prisma.checklistTemplateItem.findFirst({
-      where: {
-        id: itemId,
-        templateId,
-        workspaceId,
-      },
+      where: itemWhereByWorkspaceTemplateAndId(workspaceId, templateId, itemId),
       select: templateItemSelect,
     });
   },
 
-  async getNextSortOrder(workspaceId: string, templateId: string) {
-    const maxSortOrder = await prisma.checklistTemplateItem.aggregate({
-      where: {
-        workspaceId,
-        templateId,
-      },
-      _max: {
-        sortOrder: true,
-      },
-    });
-
-    return (maxSortOrder._max.sortOrder ?? -1) + 1;
-  },
-
-  createTemplateItem(input: {
-    workspaceId: string;
-    templateId: string;
-    title: string;
-    description: string | null;
-    sortOrder: number;
-    isRequired: boolean;
-    requiresEvidence: boolean;
-    isCritical: boolean;
-  }) {
-    return prisma.checklistTemplateItem.create({
-      data: {
-        workspaceId: input.workspaceId,
-        templateId: input.templateId,
-        title: input.title,
-        description: input.description,
-        sortOrder: input.sortOrder,
-        isRequired: input.isRequired,
-        requiresEvidence: input.requiresEvidence,
-        isCritical: input.isCritical,
-      },
-      select: templateItemSelect,
-    });
-  },
-
-  async updateTemplateItem(
+  updateTemplateItem(
     workspaceId: string,
     templateId: string,
     itemId: string,
     data: UpdateTemplateItemInput,
   ) {
-    const updated = await prisma.checklistTemplateItem.updateMany({
-      where: {
-        id: itemId,
-        templateId,
-        workspaceId,
-      },
-      data,
-    });
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.checklistTemplateItem.findFirst({
+        where: itemWhereByWorkspaceTemplateAndId(workspaceId, templateId, itemId),
+        select: { id: true },
+      });
 
-    if (updated.count === 0) {
-      return null;
-    }
+      if (!existing) {
+        return null;
+      }
 
-    return this.findTemplateItemById(workspaceId, templateId, itemId);
-  },
+      await tx.checklistTemplateItem.update({
+        where: { id: existing.id },
+        data,
+      });
 
-  deleteTemplateItem(workspaceId: string, templateId: string, itemId: string) {
-    return prisma.checklistTemplateItem.deleteMany({
-      where: {
-        id: itemId,
-        templateId,
-        workspaceId,
-      },
+      return tx.checklistTemplateItem.findFirst({
+        where: itemWhereByWorkspaceTemplateAndId(workspaceId, templateId, itemId),
+        select: templateItemSelect,
+      });
     });
   },
 
@@ -403,26 +499,78 @@ export const checklistsRepository = {
         templateId,
       },
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-      select: {
-        id: true,
-      },
+      select: { id: true },
+    });
+  },
+
+  deleteTemplateItemAndCompact(workspaceId: string, templateId: string, itemId: string) {
+    return prisma.$transaction(async (tx) => {
+      const targetItem = await tx.checklistTemplateItem.findFirst({
+        where: itemWhereByWorkspaceTemplateAndId(workspaceId, templateId, itemId),
+        select: templateItemSelect,
+      });
+
+      if (!targetItem) {
+        return null;
+      }
+
+      await tx.checklistTemplateItem.delete({
+        where: { id: targetItem.id },
+      });
+
+      const remainingItems = await tx.checklistTemplateItem.findMany({
+        where: {
+          workspaceId,
+          templateId,
+        },
+        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        select: itemOrderSelect,
+      });
+
+      const updates = remainingItems
+        .map((item, index) => ({ id: item.id, nextSortOrder: index, sortOrder: item.sortOrder }))
+        .filter((item) => item.sortOrder !== item.nextSortOrder);
+
+      await Promise.all(
+        updates.map((item) =>
+          tx.checklistTemplateItem.update({
+            where: { id: item.id },
+            data: { sortOrder: item.nextSortOrder },
+          }),
+        ),
+      );
+
+      return targetItem;
     });
   },
 
   reorderTemplateItems(workspaceId: string, templateId: string, orderedItemIds: string[]) {
     return prisma.$transaction(async (tx) => {
+      const maxSortOrder = await tx.checklistTemplateItem.aggregate({
+        where: {
+          workspaceId,
+          templateId,
+        },
+        _max: {
+          sortOrder: true,
+        },
+      });
+
+      const offset = (maxSortOrder._max.sortOrder ?? -1) + orderedItemIds.length + 1;
+
       for (let index = 0; index < orderedItemIds.length; index += 1) {
         const itemId = orderedItemIds[index];
-
         await tx.checklistTemplateItem.updateMany({
-          where: {
-            id: itemId,
-            templateId,
-            workspaceId,
-          },
-          data: {
-            sortOrder: index,
-          },
+          where: itemWhereByWorkspaceTemplateAndId(workspaceId, templateId, itemId),
+          data: { sortOrder: offset + index },
+        });
+      }
+
+      for (let index = 0; index < orderedItemIds.length; index += 1) {
+        const itemId = orderedItemIds[index];
+        await tx.checklistTemplateItem.updateMany({
+          where: itemWhereByWorkspaceTemplateAndId(workspaceId, templateId, itemId),
+          data: { sortOrder: index },
         });
       }
 
@@ -432,20 +580,15 @@ export const checklistsRepository = {
           templateId,
         },
         orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-        select: templateItemSelect,
+        select: itemOrderSelect,
       });
     });
   },
 
   async projectExistsInWorkspace(workspaceId: string, projectId: string) {
-    const hasProjectTable = await tableExists('Project');
-    if (!hasProjectTable) {
-      return null;
-    }
-
-    const hasWorkspaceIdColumn = await tableHasColumn('Project', 'workspaceId');
-    if (!hasWorkspaceIdColumn) {
-      return null;
+    const ready = await tableHasColumns(PROJECT_TABLE, ['id', 'workspaceId']);
+    if (!ready) {
+      return false;
     }
 
     const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -460,14 +603,9 @@ export const checklistsRepository = {
   },
 
   async pipelineStageExistsInWorkspace(workspaceId: string, pipelineStageId: string) {
-    const hasPipelineStageTable = await tableExists('PipelineStage');
-    if (!hasPipelineStageTable) {
-      return null;
-    }
-
-    const hasWorkspaceIdColumn = await tableHasColumn('PipelineStage', 'workspaceId');
-    if (!hasWorkspaceIdColumn) {
-      return null;
+    const ready = await tableHasColumns(PIPELINE_STAGE_TABLE, ['id', 'workspaceId']);
+    if (!ready) {
+      return false;
     }
 
     const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
@@ -481,126 +619,118 @@ export const checklistsRepository = {
     return rows.length > 0;
   },
 
-  findChecklistInstanceDuplicate(input: {
-    workspaceId: string;
-    projectId: string;
-    pipelineStageId: string | null;
-    checklistTemplateId: string;
-  }) {
-    return prisma.checklistInstance.findFirst({
-      where: {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        pipelineStageId: input.pipelineStageId,
-        checklistTemplateId: input.checklistTemplateId,
-      },
-      select: instanceSelect,
-    });
-  },
+  findActiveTemplateById(
+    workspaceId: string,
+    templateId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) {
+      return tx.checklistTemplate.findFirst({
+        where: {
+          workspaceId,
+          id: templateId,
+          isArchived: false,
+        },
+        select: templateGateSelect,
+      });
+    }
 
-  findChecklistInstanceByUnique(input: {
-    workspaceId: string;
-    projectId: string;
-    pipelineStageId: string | null;
-    checklistTemplateId: string;
-  }) {
-    return prisma.checklistInstance.findFirst({
-      where: {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        pipelineStageId: input.pipelineStageId,
-        checklistTemplateId: input.checklistTemplateId,
-      },
-      select: instanceWithItemsAndTemplateSelect,
-    });
-  },
-
-  findBlockingStageChecklistRule(workspaceId: string, pipelineStageId: string) {
-    return prisma.stageChecklistRule.findFirst({
+    return prisma.checklistTemplate.findFirst({
       where: {
         workspaceId,
-        pipelineStageId,
-        isBlocking: true,
+        id: templateId,
+        isArchived: false,
       },
-      select: stageChecklistRuleSelect,
+      select: templateGateSelect,
     });
   },
 
-  findChecklistInstanceForStageRule(input: {
-    workspaceId: string;
-    projectId: string;
-    pipelineStageId: string;
-    checklistTemplateId: string;
-  }) {
-    return prisma.checklistInstance.findFirst({
-      where: {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        pipelineStageId: input.pipelineStageId,
-        checklistTemplateId: input.checklistTemplateId,
-      },
-      select: instanceWithItemsAndTemplateSelect,
-    });
-  },
-
-  createChecklistInstanceWithItems(input: {
-    workspaceId: string;
-    projectId: string;
-    pipelineStageId: string | null;
-    checklistTemplateId: string;
-  }) {
-    return prisma.$transaction(async (tx) => {
-      const instance = await tx.checklistInstance.create({
-        data: {
+  findChecklistInstanceByUnique(
+    input: {
+      workspaceId: string;
+      projectId: string;
+      pipelineStageId: string;
+      checklistTemplateId: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) {
+      return tx.checklistInstance.findFirst({
+        where: {
           workspaceId: input.workspaceId,
           projectId: input.projectId,
           pipelineStageId: input.pipelineStageId,
           checklistTemplateId: input.checklistTemplateId,
         },
-        select: instanceSelect,
+        select: checklistInstanceWithItemsSelect,
       });
+    }
 
-      const templateItems = await tx.checklistTemplateItem.findMany({
+    return prisma.checklistInstance.findFirst({
+      where: {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        pipelineStageId: input.pipelineStageId,
+        checklistTemplateId: input.checklistTemplateId,
+      },
+      select: checklistInstanceWithItemsSelect,
+    });
+  },
+
+  createChecklistInstanceWithItems(
+    input: {
+      workspaceId: string;
+      projectId: string;
+      pipelineStageId: string;
+      checklistTemplateId: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) {
+      return createChecklistInstanceWithItemsInTx(tx, input);
+    }
+
+    return prisma.$transaction((innerTx) =>
+      createChecklistInstanceWithItemsInTx(innerTx, input),
+    );
+  },
+
+  async listMissingRequiredItemIds(
+    workspaceId: string,
+    instanceId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) {
+      const rows = await tx.checklistInstanceItem.findMany({
         where: {
-          workspaceId: input.workspaceId,
-          templateId: input.checklistTemplateId,
+          workspaceId,
+          instanceId,
+          isRequiredSnapshot: true,
+          state: 'pending',
         },
-        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+        orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
-          title: true,
-          sortOrder: true,
-          isRequired: true,
-          requiresEvidence: true,
-          isCritical: true,
         },
       });
 
-      if (templateItems.length > 0) {
-        await tx.checklistInstanceItem.createMany({
-          data: templateItems.map((item) => ({
-            workspaceId: input.workspaceId,
-            instanceId: instance.id,
-            templateItemId: item.id,
-            titleSnapshot: item.title,
-            isRequiredSnapshot: item.isRequired,
-            requiresEvidenceSnapshot: item.requiresEvidence,
-            isCriticalSnapshot: item.isCritical,
-            sortOrderSnapshot: item.sortOrder,
-          })),
-        });
-      }
+      return rows.map((row) => row.id);
+    }
 
-      const created = await tx.checklistInstance.findFirst({
-        where: {
-          id: instance.id,
-          workspaceId: input.workspaceId,
-        },
-        select: instanceWithItemsAndTemplateSelect,
-      });
-
-      return created as ChecklistInstanceWithItemsRecord;
+    const rows = await prisma.checklistInstanceItem.findMany({
+      where: {
+        workspaceId,
+        instanceId,
+        isRequiredSnapshot: true,
+        state: 'pending',
+      },
+      orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+      },
     });
+
+    return rows.map((row) => row.id);
   },
 
   listChecklistInstancesByProject(workspaceId: string, projectId: string) {
@@ -609,106 +739,172 @@ export const checklistsRepository = {
         workspaceId,
         projectId,
       },
-      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
-      select: instanceWithItemsAndTemplateSelect,
-    });
-  },
-
-  findChecklistInstanceById(workspaceId: string, instanceId: string) {
-    return prisma.checklistInstance.findFirst({
-      where: {
-        id: instanceId,
-        workspaceId,
-      },
-      select: instanceSelect,
-    });
-  },
-
-  listChecklistInstanceItems(workspaceId: string, instanceId: string) {
-    return prisma.checklistInstanceItem.findMany({
-      where: {
-        workspaceId,
-        instanceId,
-      },
-      orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
-      select: instanceItemSelect,
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      select: checklistInstanceSummarySelect,
     });
   },
 
   findChecklistInstanceItemById(workspaceId: string, itemId: string) {
     return prisma.checklistInstanceItem.findFirst({
       where: {
-        id: itemId,
         workspaceId,
+        id: itemId,
       },
-      select: instanceItemSelect,
+      select: checklistInstanceItemWithInstanceSelect,
     });
   },
 
-  async updateChecklistInstanceItemIfState(
-    workspaceId: string,
-    itemId: string,
-    expectedState: ChecklistItemState,
-    data: UpdateInstanceItemInput,
-  ) {
-    const updated = await prisma.checklistInstanceItem.updateMany({
-      where: {
-        id: itemId,
-        workspaceId,
-        state: expectedState,
-      },
-      data,
-    });
-
-    if (updated.count === 0) {
-      return null;
-    }
-
-    return this.findChecklistInstanceItemById(workspaceId, itemId);
-  },
-
-  async updateChecklistInstanceItem(
-    workspaceId: string,
-    itemId: string,
-    data: UpdateInstanceItemInput,
-  ) {
-    const updated = await prisma.checklistInstanceItem.updateMany({
-      where: {
-        id: itemId,
-        workspaceId,
-      },
-      data,
-    });
-
-    if (updated.count === 0) {
-      return null;
-    }
-
-    return this.findChecklistInstanceItemById(workspaceId, itemId);
-  },
-
-  async updateChecklistInstanceStatus(
-    workspaceId: string,
-    instanceId: string,
-    status: ChecklistInstanceStatus,
-  ) {
-    const updated = await prisma.checklistInstance.updateMany({
-      where: {
-        id: instanceId,
-        workspaceId,
-        status: {
-          not: 'archived',
+  async completeChecklistItemFromPending(input: {
+    workspaceId: string;
+    itemId: string;
+    evidenceNote: string | null;
+    evidenceUrl: string | null;
+    completedByUserId: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const completedAt = new Date();
+      const updated = await tx.checklistInstanceItem.updateMany({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+          state: 'pending',
         },
-      },
-      data: {
-        status,
-      },
+        data: {
+          state: 'completed',
+          evidenceNote: input.evidenceNote,
+          evidenceUrl: input.evidenceUrl,
+          notApplicableReason: null,
+          completedAt,
+          completedByUserId: input.completedByUserId,
+        },
+      });
+
+      if (updated.count === 0) {
+        const current = await tx.checklistInstanceItem.findFirst({
+          where: {
+            workspaceId: input.workspaceId,
+            id: input.itemId,
+          },
+          select: checklistInstanceItemWithInstanceSelect,
+        });
+
+        return { updated: false as const, current };
+      }
+
+      const item = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!item) {
+        return { updated: false as const, current: null };
+      }
+
+      await recalculateChecklistInstanceStatusInTx(tx, input.workspaceId, item.instanceId);
+
+      return { updated: true as const, item };
     });
+  },
 
-    if (updated.count === 0) {
-      return null;
-    }
+  async markChecklistItemNotApplicableFromPending(input: {
+    workspaceId: string;
+    itemId: string;
+    reason: string;
+    completedByUserId: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const completedAt = new Date();
+      const updated = await tx.checklistInstanceItem.updateMany({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+          state: 'pending',
+        },
+        data: {
+          state: 'not_applicable',
+          notApplicableReason: input.reason,
+          evidenceNote: null,
+          evidenceUrl: null,
+          completedAt,
+          completedByUserId: input.completedByUserId,
+        },
+      });
 
-    return this.findChecklistInstanceById(workspaceId, instanceId);
+      if (updated.count === 0) {
+        const current = await tx.checklistInstanceItem.findFirst({
+          where: {
+            workspaceId: input.workspaceId,
+            id: input.itemId,
+          },
+          select: checklistInstanceItemWithInstanceSelect,
+        });
+
+        return { updated: false as const, current };
+      }
+
+      const item = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!item) {
+        return { updated: false as const, current: null };
+      }
+
+      await recalculateChecklistInstanceStatusInTx(tx, input.workspaceId, item.instanceId);
+
+      return { updated: true as const, item };
+    });
+  },
+
+  async resetChecklistItem(workspaceId: string, itemId: string) {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.checklistInstanceItem.updateMany({
+        where: {
+          workspaceId,
+          id: itemId,
+        },
+        data: {
+          state: 'pending',
+          evidenceNote: null,
+          evidenceUrl: null,
+          notApplicableReason: null,
+          completedAt: null,
+          completedByUserId: null,
+        },
+      });
+
+      if (updated.count === 0) {
+        return null;
+      }
+
+      const item = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId,
+          id: itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!item) {
+        return null;
+      }
+
+      await recalculateChecklistInstanceStatusInTx(tx, workspaceId, item.instanceId);
+
+      return item;
+    });
+  },
+
+  recalculateChecklistInstanceStatus(workspaceId: string, instanceId: string) {
+    return prisma.$transaction((tx) =>
+      recalculateChecklistInstanceStatusInTx(tx, workspaceId, instanceId),
+    );
   },
 };
