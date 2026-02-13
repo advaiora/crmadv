@@ -41,6 +41,7 @@ model Workspace {
   userRoles              UserRole[]
   branding               WorkspaceBranding?
   projects               Project[]
+  projectCategories      ProjectCategory[]
   pipelineStages         PipelineStage[]
   quotes                 Quote[]
   quoteEmailLogs         QuoteEmailLog[]
@@ -122,22 +123,41 @@ model Project {
   @@index([workspaceId, updatedAt])
 }
 
+model ProjectCategory {
+  id          String          @id @default(cuid())
+  workspaceId String
+  name        String
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stages      PipelineStage[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, sortOrder])
+}
+
 model PipelineStage {
   id                      String             @id @default(cuid())
   workspaceId             String
+  categoryId              String?
   name                    String
   sortOrder               Int                @default(0)
+  isClosed                Boolean            @default(false)
+  color                   String?            @db.VarChar(20)
   isGated                 Boolean            @default(false)
   gateChecklistTemplateId String?
   autoCreateInstance      Boolean            @default(true)
   createdAt               DateTime           @default(now())
   updatedAt               DateTime           @updatedAt
   workspace               Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category                ProjectCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   gateChecklistTemplate   ChecklistTemplate? @relation("PipelineStageGateTemplate", fields: [gateChecklistTemplateId], references: [id], onDelete: Restrict)
   projects                Project[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, sortOrder])
+  @@index([workspaceId, categoryId, sortOrder])
   @@index([workspaceId, isGated])
 }
 

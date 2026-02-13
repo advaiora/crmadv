@@ -167,6 +167,63 @@ const normalizeProjectPayload = (payload) => {
     return payload;
 };
 
+const normalizeCategoryPayload = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+        return payload;
+    }
+
+    if (payload.category) {
+        return payload.category;
+    }
+
+    return payload;
+};
+
+const normalizeStagePayload = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+        return payload;
+    }
+
+    if (payload.stage) {
+        return payload.stage;
+    }
+
+    return payload;
+};
+
+const normalizeHistoryList = (payload) => {
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+
+    if (Array.isArray(payload?.items)) {
+        return payload.items;
+    }
+
+    if (Array.isArray(payload?.history)) {
+        return payload.history;
+    }
+
+    if (Array.isArray(payload?.stageHistory)) {
+        return payload.stageHistory;
+    }
+
+    if (Array.isArray(payload?.movements)) {
+        return payload.movements;
+    }
+
+    return [];
+};
+
+const projectHistoryEndpoints = [
+    '/projects/:id/history',
+    '/projects/:id/stage-history',
+];
+
+let resolvedProjectHistoryEndpoint = undefined;
+let resolvedStageCreateMode = undefined;
+let resolvedStageReorderMode = undefined;
+
 export const listCategories = async ({ signal } = {}) => {
     const result = await projectsFetch('/projects/categories', {
         method: 'GET',
@@ -194,6 +251,41 @@ export const listProjects = async (params, { signal } = {}) => {
     return normalizeList(result);
 };
 
+export const createCategory = async (input) => {
+    const result = await projectsFetch('/projects/categories', {
+        method: 'POST',
+        body: input,
+    });
+
+    return normalizeCategoryPayload(result);
+};
+
+export const updateCategory = async (id, patch) => {
+    const result = await projectsFetch(`/projects/categories/${id}`, {
+        method: 'PATCH',
+        body: patch,
+    });
+
+    return normalizeCategoryPayload(result);
+};
+
+export const deleteCategory = async (id) => {
+    const result = await projectsFetch(`/projects/categories/${id}`, {
+        method: 'DELETE',
+    });
+
+    return result || { ok: true };
+};
+
+export const getProject = async (id, { signal } = {}) => {
+    const result = await projectsFetch(`/projects/${id}`, {
+        method: 'GET',
+        signal,
+    });
+
+    return normalizeProjectPayload(result);
+};
+
 export const createProject = async (input) => {
     const result = await projectsFetch('/projects', {
         method: 'POST',
@@ -210,6 +302,175 @@ export const updateProject = async (id, patch) => {
     });
 
     return normalizeProjectPayload(result);
+};
+
+export const createStage = async (categoryId, input) => {
+    if (resolvedStageCreateMode === 'global') {
+        const result = await projectsFetch('/projects/stages', {
+            method: 'POST',
+            body: {
+                categoryId,
+                ...input,
+            },
+        });
+
+        return normalizeStagePayload(result);
+    }
+
+    if (resolvedStageCreateMode === 'scoped') {
+        const result = await projectsFetch(`/projects/categories/${categoryId}/stages`, {
+            method: 'POST',
+            body: input,
+        });
+
+        return normalizeStagePayload(result);
+    }
+
+    try {
+        const result = await projectsFetch(`/projects/categories/${categoryId}/stages`, {
+            method: 'POST',
+            body: input,
+        });
+
+        resolvedStageCreateMode = 'scoped';
+        return normalizeStagePayload(result);
+    } catch (error) {
+        if (!isApiError(error) || error.status !== 404) {
+            throw error;
+        }
+    }
+
+    const fallbackResult = await projectsFetch('/projects/stages', {
+        method: 'POST',
+        body: {
+            categoryId,
+            ...input,
+        },
+    });
+    resolvedStageCreateMode = 'global';
+    return normalizeStagePayload(fallbackResult);
+};
+
+export const updateStage = async (stageId, patch) => {
+    const result = await projectsFetch(`/projects/stages/${stageId}`, {
+        method: 'PATCH',
+        body: patch,
+    });
+
+    return normalizeStagePayload(result);
+};
+
+export const deleteStage = async (stageId) => {
+    const result = await projectsFetch(`/projects/stages/${stageId}`, {
+        method: 'DELETE',
+    });
+
+    return result || { ok: true };
+};
+
+export const reorderStages = async (categoryId, orderedStageIds) => {
+    if (resolvedStageReorderMode === 'global') {
+        const result = await projectsFetch('/projects/stages/reorder', {
+            method: 'POST',
+            body: {
+                categoryId,
+                stageIds: orderedStageIds,
+            },
+        });
+
+        return result || { ok: true };
+    }
+
+    if (resolvedStageReorderMode === 'scoped') {
+        const result = await projectsFetch(`/projects/categories/${categoryId}/stages/reorder`, {
+            method: 'POST',
+            body: {
+                stageIds: orderedStageIds,
+            },
+        });
+
+        return result || { ok: true };
+    }
+
+    try {
+        const result = await projectsFetch(`/projects/categories/${categoryId}/stages/reorder`, {
+            method: 'POST',
+            body: {
+                stageIds: orderedStageIds,
+            },
+        });
+
+        resolvedStageReorderMode = 'scoped';
+        return result || { ok: true };
+    } catch (error) {
+        if (!isApiError(error) || error.status !== 404) {
+            throw error;
+        }
+    }
+
+    const fallbackResult = await projectsFetch('/projects/stages/reorder', {
+        method: 'POST',
+        body: {
+            categoryId,
+            stageIds: orderedStageIds,
+        },
+    });
+    resolvedStageReorderMode = 'global';
+    return fallbackResult || { ok: true };
+};
+
+export const deleteProject = async (id) => {
+    await projectsFetch(`/projects/${id}`, {
+        method: 'DELETE',
+    });
+};
+
+export const getProjectStageHistory = async (id, { signal } = {}) => {
+    if (resolvedProjectHistoryEndpoint === null) {
+        return null;
+    }
+
+    if (typeof resolvedProjectHistoryEndpoint === 'string') {
+        try {
+            const result = await projectsFetch(
+                resolvedProjectHistoryEndpoint.replace(':id', id),
+                {
+                    method: 'GET',
+                    signal,
+                },
+            );
+
+            return normalizeHistoryList(result);
+        } catch (error) {
+            if (isApiError(error) && error.status === 404) {
+                resolvedProjectHistoryEndpoint = null;
+                return null;
+            }
+
+            throw error;
+        }
+    }
+
+    for (const endpointTemplate of projectHistoryEndpoints) {
+        try {
+            const result = await projectsFetch(endpointTemplate.replace(':id', id), {
+                method: 'GET',
+                signal,
+            });
+
+            resolvedProjectHistoryEndpoint = endpointTemplate;
+            return normalizeHistoryList(result);
+        } catch (error) {
+            if (isApiError(error) && error.status === 404) {
+                continue;
+            }
+
+            throw error;
+        }
+    }
+
+    resolvedProjectHistoryEndpoint = null;
+    return null;
 };
 
 const normalizeMoveResponse = (payload) => {

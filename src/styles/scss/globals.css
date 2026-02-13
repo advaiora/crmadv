@@ -455,23 +455,25 @@ textarea::placeholder {
 
 /* Focus ring: buttons, inputs, links, dropdowns, tabs */
 :where(
-    a,
-    button,
-    [role="button"],
-    input,
-    select,
-    textarea,
-    .btn,
-    .dropdown-item,
-    .nav-link,
-    .page-link,
-    .form-check-input,
-    .form-control,
-    .form-select
-  ):focus-visible {
+  a,
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea,
+  .btn,
+  .dropdown-item,
+  .nav-link,
+  .page-link,
+  .form-check-input,
+  .form-control,
+  .form-select
+):focus-visible {
   outline: 2px solid var(--ring) !important;
   outline-offset: 2px !important;
-  box-shadow: 0 0 0 2px var(--focus-ring-offset), 0 0 0 4px var(--focus-ring-shadow) !important;
+  box-shadow:
+    0 0 0 2px var(--focus-ring-offset),
+    0 0 0 4px var(--focus-ring-shadow) !important;
 }
 
 /* Dropdowns and tabs */

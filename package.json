@@ -15,7 +15,10 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "test:unit": "node --test --import tsx \"server/**/*.test.ts\"",
+    "test:integration": "node --test --import tsx \"server/**/*.smoke.ts\"",
+    "test:backend": "npm run test:unit && npm run test:integration"
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.14.4",
@@ -45,6 +48,7 @@
     "bourbon": "^7.3.0",
     "classnames": "^2.5.1",
     "dropzone": "^6.0.0-beta.2",
+    "dotenv": "^17.2.3",
     "fastify": "^5.7.4",
     "font-awesome": "^4.7.0",
     "framer-motion": "^12.23.26",

@@ -291,6 +291,24 @@ async function main() {
     },
   });
 
+  const defaultProjectCategory = await prisma.projectCategory.upsert({
+    where: {
+      workspaceId_name: {
+        workspaceId: workspace.id,
+        name: 'Pipeline',
+      },
+    },
+    update: {
+      sortOrder: 0,
+    },
+    create: {
+      workspaceId: workspace.id,
+      name: 'Pipeline',
+      sortOrder: 0,
+    },
+    select: { id: true },
+  });
+
   const prePublishingTemplate = await prisma.checklistTemplate.upsert({
     where: {
       workspaceId_name: {
@@ -378,6 +396,7 @@ async function main() {
     ? await prisma.pipelineStage.update({
         where: { id: existingGatedStage.id },
         data: {
+          categoryId: defaultProjectCategory.id,
           sortOrder: 0,
           isGated: true,
           gateChecklistTemplateId: prePublishingTemplate.id,
@@ -388,6 +407,7 @@ async function main() {
     : await prisma.pipelineStage.create({
         data: {
           workspaceId: workspace.id,
+          categoryId: defaultProjectCategory.id,
           name: gatedStageName,
           sortOrder: 0,
           isGated: true,

@@ -1,0 +1,269 @@
+/* =========================================================
+   PROJECT GLOBAL CSS TOKENS (NON modifica dimensioni/layout)
+   Obiettivo: look "Notion-ish" soft + coerente tra pagine
+   - NIENTE padding/margin/width/height/font-size
+   - Solo: colori, background, border, shadow, hover/focus
+   ========================================================= */
+
+/* ---------- Root tokens ---------- */
+:root,
+[data-bs-theme="light"] {
+  --app-surface: #ffffff;
+  --app-surface-2: rgba(15, 23, 42, 0.02);
+  --app-border: rgba(15, 23, 42, 0.1);
+  --app-border-strong: rgba(15, 23, 42, 0.14);
+  --app-text: #0f172a;
+  --app-muted: rgba(15, 23, 42, 0.62);
+
+  --app-hover: rgba(15, 23, 42, 0.04);
+  --app-active: rgba(15, 23, 42, 0.08);
+
+  --app-shadow-sm: 0 6px 18px rgba(2, 6, 23, 0.06);
+  --app-shadow-md: 0 10px 24px rgba(2, 6, 23, 0.08);
+
+  /* “Accent” neutro (non blu pieno) */
+  --app-accent: rgba(15, 23, 42, 0.12);
+  --app-accent-strong: rgba(15, 23, 42, 0.18);
+
+  /* Focus ring sobrio */
+  --app-focus-ring: 0 0 0 0.15rem rgba(15, 23, 42, 0.16);
+
+  /* Danger */
+  --app-danger: #dc2626;
+  --app-danger-bg: rgba(220, 38, 38, 0.1);
+  --app-danger-border: rgba(220, 38, 38, 0.3);
+
+  /* Primary bridge (se vuoi usare var(--bs-primary) altrove) */
+  --brand-primary-soft: rgba(15, 23, 42, 0.1);
+}
+
+[data-bs-theme="dark"] {
+  --app-surface: #171717;
+  --app-surface-2: rgba(255, 255, 255, 0.03);
+  --app-border: rgba(255, 255, 255, 0.12);
+  --app-border-strong: rgba(255, 255, 255, 0.18);
+  --app-text: #f5f5f5;
+  --app-muted: rgba(245, 245, 245, 0.65);
+
+  --app-hover: rgba(255, 255, 255, 0.06);
+  --app-active: rgba(255, 255, 255, 0.1);
+
+  --app-shadow-sm: 0 10px 24px rgba(0, 0, 0, 0.3);
+  --app-shadow-md: 0 12px 28px rgba(0, 0, 0, 0.38);
+
+  --app-accent: rgba(255, 255, 255, 0.14);
+  --app-accent-strong: rgba(255, 255, 255, 0.22);
+
+  --app-focus-ring: 0 0 0 0.15rem rgba(255, 255, 255, 0.16);
+
+  --app-danger: #ef4444;
+  --app-danger-bg: rgba(239, 68, 68, 0.16);
+  --app-danger-border: rgba(239, 68, 68, 0.34);
+
+  --brand-primary-soft: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- Cards (bootstrap/react-bootstrap) ---------- */
+.card,
+.card-border {
+  background-color: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+  box-shadow: none !important; /* lascia che siano i componenti a decidere, look pulito */
+}
+
+.card .card-header,
+.card-border .card-header {
+  background-color: transparent !important;
+  border-bottom-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+.card .card-body,
+.card-border .card-body {
+  color: var(--app-text) !important;
+}
+
+.text-muted {
+  color: var(--app-muted) !important;
+}
+
+/* ---------- Tables ---------- */
+.table {
+  color: var(--app-text) !important;
+}
+
+.table > :not(caption) > * > * {
+  border-color: var(--app-border) !important;
+}
+
+.table tbody tr:hover {
+  background-color: var(--app-hover) !important;
+}
+
+/* ---------- ListGroup ---------- */
+.list-group-item {
+  border-color: var(--app-border) !important;
+  background-color: transparent !important;
+  color: var(--app-text) !important;
+}
+
+.list-group-item-action:hover {
+  background-color: var(--app-hover) !important;
+}
+
+.list-group-item.active,
+.list-group-item.active:hover {
+  background-color: var(--app-active) !important;
+  color: var(--app-text) !important;
+  border-color: var(--app-border) !important;
+}
+
+/* ---------- Dropdown / Menu ---------- */
+.dropdown-menu {
+  background-color: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+  box-shadow: var(--app-shadow-md) !important;
+}
+
+.dropdown-item {
+  color: var(--app-text) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--app-hover) !important;
+  color: var(--app-text) !important;
+}
+
+/* ---------- Buttons: outline-secondary => pill icon vibe ---------- */
+.btn-outline-secondary {
+  background-color: transparent !important;
+  border-color: var(--app-border-strong) !important;
+  color: var(--app-text) !important;
+  box-shadow: none !important;
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+  background-color: var(--app-hover) !important;
+  border-color: var(--app-accent-strong) !important;
+  color: var(--app-text) !important;
+}
+
+.btn-outline-secondary:active {
+  background-color: var(--app-active) !important;
+  border-color: var(--app-accent-strong) !important;
+  color: var(--app-text) !important;
+}
+
+.btn-outline-secondary:disabled {
+  opacity: 0.5 !important;
+  background-color: transparent !important;
+}
+
+/* ---------- Buttons: outline-danger ---------- */
+.btn-outline-danger {
+  background-color: transparent !important;
+  border-color: var(--app-danger-border) !important;
+  color: var(--app-danger) !important;
+  box-shadow: none !important;
+}
+
+.btn-outline-danger:hover,
+.btn-outline-danger:focus {
+  background-color: var(--app-danger-bg) !important;
+  border-color: var(--app-danger) !important;
+  color: var(--app-danger) !important;
+}
+
+.btn-outline-danger:active {
+  background-color: var(--app-danger-bg) !important;
+  border-color: var(--app-danger) !important;
+  color: var(--app-danger) !important;
+}
+
+/* ---------- Buttons: primary (meno “sparato”, più soft) ---------- */
+/* Se vuoi mantenere il tuo brand giallo/primary altrove, commenta questo blocco */
+.btn-primary,
+.btn-outline-primary {
+  box-shadow: none !important;
+}
+
+.btn-primary {
+  color: var(--app-text) !important;
+  border-color: var(--app-border-strong) !important;
+  background-color: var(--brand-primary-soft) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  color: var(--app-text) !important;
+  border-color: var(--app-accent-strong) !important;
+  background-color: var(--app-hover) !important;
+}
+
+/* ---------- Inputs / Select ---------- */
+.form-control,
+.form-select,
+.input-group-text {
+  background-color: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+  box-shadow: none !important;
+}
+
+.form-control::placeholder {
+  color: var(--app-muted) !important;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--app-accent-strong) !important;
+  box-shadow: var(--app-focus-ring) !important;
+}
+
+/* ---------- Modals ---------- */
+.modal-content {
+  background-color: var(--app-surface) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+  box-shadow: var(--app-shadow-md) !important;
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--app-border) !important;
+}
+
+/* ---------- Badges ---------- */
+.badge.bg-light {
+  background-color: var(--app-hover) !important;
+  color: var(--app-text) !important;
+  border: 1px solid var(--app-border) !important;
+}
+
+.badge.bg-secondary {
+  background-color: var(--app-hover) !important;
+  color: var(--app-text) !important;
+  border: 1px solid var(--app-border) !important;
+}
+
+/* ---------- Toastify (se vuoi un look più pulito) ---------- */
+.Toastify__toast {
+  background: var(--app-surface) !important;
+  color: var(--app-text) !important;
+  border: 1px solid var(--app-border) !important;
+  box-shadow: var(--app-shadow-sm) !important;
+}
+
+.Toastify__progress-bar {
+  background: var(--app-accent-strong) !important;
+}
+
+/* ---------- SVG icons inherit color ---------- */
+.btn svg,
+.dropdown-item svg {
+  stroke: currentColor;
+  color: currentColor;
+}

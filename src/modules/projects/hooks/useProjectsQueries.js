@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { listCategories, listProjects, listStages } from '../api/projects.api';
+import { getProject, listCategories, listProjects, listStages } from '../api/projects.api';
 
 const createIdleState = (initialData) => ({
     data: initialData,
@@ -159,6 +159,57 @@ export const useProjects = (categoryId, filters = {}) => {
 
         return () => controller.abort();
     }, [categoryId, filtersKey, reloadKey]);
+
+    return {
+        ...state,
+        refetch,
+    };
+};
+
+export const useProject = (projectId) => {
+    const [state, setState] = useState(() => createIdleState(null));
+    const [reloadKey, setReloadKey] = useState(0);
+
+    const refetch = useCallback(() => {
+        setReloadKey((current) => current + 1);
+    }, []);
+
+    useEffect(() => {
+        if (!projectId) {
+            setState(createIdleState(null));
+            return undefined;
+        }
+
+        const controller = new AbortController();
+
+        setState((current) => ({
+            ...current,
+            loading: true,
+            error: null,
+        }));
+
+        getProject(projectId, { signal: controller.signal })
+            .then((data) => {
+                setState({
+                    data,
+                    loading: false,
+                    error: null,
+                });
+            })
+            .catch((error) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+
+                setState({
+                    data: null,
+                    loading: false,
+                    error,
+                });
+            });
+
+        return () => controller.abort();
+    }, [projectId, reloadKey]);
 
     return {
         ...state,

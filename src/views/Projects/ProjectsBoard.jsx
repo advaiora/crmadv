@@ -1,181 +1,402 @@
-import React, { useMemo } from 'react';
-import { Card, Col, Form, Row } from 'react-bootstrap';
-import ModulePermissionGate from '../../components/guards/ModulePermissionGate';
-import { isApiError } from '../../modules/projects/api/projects.api';
-import { useCategories, useProjects, useStages } from '../../modules/projects/hooks/useProjectsQueries';
-import { useSelectedCategoryId } from '../../modules/projects/hooks/useSelectedCategoryId';
-import EmptyState from '../../modules/projects/ui/states/EmptyState';
-import ErrorState from '../../modules/projects/ui/states/ErrorState';
-import LoadingState from '../../modules/projects/ui/states/LoadingState';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Badge, Button, Card, Col, Form, Row } from "react-bootstrap";
+import { Plus } from "lucide-react";
+import { ToastContainer, toast } from "react-toastify";
+import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
+import { createProject, isApiError, moveProject } from "../../modules/projects/api/projects.api";
+import { useCategories, useProjects, useStages } from "../../modules/projects/hooks/useProjectsQueries";
+import { useSelectedCategoryId } from "../../modules/projects/hooks/useSelectedCategoryId";
+import ProjectsBoardLayout from "../../modules/projects/ui/board/ProjectsBoard";
+import QuickCreateProjectModal from "../../modules/projects/ui/modals/QuickCreateProjectModal";
+import EmptyState from "../../modules/projects/ui/states/EmptyState";
+import ErrorState from "../../modules/projects/ui/states/ErrorState";
+import LoadingState from "../../modules/projects/ui/states/LoadingState";
+import { hasPermission } from "../../utils/workspaceAccess";
 
 const sortCategories = (categories) =>
-    [...categories].sort((left, right) => {
-        const leftOrder = Number(left?.sortOrder);
-        const rightOrder = Number(right?.sortOrder);
-        const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
-        const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
+  [...categories].sort((left, right) => {
+    const leftOrder = Number(left?.sortOrder);
+    const rightOrder = Number(right?.sortOrder);
+    const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
+    const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
 
-        if (safeLeftOrder !== safeRightOrder) {
-            return safeLeftOrder - safeRightOrder;
-        }
+    if (safeLeftOrder !== safeRightOrder) {
+      return safeLeftOrder - safeRightOrder;
+    }
 
-        return String(left?.name || '').localeCompare(String(right?.name || ''), 'it');
-    });
+    return String(left?.name || "").localeCompare(String(right?.name || ""), "it");
+  });
+
+const sortStages = (stages) =>
+  [...stages].sort((left, right) => {
+    const leftOrder = Number(left?.sortOrder);
+    const rightOrder = Number(right?.sortOrder);
+    const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
+    const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
+
+    if (safeLeftOrder !== safeRightOrder) {
+      return safeLeftOrder - safeRightOrder;
+    }
+
+    return String(left?.name || "").localeCompare(String(right?.name || ""), "it");
+  });
 
 const getErrorMessage = (error) => {
-    if (!error) {
-        return '';
-    }
-
-    if (isApiError(error)) {
-        return `${error.message} (${error.code || error.status || 'API_ERROR'})`;
-    }
-
-    return error?.message || 'Errore inatteso';
+  if (!error) return "";
+  if (isApiError(error)) return `${error.message} (${error.code || error.status || "API_ERROR"})`;
+  return error?.message || "Errore inatteso";
 };
 
-const ProjectsBoardContent = () => {
-    const categoriesQuery = useCategories();
-    const categories = useMemo(
-        () => sortCategories(categoriesQuery.data || []),
-        [categoriesQuery.data],
+const resolveProjectStageId = (project) => project?.stageId || project?.pipelineStageId || project?.stage?.id || "";
+const withProjectStageId = (project, stageId) => ({ ...project, stageId, pipelineStageId: stageId });
+const normalizeBoardProject = (project) => withProjectStageId(project, resolveProjectStageId(project));
+
+const moveProjectInBoard = (projects, projectId, toStageId) => {
+  const projectIndex = projects.findIndex((project) => String(project.id) === String(projectId));
+  if (projectIndex === -1) return projects;
+
+  const targetProject = projects[projectIndex];
+  const fromStageId = resolveProjectStageId(targetProject);
+  if (!toStageId || toStageId === fromStageId) return projects;
+
+  const nextProjects = [...projects];
+  nextProjects.splice(projectIndex, 1);
+  nextProjects.push(withProjectStageId(targetProject, toStageId));
+  return nextProjects;
+};
+
+const SectionCard = ({ children, className = "" }) => (
+  <Card className={`border-0 shadow-sm rounded-4 ${className}`}>
+    <Card.Body className="p-3 p-md-4">{children}</Card.Body>
+  </Card>
+);
+
+const ProjectsBoardContent = ({ access }) => {
+  const categoriesQuery = useCategories();
+  const categories = useMemo(() => sortCategories(categoriesQuery.data || []), [categoriesQuery.data]);
+
+  const { categoryId, setCategoryId } = useSelectedCategoryId(categories);
+  const stagesQuery = useStages(categoryId);
+  const projectsQuery = useProjects(categoryId);
+
+  const stages = useMemo(() => sortStages(stagesQuery.data || []), [stagesQuery.data]);
+  const [boardProjects, setBoardProjects] = useState([]);
+  const boardProjectsRef = useRef([]);
+  const [movingProjectIds, setMovingProjectIds] = useState(() => new Set());
+
+  const [isQuickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateSubmitting, setQuickCreateSubmitting] = useState(false);
+  const [quickCreateError, setQuickCreateError] = useState("");
+  const [quickCreateDraft, setQuickCreateDraft] = useState({ name: "", clientId: "" });
+
+  const canMove = hasPermission(access, "projects.edit");
+  const canCreate = hasPermission(access, "projects.create") || hasPermission(access, "projects.edit");
+  const defaultStageId = stages[0]?.id || "";
+  const quickCreateDisabledReason = !canCreate ? "Non hai permessi" : !defaultStageId ? "Nessuno stage configurato per questa categoria" : "";
+
+  useEffect(() => {
+    const normalizedProjects = (projectsQuery.data || []).map(normalizeBoardProject);
+    setBoardProjects(normalizedProjects);
+  }, [projectsQuery.data]);
+
+  useEffect(() => {
+    boardProjectsRef.current = boardProjects;
+  }, [boardProjects]);
+
+  useEffect(() => {
+    setQuickCreateOpen(false);
+    setQuickCreateError("");
+  }, [categoryId]);
+
+  const refetchBoard = useCallback(() => {
+    stagesQuery.refetch();
+    projectsQuery.refetch();
+  }, [projectsQuery, stagesQuery]);
+
+  const showMoveConflictToast = useCallback(() => {
+    toast.error(
+      ({ closeToast }) => (
+        <div className="d-flex flex-column gap-2">
+          <span>Qualcuno ha aggiornato il progetto. Ricarica la board.</span>
+          <Button
+            type="button"
+            variant="outline-secondary"
+            size="sm"
+            onClick={() => {
+              closeToast?.();
+              void projectsQuery.refetch();
+            }}
+          >
+            Ricarica
+          </Button>
+        </div>
+      ),
+      { autoClose: 7000 },
     );
+  }, [projectsQuery]);
 
-    const { categoryId, setCategoryId } = useSelectedCategoryId(categories);
-    const stagesQuery = useStages(categoryId);
-    const projectsQuery = useProjects(categoryId);
+  const handleMove = useCallback(
+    async (projectId, toStageId) => {
+      if (!canMove) return;
 
-    const stages = stagesQuery.data || [];
-    const projects = projectsQuery.data || [];
+      let previousProjects = null;
 
-    const stageNameById = useMemo(
-        () => new Map(stages.map((stage) => [stage.id, stage.name])),
-        [stages],
-    );
+      setBoardProjects((currentProjects) => {
+        const nextProjects = moveProjectInBoard(currentProjects, projectId, toStageId);
+        if (nextProjects === currentProjects) return currentProjects;
+        previousProjects = currentProjects;
+        return nextProjects;
+      });
 
-    if (categoriesQuery.loading) {
-        return <LoadingState message="Caricamento categorie progetto..." />;
-    }
+      if (!previousProjects) return;
 
-    if (categoriesQuery.error) {
-        return (
-            <ErrorState
-                title="Errore categorie"
-                message={getErrorMessage(categoriesQuery.error)}
-                onRetry={categoriesQuery.refetch}
-            />
-        );
-    }
+      setMovingProjectIds((current) => {
+        const next = new Set(current);
+        next.add(projectId);
+        return next;
+      });
 
-    if (!categories.length) {
-        return (
-            <EmptyState
-                title="Nessuna categoria disponibile"
-                description="Crea almeno una categoria per iniziare a visualizzare la board."
-            />
-        );
-    }
+      try {
+        await moveProject(projectId, { toStageId });
+        void projectsQuery.refetch();
+      } catch (error) {
+        setBoardProjects(previousProjects);
 
+        if (isApiError(error) && error.status === 409) {
+          showMoveConflictToast();
+          return;
+        }
+
+        toast.error("Impossibile spostare il progetto");
+      } finally {
+        setMovingProjectIds((current) => {
+          const next = new Set(current);
+          next.delete(projectId);
+          return next;
+        });
+      }
+    },
+    [canMove, projectsQuery, showMoveConflictToast],
+  );
+
+  const openQuickCreate = useCallback(() => {
+    if (!canCreate || !defaultStageId) return;
+    setQuickCreateError("");
+    setQuickCreateOpen(true);
+  }, [canCreate, defaultStageId]);
+
+  const closeQuickCreate = useCallback(() => {
+    if (quickCreateSubmitting) return;
+    setQuickCreateOpen(false);
+  }, [quickCreateSubmitting]);
+
+  const handleQuickCreateSubmit = useCallback(
+    async (values) => {
+      if (!canCreate) return;
+
+      if (!defaultStageId) {
+        setQuickCreateError("Nessuno stage configurato per questa categoria.");
+        return;
+      }
+
+      setQuickCreateSubmitting(true);
+      setQuickCreateError("");
+      setQuickCreateOpen(false);
+
+      const optimisticId = `temp-${Date.now()}`;
+      const previousProjects = boardProjectsRef.current;
+      const now = new Date().toISOString();
+
+      const optimisticProject = normalizeBoardProject({
+        id: optimisticId,
+        name: values.name,
+        clientId: values.clientId || null,
+        clientName: values.clientId || null,
+        categoryId,
+        stageId: defaultStageId,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      setBoardProjects((currentProjects) => [...currentProjects, optimisticProject]);
+
+      try {
+        const payload = { name: values.name, categoryId, stageId: defaultStageId };
+        if (values.clientId) payload.clientId = values.clientId;
+
+        const createdProject = await createProject(payload);
+        const normalizedCreatedProject = normalizeBoardProject({
+          ...createdProject,
+          stageId: resolveProjectStageId(createdProject) || defaultStageId,
+        });
+
+        setBoardProjects((currentProjects) => currentProjects.map((project) => (project.id === optimisticId ? normalizedCreatedProject : project)));
+
+        setQuickCreateDraft({ name: "", clientId: "" });
+        toast.success("Creato");
+        void projectsQuery.refetch();
+      } catch (error) {
+        setBoardProjects(previousProjects);
+        setQuickCreateDraft({ name: values.name || "", clientId: values.clientId || "" });
+        setQuickCreateError(getErrorMessage(error) || "Errore creazione progetto");
+        setQuickCreateOpen(true);
+        toast.error("Errore creazione progetto");
+      } finally {
+        setQuickCreateSubmitting(false);
+      }
+    },
+    [canCreate, categoryId, defaultStageId, projectsQuery],
+  );
+
+  // ====== Stati “incorniciati” ======
+  if (categoriesQuery.loading) {
     return (
-        <>
-            <Card className="card-border mb-3">
-                <Card.Body>
-                    <Row className="g-3 align-items-end">
-                        <Col md={6} lg={4}>
-                            <Form.Group>
-                                <Form.Label>Categoria</Form.Label>
-                                <Form.Select
-                                    value={categoryId}
-                                    onChange={(event) => setCategoryId(event.target.value)}
-                                >
-                                    {categories.map((category) => (
-                                        <option key={category.id} value={category.id}>
-                                            {category.name}
-                                        </option>
-                                    ))}
-                                </Form.Select>
-                            </Form.Group>
-                        </Col>
-                    </Row>
-                </Card.Body>
-            </Card>
-
-            {(stagesQuery.loading || projectsQuery.loading) && (
-                <LoadingState message="Caricamento stages e progetti..." />
-            )}
-
-            {(stagesQuery.error || projectsQuery.error) && (
-                <ErrorState
-                    title="Errore board progetti"
-                    message={getErrorMessage(stagesQuery.error || projectsQuery.error)}
-                    onRetry={() => {
-                        stagesQuery.refetch();
-                        projectsQuery.refetch();
-                    }}
-                />
-            )}
-
-            {!stagesQuery.loading && !projectsQuery.loading && !stagesQuery.error && !projectsQuery.error && (
-                <>
-                    <Card className="card-border mb-3">
-                        <Card.Body>
-                            <div className="d-flex flex-wrap gap-3 align-items-center justify-content-between">
-                                <div>
-                                    <h6 className="mb-1">Board pronta per Step 3</h6>
-                                    <p className="text-muted mb-0">
-                                        Dati caricati: {stages.length} stage, {projects.length} progetti
-                                    </p>
-                                </div>
-                            </div>
-                        </Card.Body>
-                    </Card>
-
-                    {projects.length === 0 ? (
-                        <EmptyState
-                            title="Nessun progetto trovato"
-                            description="La categoria selezionata non contiene ancora progetti."
-                        />
-                    ) : (
-                        <Card className="card-border">
-                            <Card.Header className="bg-transparent py-3">
-                                <h6 className="mb-0">Progetti caricati</h6>
-                            </Card.Header>
-                            <Card.Body>
-                                <ul className="mb-0 ps-3">
-                                    {projects.map((project) => (
-                                        <li key={project.id} className="mb-2">
-                                            <span className="fw-semibold">{project.name}</span>
-                                            <span className="text-muted ms-2">
-                                                (stage: {stageNameById.get(project.stageId) || project.stageId})
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </Card.Body>
-                        </Card>
-                    )}
-                </>
-            )}
-        </>
+      <SectionCard>
+        <LoadingState message="Caricamento categorie progetto..." />
+      </SectionCard>
     );
+  }
+
+  if (categoriesQuery.error) {
+    return (
+      <SectionCard>
+        <ErrorState title="Errore categorie" message={getErrorMessage(categoriesQuery.error)} onRetry={categoriesQuery.refetch} />
+      </SectionCard>
+    );
+  }
+
+  if (!categories.length) {
+    return (
+      <SectionCard>
+        <EmptyState title="Nessuna categoria disponibile" description="Crea almeno una categoria per iniziare a visualizzare la board." />
+      </SectionCard>
+    );
+  }
+
+  const projectsCount = boardProjects.length;
+  const stagesCount = stages.length;
+
+  return (
+    <>
+      {/* Toolbar */}
+      <SectionCard className="mb-3">
+        <Row className="g-3 align-items-end">
+          <Col xs={12} lg={6}>
+            <Form.Group>
+              <Form.Label className="small text-muted mb-1">Categoria</Form.Label>
+              <Form.Select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="py-2">
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          </Col>
+
+          <Col xs={12} lg={6} className="d-flex justify-content-lg-end">
+            <div className="d-grid d-lg-flex gap-2">
+              <Button
+                variant="primary"
+                onClick={openQuickCreate}
+                disabled={Boolean(quickCreateDisabledReason)}
+                title={quickCreateDisabledReason || undefined}
+                className="d-inline-flex align-items-center justify-content-center gap-2 py-2 px-3 rounded-3"
+              >
+                <Plus size={16} />
+                Nuovo progetto
+              </Button>
+            </div>
+          </Col>
+        </Row>
+      </SectionCard>
+
+      {/* Board container */}
+      <div className="rounded-4">
+        {stagesQuery.loading && (
+          <SectionCard className="mb-3">
+            <LoadingState message="Caricamento stage..." />
+          </SectionCard>
+        )}
+
+        {(stagesQuery.error || projectsQuery.error) && (
+          <SectionCard className="mb-3">
+            <ErrorState title="Errore board progetti" message={getErrorMessage(stagesQuery.error || projectsQuery.error)} onRetry={refetchBoard} />
+          </SectionCard>
+        )}
+
+        {!stagesQuery.loading && projectsQuery.loading && !stagesQuery.error && (
+          <SectionCard className="mb-3">
+            <LoadingState message="Caricamento progetti..." />
+          </SectionCard>
+        )}
+
+        {!stagesQuery.loading && !projectsQuery.loading && !stagesQuery.error && !projectsQuery.error && (
+          <>
+            {!stages.length && (
+              <SectionCard className="mb-3">
+                <EmptyState title="Nessuno stage configurato per questa categoria" description="Configura almeno uno stage per visualizzare la board." />
+              </SectionCard>
+            )}
+
+            {stages.length > 0 && boardProjects.length === 0 && (
+              <SectionCard className="mb-3">
+                <EmptyState title="Nessun progetto in questa pipeline" description="Aggiungi un progetto per iniziare a popolare le colonne." />
+              </SectionCard>
+            )}
+
+            {stages.length > 0 && boardProjects.length > 0 && (
+              <div className="mt-2">
+                {/* Board già gestisce la UI interna */}
+                <ProjectsBoardLayout
+                  categoryId={categoryId}
+                  stages={stages}
+                  projects={boardProjects}
+                  onMove={handleMove}
+                  canMove={canMove}
+                  onQuickCreate={openQuickCreate}
+                  movingProjectIds={movingProjectIds}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <QuickCreateProjectModal
+        show={isQuickCreateOpen}
+        onHide={closeQuickCreate}
+        onSubmit={handleQuickCreateSubmit}
+        submitting={quickCreateSubmitting}
+        submitError={quickCreateError}
+        categoryId={categoryId}
+        defaultStageId={defaultStageId}
+        initialValues={quickCreateDraft}
+      />
+    </>
+  );
 };
 
 const ProjectsBoard = () => {
-    return (
-        <ModulePermissionGate
-            requiredModule="projects"
-            requiredPermission="projects.view"
-            moduleName="Progetti"
-        >
-            <div className="container-fluid py-4">
-                <div className="mb-3">
-                    <h3 className="mb-1">Progetti</h3>
-                    <p className="text-muted mb-0">Board</p>
-                </div>
-                <ProjectsBoardContent />
+  return (
+    <ModulePermissionGate requiredModule="projects" requiredPermission="projects.view" moduleName="Progetti">
+      {({ access }) => (
+        <div className="container-fluid py-4" style={{ background: "var(--bs-body-bg)" }}>
+          {/* Page header */}
+          <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
+            <div>
+              <h3 className="mb-1 fw-semibold">Progetti</h3>
+              <p className="text-muted mb-0">Board operativa per categoria</p>
             </div>
-        </ModulePermissionGate>
-    );
+          </div>
+
+          <ProjectsBoardContent access={access} />
+
+          <ToastContainer position="bottom-right" theme="light" />
+        </div>
+      )}
+    </ModulePermissionGate>
+  );
 };
 
 export default ProjectsBoard;
