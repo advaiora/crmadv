@@ -1,5 +1,7 @@
 import { badRequest, conflict, forbidden, notFound } from '../core/errors.js';
+import { assignWorkspaceUserRole, normalizeWorkspaceSystemRoleName } from '../auth/workspace-bootstrap.js';
 import { membershipRepository } from '../repositories/membership.repository.js';
+import { prisma } from '../prisma.js';
 import { roleRepository } from '../repositories/role.repository.js';
 
 const MAX_ROLE_NAME_LENGTH = 50;
@@ -10,7 +12,7 @@ type RolePayload = {
 };
 
 type AssignRolesPayload = {
-  roles: string[];
+  roleName: string;
 };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -150,6 +152,13 @@ export const workspaceRolesService = {
       throw notFound('Role not found');
     }
 
+    if (existingRole.isSystem || existingRole.isSuperadmin) {
+      throw forbidden('System roles cannot be modified', {
+        roleId: existingRole.id,
+        roleName: existingRole.name,
+      });
+    }
+
     const payload = this.parseRolePayload(body);
 
     const roleWithSameName = await roleRepository.findRoleByName(workspaceId, payload.name);
@@ -228,12 +237,29 @@ export const workspaceRolesService = {
       throw badRequest('Body must be a JSON object');
     }
 
-    return {
-      roles: normalizeStringArray(body.roles, 'roles'),
-    };
+    const roleFromBody = normalizeWorkspaceSystemRoleName(body.role);
+    if (roleFromBody) {
+      return {
+        roleName: roleFromBody,
+      };
+    }
+
+    // Backward compatibility: old payload shape { roles: [roleId] }.
+    if (Array.isArray(body.roles)) {
+      const roles = normalizeStringArray(body.roles, 'roles', false);
+      if (roles.length !== 1) {
+        throw badRequest('Body.roles must contain exactly one role id');
+      }
+
+      return {
+        roleName: roles[0],
+      };
+    }
+
+    throw badRequest('Role is required');
   },
 
-  async assignUserRoles(workspaceId: string, targetUserId: string, body: unknown) {
+  async assignUserRoles(workspaceId: string, targetUserId: string, body: unknown, actorUserId: string) {
     const payload = this.parseAssignRolesPayload(body);
 
     const isMember = await membershipRepository.isMember(targetUserId, workspaceId);
@@ -244,23 +270,34 @@ export const workspaceRolesService = {
       });
     }
 
-    const uniqueRoleIds = Array.from(new Set(payload.roles));
-    const rolesCount = await roleRepository.countRolesByIds(workspaceId, uniqueRoleIds);
-    if (rolesCount !== uniqueRoleIds.length) {
-      throw badRequest('One or more role ids are invalid for this workspace');
+    const parsedRoleName = normalizeWorkspaceSystemRoleName(payload.roleName);
+    const nextRoleName = parsedRoleName
+      ? parsedRoleName
+      : ((await roleRepository.findRoleById(workspaceId, payload.roleName))?.name ?? '');
+    const normalizedNextRoleName = normalizeWorkspaceSystemRoleName(nextRoleName);
+
+    if (!normalizedNextRoleName) {
+      throw badRequest('Invalid role. Allowed roles: Superadmin, Admin, Manager, Operativo, Viewer');
     }
 
-    const currentRoleIds = await roleRepository.listUserRoleIds(workspaceId, targetUserId);
-    const nextRoleIds = [...uniqueRoleIds].sort();
-
-    await roleRepository.replaceUserRoles(workspaceId, targetUserId, nextRoleIds);
+    const assignment = await prisma.$transaction((tx) =>
+      assignWorkspaceUserRole({
+        tx,
+        workspaceId,
+        targetUserId,
+        actorUserId,
+        nextRoleName: normalizedNextRoleName,
+        sourceAction: 'workspace.roles.assign',
+        auditAction: 'rbac.user.role.modified',
+      }),
+    );
 
     return {
       userId: targetUserId,
-      roles: nextRoleIds,
+      roles: [assignment.assignedRoleName],
       changes: {
-        from: currentRoleIds,
-        to: nextRoleIds,
+        from: assignment.previousRoleName ? [assignment.previousRoleName] : [],
+        to: [assignment.assignedRoleName],
       },
     };
   },

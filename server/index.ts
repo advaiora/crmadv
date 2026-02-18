@@ -19,6 +19,9 @@ export const startServer = async (): Promise<StartedServer> => {
   const prismaClient = initializePrisma(runtimeEnv.databaseUrl);
   const { createApp } = await import('./app.js');
   const app = createApp();
+  const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? '';
+  const frontendGoogleClientId = process.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.trim() ?? '';
 
   app.log.info(
     {
@@ -26,6 +29,38 @@ export const startServer = async (): Promise<StartedServer> => {
     },
     'Database configuration loaded',
   );
+
+  if (!googleClientId) {
+    app.log.error('GOOGLE_CLIENT_ID is missing. /auth/google will fail until this env var is configured.');
+  } else {
+    app.log.info(
+      {
+        googleClientId,
+        googleClientIdLength: googleClientId.length,
+        allowedOrigins: allowedOrigins || '(not-set)',
+      },
+      'GOOGLE_CLIENT_ID configured',
+    );
+    if (frontendGoogleClientId && frontendGoogleClientId !== googleClientId) {
+      app.log.warn(
+        {
+          googleClientIdLength: googleClientId.length,
+          viteGoogleClientIdLength: frontendGoogleClientId.length,
+        },
+        'Frontend/backend Google client ID mismatch detected in environment',
+      );
+    }
+    app.log.info(
+      {
+        hints: [
+          'Ensure this client ID is the same in frontend VITE_GOOGLE_CLIENT_ID',
+          'Ensure Authorized JavaScript origins in Google Cloud include your frontend origin',
+          'Redirect URI is not required for GIS popup flow; required only for redirect flow',
+        ],
+      },
+      'Google OAuth configuration hints',
+    );
+  }
 
   await app.listen({ host: runtimeEnv.apiHost, port: runtimeEnv.apiPort });
   app.log.info(`API listening on http://${runtimeEnv.apiHost}:${runtimeEnv.apiPort}`);

@@ -100,9 +100,11 @@ export const routes = [
 
 export const authRoutes = [
     { path: '/login', exact: true, component: Login },
+    { path: '/auth/login', exact: true, component: Login },
     { path: '/login-simple', exact: true, component: LoginSimple },
     { path: '/login-classic', exact: true, component: LoginClassic },
     { path: '/signup', exact: true, component: Signup },
+    { path: '/auth/signup', exact: true, component: Signup },
     { path: '/signup-simple', exact: true, component: SignUpSimple },
     { path: '/signup-classic', exact: true, component: SignupClassic },
     { path: '/lock-screen', exact: true, component: LockScreen },

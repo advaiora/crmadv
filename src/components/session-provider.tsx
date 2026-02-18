@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 import { clearSession, readSession, type SessionState, writeSession } from '../lib/session';
 
 type LoginInput = {
+    accessToken: string;
     userId: string;
     userEmail: string;
     userRole: string;
@@ -23,6 +24,7 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
 
     const login = useCallback((input: LoginInput) => {
         const nextSession = writeSession({
+            accessToken: input.accessToken,
             userId: input.userId,
             userEmail: input.userEmail,
             userRole: input.userRole,

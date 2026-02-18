@@ -102,6 +102,7 @@ test('POST /auth/login returns 503 with readable error when DB is not reachable'
         DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:1/postgres?connect_timeout=1',
         API_HOST: TEST_HOST,
         API_PORT: '4103',
+        AUTH_JWT_SECRET: 'integration-test-super-secret',
       },
       loadDotenv: false,
     });

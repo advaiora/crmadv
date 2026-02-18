@@ -1,7 +1,14 @@
 import { clearSession, readSession } from './session';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
-const DEFAULT_WORKSPACE_SLUG = import.meta.env.VITE_DEV_WORKSPACE_SLUG || 'demo';
+const API_BASE_URL = (
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
+    '/api'
+).replace(/\/$/, '');
+const DEFAULT_WORKSPACE_SLUG =
+    import.meta.env.DEV && typeof import.meta.env.VITE_DEV_WORKSPACE_SLUG === 'string'
+        ? import.meta.env.VITE_DEV_WORKSPACE_SLUG.trim()
+        : '';
 
 const isAbsoluteUrl = (path: string) => /^https?:\/\//i.test(path);
 
@@ -28,17 +35,14 @@ export const apiFetch = async (path: string, options: ApiFetchOptions = {}) => {
 
     if (!skipAuthHeaders) {
         const session = readSession();
-        if (session?.userId) {
-            requestHeaders.set('x-user-id', session.userId);
-        }
-        if (session?.userEmail) {
-            requestHeaders.set('x-user-email', session.userEmail);
+        if (session?.accessToken) {
+            requestHeaders.set('Authorization', `Bearer ${session.accessToken}`);
         }
         if (session?.workspaceId) {
             requestHeaders.set('x-workspace-id', session.workspaceId);
         } else if (session?.workspaceSlug) {
             requestHeaders.set('x-workspace-slug', session.workspaceSlug);
-        } else if (DEFAULT_WORKSPACE_SLUG) {
+        } else if (import.meta.env.DEV && DEFAULT_WORKSPACE_SLUG) {
             requestHeaders.set('x-workspace-slug', DEFAULT_WORKSPACE_SLUG);
         }
     }

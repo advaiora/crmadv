@@ -6,6 +6,9 @@ const DEFAULT_ENV_FILE = '.env';
 const DATABASE_URL_PREFIX = 'postgresql://';
 const PRISMA_ENGINE_ENV_KEY = 'PRISMA_CLIENT_ENGINE_TYPE';
 const DEFAULT_PRISMA_ENGINE = 'binary';
+const AUTH_JWT_SECRET_KEY = 'AUTH_JWT_SECRET';
+const AUTH_JWT_EXPIRES_IN_KEY = 'AUTH_JWT_EXPIRES_IN_SECONDS';
+const DEFAULT_AUTH_JWT_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
 
 export type RuntimeEnvOptions = {
   env?: NodeJS.ProcessEnv;
@@ -18,6 +21,10 @@ export type RuntimeEnv = {
   databaseUrl: string;
   apiHost: string;
   apiPort: number;
+  auth: {
+    jwtSecret: string;
+    jwtExpiresInSeconds: number;
+  };
   prisma: {
     previousEngineType: string | null;
     engineType: string;
@@ -161,6 +168,34 @@ const validateApiPort = (rawPort: string | undefined) => {
   return parsed;
 };
 
+const validateAuthJwtSecret = (rawSecret: string | undefined | null) => {
+  if (isBlank(rawSecret)) {
+    throw new Error('Missing AUTH_JWT_SECRET. Define a strong JWT secret in .env.');
+  }
+
+  const secret = String(rawSecret).trim();
+  if (secret.length < 16) {
+    throw new Error('Invalid AUTH_JWT_SECRET: expected at least 16 characters.');
+  }
+
+  return secret;
+};
+
+const validateAuthJwtExpiresInSeconds = (rawValue: string | undefined | null) => {
+  if (isBlank(rawValue)) {
+    return DEFAULT_AUTH_JWT_EXPIRES_IN_SECONDS;
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isInteger(parsed) || parsed < 60 || parsed > 60 * 60 * 24 * 30) {
+    throw new Error(
+      `Invalid ${AUTH_JWT_EXPIRES_IN_KEY}: "${rawValue}". Expected an integer between 60 and 2592000.`,
+    );
+  }
+
+  return parsed;
+};
+
 export const getSafeDatabaseTarget = (databaseUrl: string) => {
   const parsed = new URL(databaseUrl);
   const database = parsed.pathname.replace(/^\/+/, '') || '(default)';
@@ -194,6 +229,8 @@ export const loadAndValidateRuntimeEnv = (options: RuntimeEnvOptions = {}): Runt
   const databaseUrl = validateDatabaseUrl(env.DATABASE_URL);
   const apiHost = isBlank(env.API_HOST) ? '0.0.0.0' : String(env.API_HOST).trim();
   const apiPort = validateApiPort(env.API_PORT);
+  const authJwtSecret = validateAuthJwtSecret(env[AUTH_JWT_SECRET_KEY]);
+  const authJwtExpiresInSeconds = validateAuthJwtExpiresInSeconds(env[AUTH_JWT_EXPIRES_IN_KEY]);
   const prismaEngine = normalizePrismaEngineType(env, databaseUrl);
 
   const dotenvParsed = dotenvResult?.parsed ?? {};
@@ -209,6 +246,10 @@ export const loadAndValidateRuntimeEnv = (options: RuntimeEnvOptions = {}): Runt
     databaseUrl,
     apiHost,
     apiPort,
+    auth: {
+      jwtSecret: authJwtSecret,
+      jwtExpiresInSeconds: authJwtExpiresInSeconds,
+    },
     prisma: {
       previousEngineType: prismaEngine.previousEngineType,
       engineType: prismaEngine.engineType,

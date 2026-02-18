@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { Prisma } from "@prisma/client";
 import { audit } from "./audit/audit.js";
 import { readHeaderValue } from "./auth/devAuth.js";
@@ -9,7 +10,6 @@ import { requireModuleEnabled } from "./guards/requireModule.js";
 import { requirePermission } from "./guards/requirePermission.js";
 import { requireWorkspace } from "./guards/requireWorkspace.js";
 import { prisma } from "./prisma.js";
-import meRoute from "./routes/me.route.js";
 import authRoute from "./routes/auth.route.js";
 import workspaceBrandingRoute from "./routes/workspace-branding.route.js";
 import workspaceModulesRoute from "./routes/workspace-modules.route.js";
@@ -21,8 +21,53 @@ import workspaceChecklistInstancesRoute from "./modules/checklists/routes/worksp
 import workspaceProjectsRoute from "./modules/projects/routes/workspace-projects.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
+const DEV_DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const DEV_EXPECTED_FRONTEND_ORIGIN = "http://localhost:5173";
+const CORS_ALLOW_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+const CORS_ALLOW_HEADERS = "Content-Type, Authorization, X-Workspace-Id, X-Workspace-Slug, X-Google-Client-Id-Debug";
 
 const sanitizeErrorMessage = (message: string) => message.replace(/\/\/([^:@/\s]+)(?::[^@/\s]*)?@/g, "//***:***@");
+
+const normalizeOrigin = (value: string): string | null => {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    return new URL(normalized).origin;
+  } catch {
+    return null;
+  }
+};
+
+const parseAllowedOrigins = () => {
+  const rawValue = process.env.ALLOWED_ORIGINS;
+  const isProduction = process.env.NODE_ENV === "production";
+  const candidates = rawValue
+    ? rawValue.split(",")
+    : isProduction
+      ? []
+      : DEV_DEFAULT_ALLOWED_ORIGINS;
+
+  const normalizedOrigins = new Set<string>();
+  for (const candidate of candidates) {
+    const normalized = normalizeOrigin(candidate);
+    if (normalized) {
+      normalizedOrigins.add(normalized);
+    }
+  }
+
+  return [...normalizedOrigins];
+};
+
+const setCorsHeaders = (reply: { header: (name: string, value: string) => void }, origin: string) => {
+  reply.header("Access-Control-Allow-Origin", origin);
+  reply.header("Access-Control-Allow-Credentials", "true");
+  reply.header("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
+  reply.header("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
+  reply.header("Vary", "Origin");
+};
 
 const isDatabaseUnavailableError = (error: unknown) => {
   if (error instanceof Error) {
@@ -76,6 +121,67 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   const app = Fastify({
     logger: true,
     ...options,
+  });
+  const corsAllowedOrigins = parseAllowedOrigins();
+  const corsAllowedOriginsSet = new Set(corsAllowedOrigins);
+
+  app.log.info(
+    {
+      corsAllowedOrigins,
+    },
+    "CORS origins configured",
+  );
+
+  if (process.env.NODE_ENV !== "production" && !corsAllowedOriginsSet.has(DEV_EXPECTED_FRONTEND_ORIGIN)) {
+    app.log.warn(
+      {
+        expectedOrigin: DEV_EXPECTED_FRONTEND_ORIGIN,
+        configuredOrigins: corsAllowedOrigins,
+      },
+      "CORS dev origin missing. Requests from local frontend may fail.",
+    );
+  }
+
+  app.addHook("onRequest", async (request, reply) => {
+    const requestOriginRaw = typeof request.headers.origin === "string" ? request.headers.origin : null;
+    const requestOrigin = requestOriginRaw ? normalizeOrigin(requestOriginRaw) : null;
+    const isAllowedOrigin = requestOrigin ? corsAllowedOriginsSet.has(requestOrigin) : false;
+
+    if (requestOrigin && isAllowedOrigin) {
+      setCorsHeaders(reply, requestOrigin);
+      if (request.url.startsWith("/auth/google")) {
+        request.log.info(
+          {
+            reqId: request.id,
+            requestOrigin,
+            route: request.url,
+          },
+          "CORS allowed for Google auth request",
+        );
+      }
+    }
+
+    if (request.method !== "OPTIONS") {
+      return;
+    }
+
+    if (requestOrigin && !isAllowedOrigin) {
+      request.log.warn(
+        {
+          reqId: request.id,
+          route: request.url,
+          requestOrigin,
+          corsAllowedOrigins,
+        },
+        "CORS origin blocked",
+      );
+      reply.code(403).send({
+        error: "CORS origin not allowed",
+      });
+      return;
+    }
+
+    reply.code(204).send();
   });
 
   app.setErrorHandler((error, request, reply) => {
@@ -136,8 +242,12 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   });
 
   app.setNotFoundHandler((_request, reply) => fail(reply, 404, "NOT_FOUND", "Resource not found"));
+  void app.register(rateLimit, {
+    global: false,
+    max: 200,
+    timeWindow: "1 minute",
+  });
 
-  void app.register(meRoute);
   void app.register(authRoute);
   void app.register(workspaceBrandingRoute);
   void app.register(workspaceModulesRoute);

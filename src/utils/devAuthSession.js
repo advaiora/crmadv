@@ -16,6 +16,7 @@ export const getDevAuthSession = () => {
     }
 
     return {
+        accessToken: session.accessToken,
         userId: session.userId,
         email: session.userEmail,
         role: session.userRole,
@@ -27,6 +28,10 @@ export const getDevAuthSession = () => {
 export const setDevAuthSession = (nextSession) => {
     const current = getDevAuthSession();
 
+    const accessToken =
+        normalizeValue(nextSession?.accessToken) ||
+        normalizeValue(nextSession?.token) ||
+        current?.accessToken;
     const userId = normalizeValue(nextSession?.userId) || current?.userId;
     const userEmail =
         normalizeValue(nextSession?.userEmail) ||
@@ -46,6 +51,7 @@ export const setDevAuthSession = (nextSession) => {
         'demo';
 
     const saved = writeSession({
+        accessToken,
         userId,
         userEmail,
         userRole,
@@ -58,6 +64,7 @@ export const setDevAuthSession = (nextSession) => {
     }
 
     return {
+        accessToken: saved.accessToken,
         userId: saved.userId,
         email: saved.userEmail,
         role: saved.userRole,
@@ -72,14 +79,13 @@ export const clearDevAuthSession = () => {
 
 export const getDevAuthHeaders = () => {
     const session = readSession();
-    if (!session) {
+    if (!session?.accessToken) {
         return {};
     }
     const fallbackWorkspaceSlug = normalizeValue(import.meta.env.VITE_DEV_WORKSPACE_SLUG) || 'demo';
 
     return {
-        'x-user-id': session.userId,
-        'x-user-email': session.userEmail,
+        Authorization: `Bearer ${session.accessToken}`,
         ...(session.workspaceId
             ? { 'x-workspace-id': session.workspaceId }
             : session.workspaceSlug

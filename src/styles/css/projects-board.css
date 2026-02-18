@@ -1,0 +1,71 @@
+/* projects-board.css */
+
+/* Board layout */
+.projects-board-shell {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.projects-board-columns {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+/* Column */
+.projects-stage-column {
+  flex: 0 0 320px;
+  max-width: 320px;
+
+  background: var(--stage-bg, var(--bs-body-bg));
+  border: 1px solid var(--stage-border, rgba(15, 23, 42, 0.08));
+  border-radius: 16px;
+  overflow: hidden;
+  transition:
+    background 0.2s ease,
+    border 0.2s ease;
+}
+
+/* Header */
+.projects-stage-header {
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.03);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Dropzone */
+.projects-stage-dropzone {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 160px;
+}
+
+/* Card base */
+.projects-board-card {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  transition: box-shadow 0.15s ease;
+}
+
+.projects-board-card.is-dragging {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.projects-card-body-clean {
+  background: transparent !important;
+}
+
+.projects-board-card--tinted {
+  background: var(--stage-bg, transparent) !important;
+  border-color: var(--stage-border, rgba(15, 23, 42, 0.1)) !important;
+}
+
+.projects-board-card--tinted > .card-body {
+  background: transparent !important;
+}

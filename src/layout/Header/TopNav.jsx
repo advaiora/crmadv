@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import HkBadge from '../../components/@hk-badge/@hk-badge';
 import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
 import { fetchWorkspaceAccess } from '../../utils/workspaceAccess';
+import { apiPost } from '../../utils/apiClient';
 import { useSession } from '../../hooks/useSession';
 
 // Images
@@ -132,8 +133,13 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
         void loadNavbarData();
     }, [loadNavbarData]);
 
-    const handleSignOut = (event) => {
+    const handleSignOut = async (event) => {
         event.preventDefault();
+        try {
+            await apiPost('/auth/logout');
+        } catch (_error) {
+            // Logout is best effort for stateless JWT sessions.
+        }
         logout();
         setNavbarData(null);
         setNavbarDataError('');

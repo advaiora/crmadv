@@ -155,6 +155,7 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
         workspace.id,
         request.params.userId,
         request.body,
+        user.id,
       );
 
       await audit.log({

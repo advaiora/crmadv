@@ -1,4 +1,5 @@
 export type SessionState = {
+    accessToken: string;
     userId: string;
     userEmail: string;
     userRole: string;
@@ -25,17 +26,19 @@ const normalizeSession = (rawSession: unknown): SessionState | null => {
     }
 
     const source = rawSession as Record<string, unknown>;
+    const accessToken = normalizeValue(source.accessToken);
     const userId = normalizeValue(source.userId);
     const userEmail = normalizeValue(source.userEmail);
     const userRole = normalizeValue(source.userRole) || 'member';
     const workspaceId = normalizeValue(source.workspaceId);
     const workspaceSlug = normalizeValue(source.workspaceSlug);
 
-    if (!userId || !userEmail) {
+    if (!accessToken || !userId || !userEmail) {
         return null;
     }
 
     return {
+        accessToken,
         userId,
         userEmail: userEmail.toLowerCase(),
         userRole,

@@ -15,7 +15,7 @@ export const isApiError = (error) => error instanceof ApiError;
 
 const getRequiredHeaders = () => {
     const headers = getDevAuthHeaders();
-    if (!headers['x-user-id'] || !headers['x-user-email']) {
+    if (!headers.Authorization) {
         throw new ApiError('Sessione non disponibile. Effettua il login.', {
             status: 401,
             code: 'UNAUTHORIZED',

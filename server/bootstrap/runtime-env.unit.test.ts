@@ -9,6 +9,7 @@ const DATABASE_URL_KEY = 'DATABASE_URL';
 const API_HOST_KEY = 'API_HOST';
 const API_PORT_KEY = 'API_PORT';
 const PRISMA_ENGINE_KEY = 'PRISMA_CLIENT_ENGINE_TYPE';
+const AUTH_JWT_SECRET_KEY = 'AUTH_JWT_SECRET';
 
 const restoreEnvValue = (key: string, value: string | undefined) => {
   if (value === undefined) {
@@ -27,11 +28,12 @@ test('loadAndValidateRuntimeEnv loads variables from .env', async () => {
   const previousApiHost = process.env[API_HOST_KEY];
   const previousApiPort = process.env[API_PORT_KEY];
   const previousPrismaEngine = process.env[PRISMA_ENGINE_KEY];
+  const previousAuthJwtSecret = process.env[AUTH_JWT_SECRET_KEY];
 
   try {
     await writeFile(
       envPath,
-      'DATABASE_URL=postgresql://test-user:test-pass@localhost:5432/crm_test\nAPI_HOST=127.0.0.1\nAPI_PORT=4100\n',
+      'DATABASE_URL=postgresql://test-user:test-pass@localhost:5432/crm_test\nAPI_HOST=127.0.0.1\nAPI_PORT=4100\nAUTH_JWT_SECRET=unit-test-super-secret\n',
       'utf8',
     );
 
@@ -39,6 +41,7 @@ test('loadAndValidateRuntimeEnv loads variables from .env', async () => {
     delete process.env[API_HOST_KEY];
     delete process.env[API_PORT_KEY];
     delete process.env[PRISMA_ENGINE_KEY];
+    delete process.env[AUTH_JWT_SECRET_KEY];
 
     const runtimeEnv = loadAndValidateRuntimeEnv({
       cwd: tempDir,
@@ -50,6 +53,7 @@ test('loadAndValidateRuntimeEnv loads variables from .env', async () => {
     assert.equal(process.env.PRISMA_CLIENT_ENGINE_TYPE, 'binary');
     assert.equal(runtimeEnv.apiHost, '127.0.0.1');
     assert.equal(runtimeEnv.apiPort, 4100);
+    assert.equal(runtimeEnv.auth.jwtSecret, 'unit-test-super-secret');
     assert.deepEqual(runtimeEnv.databaseTarget, {
       host: 'localhost',
       port: '5432',
@@ -62,6 +66,7 @@ test('loadAndValidateRuntimeEnv loads variables from .env', async () => {
     restoreEnvValue(API_HOST_KEY, previousApiHost);
     restoreEnvValue(API_PORT_KEY, previousApiPort);
     restoreEnvValue(PRISMA_ENGINE_KEY, previousPrismaEngine);
+    restoreEnvValue(AUTH_JWT_SECRET_KEY, previousAuthJwtSecret);
     await rm(tempDir, { recursive: true, force: true });
   }
 });
@@ -92,6 +97,7 @@ test('loadAndValidateRuntimeEnv fails fast when PRISMA_CLIENT_ENGINE_TYPE is dat
           PRISMA_CLIENT_ENGINE_TYPE: 'dataproxy',
           API_HOST: '127.0.0.1',
           API_PORT: '4000',
+          AUTH_JWT_SECRET: 'unit-test-super-secret',
         },
         loadDotenv: false,
       }),
@@ -118,6 +124,7 @@ test('loadAndValidateRuntimeEnv fails when .env files contain PRISMA_CLIENT_ENGI
             DATABASE_URL: 'postgresql://user:password@localhost:5432/mydb',
             API_HOST: '127.0.0.1',
             API_PORT: '4000',
+            AUTH_JWT_SECRET: 'unit-test-super-secret',
           },
           loadDotenv: false,
         }),

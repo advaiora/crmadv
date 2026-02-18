@@ -14,6 +14,7 @@ test('bootstrapRuntime validates env without initializing Prisma', async () => {
           DATABASE_URL: 'prisma://localhost:5432/test',
           API_HOST: '127.0.0.1',
           API_PORT: '4101',
+          AUTH_JWT_SECRET: 'unit-test-super-secret',
         },
         loadDotenv: false,
       }),
@@ -27,6 +28,7 @@ test('bootstrapRuntime validates env without initializing Prisma', async () => {
       DATABASE_URL: 'postgresql://test-user:test-pass@localhost:5432/crm_test',
       API_HOST: '127.0.0.1',
       API_PORT: '4102',
+      AUTH_JWT_SECRET: 'unit-test-super-secret',
     },
     loadDotenv: false,
   });
