@@ -154,6 +154,10 @@ const isFedCmNetworkError = (message) =>
   /fedcm.*networkerror|networkerror.*retrieving a token|errore fedcm nel recupero token|issuing_failed/i.test(
     String(message || "").toLowerCase(),
   );
+const isFedCmDisabledByBrowser = (message) =>
+  /fedcm was disabled|third-party sign-in|manage third-party sign-in|site settings/i.test(
+    String(message || "").toLowerCase(),
+  );
 
 const safeParseJson = async (response) => {
   try {
@@ -279,11 +283,6 @@ export const authenticateWithGoogle = async ({
       (await requestGoogleIdToken(googleClientId, {
         redirectUri,
         debugRawResponse,
-        onMoment: (moment) => {
-          if (import.meta.env.DEV) {
-            console.info("[GoogleAuth] GIS prompt moment", moment);
-          }
-        },
       }));
 
     if (import.meta.env.DEV) {
@@ -378,6 +377,8 @@ export const authenticateWithGoogle = async ({
     });
     const message = isPopupOrCancelMessage(rawMessage)
       ? "Popup Google bloccato o accesso annullato. Abilita i popup e riprova."
+      : isFedCmDisabledByBrowser(rawMessage)
+        ? "Sign-in Google bloccato dal browser: FedCM/dispositivo di terze parti disabilitato per questo sito. Riabilitalo nelle impostazioni del sito e riprova."
       : isFedCmNetworkError(rawMessage)
         ? "Errore FedCM nel recupero del token Google. Verifica origin OAuth, CSP e configurazione browser."
       : rawMessage && isFriendlyClientMessage(rawMessage)

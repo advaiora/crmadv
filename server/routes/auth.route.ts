@@ -6,9 +6,13 @@ import { HttpError, badRequest, conflict, isHttpError, internalServerError, unau
 import { ok } from '../core/response.js';
 import { extractBearerToken, signAccessToken, verifyAccessToken } from '../auth/jwt.js';
 import {
+  assignWorkspaceUserRole,
   initializeWorkspaceAuthDefaults,
   normalizeWorkspaceSystemRoleName,
   REGISTRABLE_WORKSPACE_ROLE_NAMES,
+  ensureWorkspaceSystemRoles,
+  SYSTEM_ROLE_NAME,
+  type WorkspaceSystemRoleName,
 } from '../auth/workspace-bootstrap.js';
 import { requireAuthIdentity } from '../guards/requireAuth.js';
 import { audit } from '../audit/audit.js';
@@ -366,6 +370,95 @@ const logGoogleAuthConfigDiagnostics = ({
 const readSingleHeaderValue = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
+const LEGACY_USER_ROLE_TO_WORKSPACE_ROLE: Record<string, WorkspaceSystemRoleName> = {
+  superadmin: SYSTEM_ROLE_NAME.superadmin,
+  admin: SYSTEM_ROLE_NAME.admin,
+  manager: SYSTEM_ROLE_NAME.manager,
+  operativo: SYSTEM_ROLE_NAME.operativo,
+  viewer: SYSTEM_ROLE_NAME.viewer,
+};
+
+const resolveFallbackWorkspaceRoleName = (legacyUserRole: string | null | undefined): WorkspaceSystemRoleName => {
+  if (!legacyUserRole) {
+    return SYSTEM_ROLE_NAME.viewer;
+  }
+
+  const normalizedRole = legacyUserRole.trim().toLowerCase();
+  return LEGACY_USER_ROLE_TO_WORKSPACE_ROLE[normalizedRole] ?? SYSTEM_ROLE_NAME.viewer;
+};
+
+const ensureWorkspaceAccessDefaults = async ({
+  tx,
+  workspaceId,
+  userId,
+  fallbackUserRole,
+  sourceAction,
+}: {
+  tx: Prisma.TransactionClient;
+  workspaceId: string;
+  userId: string;
+  fallbackUserRole: string | null | undefined;
+  sourceAction: string;
+}) => {
+  const [assignedRoleCount, workspaceModuleCount, availableModuleCount, availablePermissionCount] = await Promise.all([
+    tx.userRole.count({
+      where: {
+        workspaceId,
+        userId,
+      },
+    }),
+    tx.workspaceModule.count({
+      where: {
+        workspaceId,
+      },
+    }),
+    tx.module.count(),
+    tx.permission.count(),
+  ]);
+
+  const shouldInitializeModules = workspaceModuleCount === 0;
+  const shouldAssignRole = assignedRoleCount === 0;
+  const shouldBootstrapCatalog = availableModuleCount === 0 || availablePermissionCount === 0;
+
+  if (!shouldInitializeModules && !shouldAssignRole && !shouldBootstrapCatalog) {
+    return null;
+  }
+
+  await ensureWorkspaceSystemRoles({
+    tx,
+    workspaceId,
+    actorUserId: userId,
+    sourceAction,
+  });
+
+  if (!shouldAssignRole) {
+    return null;
+  }
+
+  const activeWorkspaceUserCount = await tx.membership.count({
+    where: {
+      workspaceId,
+      status: 'active',
+    },
+  });
+
+  const nextRoleName =
+    activeWorkspaceUserCount <= 1
+      ? SYSTEM_ROLE_NAME.superadmin
+      : resolveFallbackWorkspaceRoleName(fallbackUserRole);
+
+  return assignWorkspaceUserRole({
+    tx,
+    workspaceId,
+    targetUserId: userId,
+    actorUserId: userId,
+    nextRoleName,
+    sourceAction,
+    enforceHierarchy: false,
+    auditAction: 'rbac.user.role.assigned',
+  });
+};
+
 type MembershipRecord = {
   workspaceId: string;
   status: string;
@@ -574,8 +667,21 @@ const authRoute: FastifyPluginAsync = async (app) => {
         throw unauthorized('Credenziali non valide');
       }
 
+      const repairedRole = await prisma.$transaction((tx) =>
+        ensureWorkspaceAccessDefaults({
+          tx,
+          workspaceId: activeMembership.workspace.id,
+          userId: user.id,
+          fallbackUserRole: user.role,
+          sourceAction: 'auth.login.self_heal',
+        }),
+      );
+
       const sessionPayload = await createSessionPayload({
-        user,
+        user: {
+          ...user,
+          role: repairedRole?.assignedUserRole ?? user.role,
+        },
         workspace: activeMembership.workspace,
       });
 
@@ -797,7 +903,17 @@ const authRoute: FastifyPluginAsync = async (app) => {
               roleName: parsed.data.role ?? undefined,
             },
           });
-          const resolvedUserRole = workspaceResolution.roleAssignment?.assignedUserRole ?? upsertedUser.user.role;
+          const repairedRole = await ensureWorkspaceAccessDefaults({
+            tx,
+            workspaceId: workspaceResolution.workspace.id,
+            userId: upsertedUser.user.id,
+            fallbackUserRole: workspaceResolution.roleAssignment?.assignedUserRole ?? upsertedUser.user.role,
+            sourceAction: 'auth.google.self_heal',
+          });
+          const resolvedUserRole =
+            repairedRole?.assignedUserRole ??
+            workspaceResolution.roleAssignment?.assignedUserRole ??
+            upsertedUser.user.role;
           const resolvedUser = {
             ...upsertedUser.user,
             role: resolvedUserRole,
@@ -913,6 +1029,17 @@ const authRoute: FastifyPluginAsync = async (app) => {
       throw unauthorized('Sessione non valida');
     }
 
+    const repairedRole = await prisma.$transaction((tx) =>
+      ensureWorkspaceAccessDefaults({
+        tx,
+        workspaceId: activeMembership.workspace.id,
+        userId: user.id,
+        fallbackUserRole: user.role,
+        sourceAction: 'auth.me.self_heal',
+      }),
+    );
+    const effectiveUserRole = repairedRole?.assignedUserRole ?? user.role;
+
     const [enabledModules, permissions, roles, recentActivity] = await Promise.all([
       moduleRepository.listEnabledModules(activeMembership.workspace.id),
       rbacRepository.listUserPermissions(user.id, activeMembership.workspace.id),
@@ -932,13 +1059,14 @@ const authRoute: FastifyPluginAsync = async (app) => {
 
     const shouldRefreshToken =
       tokenClaims.workspaceId !== activeMembership.workspace.id ||
-      tokenClaims.workspaceSlug !== activeMembership.workspace.slug;
+      tokenClaims.workspaceSlug !== activeMembership.workspace.slug ||
+      tokenClaims.role !== effectiveUserRole;
 
     const refreshedToken = shouldRefreshToken
       ? await signAccessToken({
           sub: user.id,
           email: user.email,
-          role: user.role,
+          role: effectiveUserRole,
           workspaceId: activeMembership.workspace.id,
           workspaceSlug: activeMembership.workspace.slug,
         })
@@ -950,7 +1078,7 @@ const authRoute: FastifyPluginAsync = async (app) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: effectiveUserRole,
       },
       workspace: activeMembership.workspace,
       memberships: memberships.map((membership) => ({

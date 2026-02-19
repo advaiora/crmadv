@@ -23,18 +23,6 @@ const settlePendingRequest = (resolver, value) => {
   resolver(value);
 };
 
-const notifyMoment = (handler, moment) => {
-  if (typeof handler !== "function") {
-    return;
-  }
-
-  try {
-    handler(moment);
-  } catch {
-    // Moment listeners must never break auth flow.
-  }
-};
-
 const summarizeGoogleCallbackResponse = (response) => {
   const credential = typeof response?.credential === "string" ? response.credential : "";
   const credentialPreview =
@@ -61,7 +49,7 @@ const resolvePromptErrorMessage = (reason) => {
     case "popup_closed_by_user":
       return "Accesso Google annullato dall'utente.";
     case "timeout":
-      return "Timeout durante l'accesso Google. Riprova.";
+      return "Timeout durante l'accesso Google. Verifica che il browser consenta il sign-in di terze parti (FedCM) e riprova.";
     case "invalid_client":
     case "missing_client_id":
     case "unregistered_origin":
@@ -116,6 +104,7 @@ const ensureGoogleInitialized = (clientId, diagnostics) => {
     auto_select: false,
     // FedCM is mandatory in modern Chrome; keep GIS configuration minimal and compatible.
     itp_support: true,
+    use_fedcm_for_prompt: true,
     callback: (response) => {
       if (!pendingRequest) {
         return;
@@ -189,7 +178,6 @@ export const requestGoogleIdToken = (clientId, options = {}) =>
 
     const parsedTimeoutMs = Number(options.timeoutMs);
     const timeoutMs = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= MIN_TIMEOUT_MS ? parsedTimeoutMs : DEFAULT_TIMEOUT_MS;
-    const onMoment = typeof options.onMoment === "function" ? options.onMoment : null;
     pendingRequest = {
       resolve,
       reject,
@@ -198,48 +186,26 @@ export const requestGoogleIdToken = (clientId, options = {}) =>
       }, timeoutMs),
     };
 
-    googleAccountsApi.prompt((notification) => {
-      if (!pendingRequest) {
-        return;
-      }
-
-      // Under FedCM, these notifications can be delayed or unavailable; treat them as diagnostics.
-      const momentType = typeof notification?.getMomentType === "function" ? notification.getMomentType() : "";
-      if (!momentType) {
-        return;
-      }
-
-      if (momentType === "display") {
-        if (import.meta.env.DEV) {
-          console.info("[GoogleSignIn] Prompt display moment");
-        }
-        notifyMoment(onMoment, { type: "display" });
-        return;
-      }
-
-      if (momentType === "skipped") {
-        if (import.meta.env.DEV) {
-          console.warn("[GoogleSignIn] Prompt skipped moment");
-        }
-        notifyMoment(onMoment, { type: "skipped" });
-        settlePendingRequest(reject, buildPromptError("skipped"));
-        return;
-      }
-
-      if (momentType === "dismissed") {
-        const reason = "dismissed";
-
-        notifyMoment(onMoment, {
-          type: "dismissed",
-          reason,
-        });
-
-        if (import.meta.env.DEV) {
-          console.info("[GoogleSignIn] Prompt dismissed moment", { reason });
-        }
-        // Do not fail early on dismissed in FedCM mode; callback or timeout will settle the request.
-      }
-    });
+    googleAccountsApi.prompt();
   });
 
 export const isGoogleIdentityAvailable = () => Boolean(getGoogleAccountsApi());
+
+export const resetGoogleIdentitySession = () => {
+  const googleAccountsApi = getGoogleAccountsApi();
+
+  if (pendingRequest) {
+    settlePendingRequest(pendingRequest.reject, buildPromptError("cancel_called"));
+  }
+
+  if (googleAccountsApi && typeof googleAccountsApi.cancel === "function") {
+    googleAccountsApi.cancel();
+  }
+
+  // Recommended on app logout to avoid stale One Tap/FedCM state.
+  if (googleAccountsApi && typeof googleAccountsApi.disableAutoSelect === "function") {
+    googleAccountsApi.disableAutoSelect();
+  }
+
+  initializedClientId = null;
+};

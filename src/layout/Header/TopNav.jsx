@@ -12,6 +12,7 @@ import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
 import { fetchWorkspaceAccess } from '../../utils/workspaceAccess';
 import { apiPost } from '../../utils/apiClient';
 import { useSession } from '../../hooks/useSession';
+import { resetGoogleIdentitySession } from '../../utils/googleIdentity';
 
 // Images
 import avatar3 from '../../assets/img/avatar3.jpg';
@@ -140,6 +141,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
         } catch (_error) {
             // Logout is best effort for stateless JWT sessions.
         }
+        resetGoogleIdentitySession();
         logout();
         setNavbarData(null);
         setNavbarDataError('');

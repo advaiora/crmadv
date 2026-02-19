@@ -1,6 +1,7 @@
 import { faGoogle } from "@fortawesome/free-brands-svg-icons";
+import { faCircleCheck } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Col, Container, Form, InputGroup, Row } from "react-bootstrap";
 import { Link, useHistory, useLocation } from "react-router-dom";
 import CommanFooter1 from "../../CommanFooter1";
@@ -26,6 +27,67 @@ const slugify = (value) =>
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+const decodeIdTokenPayload = (idToken) => {
+  if (typeof idToken !== "string") {
+    return null;
+  }
+
+  const tokenParts = idToken.split(".");
+  if (tokenParts.length < 2) {
+    return null;
+  }
+
+  try {
+    const base64Url = tokenParts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedBase64 = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`;
+    const payload = JSON.parse(window.atob(paddedBase64));
+    return typeof payload === "object" && payload !== null ? payload : null;
+  } catch (_error) {
+    return null;
+  }
+};
+
+const extractProfileFromIdToken = (idToken) => {
+  const payload = decodeIdTokenPayload(idToken);
+
+  const suggestedName = typeof payload?.name === "string" ? payload.name.trim() : "";
+  const suggestedEmail = typeof payload?.email === "string" ? payload.email.trim().toLowerCase() : "";
+
+  return {
+    name: suggestedName,
+    email: suggestedEmail.includes("@") ? suggestedEmail : "",
+  };
+};
+
+const buildWorkspaceNameSuggestion = (displayName, email) => {
+  const normalizedName = typeof displayName === "string" ? displayName.trim() : "";
+  if (normalizedName) {
+    return `Workspace di ${normalizedName}`;
+  }
+
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const localPart = normalizedEmail.includes("@") ? normalizedEmail.split("@")[0] : "";
+  if (localPart) {
+    return `Workspace di ${localPart}`;
+  }
+
+  return "";
+};
+
+const resolveGoogleWorkspaceSlug = ({ workspaceName, name, email }) => {
+  const candidates = [workspaceName, name, email.includes("@") ? email.split("@")[0] : "", "workspace"];
+
+  for (const candidate of candidates) {
+    const slug = slugify(candidate || "");
+    if (slug) {
+      return slug;
+    }
+  }
+
+  return "workspace";
+};
+
 const Signup = () => {
   const history = useHistory();
   const location = useLocation();
@@ -36,6 +98,7 @@ const Signup = () => {
   const [password, setPassword] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceSlug, setWorkspaceSlug] = useState("");
+  const [workspaceNameEdited, setWorkspaceNameEdited] = useState(false);
   const [slugEdited, setSlugEdited] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(true);
@@ -62,22 +125,60 @@ const Signup = () => {
   const normalizedName = name.trim();
   const normalizedWorkspaceName = workspaceName.trim();
   const normalizedWorkspaceSlug = workspaceSlug.trim().toLowerCase();
+  const isGoogleWorkspaceStep = googlePendingIdToken.length > 0;
+  const effectiveWorkspaceSlug = isGoogleWorkspaceStep
+    ? resolveGoogleWorkspaceSlug({
+        workspaceName: normalizedWorkspaceName,
+        name: normalizedName,
+        email: normalizedEmail,
+      })
+    : normalizedWorkspaceSlug;
   const emailError = normalizedEmail === "" || !isValidEmail(normalizedEmail);
   const passwordError = password.length < 8;
   const workspaceNameError = normalizedWorkspaceName === "";
-  const workspaceSlugError = normalizedWorkspaceSlug === "";
+  const workspaceSlugError = !isGoogleWorkspaceStep && normalizedWorkspaceSlug === "";
   const termsError = !termsAccepted;
-  const slugHasInvalidChars = normalizedWorkspaceSlug !== "" && /[^a-z0-9-]/.test(normalizedWorkspaceSlug);
+  const slugHasInvalidChars = !isGoogleWorkspaceStep && normalizedWorkspaceSlug !== "" && /[^a-z0-9-]/.test(normalizedWorkspaceSlug);
   const isBusy = formLoading || googleLoading;
   const isSubmitDisabled = isBusy || emailError || passwordError || workspaceNameError || workspaceSlugError || termsError || slugHasInvalidChars;
   const showEmailError = (touched.email || submitAttempted) && emailError;
   const showWorkspaceNameError = (touched.workspaceName || submitAttempted) && workspaceNameError;
-  const showWorkspaceSlugError = (touched.workspaceSlug || submitAttempted) && (workspaceSlugError || slugHasInvalidChars);
+  const showWorkspaceSlugError = !isGoogleWorkspaceStep && (touched.workspaceSlug || submitAttempted) && (workspaceSlugError || slugHasInvalidChars);
   const showPasswordError = (touched.password || submitAttempted) && passwordError;
   const showTermsError = (touched.terms || submitAttempted) && termsError;
   const isGoogleSignupDisabled = isBusy || !googleClientId;
-  const isGoogleWorkspaceStep = googlePendingIdToken.length > 0;
+  const isGoogleWorkspaceConfirmDisabled = isBusy || workspaceNameError;
+  const isGoogleWorkspaceNameValid = isGoogleWorkspaceStep && !workspaceNameError;
+  const showGoogleWorkspaceRequired = isGoogleWorkspaceStep && (touched.workspaceName || submitAttempted) && workspaceNameError;
   const resolvePostAuthPath = (onboardingRequired) => (onboardingRequired ? "/dashboard?onboarding=1" : "/dashboard");
+
+  const applyGooglePrefill = useCallback(
+    ({ idToken = "", suggestedEmail = "", suggestedName = "" }) => {
+      const profile = extractProfileFromIdToken(idToken);
+      const resolvedName = profile.name || (typeof suggestedName === "string" ? suggestedName.trim() : "");
+      const resolvedEmail =
+        profile.email || (typeof suggestedEmail === "string" ? suggestedEmail.trim().toLowerCase() : "");
+
+      if (resolvedName) {
+        setName(resolvedName);
+      }
+
+      if (resolvedEmail) {
+        setEmail(resolvedEmail);
+      }
+
+      if (!workspaceNameEdited) {
+        const workspaceSuggestion = buildWorkspaceNameSuggestion(resolvedName, resolvedEmail);
+        if (workspaceSuggestion) {
+          setWorkspaceName((currentValue) => (currentValue.trim() ? currentValue : workspaceSuggestion));
+          setWorkspaceSlug((currentValue) =>
+            currentValue.trim() ? currentValue : slugify(workspaceSuggestion),
+          );
+        }
+      }
+    },
+    [workspaceNameEdited]
+  );
 
   useEffect(
     () => () => {
@@ -93,23 +194,42 @@ const Signup = () => {
       location?.state && typeof location.state === "object" && typeof location.state.suggestedEmail === "string"
         ? location.state.suggestedEmail.trim().toLowerCase()
         : "";
+    const suggestedName =
+      location?.state && typeof location.state === "object" && typeof location.state.suggestedName === "string"
+        ? location.state.suggestedName.trim()
+        : "";
     const pendingGoogleToken =
       location?.state && typeof location.state === "object" && typeof location.state.googlePendingIdToken === "string"
         ? location.state.googlePendingIdToken.trim()
         : "";
 
-    if (suggestedEmail && !email.trim()) {
-      setEmail(suggestedEmail);
-    }
     if (pendingGoogleToken && !googlePendingIdToken) {
       setGooglePendingIdToken(pendingGoogleToken);
       setErrorMessage("");
-      setSuccessMessage("Accesso Google completato. Inserisci i dati del workspace per terminare.");
+      setSuccessMessage("Accesso Google completato. Inserisci solo il nome del workspace per terminare.");
     }
-  }, [location, email, googlePendingIdToken]);
+
+    if (pendingGoogleToken) {
+      applyGooglePrefill({
+        idToken: pendingGoogleToken,
+        suggestedEmail,
+        suggestedName,
+      });
+      return;
+    }
+
+    if (suggestedName && !name.trim()) {
+      setName(suggestedName);
+    }
+
+    if (suggestedEmail && !email.trim()) {
+      setEmail(suggestedEmail);
+    }
+  }, [location, email, name, googlePendingIdToken, applyGooglePrefill]);
 
   const handleWorkspaceNameChange = (event) => {
     const value = event.target.value;
+    setWorkspaceNameEdited(true);
     setWorkspaceName(value);
     if (!slugEdited) {
       setWorkspaceSlug(slugify(value));
@@ -251,10 +371,8 @@ const Signup = () => {
       setTouched((prev) => ({
         ...prev,
         workspaceName: true,
-        workspaceSlug: true,
-        terms: true,
       }));
-      if (workspaceNameError || workspaceSlugError || termsError || slugHasInvalidChars) {
+      if (workspaceNameError) {
         return;
       }
     }
@@ -318,7 +436,8 @@ const Signup = () => {
 
           if (normalizedError.code === "NO_WORKSPACE") {
             setGooglePendingIdToken(idToken);
-            setSuccessMessage("Accesso Google completato. Inserisci i dati del workspace per terminare.");
+            applyGooglePrefill({ idToken });
+            setSuccessMessage("Accesso Google completato. Inserisci solo il nome del workspace per terminare.");
             return;
           }
 
@@ -326,16 +445,42 @@ const Signup = () => {
         }
       }
 
-      const result = await authenticateWithGoogle({
-        apiBaseUrl,
-        googleClientId,
-        redirectUri: googleRedirectUri,
-        debugRawResponse: googleDebugRawResponse,
-        mode: "signup",
-        workspaceName: normalizedWorkspaceName,
-        workspaceSlug: normalizedWorkspaceSlug,
-        idToken: googlePendingIdToken,
-      });
+      let result;
+      try {
+        result = await authenticateWithGoogle({
+          apiBaseUrl,
+          googleClientId,
+          redirectUri: googleRedirectUri,
+          debugRawResponse: googleDebugRawResponse,
+          mode: "signup",
+          workspaceName: normalizedWorkspaceName,
+          workspaceSlug: effectiveWorkspaceSlug,
+          idToken: googlePendingIdToken,
+        });
+      } catch (signupError) {
+        const normalizedSignupError =
+          signupError instanceof GoogleAuthError
+            ? signupError
+            : new GoogleAuthError({
+                message: "Registrazione Google non riuscita. Riprova.",
+              });
+
+        if (normalizedSignupError.code !== "SLUG_TAKEN") {
+          throw normalizedSignupError;
+        }
+
+        const autoFallbackSlug = `${effectiveWorkspaceSlug}-${Date.now().toString().slice(-4)}`;
+        result = await authenticateWithGoogle({
+          apiBaseUrl,
+          googleClientId,
+          redirectUri: googleRedirectUri,
+          debugRawResponse: googleDebugRawResponse,
+          mode: "signup",
+          workspaceName: normalizedWorkspaceName,
+          workspaceSlug: autoFallbackSlug,
+          idToken: googlePendingIdToken,
+        });
+      }
       const { token, user, workspace, onboardingRequired } = result;
 
       login({
@@ -375,7 +520,7 @@ const Signup = () => {
   const leftPanelBackground = "var(--primary, #facc15)";
 
   return (
-    <div className="hk-pg-wrapper py-0">
+    <div className="hk-pg-wrapper py-0" data-bs-theme="dark">
       <div className="hk-pg-body py-0">
         <Container fluid>
           <Row className="auth-split">
@@ -451,27 +596,25 @@ const Signup = () => {
                         />
                       </h4>
 
-                      <Button variant="outline-dark" className="btn-rounded btn-block mb-3" type="button" onClick={handleGoogleSignup} disabled={isGoogleSignupDisabled}>
-                        <span>
-                          <span className="icon">
-                            <FontAwesomeIcon icon={faGoogle} />
-                          </span>
-                          <span>
-                            {googleLoading
-                              ? isGoogleWorkspaceStep
-                                ? "Completamento..."
-                                : "Accesso..."
-                              : isGoogleWorkspaceStep
-                                ? "Completa registrazione Google"
-                                : "Registrati con Google"}
-                          </span>
-                        </span>
-                      </Button>
-                      {isGoogleWorkspaceStep && <small className="text-muted d-block mb-2">Ora completa nome e indirizzo del workspace.</small>}
-
-                      <div className="title-sm title-wth-divider divider-center my-4">
-                        <span>Oppure</span>
-                      </div>
+                      {!isGoogleWorkspaceStep ? (
+                        <>
+                          <Button variant="outline-dark" className="btn-rounded btn-block mb-3" type="button" onClick={handleGoogleSignup} disabled={isGoogleSignupDisabled}>
+                            <span>
+                              <span className="icon">
+                                <FontAwesomeIcon icon={faGoogle} />
+                              </span>
+                              <span>{googleLoading ? "Accesso..." : "Registrati con Google"}</span>
+                            </span>
+                          </Button>
+                          <div className="title-sm title-wth-divider divider-center my-4">
+                            <span>Oppure</span>
+                          </div>
+                        </>
+                      ) : (
+                        <small className="text-muted d-block mb-3">
+                          Account Google collegato. Inserisci il nome del tuo workspace per continuare.
+                        </small>
+                      )}
 
                       {errorMessage && (
                         <div className="alert alert-danger py-2" role="alert">
@@ -486,135 +629,281 @@ const Signup = () => {
                       )}
 
                       <Row className="gx-3">
-                        <Col lg={12} as={Form.Group} className="mb-3">
-                          <Form.Label>Nome</Form.Label>
-                          <Form.Control
-                            placeholder="Inserisci il tuo nome"
-                            type="text"
-                            value={name}
-                            onChange={(event) => {
-                              setName(event.target.value);
-                              setErrorMessage("");
-                            }}
-                          />
-                        </Col>
+                        {isGoogleWorkspaceStep ? (
+                          <>
+                            <Col lg={12} className="mb-3">
+                              <div
+                                className="rounded-3 p-3"
+                                style={{
+                                  border: "1px solid rgba(250, 204, 21, 0.35)",
+                                  background:
+                                    "linear-gradient(135deg, rgba(250, 204, 21, 0.12) 0%, rgba(15, 23, 42, 0.45) 100%)",
+                                  boxShadow: "0 10px 24px rgba(0, 0, 0, 0.18)",
+                                }}
+                              >
+                                <div className="d-flex align-items-center justify-content-between mb-3">
+                                  <div className="d-inline-flex align-items-center gap-2">
+                                    <span
+                                      className="d-inline-flex align-items-center justify-content-center rounded-circle"
+                                      style={{
+                                        width: 30,
+                                        height: 30,
+                                        background: "rgba(250, 204, 21, 0.22)",
+                                        color: "#facc15",
+                                      }}
+                                    >
+                                      <FontAwesomeIcon icon={faGoogle} />
+                                    </span>
+                                    <p className="mb-0 fw-semibold" style={{ color: "#f8fafc" }}>
+                                      Dati precompilati da Google
+                                    </p>
+                                  </div>
+                                  <span
+                                    className="badge rounded-pill text-uppercase"
+                                    style={{
+                                      background: "rgba(16, 185, 129, 0.16)",
+                                      color: "#34d399",
+                                      border: "1px solid rgba(52, 211, 153, 0.35)",
+                                      letterSpacing: "0.04em",
+                                      fontSize: "0.65rem",
+                                    }}
+                                  >
+                                    Verificato
+                                  </span>
+                                </div>
 
-                        <Col lg={12} as={Form.Group} className="mb-3">
-                          <Form.Label>Email</Form.Label>
-                          <Form.Control
-                            placeholder="Inserisci la tua email"
-                            type="email"
-                            value={email}
-                            onChange={(event) => {
-                              setEmail(event.target.value);
-                              setErrorMessage("");
-                            }}
-                            onBlur={() => handleFieldBlur("email")}
-                          />
-                          {showEmailError && <small className="text-danger d-block mt-1">Inserisci un'email valida.</small>}
-                        </Col>
+                                <Row className="g-2">
+                                  <Col xs={12} md={6}>
+                                    <div
+                                      className="rounded-2 px-3 py-2"
+                                      style={{
+                                        background: "rgba(15, 23, 42, 0.44)",
+                                        border: "1px solid rgba(148, 163, 184, 0.24)",
+                                      }}
+                                    >
+                                      <p
+                                        className="mb-1 text-uppercase fw-semibold"
+                                        style={{
+                                          fontSize: "0.65rem",
+                                          letterSpacing: "0.05em",
+                                          color: "rgba(226, 232, 240, 0.72)",
+                                        }}
+                                      >
+                                        Nome
+                                      </p>
+                                      <p
+                                        className="mb-0 fw-medium text-truncate"
+                                        style={{ color: "#f8fafc" }}
+                                        title={normalizedName || "-"}
+                                      >
+                                        {normalizedName || "-"}
+                                      </p>
+                                    </div>
+                                  </Col>
+                                  <Col xs={12} md={6}>
+                                    <div
+                                      className="rounded-2 px-3 py-2"
+                                      style={{
+                                        background: "rgba(15, 23, 42, 0.44)",
+                                        border: "1px solid rgba(148, 163, 184, 0.24)",
+                                      }}
+                                    >
+                                      <p
+                                        className="mb-1 text-uppercase fw-semibold"
+                                        style={{
+                                          fontSize: "0.65rem",
+                                          letterSpacing: "0.05em",
+                                          color: "rgba(226, 232, 240, 0.72)",
+                                        }}
+                                      >
+                                        Email
+                                      </p>
+                                      <p
+                                        className="mb-0 fw-medium text-truncate"
+                                        style={{ color: "#f8fafc" }}
+                                        title={normalizedEmail || "-"}
+                                      >
+                                        {normalizedEmail || "-"}
+                                      </p>
+                                    </div>
+                                  </Col>
+                                </Row>
+                              </div>
+                            </Col>
 
-                        <Col lg={12} as={Form.Group} className="mb-3">
-                          <Form.Label>Nome del tuo spazio di lavoro</Form.Label>
-                          <Form.Control
-                            placeholder="Es. Advaiora Team"
-                            type="text"
-                            value={workspaceName}
-                            onChange={(event) => {
-                              handleWorkspaceNameChange(event);
-                              setErrorMessage("");
-                            }}
-                            onBlur={() => handleFieldBlur("workspaceName")}
-                          />
-                          <Form.Text className="text-muted d-block mt-1">E' il nome che vedrai nel tuo CRM.</Form.Text>
-                          {showWorkspaceNameError && <small className="text-danger d-block mt-1">Inserisci il nome del tuo spazio di lavoro.</small>}
-                        </Col>
-
-                        <Col lg={12} as={Form.Group} className="mb-3">
-                          <Form.Label>Indirizzo personalizzato</Form.Label>
-                          <Form.Control
-                            placeholder="es. advaiora-team"
-                            type="text"
-                            value={workspaceSlug}
-                            onChange={(event) => {
-                              handleWorkspaceSlugChange(event);
-                              setErrorMessage("");
-                            }}
-                            onBlur={() => handleFieldBlur("workspaceSlug")}
-                          />
-                          <Form.Text className="text-muted d-block mt-1">Sara' usato nell'indirizzo di accesso.</Form.Text>
-                          {showWorkspaceSlugError && (
-                            <small className="text-danger d-block mt-1">
-                              {workspaceSlugError ? "Inserisci un indirizzo personalizzato." : "Usa solo lettere minuscole, numeri e trattini."}
-                            </small>
-                          )}
-                          {workspaceSlug && (
-                            <small className={`d-block mt-1 ${slugHasInvalidChars ? "text-danger" : "text-muted"}`}>
-                              L'indirizzo sara': app.tuosito.com/{normalizedWorkspaceSlug}
-                            </small>
-                          )}
-                        </Col>
-
-                        <Col lg={12} as={Form.Group} className="mb-3">
-                          <Form.Label>Password</Form.Label>
-                          <InputGroup className="password-check">
-                            <span className="input-affix-wrapper affix-wth-text">
+                            <Col lg={12} as={Form.Group} className="mb-3">
+                              <Form.Label className="d-flex align-items-center gap-1">
+                                Nome del workspace <span className="text-danger">*</span>
+                              </Form.Label>
                               <Form.Control
-                                placeholder="Minimo 8 caratteri"
-                                type={showPassword ? "text" : "password"}
-                                autoComplete="new-password"
-                                value={password}
+                                placeholder="Es. Workspace di Mario Rossi"
+                                type="text"
+                                value={workspaceName}
                                 onChange={(event) => {
-                                  setPassword(event.target.value);
+                                  handleWorkspaceNameChange(event);
                                   setErrorMessage("");
                                 }}
-                                onBlur={() => handleFieldBlur("password")}
+                                onBlur={() => handleFieldBlur("workspaceName")}
                               />
-                              {/* Show/Hide: niente navigazione */}
-                              <button
+                              <div className="d-flex align-items-center justify-content-between mt-1">
+                                <small className={showGoogleWorkspaceRequired ? "text-danger" : "text-muted"}>
+                                  {showGoogleWorkspaceRequired ? "* Campo obbligatorio" : "Puoi modificare liberamente il nome suggerito."}
+                                </small>
+                                {isGoogleWorkspaceNameValid && (
+                                  <span className="text-success small d-inline-flex align-items-center gap-1">
+                                    <FontAwesomeIcon icon={faCircleCheck} />
+                                    Ok
+                                  </span>
+                                )}
+                              </div>
+                            </Col>
+
+                            <Col lg={12}>
+                              <Button
+                                variant="primary"
+                                className="btn-rounded btn-uppercase btn-block"
                                 type="button"
-                                className="input-suffix text-primary text-uppercase fs-8 fw-medium btn btn-link p-0"
-                                onClick={() => setShowPassword(!showPassword)}
-                                style={{ textDecoration: "none" }}
+                                onClick={handleGoogleSignup}
+                                disabled={isGoogleWorkspaceConfirmDisabled}
                               >
-                                {showPassword ? <span>Nascondi</span> : <span>Mostra</span>}
-                              </button>
-                            </span>
-                          </InputGroup>
-                          {showPasswordError && <small className="text-danger d-block mt-1">La password deve contenere almeno 8 caratteri.</small>}
-                        </Col>
+                                {googleLoading ? "Completamento..." : "Continua"}
+                              </Button>
+                            </Col>
+                          </>
+                        ) : (
+                          <>
+                            <Col lg={12} as={Form.Group} className="mb-3">
+                              <Form.Label>Nome</Form.Label>
+                              <Form.Control
+                                placeholder="Inserisci il tuo nome"
+                                type="text"
+                                value={name}
+                                onChange={(event) => {
+                                  setName(event.target.value);
+                                  setErrorMessage("");
+                                }}
+                              />
+                            </Col>
+
+                            <Col lg={12} as={Form.Group} className="mb-3">
+                              <Form.Label>Email</Form.Label>
+                              <Form.Control
+                                placeholder="Inserisci la tua email"
+                                type="email"
+                                value={email}
+                                onChange={(event) => {
+                                  setEmail(event.target.value);
+                                  setErrorMessage("");
+                                }}
+                                onBlur={() => handleFieldBlur("email")}
+                              />
+                              {showEmailError && <small className="text-danger d-block mt-1">Inserisci un'email valida.</small>}
+                            </Col>
+
+                            <Col lg={12} as={Form.Group} className="mb-3">
+                              <Form.Label>Nome del tuo workspace</Form.Label>
+                              <Form.Control
+                                placeholder="Es. Advaiora Team"
+                                type="text"
+                                value={workspaceName}
+                                onChange={(event) => {
+                                  handleWorkspaceNameChange(event);
+                                  setErrorMessage("");
+                                }}
+                                onBlur={() => handleFieldBlur("workspaceName")}
+                              />
+                              <Form.Text className="text-muted d-block mt-1">E' il nome che vedrai nel tuo CRM.</Form.Text>
+                              {showWorkspaceNameError && <small className="text-danger d-block mt-1">Inserisci il nome del tuo spazio di lavoro.</small>}
+                            </Col>
+
+                            <Col lg={12} as={Form.Group} className="mb-3">
+                              <Form.Label>Indirizzo personalizzato</Form.Label>
+                              <Form.Control
+                                placeholder="es. advaiora-team"
+                                type="text"
+                                value={workspaceSlug}
+                                onChange={(event) => {
+                                  handleWorkspaceSlugChange(event);
+                                  setErrorMessage("");
+                                }}
+                                onBlur={() => handleFieldBlur("workspaceSlug")}
+                              />
+                              <Form.Text className="text-muted d-block mt-1">Sara' usato nell'indirizzo di accesso.</Form.Text>
+                              {showWorkspaceSlugError && (
+                                <small className="text-danger d-block mt-1">
+                                  {workspaceSlugError ? "Inserisci un indirizzo personalizzato." : "Usa solo lettere minuscole, numeri e trattini."}
+                                </small>
+                              )}
+                              {workspaceSlug && (
+                                <small className={`d-block mt-1 ${slugHasInvalidChars ? "text-danger" : "text-muted"}`}>
+                                  L'indirizzo sara': app.tuosito.com/{normalizedWorkspaceSlug}
+                                </small>
+                              )}
+                            </Col>
+
+                            <Col lg={12} as={Form.Group} className="mb-3">
+                              <Form.Label>Password</Form.Label>
+                              <InputGroup className="password-check">
+                                <span className="input-affix-wrapper affix-wth-text">
+                                  <Form.Control
+                                    placeholder="Minimo 8 caratteri"
+                                    type={showPassword ? "text" : "password"}
+                                    autoComplete="new-password"
+                                    value={password}
+                                    onChange={(event) => {
+                                      setPassword(event.target.value);
+                                      setErrorMessage("");
+                                    }}
+                                    onBlur={() => handleFieldBlur("password")}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="input-suffix text-primary text-uppercase fs-8 fw-medium btn btn-link p-0"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    style={{ textDecoration: "none" }}
+                                  >
+                                    {showPassword ? <span>Nascondi</span> : <span>Mostra</span>}
+                                  </button>
+                                </span>
+                              </InputGroup>
+                              {showPasswordError && <small className="text-danger d-block mt-1">La password deve contenere almeno 8 caratteri.</small>}
+                            </Col>
+                          </>
+                        )}
                       </Row>
+                      {!isGoogleWorkspaceStep && (
+                        <>
+                          <Form.Check id="terms" className="form-check-sm mb-3">
+                            <Form.Check.Input
+                              type="checkbox"
+                              checked={termsAccepted}
+                              onChange={(event) => {
+                                setTermsAccepted(event.target.checked);
+                                setTouched((prev) => ({ ...prev, terms: true }));
+                                setErrorMessage("");
+                              }}
+                              onBlur={() => handleFieldBlur("terms")}
+                            />
+                            <Form.Check.Label className="text-muted fs-7">
+                              Creando un account confermi di aver letto e accettato i <Link to="#">Termini di utilizzo</Link> e la{" "}
+                              <Link to="#">Privacy Policy</Link>. Puoi modificare le notifiche in qualsiasi momento.
+                            </Form.Check.Label>
+                            {showTermsError && <small className="text-danger d-block mt-1">Devi accettare termini e privacy policy.</small>}
+                          </Form.Check>
 
-                      <Form.Check id="terms" className="form-check-sm mb-3">
-                        <Form.Check.Input
-                          type="checkbox"
-                          checked={termsAccepted}
-                          onChange={(event) => {
-                            setTermsAccepted(event.target.checked);
-                            setTouched((prev) => ({ ...prev, terms: true }));
-                            setErrorMessage("");
-                          }}
-                          onBlur={() => handleFieldBlur("terms")}
-                        />
-                        <Form.Check.Label className="text-muted fs-7">
-                          Creando un account confermi di aver letto e accettato i <Link to="#">Termini di utilizzo</Link> e la{" "}
-                          <Link to="#">Privacy Policy</Link>. Puoi modificare le notifiche in qualsiasi momento.
-                        </Form.Check.Label>
-                        {showTermsError && <small className="text-danger d-block mt-1">Devi accettare termini e privacy policy.</small>}
-                      </Form.Check>
+                          <Button variant="primary" className="btn-rounded btn-uppercase btn-block" type="submit" disabled={isSubmitDisabled}>
+                            {formLoading ? "Creazione..." : "Crea account"}
+                          </Button>
 
-                      {/* Bottone submit (poi collegheremo POST /auth/register) */}
-                      <Button variant="primary" className="btn-rounded btn-uppercase btn-block" type="submit" disabled={isSubmitDisabled}>
-                        {formLoading ? "Creazione..." : "Crea account"}
-                      </Button>
-
-                      {/* Link verso login (nel tuo RouteList è /login, quindi linko quello) */}
-                      <p className="p-xs mt-2 text-center">
-                        Hai già un account?{" "}
-                        <Link to="/login">
-                          <u>Accedi</u>
-                        </Link>
-                      </p>
+                          {/* Link verso login (nel tuo RouteList e /login, quindi linko quello) */}
+                          <p className="p-xs mt-2 text-center">
+                            Hai gia un account?{" "}
+                            <Link to="/login">
+                              <u>Accedi</u>
+                            </Link>
+                          </p>
+                        </>
+                      )}
                     </Col>
                   </Row>
                 </Form>
@@ -631,3 +920,4 @@ const Signup = () => {
 };
 
 export default Signup;
+

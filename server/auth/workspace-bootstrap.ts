@@ -1,6 +1,79 @@
 import type { Prisma } from '@prisma/client';
 import { badRequest, forbidden, notFound } from '../core/errors.js';
 
+type ModuleCatalogEntry = {
+  key: string;
+  name: string;
+  isCore: boolean;
+  description: string;
+};
+
+type PermissionCatalogEntry = {
+  key: string;
+  moduleKey: string;
+  description: string;
+};
+
+const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
+  { key: 'modules', name: 'Module Registry', isCore: true, description: 'Module registry' },
+  { key: 'branding', name: 'Branding', isCore: true, description: 'Branding module' },
+  { key: 'audit', name: 'Audit', isCore: true, description: 'Audit module' },
+  { key: 'team', name: 'Team', isCore: false, description: 'Team module' },
+  { key: 'clients', name: 'Clients', isCore: false, description: 'Clients module' },
+  { key: 'projects', name: 'Projects', isCore: false, description: 'Projects module' },
+  { key: 'checklists', name: 'Checklists', isCore: false, description: 'Checklists module' },
+  { key: 'quotes', name: 'Quotes', isCore: false, description: 'Quotes module' },
+  { key: 'web', name: 'Web', isCore: false, description: 'Web module' },
+  { key: 'vault', name: 'Vault', isCore: false, description: 'Vault module' },
+  { key: 'seo', name: 'SEO', isCore: false, description: 'SEO module' },
+] as const;
+
+const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
+  { key: 'modules.manage', moduleKey: 'modules', description: 'Manage workspace modules' },
+  { key: 'branding.manage', moduleKey: 'branding', description: 'Manage workspace branding' },
+  { key: 'audit.view', moduleKey: 'audit', description: 'View audit logs' },
+  { key: 'roles.view', moduleKey: 'team', description: 'View workspace roles' },
+  { key: 'roles.manage', moduleKey: 'team', description: 'Manage workspace roles' },
+  { key: 'roles.assign', moduleKey: 'team', description: 'Assign roles to workspace users' },
+  { key: 'team.view', moduleKey: 'team', description: 'View team members' },
+  { key: 'team.manage', moduleKey: 'team', description: 'Manage team members' },
+  { key: 'clients.view', moduleKey: 'clients', description: 'View clients' },
+  { key: 'clients.create', moduleKey: 'clients', description: 'Create clients' },
+  { key: 'clients.edit', moduleKey: 'clients', description: 'Edit clients' },
+  { key: 'clients.delete', moduleKey: 'clients', description: 'Delete clients' },
+  { key: 'projects.view', moduleKey: 'projects', description: 'View projects' },
+  { key: 'projects.create', moduleKey: 'projects', description: 'Create projects' },
+  { key: 'projects.edit', moduleKey: 'projects', description: 'Edit projects' },
+  { key: 'projects.delete', moduleKey: 'projects', description: 'Delete projects' },
+  { key: 'projects.move_stage', moduleKey: 'projects', description: 'Move projects between stages' },
+  { key: 'checklists.view', moduleKey: 'checklists', description: 'View checklists' },
+  { key: 'checklists.create', moduleKey: 'checklists', description: 'Create checklist templates' },
+  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Edit checklist templates and items' },
+  { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archive checklist templates and delete items' },
+  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Complete checklist instance items' },
+  { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Override checklist gates' },
+  { key: 'quotes.view', moduleKey: 'quotes', description: 'View quotes' },
+  { key: 'quotes.create', moduleKey: 'quotes', description: 'Create quotes' },
+  { key: 'quotes.edit', moduleKey: 'quotes', description: 'Edit quotes' },
+  { key: 'quotes.delete', moduleKey: 'quotes', description: 'Delete quotes' },
+  { key: 'quotes.send', moduleKey: 'quotes', description: 'Send quotes' },
+  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Accept quotes' },
+  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Manage quote templates' },
+  { key: 'web.view', moduleKey: 'web', description: 'View web assets' },
+  { key: 'web.create', moduleKey: 'web', description: 'Create web assets' },
+  { key: 'web.edit', moduleKey: 'web', description: 'Edit web assets' },
+  { key: 'web.delete', moduleKey: 'web', description: 'Delete web assets' },
+  { key: 'vault.view_list', moduleKey: 'vault', description: 'View vault item list' },
+  { key: 'vault.create', moduleKey: 'vault', description: 'Create vault items' },
+  { key: 'vault.edit', moduleKey: 'vault', description: 'Edit vault items' },
+  { key: 'vault.reveal', moduleKey: 'vault', description: 'Reveal vault secrets' },
+  { key: 'vault.delete', moduleKey: 'vault', description: 'Delete vault items' },
+  { key: 'seo.view', moduleKey: 'seo', description: 'View SEO data' },
+  { key: 'seo.run_scan', moduleKey: 'seo', description: 'Run SEO scans' },
+  { key: 'seo.export', moduleKey: 'seo', description: 'Export SEO reports' },
+  { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Manage SEO settings' },
+] as const;
+
 export const SYSTEM_ROLE_NAME = {
   superadmin: 'Superadmin',
   admin: 'Admin',
@@ -58,18 +131,10 @@ const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   },
   {
     name: SYSTEM_ROLE_NAME.admin,
-    description: 'Manage clients and assign operational roles',
+    description: 'High-privilege workspace administrator',
     isSuperadmin: false,
     userRole: 'admin',
-    permissions: [
-      'roles.view',
-      'roles.assign',
-      'team.view',
-      'clients.view',
-      'clients.create',
-      'clients.edit',
-      'clients.delete',
-    ],
+    permissions: 'all',
   },
   {
     name: SYSTEM_ROLE_NAME.manager,
@@ -381,11 +446,59 @@ const resolveRegistrationRoleName = ({
     return SYSTEM_ROLE_NAME.superadmin;
   }
 
-  if (!requestedRoleName || requestedRoleName === SYSTEM_ROLE_NAME.superadmin) {
-    return SYSTEM_ROLE_NAME.admin;
+  if (requestedRoleName && requestedRoleName !== SYSTEM_ROLE_NAME.superadmin) {
+    return requestedRoleName;
   }
 
-  return requestedRoleName;
+  return SYSTEM_ROLE_NAME.viewer;
+};
+
+const ensureRbacCatalog = async (tx: Prisma.TransactionClient) => {
+  const modulesByKey = new Map<string, string>();
+
+  for (const moduleEntry of SYSTEM_MODULE_CATALOG) {
+    const moduleRecord = await tx.module.upsert({
+      where: {
+        key: moduleEntry.key,
+      },
+      update: {
+        name: moduleEntry.name,
+        description: moduleEntry.description,
+        isCore: moduleEntry.isCore,
+      },
+      create: {
+        key: moduleEntry.key,
+        name: moduleEntry.name,
+        description: moduleEntry.description,
+        isCore: moduleEntry.isCore,
+      },
+      select: {
+        id: true,
+        key: true,
+      },
+    });
+
+    modulesByKey.set(moduleRecord.key, moduleRecord.id);
+  }
+
+  for (const permissionEntry of SYSTEM_PERMISSION_CATALOG) {
+    const moduleId = modulesByKey.get(permissionEntry.moduleKey) ?? null;
+
+    await tx.permission.upsert({
+      where: {
+        key: permissionEntry.key,
+      },
+      update: {
+        description: permissionEntry.description,
+        moduleId,
+      },
+      create: {
+        key: permissionEntry.key,
+        description: permissionEntry.description,
+        moduleId,
+      },
+    });
+  }
 };
 
 export const ensureWorkspaceSystemRoles = async ({
@@ -399,6 +512,8 @@ export const ensureWorkspaceSystemRoles = async ({
   actorUserId: string;
   sourceAction: string;
 }) => {
+  await ensureRbacCatalog(tx);
+
   const [permissions, modules] = await Promise.all([
     tx.permission.findMany({
       select: {

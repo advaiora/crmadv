@@ -16,14 +16,14 @@ const loginSchema = z.object({
   password: z.string().min(1, "Inserisci la password"),
 });
 
-const extractEmailFromIdToken = (idToken) => {
+const extractProfileFromIdToken = (idToken) => {
   if (typeof idToken !== "string") {
-    return "";
+    return { email: "", name: "" };
   }
 
   const tokenParts = idToken.split(".");
   if (tokenParts.length < 2) {
-    return "";
+    return { email: "", name: "" };
   }
 
   try {
@@ -32,10 +32,30 @@ const extractEmailFromIdToken = (idToken) => {
     const paddedBase64 = `${base64}${"=".repeat((4 - (base64.length % 4)) % 4)}`;
     const payload = JSON.parse(window.atob(paddedBase64));
     const extractedEmail = typeof payload?.email === "string" ? payload.email.trim().toLowerCase() : "";
-    return extractedEmail.includes("@") ? extractedEmail : "";
+    const extractedName = typeof payload?.name === "string" ? payload.name.trim() : "";
+    return {
+      email: extractedEmail.includes("@") ? extractedEmail : "",
+      name: extractedName,
+    };
   } catch (_error) {
-    return "";
+    return { email: "", name: "" };
   }
+};
+
+const resolveGoogleLoginError = (error) => {
+  if (error instanceof GoogleAuthError) {
+    return error;
+  }
+
+  const fallbackMessage = "Impossibile completare il login Google. Riprova.";
+  const rawMessage = error instanceof Error ? error.message?.trim() : "";
+  const isUserFriendlyMessage =
+    rawMessage.length > 0 &&
+    /google|popup|annull|timeout|configur|credential|fedcm|token|origin/i.test(rawMessage);
+
+  return new GoogleAuthError({
+    message: isUserFriendlyMessage ? rawMessage : fallbackMessage,
+  });
 };
 
 const Login = ({ history }) => {
@@ -158,14 +178,14 @@ const Login = ({ history }) => {
     setGoogleErrorCode("");
     setGoogleLoading(true);
     let requestedIdToken = "";
-    let suggestedEmailFromGoogle = "";
+    let suggestedProfileFromGoogle = { email: "", name: "" };
 
     try {
       requestedIdToken = await requestGoogleIdToken(googleClientId, {
         redirectUri: googleRedirectUri,
         debugRawResponse: googleDebugRawResponse,
       });
-      suggestedEmailFromGoogle = extractEmailFromIdToken(requestedIdToken);
+      suggestedProfileFromGoogle = extractProfileFromIdToken(requestedIdToken);
 
       const result = await authenticateWithGoogle({
         apiBaseUrl,
@@ -188,20 +208,17 @@ const Login = ({ history }) => {
 
       history.push(resolvePostAuthPath(onboardingRequired));
     } catch (error) {
-      const normalizedError =
-        error instanceof GoogleAuthError
-          ? error
-          : new GoogleAuthError({
-              message: "Impossibile completare il login Google. Riprova.",
-            });
+      const normalizedError = resolveGoogleLoginError(error);
       if (normalizedError.code === "NO_WORKSPACE" && requestedIdToken) {
         const fallbackEmail = email.trim().toLowerCase();
         const suggestedEmail =
-          suggestedEmailFromGoogle || (fallbackEmail.includes("@") ? fallbackEmail : "");
+          suggestedProfileFromGoogle.email || (fallbackEmail.includes("@") ? fallbackEmail : "");
+        const suggestedName = suggestedProfileFromGoogle.name || "";
 
         history.push({
           pathname: "/auth/signup",
           state: {
+            ...(suggestedName ? { suggestedName } : {}),
             ...(suggestedEmail ? { suggestedEmail } : {}),
             googlePendingIdToken: requestedIdToken,
           },
@@ -216,7 +233,7 @@ const Login = ({ history }) => {
   };
 
   return (
-    <div className="hk-pg-wrapper py-0">
+    <div className="hk-pg-wrapper py-0" data-bs-theme="dark">
       <div className="hk-pg-body py-0">
         <Container fluid className="min-vh-100 px-0">
           <Row className="g-0 min-vh-100">
