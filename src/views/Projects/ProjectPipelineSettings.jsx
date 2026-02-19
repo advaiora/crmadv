@@ -360,10 +360,18 @@ const PipelineSettingsContent = () => {
                   {categories.map((category) => (
                     <ListGroup.Item
                       key={category.id}
-                      action
+                      as="div"
+                      role="button"
+                      tabIndex={0}
                       active={category.id === categoryId}
                       onClick={() => setCategoryId(category.id)}
-                      className="d-flex justify-content-between align-items-center gap-2"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setCategoryId(category.id);
+                        }
+                      }}
+                      className="list-group-item-action d-flex justify-content-between align-items-center gap-2"
                     >
                       <span>{category.name}</span>
                       <span className="d-flex align-items-center gap-1">

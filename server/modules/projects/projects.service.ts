@@ -8,6 +8,7 @@ import { projectsRepository } from './projects.repository.js';
 const MIN_OVERRIDE_REASON_LENGTH = 10;
 const MAX_OVERRIDE_REASON_LENGTH = 500;
 const MAX_PROJECT_NAME_LENGTH = 160;
+const MAX_PROJECT_DESCRIPTION_LENGTH = 2000;
 const MAX_CATEGORY_NAME_LENGTH = 120;
 const MAX_STAGE_NAME_LENGTH = 120;
 const MAX_STAGE_COLOR_LENGTH = 20;
@@ -15,6 +16,25 @@ const MAX_STAGE_COLOR_LENGTH = 20;
 const idSchema = z.string().trim().min(1);
 const nonEmptyStringSchema = z.string().trim().min(1);
 const sortOrderSchema = z.number().int().min(0).max(10000);
+const clientIdsSchema = z.array(idSchema).max(100);
+const nullableProjectNumberSchema = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) {
+    return value === '' ? null : value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : value;
+  }
+
+  return value;
+}, z.number().finite().nullable().optional());
+const nullableProjectDueDateSchema = z.union([z.string().trim(), z.date(), z.null()]).optional();
 
 const createProjectBodySchema = z
   .object({
@@ -22,7 +42,11 @@ const createProjectBodySchema = z
     categoryId: z.string().trim().min(1).optional(),
     stageId: z.string().trim().min(1).optional(),
     pipelineStageId: z.string().trim().min(1).optional(),
-    clientId: z.string().trim().min(1).optional(),
+    clientId: z.string().trim().min(1).nullable().optional(),
+    clientIds: clientIdsSchema.optional(),
+    description: z.string().trim().max(MAX_PROJECT_DESCRIPTION_LENGTH).nullable().optional(),
+    value: nullableProjectNumberSchema,
+    dueDate: nullableProjectDueDateSchema,
   })
   .strict()
   .superRefine((value, context) => {
@@ -40,10 +64,24 @@ const updateProjectBodySchema = z
     name: z.string().trim().min(1).max(MAX_PROJECT_NAME_LENGTH).optional(),
     stageId: z.string().trim().min(1).optional(),
     pipelineStageId: z.string().trim().min(1).optional(),
+    clientId: z.string().trim().min(1).nullable().optional(),
+    clientIds: clientIdsSchema.optional(),
+    description: z.string().trim().max(MAX_PROJECT_DESCRIPTION_LENGTH).nullable().optional(),
+    value: nullableProjectNumberSchema,
+    dueDate: nullableProjectDueDateSchema,
   })
   .strict()
   .superRefine((value, context) => {
-    if (!value.name && !value.stageId && !value.pipelineStageId) {
+    if (
+      !value.name
+      && !value.stageId
+      && !value.pipelineStageId
+      && value.clientId === undefined
+      && value.clientIds === undefined
+      && value.description === undefined
+      && value.value === undefined
+      && value.dueDate === undefined
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['name'],
@@ -155,6 +193,28 @@ const parseWithSchema = <TSchema extends z.ZodTypeAny>(
   return parsed.data;
 };
 
+const normalizeQueryStringValue = (value: unknown) => {
+  if (Array.isArray(value)) {
+    const firstValid = value.find((entry) => entry !== undefined && entry !== null && entry !== '');
+    return normalizeQueryStringValue(firstValid);
+  }
+
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  return undefined;
+};
+
 const normalizeNullableTrimmed = (value: string | null | undefined) => {
   if (value === undefined) {
     return undefined;
@@ -166,6 +226,52 @@ const normalizeNullableTrimmed = (value: string | null | undefined) => {
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+};
+
+const normalizeNullableDate = (value: string | Date | null | undefined, fieldName: string) => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw badRequest(`${fieldName} is invalid`);
+    }
+
+    return value;
+  }
+
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    throw badRequest(`${fieldName} is invalid`);
+  }
+
+  return parsed;
+};
+
+const normalizeClientIds = (clientIds: string[] | undefined, clientId: string | null | undefined) => {
+  const sourceClientIds = clientIds ?? [];
+  const merged = [
+    ...sourceClientIds,
+    ...(clientId ? [clientId] : []),
+  ];
+
+  return Array.from(
+    new Set(
+      merged
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0),
+    ),
+  );
 };
 
 const hasDuplicates = (items: string[]) => new Set(items).size !== items.length;
@@ -181,11 +287,20 @@ type CreateProjectPayload = {
   categoryId: string | null;
   stageId: string | null;
   clientId: string | null;
+  clientIds?: string[];
+  description?: string | null;
+  value?: number | null;
+  dueDate?: Date | null;
 };
 
 type UpdateProjectPayload = {
   name?: string;
   stageId?: string;
+  clientId?: string | null;
+  clientIds?: string[];
+  description?: string | null;
+  value?: number | null;
+  dueDate?: Date | null;
 };
 
 type CreateStagePayload = {
@@ -246,51 +361,103 @@ const mapStage = (stage: {
   updatedAt: stage.updatedAt,
 });
 
-const mapProject = (project: {
-  id: string;
-  workspaceId: string;
-  name: string;
-  pipelineStageId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  pipelineStage: {
-    id: string;
-    categoryId: string | null;
-    name: string;
-    sortOrder: number;
-    isClosed: boolean;
-    color: string | null;
-    category: {
-      id: string;
-      name: string;
-    } | null;
-  } | null;
-}) => ({
-  id: project.id,
-  workspaceId: project.workspaceId,
-  name: project.name,
-  categoryId: project.pipelineStage?.categoryId ?? null,
-  stageId: project.pipelineStageId,
-  pipelineStageId: project.pipelineStageId,
-  stage: project.pipelineStage
-    ? {
-        id: project.pipelineStage.id,
-        categoryId: project.pipelineStage.categoryId,
-        name: project.pipelineStage.name,
-        sortOrder: project.pipelineStage.sortOrder,
-        isClosed: project.pipelineStage.isClosed,
-        color: project.pipelineStage.color,
-      }
-    : null,
-  categoryName: project.pipelineStage?.category?.name ?? null,
-  // Reserved for future CRM relation fields.
-  clientName: null,
-  ownerName: null,
-  value: null,
-  dueDate: null,
-  createdAt: project.createdAt,
-  updatedAt: project.updatedAt,
-});
+const mapProject = (project: any) => {
+  const linkedClients = (project.clientLinks ?? [])
+    .map((link: any) => link?.client)
+    .filter((client: any): client is { id: string; name: string } => Boolean(client));
+  const fallbackClient = project.client
+    ? [{ id: project.client.id, name: project.client.name }]
+    : [];
+  const allClientsById = new Map<string, { id: string; name: string }>();
+  [...linkedClients, ...fallbackClient].forEach((client) => {
+    allClientsById.set(client.id, client);
+  });
+
+  const clients = Array.from(allClientsById.values());
+  const primaryClient = clients[0] ?? null;
+
+  return {
+    id: project.id,
+    workspaceId: project.workspaceId,
+    clientId: primaryClient?.id ?? project.clientId ?? null,
+    clientIds: clients.map((client) => client.id),
+    name: project.name,
+    categoryId: project.pipelineStage?.categoryId ?? null,
+    stageId: project.pipelineStageId,
+    pipelineStageId: project.pipelineStageId,
+    stage: project.pipelineStage
+      ? {
+          id: project.pipelineStage.id,
+          categoryId: project.pipelineStage.categoryId,
+          name: project.pipelineStage.name,
+          sortOrder: project.pipelineStage.sortOrder,
+          isClosed: project.pipelineStage.isClosed,
+          color: project.pipelineStage.color,
+        }
+      : null,
+    categoryName: project.pipelineStage?.category?.name ?? null,
+    client: primaryClient,
+    clients,
+    clientName: primaryClient?.name ?? null,
+    clientNames: clients.map((client) => client.name),
+    ...(Object.prototype.hasOwnProperty.call(project, 'description')
+      ? { description: project.description ?? null }
+      : {}),
+    // Reserved for future CRM relation fields.
+    ownerName: null,
+    ...(Object.prototype.hasOwnProperty.call(project, 'value')
+      ? { value: project.value ?? null }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(project, 'dueDate')
+      ? { dueDate: project.dueDate ?? null }
+      : {}),
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  };
+};
+
+const hasProjectDetailsPatch = (
+  payload: {
+    description?: string | null;
+    value?: number | null;
+    dueDate?: Date | null;
+  },
+) => payload.description !== undefined || payload.value !== undefined || payload.dueDate !== undefined;
+
+const extractProjectClientId = (project: unknown) => {
+  if (!project || typeof project !== 'object') {
+    return null;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(project, 'clientId')) {
+    return null;
+  }
+
+  const clientId = (project as { clientId?: unknown }).clientId;
+  if (typeof clientId === 'string') {
+    return clientId;
+  }
+
+  return null;
+};
+
+const extractProjectClientIds = (project: unknown) => {
+  if (!project || typeof project !== 'object') {
+    return [] as string[];
+  }
+
+  if (Object.prototype.hasOwnProperty.call(project, 'clientLinks')) {
+    const clientLinks = (project as { clientLinks?: Array<{ client?: { id?: unknown } | null }> }).clientLinks;
+    if (Array.isArray(clientLinks)) {
+      return Array.from(new Set(clientLinks
+        .map((link) => link?.client?.id)
+        .filter((clientId): clientId is string => typeof clientId === 'string' && clientId.trim().length > 0)));
+    }
+  }
+
+  const legacyClientId = extractProjectClientId(project);
+  return legacyClientId ? [legacyClientId] : [];
+};
 
 export const projectsService = {
   parseProjectId(rawProjectId: string) {
@@ -307,23 +474,61 @@ export const projectsService = {
 
   parseCreateBody(body: unknown): CreateProjectPayload {
     const parsed = parseWithSchema(createProjectBodySchema, body, 'Invalid create-project payload');
+    const normalizedDescription = normalizeNullableTrimmed(parsed.description);
+    const normalizedDueDate = normalizeNullableDate(parsed.dueDate, 'dueDate');
+    const normalizedClientIds = normalizeClientIds(parsed.clientIds, parsed.clientId ?? null);
 
     return {
       name: parsed.name,
       categoryId: parsed.categoryId ?? null,
       stageId: parsed.stageId ?? parsed.pipelineStageId ?? null,
-      clientId: parsed.clientId ?? null,
+      clientId: normalizedClientIds[0] ?? null,
+      ...(parsed.clientIds !== undefined || parsed.clientId !== undefined
+        ? {
+            clientIds: normalizedClientIds,
+          }
+        : {}),
+      ...(normalizedDescription !== undefined ? { description: normalizedDescription } : {}),
+      ...(parsed.value !== undefined ? { value: parsed.value } : {}),
+      ...(normalizedDueDate !== undefined ? { dueDate: normalizedDueDate } : {}),
     };
   },
 
   parseUpdateBody(body: unknown): UpdateProjectPayload {
     const parsed = parseWithSchema(updateProjectBodySchema, body, 'Invalid update-project payload');
+    const normalizedDescription = normalizeNullableTrimmed(parsed.description);
+    const normalizedDueDate = normalizeNullableDate(parsed.dueDate, 'dueDate');
+    const hasClientPatch = parsed.clientIds !== undefined || parsed.clientId !== undefined;
+    const normalizedClientIds = hasClientPatch
+      ? normalizeClientIds(parsed.clientIds, parsed.clientId ?? null)
+      : [];
 
     return {
       ...(parsed.name ? { name: parsed.name } : {}),
       ...(parsed.stageId || parsed.pipelineStageId
         ? {
             stageId: parsed.stageId ?? parsed.pipelineStageId,
+          }
+        : {}),
+      ...(hasClientPatch
+        ? {
+            clientId: normalizedClientIds[0] ?? null,
+            clientIds: normalizedClientIds,
+          }
+        : {}),
+      ...(normalizedDescription !== undefined
+        ? {
+            description: normalizedDescription,
+          }
+        : {}),
+      ...(parsed.value !== undefined
+        ? {
+            value: parsed.value,
+          }
+        : {}),
+      ...(normalizedDueDate !== undefined
+        ? {
+            dueDate: normalizedDueDate,
           }
         : {}),
     };
@@ -703,6 +908,7 @@ export const projectsService = {
       return {
         categoryId: undefined as string | undefined,
         stageId: undefined as string | undefined,
+        clientId: undefined as string | undefined,
         search: undefined as string | undefined,
       };
     }
@@ -712,38 +918,43 @@ export const projectsService = {
     }
 
     const rawQuery = query as Record<string, unknown>;
-    const categoryIdRaw = rawQuery.categoryId;
-    const stageIdRaw = rawQuery.stageId ?? rawQuery.pipelineStageId;
-    const searchRaw = rawQuery.query ?? rawQuery.q;
+    const categoryIdRaw = normalizeQueryStringValue(rawQuery.categoryId);
+    const stageIdRaw = normalizeQueryStringValue(rawQuery.stageId ?? rawQuery.pipelineStageId);
+    const clientIdRaw = normalizeQueryStringValue(rawQuery.clientId);
+    const searchRaw = normalizeQueryStringValue(rawQuery.query ?? rawQuery.q);
 
-    const categoryId =
-      categoryIdRaw === undefined || categoryIdRaw === null || categoryIdRaw === ''
-        ? undefined
-        : parseWithSchema(nonEmptyStringSchema, categoryIdRaw, 'categoryId is invalid');
+    const categoryId = categoryIdRaw
+      ? parseWithSchema(nonEmptyStringSchema, categoryIdRaw, 'categoryId is invalid')
+      : undefined;
 
-    const stageId =
-      stageIdRaw === undefined || stageIdRaw === null || stageIdRaw === ''
-        ? undefined
-        : parseWithSchema(nonEmptyStringSchema, stageIdRaw, 'stageId is invalid');
+    const stageId = stageIdRaw
+      ? parseWithSchema(nonEmptyStringSchema, stageIdRaw, 'stageId is invalid')
+      : undefined;
 
-    const search =
-      searchRaw === undefined || searchRaw === null || searchRaw === ''
-        ? undefined
-        : parseWithSchema(nonEmptyStringSchema, searchRaw, 'query is invalid');
+    const search = searchRaw
+      ? parseWithSchema(nonEmptyStringSchema, searchRaw, 'query is invalid')
+      : undefined;
+
+    const clientId = clientIdRaw
+      ? parseWithSchema(nonEmptyStringSchema, clientIdRaw, 'clientId is invalid')
+      : undefined;
 
     return {
       categoryId,
       stageId,
+      clientId,
       search,
     };
   },
 
   async listProjects(workspaceId: string, query: unknown) {
     const filters = this.parseListProjectsQuery(query);
+
     const projects = await projectsRepository.listProjects({
       workspaceId,
       categoryId: filters.categoryId,
       stageId: filters.stageId,
+      clientId: filters.clientId,
       search: filters.search,
     });
 
@@ -775,6 +986,35 @@ export const projectsService = {
       }
     }
 
+    const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
+      projectsRepository.isProjectClientSchemaReady(),
+      projectsRepository.isProjectClientsSchemaReady(),
+      projectsRepository.isProjectDetailsSchemaReady(),
+    ]);
+
+    if (hasProjectDetailsPatch(payload) && !projectDetailsReady) {
+      throw badRequest('Project details schema is not available');
+    }
+
+    if (payload.clientIds && payload.clientIds.length > 1 && !projectClientsReady) {
+      throw badRequest('Project multi-client schema is not available');
+    }
+
+    if (payload.clientIds && payload.clientIds.length > 0) {
+      if (!clientRelationReady) {
+        throw badRequest('Project client schema is not available');
+      }
+
+      const clients = await projectsRepository.findClientsByIds(input.workspaceId, payload.clientIds);
+      if (clients.length !== payload.clientIds.length) {
+        const foundIds = new Set(clients.map((client) => client.id));
+        const missingClientIds = payload.clientIds.filter((clientId) => !foundIds.has(clientId));
+        throw badRequest('Client not found in workspace', {
+          missingClientIds,
+        });
+      }
+    }
+
     let stageId = payload.stageId;
 
     if (stageId) {
@@ -803,7 +1043,17 @@ export const projectsService = {
       workspaceId: input.workspaceId,
       name: payload.name,
       pipelineStageId: stageId,
+      clientId: clientRelationReady ? payload.clientId : null,
+      ...(projectClientsReady && payload.clientIds !== undefined ? { clientIds: payload.clientIds } : {}),
+      ...(projectDetailsReady && payload.description !== undefined ? { description: payload.description } : {}),
+      ...(projectDetailsReady && payload.value !== undefined ? { value: payload.value } : {}),
+      ...(projectDetailsReady && payload.dueDate !== undefined ? { dueDate: payload.dueDate } : {}),
     });
+    if (!createdProject) {
+      throw notFound('Project not found');
+    }
+    const createdProjectClientId = extractProjectClientId(createdProject);
+    const createdProjectClientIds = extractProjectClientIds(createdProject);
 
     await audit.log({
       event: 'projects.create',
@@ -813,6 +1063,8 @@ export const projectsService = {
       entityId: createdProject.id,
       metadata: {
         projectId: createdProject.id,
+        clientId: createdProjectClientId,
+        clientIds: createdProjectClientIds,
         stageId: createdProject.pipelineStageId,
       },
       request: input.request,
@@ -838,10 +1090,46 @@ export const projectsService = {
       }
     }
 
+    const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
+      projectsRepository.isProjectClientSchemaReady(),
+      projectsRepository.isProjectClientsSchemaReady(),
+      projectsRepository.isProjectDetailsSchemaReady(),
+    ]);
+
+    if (hasProjectDetailsPatch(payload) && !projectDetailsReady) {
+      throw badRequest('Project details schema is not available');
+    }
+
+    if (payload.clientIds && payload.clientIds.length > 1 && !projectClientsReady) {
+      throw badRequest('Project multi-client schema is not available');
+    }
+
+    if (payload.clientIds && payload.clientIds.length > 0) {
+      if (!clientRelationReady) {
+        throw badRequest('Project client schema is not available');
+      }
+
+      const clients = await projectsRepository.findClientsByIds(input.workspaceId, payload.clientIds);
+      if (clients.length !== payload.clientIds.length) {
+        const foundIds = new Set(clients.map((client) => client.id));
+        const missingClientIds = payload.clientIds.filter((clientId) => !foundIds.has(clientId));
+        throw badRequest('Client not found in workspace', {
+          missingClientIds,
+        });
+      }
+    }
+
     const updatedProject = await projectsRepository.updateProject(input.workspaceId, projectId, {
       ...(payload.name ? { name: payload.name } : {}),
       ...(payload.stageId ? { pipelineStageId: payload.stageId } : {}),
+      ...(clientRelationReady && payload.clientId !== undefined ? { clientId: payload.clientId } : {}),
+      ...(projectClientsReady && payload.clientIds !== undefined ? { clientIds: payload.clientIds } : {}),
+      ...(projectDetailsReady && payload.description !== undefined ? { description: payload.description } : {}),
+      ...(projectDetailsReady && payload.value !== undefined ? { value: payload.value } : {}),
+      ...(projectDetailsReady && payload.dueDate !== undefined ? { dueDate: payload.dueDate } : {}),
     });
+    const updatedProjectClientId = updatedProject ? extractProjectClientId(updatedProject) : null;
+    const updatedProjectClientIds = updatedProject ? extractProjectClientIds(updatedProject) : [];
 
     if (!updatedProject) {
       throw notFound('Project not found');
@@ -855,6 +1143,8 @@ export const projectsService = {
       entityId: updatedProject.id,
       metadata: {
         projectId: updatedProject.id,
+        clientId: updatedProjectClientId,
+        clientIds: updatedProjectClientIds,
         stageId: updatedProject.pipelineStageId,
       },
       request: input.request,
@@ -988,3 +1278,4 @@ export const projectsService = {
     };
   },
 };
+

@@ -24,6 +24,7 @@ type ProjectsQuery = {
   categoryId?: string;
   stageId?: string;
   pipelineStageId?: string;
+  clientId?: string;
   query?: string;
   q?: string;
 };
@@ -210,6 +211,28 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
 
     return ok(reply, { items: projects });
   });
+
+  app.get<{ Params: ProjectParams }>(
+    '/projects/:id/history',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      await projectsService.getProject(workspace.id, request.params.id);
+
+      // Placeholder endpoint to avoid noisy 404s on clients expecting stage history.
+      return ok(reply, { items: [] });
+    },
+  );
+
+  app.get<{ Params: ProjectParams }>(
+    '/projects/:id/stage-history',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      await projectsService.getProject(workspace.id, request.params.id);
+
+      // Placeholder endpoint to avoid noisy 404s on clients expecting stage history.
+      return ok(reply, { items: [] });
+    },
+  );
 
   app.get<{ Params: ProjectParams }>(
     '/projects/:id',

@@ -45,9 +45,11 @@ const formatDateValue = (dateValue) => {
 };
 
 const resolveClientName = (project) => (
-    project?.clientName
-    || project?.client?.name
-    || '-'
+    (Array.isArray(project?.clientNames) && project.clientNames.length > 0
+        ? project.clientNames.join(', ')
+        : (Array.isArray(project?.clients) && project.clients.length > 0
+            ? project.clients.map((client) => client.name).join(', ')
+            : (project?.clientName || project?.client?.name || '-')))
 );
 
 const resolveOwnerName = (project) => (

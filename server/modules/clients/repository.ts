@@ -1,4 +1,4 @@
-import type { ClientType, Prisma } from '@prisma/client';
+import { Prisma, type ClientType } from '@prisma/client';
 import { prisma } from '../../prisma.js';
 
 export type ClientSortField = 'name' | 'createdAt' | 'updatedAt';
@@ -59,6 +59,62 @@ const clientSelect = {
   createdAt: true,
   updatedAt: true,
 } as const;
+
+const clientProjectSelect = {
+  id: true,
+  workspaceId: true,
+  clientId: true,
+  name: true,
+  pipelineStageId: true,
+  createdAt: true,
+  updatedAt: true,
+  pipelineStage: {
+    select: {
+      id: true,
+      categoryId: true,
+      name: true,
+      sortOrder: true,
+      isClosed: true,
+      color: true,
+      category: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+} as const;
+
+const PROJECT_TABLE = 'Project';
+const PROJECT_CLIENT_TABLE = 'ProjectClient';
+
+const isProjectClientColumnReady = async () => {
+  const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = ${PROJECT_TABLE}
+      AND column_name = 'clientId'
+    ) AS "exists"
+  `);
+
+  return rows[0]?.exists === true;
+};
+
+const isProjectClientsTableReady = async () => {
+  const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      AND table_name = ${PROJECT_CLIENT_TABLE}
+    ) AS "exists"
+  `);
+
+  return rows[0]?.exists === true;
+};
 
 const buildSearchWhere = (query: string): Prisma.ClientWhereInput => ({
   OR: [
@@ -143,6 +199,47 @@ export const clientsRepository = {
       },
       select: clientSelect,
     });
+  },
+
+  async listProjectsByClient(workspaceId: string, clientId: string) {
+    const [projectClientsReady, legacyProjectClientReady] = await Promise.all([
+      isProjectClientsTableReady(),
+      isProjectClientColumnReady(),
+    ]);
+
+    if (projectClientsReady) {
+      return prisma.project.findMany({
+        where: {
+          workspaceId,
+          clientLinks: {
+            some: {
+              clientId,
+            },
+          },
+        },
+        orderBy: [
+          { updatedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: clientProjectSelect,
+      });
+    }
+
+    if (legacyProjectClientReady) {
+      return prisma.project.findMany({
+        where: {
+          workspaceId,
+          clientId,
+        },
+        orderBy: [
+          { updatedAt: 'desc' },
+          { createdAt: 'desc' },
+        ],
+        select: clientProjectSelect,
+      });
+    }
+
+    return [];
   },
 
   create(workspaceId: string, input: CreateClientInput) {

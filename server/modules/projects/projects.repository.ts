@@ -42,7 +42,7 @@ const pipelineStageSelect = {
   updatedAt: true,
 } as const;
 
-const projectSelect = {
+const baseProjectSelect = {
   id: true,
   workspaceId: true,
   name: true,
@@ -67,7 +67,57 @@ const projectSelect = {
   },
 } as const;
 
+const buildProjectSelect = ({
+  includeClient,
+  includeClientLinks,
+  includeDetails,
+}: {
+  includeClient: boolean;
+  includeClientLinks: boolean;
+  includeDetails: boolean;
+}) => ({
+  ...baseProjectSelect,
+  ...(includeClient
+    ? {
+        clientId: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      }
+    : {}),
+  ...(includeClientLinks
+    ? {
+        clientLinks: {
+          select: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: [
+            { createdAt: 'asc' as const },
+            { id: 'asc' as const },
+          ],
+        },
+      }
+    : {}),
+  ...(includeDetails
+    ? {
+        description: true,
+        value: true,
+        dueDate: true,
+      }
+    : {}),
+});
+
 const PROJECT_TABLE = 'Project';
+const CLIENT_TABLE = 'Client';
+const PROJECT_CLIENT_TABLE = 'ProjectClient';
 const PIPELINE_STAGE_TABLE = 'PipelineStage';
 
 const tableExists = async (tableName: string) => {
@@ -103,6 +153,47 @@ const tableHasColumns = async (tableName: string, columns: readonly string[]) =>
 };
 
 export const projectsRepository = {
+  async isProjectClientSchemaReady() {
+    const [projectTableExists, clientTableExists] = await Promise.all([
+      tableExists(PROJECT_TABLE),
+      tableExists(CLIENT_TABLE),
+    ]);
+
+    if (!projectTableExists || !clientTableExists) {
+      return false;
+    }
+
+    return tableHasColumn(PROJECT_TABLE, 'clientId');
+  },
+
+  async isProjectClientsSchemaReady() {
+    const [projectTableExists, clientTableExists, projectClientTableExists] = await Promise.all([
+      tableExists(PROJECT_TABLE),
+      tableExists(CLIENT_TABLE),
+      tableExists(PROJECT_CLIENT_TABLE),
+    ]);
+
+    if (!projectTableExists || !clientTableExists || !projectClientTableExists) {
+      return false;
+    }
+
+    const [projectClientColumnsReady, clientColumnsReady] = await Promise.all([
+      tableHasColumns(PROJECT_CLIENT_TABLE, ['projectId', 'clientId']),
+      tableHasColumns(CLIENT_TABLE, ['id', 'workspaceId']),
+    ]);
+
+    return projectClientColumnsReady && clientColumnsReady;
+  },
+
+  async isProjectDetailsSchemaReady() {
+    const projectTableExists = await tableExists(PROJECT_TABLE);
+    if (!projectTableExists) {
+      return false;
+    }
+
+    return tableHasColumns(PROJECT_TABLE, ['description', 'value', 'dueDate']);
+  },
+
   listCategories(workspaceId: string) {
     return prisma.projectCategory.findMany({
       where: {
@@ -371,12 +462,19 @@ export const projectsRepository = {
     );
   },
 
-  listProjects(input: {
+  async listProjects(input: {
     workspaceId: string;
     categoryId?: string;
     stageId?: string;
+    clientId?: string;
     search?: string;
   }) {
+    const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
+      this.isProjectClientSchemaReady(),
+      this.isProjectClientsSchemaReady(),
+      this.isProjectDetailsSchemaReady(),
+    ]);
+
     return prisma.project.findMany({
       where: {
         workspaceId: input.workspaceId,
@@ -388,6 +486,21 @@ export const projectsRepository = {
             }
           : {}),
         ...(input.stageId ? { pipelineStageId: input.stageId } : {}),
+        ...(input.clientId
+          ? (
+              projectClientsReady
+                ? {
+                    clientLinks: {
+                      some: {
+                        clientId: input.clientId,
+                      },
+                    },
+                  }
+                : clientRelationReady
+                  ? { clientId: input.clientId }
+                  : {}
+            )
+          : {}),
         ...(input.search
           ? {
               name: {
@@ -401,33 +514,87 @@ export const projectsRepository = {
         { updatedAt: 'desc' },
         { createdAt: 'desc' },
       ],
-      select: projectSelect,
+      select: buildProjectSelect({
+        includeClient: clientRelationReady,
+        includeClientLinks: projectClientsReady,
+        includeDetails: projectDetailsReady,
+      }),
     });
   },
 
-  findProjectWithStage(workspaceId: string, projectId: string) {
+  async findProjectWithStage(workspaceId: string, projectId: string) {
+    const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
+      this.isProjectClientSchemaReady(),
+      this.isProjectClientsSchemaReady(),
+      this.isProjectDetailsSchemaReady(),
+    ]);
+
     return prisma.project.findFirst({
       where: {
         workspaceId,
         id: projectId,
       },
-      select: projectSelect,
+      select: buildProjectSelect({
+        includeClient: clientRelationReady,
+        includeClientLinks: projectClientsReady,
+        includeDetails: projectDetailsReady,
+      }),
     });
   },
 
-  createProject(input: {
+  async createProject(input: {
     workspaceId: string;
     name: string;
     pipelineStageId: string;
+    clientId?: string | null;
+    clientIds?: string[];
+    description?: string | null;
+    value?: number | null;
+    dueDate?: Date | null;
   }) {
-    return prisma.project.create({
+    const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
+      this.isProjectClientSchemaReady(),
+      this.isProjectClientsSchemaReady(),
+      this.isProjectDetailsSchemaReady(),
+    ]);
+
+    const normalizedClientIds = Array.from(
+      new Set((input.clientIds ?? []).map((clientId) => clientId.trim()).filter(Boolean)),
+    );
+    const legacyClientId = normalizedClientIds[0] ?? input.clientId ?? null;
+
+    const createdProject = await prisma.project.create({
       data: {
         workspaceId: input.workspaceId,
         name: input.name,
+        ...(clientRelationReady ? { clientId: legacyClientId } : {}),
+        ...(projectClientsReady && normalizedClientIds.length > 0
+          ? {
+              clientLinks: {
+                createMany: {
+                  data: normalizedClientIds.map((clientId) => ({
+                    clientId,
+                  })),
+                  skipDuplicates: true,
+                },
+              },
+            }
+          : {}),
+        ...(projectDetailsReady
+          ? {
+              ...(input.description !== undefined ? { description: input.description } : {}),
+              ...(input.value !== undefined ? { value: input.value } : {}),
+              ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
+            }
+          : {}),
         pipelineStageId: input.pipelineStageId,
       },
-      select: projectSelect,
+      select: {
+        id: true,
+      },
     });
+
+    return this.findProjectWithStage(input.workspaceId, createdProject.id);
   },
 
   async updateProject(
@@ -436,17 +603,68 @@ export const projectsRepository = {
     patch: {
       name?: string;
       pipelineStageId?: string;
+      clientId?: string | null;
+      clientIds?: string[];
+      description?: string | null;
+      value?: number | null;
+      dueDate?: Date | null;
     },
   ) {
-    const updated = await prisma.project.updateMany({
-      where: {
-        workspaceId,
-        id: projectId,
-      },
-      data: patch,
+    const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
+      this.isProjectClientSchemaReady(),
+      this.isProjectClientsSchemaReady(),
+      this.isProjectDetailsSchemaReady(),
+    ]);
+
+    const normalizedClientIds = patch.clientIds !== undefined
+      ? Array.from(new Set(patch.clientIds.map((clientId) => clientId.trim()).filter(Boolean)))
+      : undefined;
+    const legacyClientId = normalizedClientIds !== undefined
+      ? (normalizedClientIds[0] ?? null)
+      : patch.clientId;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedRow = await tx.project.updateMany({
+        where: {
+          workspaceId,
+          id: projectId,
+        },
+        data: {
+          ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(patch.pipelineStageId !== undefined ? { pipelineStageId: patch.pipelineStageId } : {}),
+          ...(clientRelationReady && legacyClientId !== undefined ? { clientId: legacyClientId } : {}),
+          ...(projectDetailsReady && patch.description !== undefined ? { description: patch.description } : {}),
+          ...(projectDetailsReady && patch.value !== undefined ? { value: patch.value } : {}),
+          ...(projectDetailsReady && patch.dueDate !== undefined ? { dueDate: patch.dueDate } : {}),
+        },
+      });
+
+      if (updatedRow.count === 0) {
+        return 0;
+      }
+
+      if (projectClientsReady && normalizedClientIds !== undefined) {
+        await tx.projectClient.deleteMany({
+          where: {
+            projectId,
+          },
+        });
+
+        if (normalizedClientIds.length > 0) {
+          await tx.projectClient.createMany({
+            data: normalizedClientIds.map((clientId) => ({
+              projectId,
+              clientId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      return updatedRow.count;
     });
 
-    if (updated.count === 0) {
+    if (updated === 0) {
       return null;
     }
 
@@ -467,6 +685,34 @@ export const projectsRepository = {
     });
 
     return existingProject;
+  },
+
+  findClientById(workspaceId: string, clientId: string) {
+    return prisma.client.findFirst({
+      where: {
+        workspaceId,
+        id: clientId,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+  },
+
+  findClientsByIds(workspaceId: string, clientIds: string[]) {
+    return prisma.client.findMany({
+      where: {
+        workspaceId,
+        id: {
+          in: clientIds,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
   },
 
   async isMoveStageSchemaReady() {

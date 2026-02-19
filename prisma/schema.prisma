@@ -102,6 +102,8 @@ model Client {
   updatedAt   DateTime   @updatedAt
   workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   quotes      Quote[]
+  projects    Project[]
+  projectLinks ProjectClient[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, email])
@@ -112,16 +114,36 @@ model Client {
 model Project {
   id              String         @id @default(cuid())
   workspaceId     String
+  clientId        String?
   name            String
+  description     String?
+  value           Float?
+  dueDate         DateTime?
   pipelineStageId String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientLinks     ProjectClient[]
   pipelineStage   PipelineStage? @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, name])
+  @@index([workspaceId, clientId])
   @@index([workspaceId, pipelineStageId])
   @@index([workspaceId, updatedAt])
+}
+
+model ProjectClient {
+  id        String   @id @default(cuid())
+  projectId String
+  clientId  String
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, clientId])
+  @@index([projectId, createdAt])
+  @@index([clientId, createdAt])
 }
 
 model ProjectCategory {

@@ -239,7 +239,7 @@ const ProjectDetailContent = ({ access, id }) => {
                     errorMessage={saveError}
                     onSubmit={handleSave}
                     onCancel={() => setIsEditing(false)}
-                    supportedFields={['name']}
+                    supportedFields={['name', 'description', 'value', 'dueDate', 'clientIds']}
                 />
             ) : (
                 <ProjectDetailsCard project={project} loading={false} />

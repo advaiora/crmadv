@@ -105,6 +105,11 @@ type CsvImportHeaderCell = {
 };
 
 type ClientRecord = NonNullable<Awaited<ReturnType<typeof clientsRepository.findById>>>;
+type ClientProjectRecord = Awaited<ReturnType<typeof clientsRepository.listProjectsByClient>>[number];
+type MapClientOptions = {
+  includeProjects?: boolean;
+  projects?: ClientProjectRecord[];
+};
 
 const CSV_IMPORT_IGNORED_HEADERS = new Set(['id', 'status', 'stato']);
 const CSV_IMPORT_HEADER_ALIAS_MAP: Record<string, CsvHeaderColumn> = {
@@ -596,7 +601,30 @@ const arraysAreEqual = (left: string[], right: string[]) =>
 
 const sortUniqueFields = (fields: string[]) => Array.from(new Set(fields)).sort();
 
-const mapClient = (record: ClientRecord) => ({
+const mapClientProject = (project: ClientProjectRecord) => ({
+  id: project.id,
+  workspaceId: project.workspaceId,
+  clientId: project.clientId,
+  name: project.name,
+  categoryId: project.pipelineStage?.categoryId ?? null,
+  stageId: project.pipelineStageId,
+  pipelineStageId: project.pipelineStageId,
+  stage: project.pipelineStage
+    ? {
+        id: project.pipelineStage.id,
+        categoryId: project.pipelineStage.categoryId,
+        name: project.pipelineStage.name,
+        sortOrder: project.pipelineStage.sortOrder,
+        isClosed: project.pipelineStage.isClosed,
+        color: project.pipelineStage.color,
+      }
+    : null,
+  categoryName: project.pipelineStage?.category?.name ?? null,
+  createdAt: project.createdAt,
+  updatedAt: project.updatedAt,
+});
+
+const mapClient = (record: ClientRecord, options: MapClientOptions = {}) => ({
   id: record.id,
   workspaceId: record.workspaceId,
   type: record.type,
@@ -614,6 +642,11 @@ const mapClient = (record: ClientRecord) => ({
   },
   notes: record.notes,
   tags: record.tags,
+  ...(options.includeProjects
+    ? {
+        projects: (options.projects ?? []).map((project) => mapClientProject(project)),
+      }
+    : {}),
   createdAt: record.createdAt,
   updatedAt: record.updatedAt,
 });
@@ -836,7 +869,12 @@ export const clientsService = {
 
   async getClient(workspaceId: string, clientId: string) {
     const client = await this.requireClient(workspaceId, clientId);
-    return mapClient(client);
+    const projects = await clientsRepository.listProjectsByClient(workspaceId, client.id);
+
+    return mapClient(client, {
+      includeProjects: true,
+      projects,
+    });
   },
 
   parseExportFilters(query: unknown) {

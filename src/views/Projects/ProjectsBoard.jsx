@@ -87,7 +87,13 @@ const ProjectsBoardContent = ({ access }) => {
   const [isQuickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateSubmitting, setQuickCreateSubmitting] = useState(false);
   const [quickCreateError, setQuickCreateError] = useState("");
-  const [quickCreateDraft, setQuickCreateDraft] = useState({ name: "", clientId: "" });
+  const [quickCreateDraft, setQuickCreateDraft] = useState({
+    name: "",
+    description: "",
+    value: "",
+    dueDate: "",
+    clientIds: [],
+  });
 
   const canMove = hasPermission(access, "projects.edit");
   const canCreate = hasPermission(access, "projects.create") || hasPermission(access, "projects.edit");
@@ -210,8 +216,16 @@ const ProjectsBoardContent = ({ access }) => {
       const optimisticProject = normalizeBoardProject({
         id: optimisticId,
         name: values.name,
+        description: values.description || null,
+        value: values.value ?? null,
+        dueDate: values.dueDate || null,
         clientId: values.clientId || null,
-        clientName: values.clientId || null,
+        clientIds: values.clientIds || [],
+        clientName: values.clientName || null,
+        clientNames: Array.isArray(values.clients) ? values.clients.map((client) => client.name) : [],
+        clients: Array.isArray(values.clients)
+          ? values.clients.map((client) => ({ id: client.id, name: client.name }))
+          : [],
         categoryId,
         stageId: defaultStageId,
         createdAt: now,
@@ -223,6 +237,10 @@ const ProjectsBoardContent = ({ access }) => {
       try {
         const payload = { name: values.name, categoryId, stageId: defaultStageId };
         if (values.clientId) payload.clientId = values.clientId;
+        if (Array.isArray(values.clientIds)) payload.clientIds = values.clientIds;
+        if (values.description !== undefined) payload.description = values.description;
+        if (values.value !== undefined) payload.value = values.value;
+        if (values.dueDate !== undefined) payload.dueDate = values.dueDate;
 
         const createdProject = await createProject(payload);
         const normalizedCreatedProject = normalizeBoardProject({
@@ -232,12 +250,24 @@ const ProjectsBoardContent = ({ access }) => {
 
         setBoardProjects((currentProjects) => currentProjects.map((project) => (project.id === optimisticId ? normalizedCreatedProject : project)));
 
-        setQuickCreateDraft({ name: "", clientId: "" });
+        setQuickCreateDraft({
+          name: "",
+          description: "",
+          value: "",
+          dueDate: "",
+          clientIds: [],
+        });
         toast.success("Creato");
         void projectsQuery.refetch();
       } catch (error) {
         setBoardProjects(previousProjects);
-        setQuickCreateDraft({ name: values.name || "", clientId: values.clientId || "" });
+        setQuickCreateDraft({
+          name: values.name || "",
+          description: values.description || "",
+          value: values.value !== undefined && values.value !== null ? String(values.value) : "",
+          dueDate: values.dueDate || "",
+          clientIds: Array.isArray(values.clientIds) ? values.clientIds : [],
+        });
         setQuickCreateError(getErrorMessage(error) || "Errore creazione progetto");
         setQuickCreateOpen(true);
         toast.error("Errore creazione progetto");

@@ -11,6 +11,7 @@ import {
 import { Link, useHistory, useLocation, useParams } from 'react-router-dom';
 import {
     ArrowLeft,
+    FolderKanban,
     Mail,
     MapPin,
     Pencil,
@@ -129,6 +130,7 @@ const ClientDetail = () => {
                 const nameLabel = getClientNameLabel(client?.type);
                 const hasEmail = Boolean(client?.email);
                 const hasPhone = Boolean(client?.phone);
+                const associatedProjects = Array.isArray(client?.projects) ? client.projects : [];
 
                 return (
                     <>
@@ -348,6 +350,42 @@ const ClientDetail = () => {
                                                     </div>
                                                 ) : (
                                                     <span className="text-muted">Non impostato</span>
+                                                )}
+                                            </Card.Body>
+                                        </Card>
+
+                                        <Card className="card-border mt-3">
+                                            <Card.Header className="bg-transparent">
+                                                <h6 className="mb-0 d-inline-flex align-items-center gap-2">
+                                                    <FolderKanban size={15} />
+                                                    Progetti associati
+                                                </h6>
+                                            </Card.Header>
+                                            <Card.Body>
+                                                {associatedProjects.length > 0 ? (
+                                                    <div className="d-flex flex-column gap-2">
+                                                        {associatedProjects.map((project) => (
+                                                            <div key={project.id} className="border rounded-3 p-2">
+                                                                <div className="d-flex justify-content-between align-items-center gap-2">
+                                                                    <Link to={`/projects/${project.id}`} className="fw-semibold text-decoration-none">
+                                                                        {project.name}
+                                                                    </Link>
+                                                                    {project?.stage?.name && (
+                                                                        <span className="badge bg-light text-dark border">
+                                                                            {project.stage.name}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="small text-muted mt-1">
+                                                                    {project?.categoryName ? `Categoria: ${project.categoryName}` : 'Categoria non assegnata'}
+                                                                    {' - '}
+                                                                    Aggiornato: {formatDateTime(project.updatedAt)}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted">Nessun progetto associato</span>
                                                 )}
                                             </Card.Body>
                                         </Card>

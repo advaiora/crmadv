@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Card, Col, Form, Row } from 'react-bootstrap';
+import { listClients } from '../../../clients/ui/clientApi';
 
 const hasOwn = (value, key) => Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
 
@@ -34,6 +35,22 @@ const normalizeNumericOrNull = (value) => {
     return Number.isFinite(parsed) ? parsed : value;
 };
 
+const normalizeClientIds = (value) => Array.from(
+    new Set((Array.isArray(value) ? value : [])
+        .map((clientId) => String(clientId).trim())
+        .filter(Boolean)),
+);
+
+const areSameStringArrays = (left, right) => {
+    if (left.length !== right.length) {
+        return false;
+    }
+
+    const sortedLeft = [...left].sort();
+    const sortedRight = [...right].sort();
+    return sortedLeft.every((item, index) => item === sortedRight[index]);
+};
+
 const ProjectEditForm = ({
     project,
     submitting,
@@ -48,9 +65,13 @@ const ProjectEditForm = ({
         dueDate: '',
         description: '',
         ownerId: '',
-        clientId: '',
+        clientIds: [],
     });
     const [localError, setLocalError] = useState('');
+    const [clientSearch, setClientSearch] = useState('');
+    const [clients, setClients] = useState([]);
+    const [clientsLoading, setClientsLoading] = useState(false);
+    const [clientsError, setClientsError] = useState('');
 
     const supportSet = useMemo(() => new Set(supportedFields), [supportedFields]);
 
@@ -61,10 +82,60 @@ const ProjectEditForm = ({
             dueDate: toDateInputValue(project?.dueDate),
             description: project?.description || '',
             ownerId: project?.ownerId || '',
-            clientId: project?.clientId || '',
+            clientIds: normalizeClientIds(
+                Array.isArray(project?.clientIds)
+                    ? project.clientIds
+                    : (project?.clientId ? [project.clientId] : []),
+            ),
         });
+        setClientSearch('');
         setLocalError('');
     }, [project]);
+
+    useEffect(() => {
+        const normalizedSearch = clientSearch.trim();
+        let mounted = true;
+
+        setClientsLoading(true);
+        setClientsError('');
+
+        const timeoutId = window.setTimeout(() => {
+            listClients({
+                page: 1,
+                pageSize: 100,
+                sort: 'name',
+                query: normalizedSearch || undefined,
+            })
+                .then((result) => {
+                    if (!mounted) {
+                        return;
+                    }
+
+                    const items = Array.isArray(result?.items) ? result.items : [];
+                    setClients(items);
+                })
+                .catch((error) => {
+                    if (!mounted) {
+                        return;
+                    }
+
+                    setClients([]);
+                    setClientsError(error?.message || 'Impossibile caricare i clienti.');
+                })
+                .finally(() => {
+                    if (!mounted) {
+                        return;
+                    }
+
+                    setClientsLoading(false);
+                });
+        }, 250);
+
+        return () => {
+            mounted = false;
+            window.clearTimeout(timeoutId);
+        };
+    }, [clientSearch]);
 
     const handleChange = (fieldName) => (event) => {
         const nextValue = event.target.value;
@@ -74,7 +145,13 @@ const ProjectEditForm = ({
         }));
     };
 
-    const includeField = (fieldName) => supportSet.has(fieldName) && hasOwn(project, fieldName);
+    const includeField = (fieldName) => {
+        if (fieldName === 'clientIds') {
+            return supportSet.has(fieldName) && (hasOwn(project, 'clientIds') || hasOwn(project, 'clientId'));
+        }
+
+        return supportSet.has(fieldName) && hasOwn(project, fieldName);
+    };
 
     const handleSubmit = (event) => {
         event.preventDefault();
@@ -119,11 +196,16 @@ const ProjectEditForm = ({
             }
         }
 
-        if (includeField('clientId')) {
-            const normalizedClientId = normalizeEmpty(formState.clientId);
-            const currentClientId = normalizeEmpty(project?.clientId || '');
-            if (normalizedClientId !== currentClientId) {
-                patch.clientId = normalizedClientId;
+        if (includeField('clientIds')) {
+            const normalizedClientIds = normalizeClientIds(formState.clientIds);
+            const currentClientIds = normalizeClientIds(
+                Array.isArray(project?.clientIds)
+                    ? project.clientIds
+                    : (project?.clientId ? [project.clientId] : []),
+            );
+
+            if (!areSameStringArrays(normalizedClientIds, currentClientIds)) {
+                patch.clientIds = normalizedClientIds;
             }
         }
 
@@ -221,15 +303,50 @@ const ProjectEditForm = ({
                             </Col>
                         )}
 
-                        {includeField('clientId') && (
-                            <Col xs={12} md={6}>
+                        {includeField('clientIds') && (
+                            <Col xs={12}>
                                 <Form.Group>
-                                    <Form.Label>Client ID</Form.Label>
+                                    <Form.Label>Clienti</Form.Label>
                                     <Form.Control
-                                        value={formState.clientId}
-                                        onChange={handleChange('clientId')}
-                                        disabled={submitting}
+                                        className="mb-2"
+                                        value={clientSearch}
+                                        onChange={(event) => setClientSearch(event.target.value)}
+                                        placeholder="Cerca cliente per nome o email"
+                                        disabled={submitting || clientsLoading}
                                     />
+                                    <Form.Select
+                                        value={formState.clientIds}
+                                        onChange={(event) => {
+                                            const selectedValues = Array.from(event.target.selectedOptions).map((option) => option.value);
+                                            setFormState((current) => ({
+                                                ...current,
+                                                clientIds: selectedValues,
+                                            }));
+                                        }}
+                                        multiple
+                                        disabled={submitting || clientsLoading}
+                                    >
+                                        {clients.map((client) => (
+                                            <option key={client.id} value={client.id}>
+                                                {client.name}
+                                                {client.email ? ` - ${client.email}` : ''}
+                                            </option>
+                                        ))}
+                                        {formState.clientIds
+                                            .filter((clientId) => !clients.some((client) => String(client.id) === String(clientId)))
+                                            .map((clientId) => (
+                                                <option key={`missing-${clientId}`} value={clientId}>
+                                                    Cliente non trovato ({clientId})
+                                                </option>
+                                            ))}
+                                    </Form.Select>
+                                    <div className="small text-muted mt-1">Tieni premuto Ctrl/Cmd per selezionare piu clienti.</div>
+                                    {clientsLoading && (
+                                        <div className="small text-muted mt-1">Caricamento clienti...</div>
+                                    )}
+                                    {clientsError && (
+                                        <div className="small text-danger mt-1">{clientsError}</div>
+                                    )}
                                 </Form.Group>
                             </Col>
                         )}

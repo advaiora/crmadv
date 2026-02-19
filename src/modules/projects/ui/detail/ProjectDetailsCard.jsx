@@ -5,7 +5,7 @@ const hasOwn = (value, key) => Boolean(value) && Object.prototype.hasOwnProperty
 
 const formatCurrencyValue = (value) => {
     if (value === null || value === undefined || value === '') {
-        return '—';
+        return '-';
     }
 
     const numericValue = Number(value);
@@ -21,7 +21,7 @@ const formatCurrencyValue = (value) => {
 
 const formatDateValue = (value) => {
     if (!value) {
-        return '—';
+        return '-';
     }
 
     const parsedDate = new Date(value);
@@ -32,7 +32,19 @@ const formatDateValue = (value) => {
     return new Intl.DateTimeFormat('it-IT').format(parsedDate);
 };
 
-const resolveText = (value) => (value === null || value === undefined || value === '' ? '—' : String(value));
+const resolveText = (value) => (value === null || value === undefined || value === '' ? '-' : String(value));
+
+const resolveClientNames = (project) => {
+    if (Array.isArray(project?.clientNames) && project.clientNames.length > 0) {
+        return project.clientNames.join(', ');
+    }
+
+    if (Array.isArray(project?.clients) && project.clients.length > 0) {
+        return project.clients.map((client) => client?.name).filter(Boolean).join(', ');
+    }
+
+    return project?.clientName || project?.client?.name || project?.clientId || '-';
+};
 
 const ProjectDetailsCard = ({ project, loading }) => {
     const detailRows = [
@@ -44,14 +56,12 @@ const ProjectDetailsCard = ({ project, loading }) => {
         },
         {
             key: 'client',
-            label: 'Cliente',
-            value: resolveText(
-                project?.clientName
-                || project?.client?.name
-                || project?.clientId,
-            ),
+            label: 'Clienti',
+            value: resolveText(resolveClientNames(project)),
             visible:
-                hasOwn(project, 'clientName')
+                hasOwn(project, 'clientNames')
+                || hasOwn(project, 'clients')
+                || hasOwn(project, 'clientName')
                 || hasOwn(project, 'clientId')
                 || hasOwn(project, 'client'),
         },
