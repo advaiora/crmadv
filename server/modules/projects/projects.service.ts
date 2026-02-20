@@ -127,7 +127,19 @@ const createStageBodySchema = z
     name: z.string().trim().min(1).max(MAX_STAGE_NAME_LENGTH),
     isClosed: z.boolean().optional().default(false),
     color: z.string().trim().max(MAX_STAGE_COLOR_LENGTH).nullable().optional(),
+    isGated: z.boolean().optional().default(false),
+    gateChecklistTemplateId: idSchema.nullable().optional(),
+    autoCreateInstance: z.boolean().optional().default(true),
     sortOrder: sortOrderSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.isGated && !value.gateChecklistTemplateId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['gateChecklistTemplateId'],
+        message: 'gateChecklistTemplateId is required when isGated=true',
+      });
+    }
   })
   .strict();
 
@@ -136,11 +148,22 @@ const updateStageBodySchema = z
     name: z.string().trim().min(1).max(MAX_STAGE_NAME_LENGTH).optional(),
     isClosed: z.boolean().optional(),
     color: z.string().trim().max(MAX_STAGE_COLOR_LENGTH).nullable().optional(),
+    isGated: z.boolean().optional(),
+    gateChecklistTemplateId: idSchema.nullable().optional(),
+    autoCreateInstance: z.boolean().optional(),
     sortOrder: sortOrderSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
-    if (!value.name && value.isClosed === undefined && value.color === undefined && value.sortOrder === undefined) {
+    if (
+      !value.name
+      && value.isClosed === undefined
+      && value.color === undefined
+      && value.sortOrder === undefined
+      && value.isGated === undefined
+      && value.gateChecklistTemplateId === undefined
+      && value.autoCreateInstance === undefined
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['name'],
@@ -282,6 +305,31 @@ export type MoveProjectStagePayload = {
   overrideReason: string | null;
 };
 
+type MoveStageContext = {
+  project: {
+    id: string;
+    workspaceId: string;
+    pipelineStageId: string | null;
+  };
+  toStage: {
+    id: string;
+    workspaceId: string;
+    categoryId: string | null;
+    isClosed: boolean;
+    color: string | null;
+    isGated: boolean;
+    gateChecklistTemplateId: string | null;
+    autoCreateInstance: boolean;
+  };
+  gate: {
+    enforced: boolean;
+    overridden: boolean;
+    ruleId: string | null;
+    checklistInstanceId: string | null;
+    missingRequiredItemIds: string[];
+  };
+};
+
 type CreateProjectPayload = {
   name: string;
   categoryId: string | null;
@@ -308,6 +356,9 @@ type CreateStagePayload = {
   name: string;
   isClosed: boolean;
   color: string | null;
+  isGated: boolean;
+  gateChecklistTemplateId: string | null;
+  autoCreateInstance: boolean;
   sortOrder?: number;
 };
 
@@ -315,6 +366,9 @@ type UpdateStagePayload = {
   name?: string;
   isClosed?: boolean;
   color?: string | null;
+  isGated?: boolean;
+  gateChecklistTemplateId?: string | null;
+  autoCreateInstance?: boolean;
   sortOrder?: number;
 };
 
@@ -347,6 +401,9 @@ const mapStage = (stage: {
   sortOrder: number;
   isClosed: boolean;
   color: string | null;
+  isGated: boolean;
+  gateChecklistTemplateId: string | null;
+  autoCreateInstance: boolean;
   createdAt: Date;
   updatedAt: Date;
 }) => ({
@@ -357,6 +414,9 @@ const mapStage = (stage: {
   sortOrder: stage.sortOrder,
   isClosed: stage.isClosed,
   color: stage.color,
+  isGated: stage.isGated,
+  gateChecklistTemplateId: stage.gateChecklistTemplateId,
+  autoCreateInstance: stage.autoCreateInstance,
   createdAt: stage.createdAt,
   updatedAt: stage.updatedAt,
 });
@@ -550,6 +610,9 @@ export const projectsService = {
       name: parsed.name,
       isClosed: parsed.isClosed,
       color: normalizeNullableTrimmed(parsed.color ?? null) ?? null,
+      isGated: parsed.isGated,
+      gateChecklistTemplateId: parsed.gateChecklistTemplateId ?? null,
+      autoCreateInstance: parsed.autoCreateInstance,
       ...(parsed.sortOrder !== undefined ? { sortOrder: parsed.sortOrder } : {}),
     };
   },
@@ -561,6 +624,13 @@ export const projectsService = {
       ...(parsed.name ? { name: parsed.name } : {}),
       ...(parsed.isClosed !== undefined ? { isClosed: parsed.isClosed } : {}),
       ...(parsed.color !== undefined ? { color: normalizeNullableTrimmed(parsed.color) } : {}),
+      ...(parsed.isGated !== undefined ? { isGated: parsed.isGated } : {}),
+      ...(parsed.gateChecklistTemplateId !== undefined
+        ? { gateChecklistTemplateId: parsed.gateChecklistTemplateId }
+        : {}),
+      ...(parsed.autoCreateInstance !== undefined
+        ? { autoCreateInstance: parsed.autoCreateInstance }
+        : {}),
       ...(parsed.sortOrder !== undefined ? { sortOrder: parsed.sortOrder } : {}),
     };
   },
@@ -745,6 +815,16 @@ export const projectsService = {
         ? await projectsRepository.getNextStageSortOrder(input.workspaceId, categoryId)
         : payload.sortOrder;
 
+    if (payload.gateChecklistTemplateId) {
+      const template = await checklistsService.requireTemplate(
+        input.workspaceId,
+        payload.gateChecklistTemplateId,
+      );
+      if (template.isArchived) {
+        throw badRequest('Checklist template is archived');
+      }
+    }
+
     const createdStage = await projectsRepository.createStage({
       workspaceId: input.workspaceId,
       categoryId,
@@ -752,6 +832,9 @@ export const projectsService = {
       sortOrder,
       isClosed: payload.isClosed,
       color: payload.color ?? null,
+      isGated: payload.isGated,
+      gateChecklistTemplateId: payload.isGated ? payload.gateChecklistTemplateId : null,
+      autoCreateInstance: payload.autoCreateInstance,
     });
 
     await audit.log({
@@ -779,11 +862,39 @@ export const projectsService = {
   }) {
     const stageId = this.parseStageId(input.stageId);
     const payload = this.parseUpdateStageBody(input.body);
+    const currentStage = await projectsRepository.findStageForWorkspace(input.workspaceId, stageId);
+    if (!currentStage) {
+      throw notFound('Stage not found');
+    }
+
+    const nextIsGated = payload.isGated ?? currentStage.isGated;
+    const nextGateChecklistTemplateId =
+      payload.gateChecklistTemplateId !== undefined
+        ? payload.gateChecklistTemplateId
+        : currentStage.gateChecklistTemplateId;
+    const nextAutoCreateInstance = payload.autoCreateInstance ?? currentStage.autoCreateInstance;
+
+    if (nextIsGated && !nextGateChecklistTemplateId) {
+      throw badRequest('gateChecklistTemplateId is required when isGated=true');
+    }
+
+    if (nextGateChecklistTemplateId) {
+      const template = await checklistsService.requireTemplate(
+        input.workspaceId,
+        nextGateChecklistTemplateId,
+      );
+      if (template.isArchived) {
+        throw badRequest('Checklist template is archived');
+      }
+    }
 
     const updatedStage = await projectsRepository.updateStage(input.workspaceId, stageId, {
       ...(payload.name ? { name: payload.name } : {}),
       ...(payload.isClosed !== undefined ? { isClosed: payload.isClosed } : {}),
       ...(payload.color !== undefined ? { color: payload.color } : {}),
+      isGated: nextIsGated,
+      gateChecklistTemplateId: nextIsGated ? nextGateChecklistTemplateId : null,
+      autoCreateInstance: nextAutoCreateInstance,
       ...(payload.sortOrder !== undefined ? { sortOrder: payload.sortOrder } : {}),
     });
 
@@ -1185,54 +1296,18 @@ export const projectsService = {
     projectId: string;
     payload: MoveProjectStagePayload;
     request: FastifyRequest;
+    prevalidatedContext?: MoveStageContext;
   }) {
-    const schemaReady = await projectsRepository.isMoveStageSchemaReady();
-    if (!schemaReady) {
-      throw badRequest('Projects move-stage schema is not available', {
-        requiredTables: ['Project', 'PipelineStage'],
-        requiredColumns: {
-          Project: ['id', 'workspaceId', 'pipelineStageId'],
-          PipelineStage: [
-            'id',
-            'workspaceId',
-            'isGated',
-            'gateChecklistTemplateId',
-            'autoCreateInstance',
-          ],
-        },
-      });
-    }
-
     const projectId = this.parseProjectId(input.projectId);
     const payload = input.payload;
-
-    const project = await projectsRepository.findProjectById(input.workspaceId, projectId);
-    if (!project) {
-      throw notFound('Project not found');
-    }
-
-    const toStage = await projectsRepository.findStageById(
-      input.workspaceId,
-      payload.toStageId,
-    );
-    if (!toStage) {
-      throw notFound('Pipeline stage not found');
-    }
-
-    const gate = await checklistsService.enforceGateForStageTransition({
+    const moveContext = input.prevalidatedContext ?? await this.buildMoveStageContext({
       workspaceId: input.workspaceId,
-      projectId,
-      toStageId: payload.toStageId,
-      overrideGate: payload.overrideGate,
-      overrideReason: payload.overrideReason,
       actorUserId: input.actorUserId,
+      projectId,
+      payload,
       request: input.request,
-      stageConfig: {
-        isGated: toStage.isGated,
-        gateChecklistTemplateId: toStage.gateChecklistTemplateId,
-        autoCreateInstance: toStage.autoCreateInstance,
-      },
     });
+    const { project, gate } = moveContext;
 
     const movedProject = await projectsRepository.moveProjectToStage(
       input.workspaceId,
@@ -1275,6 +1350,65 @@ export const projectsService = {
         ruleId: gate.ruleId,
         checklistInstanceId: gate.checklistInstanceId,
       },
+    };
+  },
+
+  async buildMoveStageContext(input: {
+    workspaceId: string;
+    actorUserId: string;
+    projectId: string;
+    payload: MoveProjectStagePayload;
+    request: FastifyRequest;
+  }): Promise<MoveStageContext> {
+    const schemaReady = await projectsRepository.isMoveStageSchemaReady();
+    if (!schemaReady) {
+      throw badRequest('Projects move-stage schema is not available', {
+        requiredTables: ['Project', 'PipelineStage'],
+        requiredColumns: {
+          Project: ['id', 'workspaceId', 'pipelineStageId'],
+          PipelineStage: [
+            'id',
+            'workspaceId',
+            'isGated',
+            'gateChecklistTemplateId',
+            'autoCreateInstance',
+          ],
+        },
+      });
+    }
+
+    const project = await projectsRepository.findProjectById(input.workspaceId, input.projectId);
+    if (!project) {
+      throw notFound('Project not found');
+    }
+
+    const toStage = await projectsRepository.findStageById(
+      input.workspaceId,
+      input.payload.toStageId,
+    );
+    if (!toStage) {
+      throw notFound('Pipeline stage not found');
+    }
+
+    const gate = await checklistsService.enforceGateForStageTransition({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      toStageId: input.payload.toStageId,
+      overrideGate: input.payload.overrideGate,
+      overrideReason: input.payload.overrideReason,
+      actorUserId: input.actorUserId,
+      request: input.request,
+      stageConfig: {
+        isGated: toStage.isGated,
+        gateChecklistTemplateId: toStage.gateChecklistTemplateId,
+        autoCreateInstance: toStage.autoCreateInstance,
+      },
+    });
+
+    return {
+      project,
+      toStage,
+      gate,
     };
   },
 };

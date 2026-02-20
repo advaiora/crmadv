@@ -116,6 +116,9 @@ const dispatchQuoteEmail = async ({
     const pdfBuffer = await renderQuotePdf(quote, {
       name: workspaceLabel,
       supportEmail: branding?.supportEmail ?? null,
+      logoUrl: branding?.logoUrl ?? null,
+      primaryColor: branding?.primaryColor ?? null,
+      secondaryColor: branding?.secondaryColor ?? null,
     });
 
     if (mode === 'send') {
@@ -303,6 +306,9 @@ const workspaceQuotesRoute: FastifyPluginAsync = async (app) => {
         pdfBuffer = await renderQuotePdf(quote, {
           name: workspaceLabel,
           supportEmail: branding?.supportEmail ?? null,
+          logoUrl: branding?.logoUrl ?? null,
+          primaryColor: branding?.primaryColor ?? null,
+          secondaryColor: branding?.secondaryColor ?? null,
         });
       } catch (error) {
         request.log.error(

@@ -341,6 +341,7 @@ export const authenticateWithGoogle = async ({
     const token = responseData?.token;
     const user = responseData?.user;
     const workspace = responseData?.workspace;
+    const branding = responseData?.branding;
     const onboardingRequired = responseData?.onboardingRequired === true;
     const isNewUser = responseData?.isNewUser === true;
     const isNewWorkspace = responseData?.isNewWorkspace === true;
@@ -360,6 +361,7 @@ export const authenticateWithGoogle = async ({
       token,
       user,
       workspace,
+      branding,
       onboardingRequired,
       isNewUser,
       isNewWorkspace,

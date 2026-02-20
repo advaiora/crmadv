@@ -19,7 +19,7 @@ const Header = ({ topNavCollapsed, toggleTopNav, toggleSidebar, show }) => {
                     </span>
                 </Button>
                 <div className="v-separator d-sm-inline-block d-none" />
-                <Link to="#" className="invoiceapp-title link-dark ms-1 ms-sm-0">
+                <Link to="#" className="invoiceapp-title text-decoration-none ms-1 ms-sm-0">
                     <h1>Template Preview</h1>
                 </Link>
             </div>

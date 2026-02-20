@@ -96,6 +96,7 @@ const ProjectsBoardContent = ({ access }) => {
   });
 
   const canMove = hasPermission(access, "projects.edit");
+  const canOverrideGate = hasPermission(access, "checklists.override_gate");
   const canCreate = hasPermission(access, "projects.create") || hasPermission(access, "projects.edit");
   const defaultStageId = stages[0]?.id || "";
   const quickCreateDisabledReason = !canCreate ? "Non hai permessi" : !defaultStageId ? "Nessuno stage configurato per questa categoria" : "";
@@ -169,6 +170,37 @@ const ProjectsBoardContent = ({ access }) => {
         setBoardProjects(previousProjects);
 
         if (isApiError(error) && error.status === 409) {
+          if (error.code === "CHECKLIST_GATE_BLOCKED") {
+            if (canOverrideGate) {
+              const reason = window.prompt("Gate checklist bloccato. Inserisci una motivazione (min 10 caratteri) per forzare il passaggio:");
+              const normalizedReason = typeof reason === "string" ? reason.trim() : "";
+              if (normalizedReason.length >= 10) {
+                try {
+                  await moveProject(projectId, {
+                    toStageId,
+                    overrideGate: true,
+                    overrideReason: normalizedReason,
+                  });
+                  toast.success("Stage aggiornato con override gate");
+                  void projectsQuery.refetch();
+                  return;
+                } catch (overrideError) {
+                  toast.error(getErrorMessage(overrideError) || "Override gate non riuscito");
+                  return;
+                }
+              }
+            }
+
+            const missingCount = Array.isArray(error.details?.missingRequiredItemIds)
+              ? error.details.missingRequiredItemIds.length
+              : 0;
+            toast.error(
+              missingCount > 0
+                ? `Gate checklist bloccato: completa ${missingCount} item obbligatori prima di spostare lo stage.`
+                : "Gate checklist bloccato: completa gli item obbligatori prima di spostare lo stage.",
+            );
+            return;
+          }
           showMoveConflictToast();
           return;
         }
@@ -182,7 +214,7 @@ const ProjectsBoardContent = ({ access }) => {
         });
       }
     },
-    [canMove, projectsQuery, showMoveConflictToast],
+    [canMove, canOverrideGate, projectsQuery, showMoveConflictToast],
   );
 
   const openQuickCreate = useCallback(() => {

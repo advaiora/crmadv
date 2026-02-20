@@ -26,6 +26,7 @@ const MIN_GATE_OVERRIDE_REASON_LENGTH = 10;
 const MAX_GATE_OVERRIDE_REASON_LENGTH = 500;
 const MAX_GATE_OVERRIDE_REASON_AUDIT_LENGTH = 120;
 const CHECKLISTS_OVERRIDE_GATE_PERMISSION = 'checklists.override_gate';
+const CHECKLIST_ITEM_STATE_VALUES = ['not_started', 'in_progress', 'completed'] as const;
 
 const idSchema = z.string().trim().min(1);
 
@@ -53,6 +54,12 @@ const listTemplatesQuerySchema = z
   .object({
     q: z.string().trim().min(1).max(MAX_TEMPLATE_NAME_LENGTH).optional(),
     isArchived: booleanQuerySchema.optional(),
+  })
+  .strict();
+
+const listProjectChecklistInstancesQuerySchema = z
+  .object({
+    includeItems: booleanQuerySchema.optional(),
   })
   .strict();
 
@@ -167,6 +174,14 @@ const completeChecklistItemBodySchema = z
   })
   .strict();
 
+const updateChecklistItemStateBodySchema = z
+  .object({
+    state: z.enum(CHECKLIST_ITEM_STATE_VALUES),
+    evidenceNote: optionalTrimmedString(MAX_EVIDENCE_NOTE_LENGTH),
+    evidenceUrl: optionalEvidenceUrlSchema,
+  })
+  .strict();
+
 const markChecklistItemNotApplicableBodySchema = z
   .object({
     reason: z
@@ -179,6 +194,9 @@ const markChecklistItemNotApplicableBodySchema = z
 
 const isUniqueConstraintError = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+
+const isForeignKeyConstraintError = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
 
 const parseWithSchema = <TSchema extends z.ZodTypeAny>(
   schema: TSchema,
@@ -216,6 +234,9 @@ const normalizePatchString = (value: string | null | undefined) => {
   const normalized = value.trim();
   return normalized || null;
 };
+
+const normalizeChecklistItemState = (state: string) =>
+  state === 'pending' ? 'not_started' : state;
 
 const mapTemplateSummary = (record: ChecklistTemplateSummaryRecord) => ({
   id: record.id,
@@ -255,7 +276,7 @@ const mapChecklistInstanceItem = (
   isRequired: record.isRequiredSnapshot,
   requiresEvidenceSnapshot: record.requiresEvidenceSnapshot,
   isCriticalSnapshot: record.isCriticalSnapshot,
-  state: record.state,
+  state: normalizeChecklistItemState(record.state),
   evidenceNote: record.evidenceNote,
   evidenceUrl: record.evidenceUrl,
   notApplicableReason: record.notApplicableReason,
@@ -266,6 +287,7 @@ const mapChecklistInstanceItem = (
 const mapChecklistInstance = (record: ChecklistInstanceWithItemsRecord) => ({
   id: record.id,
   checklistTemplateId: record.checklistTemplateId,
+  checklistTemplateName: record.template?.name ?? null,
   pipelineStageId: record.pipelineStageId,
   status: record.status,
   createdAt: record.createdAt,
@@ -275,6 +297,7 @@ const mapChecklistInstance = (record: ChecklistInstanceWithItemsRecord) => ({
 const mapChecklistInstanceSummary = (record: ChecklistInstanceSummaryRecord) => ({
   id: record.id,
   checklistTemplateId: record.checklistTemplateId,
+  checklistTemplateName: record.template?.name ?? null,
   pipelineStageId: record.pipelineStageId,
   status: record.status,
   createdAt: record.createdAt,
@@ -303,8 +326,32 @@ const createTemplateArchivedError = (templateId: string) =>
     templateId,
   });
 
-const createItemAlreadyCompletedError = () =>
-  new HttpError(409, 'ITEM_ALREADY_COMPLETED', 'Checklist item is already completed');
+const createTemplateNotArchivedForDeleteError = (templateId: string) =>
+  new HttpError(
+    400,
+    'TEMPLATE_DELETE_REQUIRES_ARCHIVE',
+    'Checklist template must be archived before permanent deletion',
+    {
+      templateId,
+    },
+  );
+
+const createTemplateDeleteBlockedError = (details: {
+  templateId: string;
+  instanceCount: number;
+  gatedStageCount: number;
+}) =>
+  new HttpError(
+    409,
+    'TEMPLATE_DELETE_BLOCKED',
+    'Checklist template cannot be deleted because it is still referenced',
+    details,
+  );
+
+const createItemAlreadyCompletedError = (state?: string) =>
+  new HttpError(409, 'ITEM_ALREADY_COMPLETED', 'Checklist item is already completed', {
+    state: state ? normalizeChecklistItemState(state) : undefined,
+  });
 
 const createGateBlockedError = (details: {
   instanceId: string | null;
@@ -502,6 +549,22 @@ export const checklistsService = {
       markChecklistItemNotApplicableBodySchema,
       body,
       'Invalid checklist item not-applicable payload',
+    );
+  },
+
+  parseListProjectChecklistInstancesQuery(query: unknown) {
+    return parseWithSchema(
+      listProjectChecklistInstancesQuerySchema,
+      query,
+      'Invalid checklist instance list query params',
+    );
+  },
+
+  parseUpdateChecklistItemStateBody(body: unknown) {
+    return parseWithSchema(
+      updateChecklistItemStateBodySchema,
+      body,
+      'Invalid checklist item state payload',
     );
   },
 
@@ -718,6 +781,62 @@ export const checklistsService = {
 
     await audit.log({
       event: 'checklists.template.archive',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      entityType: 'ChecklistTemplate',
+      entityId: templateId,
+      metadata: {
+        templateId,
+      },
+      request: input.request,
+    });
+  },
+
+  async deleteTemplatePermanently(input: {
+    workspaceId: string;
+    templateId: string;
+    actorUserId: string;
+    request?: FastifyRequest;
+  }) {
+    const templateId = this.parseTemplateId(input.templateId);
+    const template = await this.requireTemplate(input.workspaceId, templateId);
+
+    if (!template.isArchived) {
+      throw createTemplateNotArchivedForDeleteError(templateId);
+    }
+
+    const usage = await checklistsRepository.getTemplateUsageCounts(input.workspaceId, templateId);
+    if (usage.instanceCount > 0 || usage.gatedStageCount > 0) {
+      throw createTemplateDeleteBlockedError({
+        templateId,
+        instanceCount: usage.instanceCount,
+        gatedStageCount: usage.gatedStageCount,
+      });
+    }
+
+    try {
+      const deleted = await checklistsRepository.deleteTemplate(input.workspaceId, templateId);
+      if (!deleted) {
+        throw notFound('Checklist template not found');
+      }
+    } catch (error) {
+      if (isForeignKeyConstraintError(error)) {
+        const refreshedUsage = await checklistsRepository.getTemplateUsageCounts(
+          input.workspaceId,
+          templateId,
+        );
+        throw createTemplateDeleteBlockedError({
+          templateId,
+          instanceCount: refreshedUsage.instanceCount,
+          gatedStageCount: refreshedUsage.gatedStageCount,
+        });
+      }
+
+      throw error;
+    }
+
+    await audit.log({
+      event: 'checklists.template.delete_permanent',
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'ChecklistTemplate',
@@ -996,9 +1115,25 @@ export const checklistsService = {
     };
   },
 
-  async listProjectChecklistInstances(workspaceId: string, rawProjectId: string) {
+  async listProjectChecklistInstances(
+    workspaceId: string,
+    rawProjectId: string,
+    query: unknown,
+  ) {
     const projectId = this.parseProjectId(rawProjectId);
+    const parsedQuery = this.parseListProjectChecklistInstancesQuery(query);
     await this.ensureProjectBelongsToWorkspace(workspaceId, projectId);
+
+    if (parsedQuery.includeItems) {
+      const instancesWithItems = await checklistsRepository.listChecklistInstancesByProjectWithItems(
+        workspaceId,
+        projectId,
+      );
+
+      return {
+        items: instancesWithItems.map((instance) => mapChecklistInstance(instance)),
+      };
+    }
 
     const instances = await checklistsRepository.listChecklistInstancesByProject(
       workspaceId,
@@ -1020,8 +1155,8 @@ export const checklistsService = {
     const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
     const payload = this.parseCompleteChecklistItemBody(input.body);
 
-    if (item.state !== 'pending') {
-      throw createItemAlreadyCompletedError();
+    if (['completed', 'not_applicable'].includes(item.state)) {
+      throw createItemAlreadyCompletedError(item.state);
     }
 
     const evidenceNote = normalizeOptionalString(payload.evidenceNote);
@@ -1043,12 +1178,57 @@ export const checklistsService = {
       if (!updated.current) {
         throw notFound('Checklist item not found');
       }
-      throw createItemAlreadyCompletedError();
+      throw createItemAlreadyCompletedError(updated.current.state);
+    }
+
+    await audit.log({
+      event: 'checklists.item.complete',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      entityType: 'ChecklistInstanceItem',
+      entityId: updated.item.id,
+      metadata: {
+        instanceId: updated.item.instanceId,
+        itemId: updated.item.id,
+        projectId: updated.item.instance.projectId,
+      },
+      request: input.request,
+    });
+
+    return mapChecklistInstanceItem(updated.item);
+  },
+
+  async markChecklistItemNotApplicable(input: {
+    workspaceId: string;
+    itemId: string;
+    actorUserId: string;
+    body: unknown;
+    request?: FastifyRequest;
+  }) {
+    const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
+    const payload = this.parseMarkChecklistItemNotApplicableBody(input.body);
+
+    if (['completed', 'not_applicable'].includes(item.state)) {
+      throw createItemAlreadyCompletedError(item.state);
+    }
+
+    const updated = await checklistsRepository.markChecklistItemNotApplicableFromPending({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+      reason: payload.reason.trim(),
+      completedByUserId: input.actorUserId,
+    });
+
+    if (!updated.updated) {
+      if (!updated.current) {
+        throw notFound('Checklist item not found');
+      }
+      throw createItemAlreadyCompletedError(updated.current.state);
     }
 
     if (updated.item.isCriticalSnapshot) {
       await audit.log({
-        event: 'checklists.item.complete',
+        event: 'checklists.item.not_applicable',
         actorUserId: input.actorUserId,
         workspaceId: input.workspaceId,
         entityType: 'ChecklistInstanceItem',
@@ -1065,7 +1245,7 @@ export const checklistsService = {
     return mapChecklistInstanceItem(updated.item);
   },
 
-  async markChecklistItemNotApplicable(input: {
+  async updateChecklistItemState(input: {
     workspaceId: string;
     itemId: string;
     actorUserId: string;
@@ -1073,29 +1253,51 @@ export const checklistsService = {
     request?: FastifyRequest;
   }) {
     const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
-    const payload = this.parseMarkChecklistItemNotApplicableBody(input.body);
+    const payload = this.parseUpdateChecklistItemStateBody(input.body);
+    const evidenceNote = payload.evidenceNote === undefined
+      ? undefined
+      : normalizeOptionalString(payload.evidenceNote);
+    const evidenceUrl = payload.evidenceUrl === undefined
+      ? undefined
+      : normalizeOptionalString(payload.evidenceUrl);
+    const hasEvidence = Boolean((evidenceNote ?? item.evidenceNote) || (evidenceUrl ?? item.evidenceUrl));
 
-    if (item.state !== 'pending') {
-      throw createItemAlreadyCompletedError();
+    if (payload.state === 'completed' && item.requiresEvidenceSnapshot && !hasEvidence) {
+      throw createEvidenceRequiredError();
     }
 
-    const updated = await checklistsRepository.markChecklistItemNotApplicableFromPending({
+    const updated = await checklistsRepository.updateChecklistItemState({
       workspaceId: input.workspaceId,
       itemId: item.id,
-      reason: payload.reason.trim(),
+      state: payload.state,
+      evidenceNote,
+      evidenceUrl,
       completedByUserId: input.actorUserId,
     });
 
     if (!updated.updated) {
-      if (!updated.current) {
-        throw notFound('Checklist item not found');
-      }
-      throw createItemAlreadyCompletedError();
+      throw notFound('Checklist item not found');
     }
 
-    if (updated.item.isCriticalSnapshot) {
+    await audit.log({
+      event: 'checklists.item.state_change',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      entityType: 'ChecklistInstanceItem',
+      entityId: updated.item.id,
+      metadata: {
+        instanceId: updated.item.instanceId,
+        itemId: updated.item.id,
+        projectId: updated.item.instance.projectId,
+        previousState: normalizeChecklistItemState(updated.previousState),
+        nextState: normalizeChecklistItemState(updated.item.state),
+      },
+      request: input.request,
+    });
+
+    if (payload.state === 'completed') {
       await audit.log({
-        event: 'checklists.item.not_applicable',
+        event: 'checklists.item.complete',
         actorUserId: input.actorUserId,
         workspaceId: input.workspaceId,
         entityType: 'ChecklistInstanceItem',

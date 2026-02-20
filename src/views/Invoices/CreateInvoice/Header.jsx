@@ -12,7 +12,7 @@ const Header = ({ topNavCollapsed, toggleTopNav, toggleSidebar, show, handleSett
         <header className="invoice-header">
             <div className="d-flex align-items-center">
                 <Dropdown>
-                    <Dropdown.Toggle as={Link} to="#" className="invoiceapp-title link-dark">
+                    <Dropdown.Toggle as={Link} to="#" className="invoiceapp-title text-decoration-none">
                         <h1>Standard Template</h1>
                     </Dropdown.Toggle>
                     <Dropdown.Menu align="start">

@@ -153,11 +153,12 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const permissions = navbarData?.permissions || [];
     const user = navbarData?.user;
     const workspace = navbarData?.workspace;
+    const branding = navbarData?.branding;
 
     const notificationCount = recentActivity.length;
     const userDisplayName = user?.name || user?.email || 'Utente';
     const userEmail = user?.email || '-';
-    const workspaceName = workspace?.name || 'Workspace';
+    const workspaceName = branding?.companyName || workspace?.name || 'Workspace';
     const userInitials = useMemo(() => buildInitials(userDisplayName), [userDisplayName]);
 
     return (

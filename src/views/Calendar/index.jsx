@@ -1,5 +1,5 @@
 /* eslint-disable no-useless-concat */
-import React, { createRef, useEffect, useState } from 'react';
+import React, { createRef, useEffect, useMemo, useState } from 'react';
 import { Button, ButtonGroup } from 'react-bootstrap';
 import classNames from 'classnames';
 import FullCalendar from '@fullcalendar/react';
@@ -10,7 +10,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 import moment from 'moment';
 import { useWindowHeight } from '@react-hook/window-size';
 import CalendarSidebar from './CalendarSidebar';
-import { CalendarEvents } from './Events';
+import { getCalendarEvents } from './Events';
 import EventsDrawer from './EventsDrawer';
 import CreateNewEvent from './CreateNewEvent';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -21,6 +21,7 @@ import { toggleTopNav } from '../../redux/action/Theme';
 import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { ChevronDown, ChevronUp } from 'react-feather';
+import { readBrandingColor } from '../../lib/brandingColors';
 
 const Calendar = ({ topNavCollapsed, toggleTopNav }) => {
 
@@ -35,6 +36,12 @@ const Calendar = ({ topNavCollapsed, toggleTopNav }) => {
     const [targetEvent, setTargetEvent] = useState();
     const [date, setDate] = useState(curYear + '-' + curMonth + '-07');
     const [currentView, setCurrentView] = useState("month");
+    const primaryColor = readBrandingColor("--bs-primary", "#0d6efd");
+    const secondaryColor = readBrandingColor("--bs-secondary", "#6c757d");
+    const calendarEvents = useMemo(
+        () => getCalendarEvents({ primaryColor, secondaryColor }),
+        [primaryColor, secondaryColor],
+    );
 
     useEffect(() => {
         const calApi = calendarRef.current.getApi();
@@ -149,7 +156,7 @@ const Calendar = ({ topNavCollapsed, toggleTopNav }) => {
                                 windowResizeDelay={500}
                                 droppable={true}
                                 editable={true}
-                                events={CalendarEvents}
+                                events={calendarEvents}
                                 // eventContent={
                                 //     function (arg) {
                                 //         if (arg.event.extendedProps.toHtml) {

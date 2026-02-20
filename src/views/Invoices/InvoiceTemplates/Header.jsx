@@ -11,7 +11,7 @@ const Header = ({ topNavCollapsed, toggleTopNav, toggleSidebar, show }) => {
     return (
         <header className="invoice-header">
             <div className="d-flex align-items-center">
-                <Link to="#" className="invoiceapp-title link-dark">
+                <Link to="#" className="invoiceapp-title text-decoration-none">
                     <h1>Invoice Templates</h1>
                 </Link>
             </div>

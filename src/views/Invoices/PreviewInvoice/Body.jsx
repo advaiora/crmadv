@@ -41,7 +41,7 @@ const Body = () => {
                                         <div className="mb-1">Due Date*</div>
                                         <div>Customer No</div>
                                     </div>
-                                    <div className="text-dark">
+                                    <div className="invoice-value-text">
                                         <div className="mb-1">0001</div>
                                         <div className="mb-1">24/08/2020</div>
                                         <div className="mb-1">Due on receipt</div>
@@ -80,45 +80,45 @@ const Body = () => {
                                             <h6>Redesiging of agencyclick.com</h6>
                                             <p>This is my project description. if the line do not filt like the sentence is to big the area will start getting bigger</p>
                                         </td>
-                                        <td className="text-end text-dark">8</td>
-                                        <td className="w-15 text-end text-dark">60.00</td>
-                                        <td className="text-end text-dark">5%</td>
-                                        <td className="w-20 text-end text-dark">$420.5</td>
+                                        <td className="text-end invoice-value-text">8</td>
+                                        <td className="w-15 text-end invoice-value-text">60.00</td>
+                                        <td className="text-end invoice-value-text">5%</td>
+                                        <td className="w-20 text-end invoice-value-text">$420.5</td>
                                     </tr>
                                     <tr>
                                         <td className="w-70">
                                             <h6>Re-branding</h6>
                                         </td>
-                                        <td className="text-end text-dark">1</td>
-                                        <td className="w-15 text-end text-dark">150.00</td>
-                                        <td className="text-end text-dark">0%</td>
-                                        <td className="w-20 text-end text-dark">$140.5</td>
+                                        <td className="text-end invoice-value-text">1</td>
+                                        <td className="w-15 text-end invoice-value-text">150.00</td>
+                                        <td className="text-end invoice-value-text">0%</td>
+                                        <td className="w-20 text-end invoice-value-text">$140.5</td>
                                     </tr>
                                     <tr>
                                         <td className="w-70">
                                             <h6>Social media marketing</h6>
                                         </td>
-                                        <td className="text-end text-dark">20</td>
-                                        <td className="w-15 text-end text-dark">30.00</td>
-                                        <td className="text-end text-dark">5%</td>
-                                        <td className="w-20 text-end text-dark">$540.5</td>
+                                        <td className="text-end invoice-value-text">20</td>
+                                        <td className="w-15 text-end invoice-value-text">30.00</td>
+                                        <td className="text-end invoice-value-text">5%</td>
+                                        <td className="w-20 text-end invoice-value-text">$540.5</td>
                                     </tr>
                                     <tr>
                                         <td colSpan={2} rowSpan={4} className="border-0" />
                                         <td colSpan={2}>Subtotal</td>
-                                        <td className="text-end text-dark">$1101.0</td>
+                                        <td className="text-end invoice-value-text">$1101.0</td>
                                     </tr>
                                     <tr>
                                         <td colSpan={2}>Item Discount</td>
-                                        <td className="text-end text-dark">$10.0</td>
+                                        <td className="text-end invoice-value-text">$10.0</td>
                                     </tr>
                                     <tr>
                                         <td colSpan={2}>Extra Discount</td>
-                                        <td className="text-end text-dark">$0</td>
+                                        <td className="text-end invoice-value-text">$0</td>
                                     </tr>
                                     <tr className="border-0">
-                                        <td colSpan={2} className="text-dark border">Total</td>
-                                        <td className="text-end text-dark border">$1101.0</td>
+                                        <td colSpan={2} className="invoice-value-text border">Total</td>
+                                        <td className="text-end invoice-value-text border">$1101.0</td>
                                     </tr>
                                 </tbody>
                             </Table>

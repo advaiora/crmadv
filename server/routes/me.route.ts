@@ -6,17 +6,19 @@ import { requireWorkspace } from '../guards/requireWorkspace.js';
 import { auditRepository } from '../repositories/audit.repository.js';
 import { moduleRepository } from '../repositories/module.repository.js';
 import { rbacRepository } from '../repositories/rbac.repository.js';
+import { workspaceBrandingService } from '../services/workspace-branding.service.js';
 
 const meRoute: FastifyPluginAsync = async (app) => {
   app.get('/me', async (request, reply) => {
     const user = await requireAuth(request);
     const workspace = await requireWorkspace(request, user.id);
 
-    const [enabledModules, permissions, roles, recentActivity] = await Promise.all([
+    const [enabledModules, permissions, roles, recentActivity, branding] = await Promise.all([
       moduleRepository.listEnabledModules(workspace.id),
       rbacRepository.listUserPermissions(user.id, workspace.id),
       rbacRepository.listUserRoles(user.id, workspace.id),
       auditRepository.listRecentByWorkspace(workspace.id, 8),
+      workspaceBrandingService.getWorkspaceBranding(workspace),
     ]);
 
     await audit.log({
@@ -36,6 +38,7 @@ const meRoute: FastifyPluginAsync = async (app) => {
         ...(user.name ? { name: user.name } : {}),
       },
       workspace,
+      branding,
       enabledModules,
       permissions,
       roles,

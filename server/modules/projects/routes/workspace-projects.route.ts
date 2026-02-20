@@ -29,6 +29,12 @@ type ProjectsQuery = {
   q?: string;
 };
 
+type MoveStageRequestContext = {
+  moveStageAccess?: Awaited<ReturnType<typeof ensureProjectsMoveStageAccess>>;
+  moveStagePayload?: ReturnType<typeof projectsService.parseMoveStageBody>;
+  moveStageContext?: Awaited<ReturnType<typeof projectsService.buildMoveStageContext>>;
+};
+
 const ensureProjectsCreateAccess = async (
   request: FastifyRequest,
 ) => {
@@ -48,6 +54,25 @@ const ensureProjectsPipelineManageAccess = async (
 ) => {
   // TODO: replace fallback with a dedicated projects.pipeline.manage permission when available.
   return ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+};
+
+const checklistGateMiddleware = async (
+  request: FastifyRequest<{ Params: ProjectParams; Body: unknown }>,
+) => {
+  const access = await ensureProjectsMoveStageAccess(request);
+  const payload = projectsService.parseMoveStageBody(request.body);
+  const moveStageContext = await projectsService.buildMoveStageContext({
+    workspaceId: access.workspace.id,
+    actorUserId: access.user.id,
+    projectId: request.params.id,
+    payload,
+    request,
+  });
+
+  const requestWithContext = request as typeof request & MoveStageRequestContext;
+  requestWithContext.moveStageAccess = access;
+  requestWithContext.moveStagePayload = payload;
+  requestWithContext.moveStageContext = moveStageContext;
 };
 
 const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
@@ -297,16 +322,24 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
 
   app.post<{ Params: ProjectParams; Body: unknown }>(
     '/projects/:id/move',
+    { preHandler: checklistGateMiddleware },
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsMoveStageAccess(request);
-      const payload = projectsService.parseMoveStageBody(request.body);
+      const requestWithContext = request as typeof request & MoveStageRequestContext;
+      const access = requestWithContext.moveStageAccess;
+      const payload = requestWithContext.moveStagePayload;
+      const moveStageContext = requestWithContext.moveStageContext;
+
+      if (!access || !payload || !moveStageContext) {
+        throw new Error('Move-stage middleware context is missing');
+      }
 
       const result = await projectsService.moveStage({
-        workspaceId: workspace.id,
-        actorUserId: user.id,
+        workspaceId: access.workspace.id,
+        actorUserId: access.user.id,
         projectId: request.params.id,
         payload,
         request,
+        prevalidatedContext: moveStageContext,
       });
 
       return ok(reply, result);
@@ -315,16 +348,24 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
 
   app.patch<{ Params: ProjectParams; Body: unknown }>(
     '/projects/:id/move-stage',
+    { preHandler: checklistGateMiddleware },
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsMoveStageAccess(request);
-      const payload = projectsService.parseMoveStageBody(request.body);
+      const requestWithContext = request as typeof request & MoveStageRequestContext;
+      const access = requestWithContext.moveStageAccess;
+      const payload = requestWithContext.moveStagePayload;
+      const moveStageContext = requestWithContext.moveStageContext;
+
+      if (!access || !payload || !moveStageContext) {
+        throw new Error('Move-stage middleware context is missing');
+      }
 
       const result = await projectsService.moveStage({
-        workspaceId: workspace.id,
-        actorUserId: user.id,
+        workspaceId: access.workspace.id,
+        actorUserId: access.user.id,
         projectId: request.params.id,
         payload,
         request,
+        prevalidatedContext: moveStageContext,
       });
 
       return ok(reply, result);

@@ -1,3 +1,8 @@
+import {
+    normalizeWorkspaceBranding,
+    type WorkspaceBrandingState,
+} from './workspaceBranding';
+
 export type SessionState = {
     accessToken: string;
     userId: string;
@@ -5,11 +10,21 @@ export type SessionState = {
     userRole: string;
     workspaceId?: string;
     workspaceSlug?: string;
+    workspaceBranding?: WorkspaceBrandingState;
 };
 
 const SESSION_STORAGE_KEY = 'advaiora.session';
+export const SESSION_CHANGED_EVENT = 'advaiora:session-changed';
 
 const isBrowser = () => typeof window !== 'undefined';
+
+const notifySessionChanged = () => {
+    if (!isBrowser()) {
+        return;
+    }
+
+    window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+};
 
 const normalizeValue = (value: unknown) => {
     if (typeof value !== 'string') {
@@ -32,6 +47,7 @@ const normalizeSession = (rawSession: unknown): SessionState | null => {
     const userRole = normalizeValue(source.userRole) || 'member';
     const workspaceId = normalizeValue(source.workspaceId);
     const workspaceSlug = normalizeValue(source.workspaceSlug);
+    const workspaceBranding = normalizeWorkspaceBranding(source.workspaceBranding);
 
     if (!accessToken || !userId || !userEmail) {
         return null;
@@ -44,6 +60,7 @@ const normalizeSession = (rawSession: unknown): SessionState | null => {
         userRole,
         ...(workspaceId ? { workspaceId } : {}),
         ...(workspaceSlug ? { workspaceSlug } : {}),
+        ...(workspaceBranding ? { workspaceBranding } : {}),
     };
 };
 
@@ -63,6 +80,7 @@ export const readSession = (): SessionState | null => {
     } catch (error) {
         console.warn('Invalid stored session, clearing.', error);
         localStorage.removeItem(SESSION_STORAGE_KEY);
+        notifySessionChanged();
         return null;
     }
 };
@@ -75,10 +93,12 @@ export const writeSession = (nextSession: unknown): SessionState | null => {
 
     if (!normalized) {
         localStorage.removeItem(SESSION_STORAGE_KEY);
+        notifySessionChanged();
         return null;
     }
 
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(normalized));
+    notifySessionChanged();
     return normalized;
 };
 
@@ -88,4 +108,5 @@ export const clearSession = () => {
     }
 
     localStorage.removeItem(SESSION_STORAGE_KEY);
+    notifySessionChanged();
 };

@@ -6,6 +6,9 @@ import { formatDateTime, formatMoney, formatQty } from './format.js';
 type WorkspacePdfData = {
   name: string;
   supportEmail: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
 };
 
 type TableColumn = {
@@ -22,11 +25,27 @@ type TableColumns = {
   tableWidth: number;
 };
 
+type BrandPalette = {
+  primaryColor: string;
+  secondaryColor: string;
+  mutedColor: string;
+  tableHeaderBackground: string;
+  tableHeaderTextColor: string;
+  tableBorderColor: string;
+};
+
 const STATUS_LABELS: Record<QuoteStatus, string> = {
   draft: 'Bozza',
   sent: 'Inviato',
   accepted: 'Accettato',
 };
+
+const HEX_COLOR_REGEX = /^#[A-Fa-f0-9]{6}$/;
+const DEFAULT_PRIMARY_COLOR = '#0d6efd';
+const DEFAULT_SECONDARY_COLOR = '#111827';
+const LOGO_FETCH_TIMEOUT_MS = 4000;
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const SUPPORTED_LOGO_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
 const toBuffer = (doc: PDFKit.PDFDocument) =>
   new Promise<Buffer>((resolve, reject) => {
@@ -55,6 +74,140 @@ const ensureVerticalSpace = (
   }
 };
 
+const normalizeHexColor = (value: string | null | undefined, fallback: string) => {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim();
+  if (!HEX_COLOR_REGEX.test(normalized)) {
+    return fallback;
+  }
+
+  return normalized.toLowerCase();
+};
+
+const parseHex = (hexColor: string) => ({
+  r: Number.parseInt(hexColor.slice(1, 3), 16),
+  g: Number.parseInt(hexColor.slice(3, 5), 16),
+  b: Number.parseInt(hexColor.slice(5, 7), 16),
+});
+
+const toHex = ({ r, g, b }: { r: number; g: number; b: number }) =>
+  `#${[r, g, b]
+    .map((component) => Math.max(0, Math.min(255, Math.round(component))).toString(16).padStart(2, '0'))
+    .join('')}`;
+
+const mixColors = (startColor: string, endColor: string, ratio: number) => {
+  const from = parseHex(startColor);
+  const to = parseHex(endColor);
+  const normalizedRatio = Math.max(0, Math.min(1, ratio));
+
+  return toHex({
+    r: from.r + (to.r - from.r) * normalizedRatio,
+    g: from.g + (to.g - from.g) * normalizedRatio,
+    b: from.b + (to.b - from.b) * normalizedRatio,
+  });
+};
+
+const getReadableTextColor = (hexColor: string) => {
+  const { r, g, b } = parseHex(hexColor);
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return luminance >= 0.62 ? '#111111' : '#ffffff';
+};
+
+const buildBrandPalette = (workspace: WorkspacePdfData): BrandPalette => {
+  const primaryColor = normalizeHexColor(workspace.primaryColor, DEFAULT_PRIMARY_COLOR);
+  const secondaryColor = normalizeHexColor(workspace.secondaryColor, DEFAULT_SECONDARY_COLOR);
+
+  return {
+    primaryColor,
+    secondaryColor,
+    mutedColor: mixColors(secondaryColor, '#ffffff', 0.36),
+    tableHeaderBackground: mixColors(primaryColor, '#ffffff', 0.84),
+    tableHeaderTextColor: getReadableTextColor(mixColors(primaryColor, '#ffffff', 0.84)),
+    tableBorderColor: mixColors(secondaryColor, '#ffffff', 0.78),
+  };
+};
+
+const parseLogoDataUrl = (logoUrl: string) => {
+  const match = /^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(logoUrl);
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = match[1].toLowerCase();
+  if (!SUPPORTED_LOGO_MIME_TYPES.has(mimeType)) {
+    return null;
+  }
+
+  try {
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0 || buffer.length > MAX_LOGO_SIZE_BYTES) {
+      return null;
+    }
+
+    return buffer;
+  } catch {
+    return null;
+  }
+};
+
+const fetchLogoBuffer = async (logoUrl: string) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), LOGO_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(logoUrl, {
+      method: 'GET',
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+    if (contentType && !SUPPORTED_LOGO_MIME_TYPES.has(contentType)) {
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    if (buffer.length === 0 || buffer.length > MAX_LOGO_SIZE_BYTES) {
+      return null;
+    }
+
+    return buffer;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const resolveLogoBuffer = async (logoUrl: string | null) => {
+  if (!logoUrl) {
+    return null;
+  }
+
+  const normalized = logoUrl.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.startsWith('data:image/')) {
+    return parseLogoDataUrl(normalized);
+  }
+
+  if (!/^https?:\/\//i.test(normalized)) {
+    return null;
+  }
+
+  return fetchLogoBuffer(normalized);
+};
+
 const buildColumns = (doc: PDFKit.PDFDocument): TableColumns => {
   const tableLeft = doc.page.margins.left;
   const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -74,17 +227,17 @@ const buildColumns = (doc: PDFKit.PDFDocument): TableColumns => {
   };
 };
 
-const drawTableHeader = (doc: PDFKit.PDFDocument, columns: TableColumns) => {
+const drawTableHeader = (doc: PDFKit.PDFDocument, columns: TableColumns, palette: BrandPalette) => {
   const headerHeight = 22;
   const y = doc.y;
 
   doc.save();
   doc
     .rect(columns.tableLeft, y, columns.tableWidth, headerHeight)
-    .fillAndStroke('#f3f4f6', '#d1d5db');
+    .fillAndStroke(palette.tableHeaderBackground, palette.tableBorderColor);
   doc.restore();
 
-  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(9);
+  doc.fillColor(palette.tableHeaderTextColor).font('Helvetica-Bold').fontSize(9);
   doc.text('Title', columns.title.x + 5, y + 7, { width: columns.title.width - 10 });
   doc.text('Qty', columns.qty.x + 5, y + 7, {
     width: columns.qty.width - 10,
@@ -105,6 +258,7 @@ const drawTableHeader = (doc: PDFKit.PDFDocument, columns: TableColumns) => {
 const drawTableRow = (
   doc: PDFKit.PDFDocument,
   columns: TableColumns,
+  palette: BrandPalette,
   line: {
     title: string;
     qty: string;
@@ -122,12 +276,12 @@ const drawTableRow = (
   doc.save();
   doc
     .rect(columns.tableLeft, y, columns.tableWidth, rowHeight)
-    .strokeColor('#e5e7eb')
+    .strokeColor(palette.tableBorderColor)
     .lineWidth(0.6)
     .stroke();
   doc.restore();
 
-  doc.fillColor('#111827').font('Helvetica').fontSize(10);
+  doc.fillColor(palette.secondaryColor).font('Helvetica').fontSize(10);
   doc.text(line.title, columns.title.x + 5, y + paddingY, { width: columns.title.width - 10 });
   doc.text(line.qty, columns.qty.x + 5, y + paddingY, {
     width: columns.qty.width - 10,
@@ -149,6 +303,8 @@ export const renderQuotePdf = async (
   quote: QuotePdfData,
   workspace: WorkspacePdfData,
 ) => {
+  const palette = buildBrandPalette(workspace);
+  const logoBuffer = await resolveLogoBuffer(workspace.logoUrl);
   const doc = new PDFDocument({
     size: 'A4',
     margin: 50,
@@ -162,40 +318,62 @@ export const renderQuotePdf = async (
   const bufferPromise = toBuffer(doc);
   const shortId = quote.id.slice(0, 8).toUpperCase();
 
-  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(24).text('Preventivo');
-  doc.fontSize(10).font('Helvetica').fillColor('#4b5563').text(`ID: ${shortId}`);
-  doc.moveDown(0.6);
+  const headerStartY = doc.y;
+  const logoMaxWidth = 128;
+  const logoMaxHeight = 48;
+  const titleX = logoBuffer ? doc.page.margins.left + logoMaxWidth + 14 : doc.page.margins.left;
 
-  doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(workspace.name);
+  if (logoBuffer) {
+    try {
+      doc.image(logoBuffer, doc.page.margins.left, headerStartY, {
+        fit: [logoMaxWidth, logoMaxHeight],
+      });
+    } catch {
+      // Ignore logo parsing/render errors and continue with text-only header.
+    }
+  }
+
+  doc.fillColor(palette.primaryColor).font('Helvetica-Bold').fontSize(24).text('Preventivo', titleX, headerStartY);
+  doc.fontSize(10).font('Helvetica').fillColor(palette.mutedColor).text(`ID: ${shortId}`, titleX, headerStartY + 28);
+  doc.y = Math.max(doc.y, headerStartY + (logoBuffer ? logoMaxHeight : 42));
+
+  doc.moveTo(doc.page.margins.left, doc.y + 4)
+    .lineTo(doc.page.width - doc.page.margins.right, doc.y + 4)
+    .lineWidth(1)
+    .strokeColor(mixColors(palette.primaryColor, '#ffffff', 0.38))
+    .stroke();
+  doc.moveDown(0.8);
+
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(palette.secondaryColor).text(workspace.name);
   if (workspace.supportEmail) {
-    doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(`Email: ${workspace.supportEmail}`);
+    doc.font('Helvetica').fontSize(10).fillColor(palette.mutedColor).text(`Email: ${workspace.supportEmail}`);
   }
 
   doc.moveDown(1);
-  doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text('Cliente');
-  doc.font('Helvetica').fontSize(10).fillColor('#111827').text(quote.client.name);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(palette.secondaryColor).text('Cliente');
+  doc.font('Helvetica').fontSize(10).fillColor(palette.secondaryColor).text(quote.client.name);
   if (quote.client.email) {
-    doc.fillColor('#4b5563').text(`Email: ${quote.client.email}`);
+    doc.fillColor(palette.mutedColor).text(`Email: ${quote.client.email}`);
   }
   if (quote.client.phone) {
-    doc.fillColor('#4b5563').text(`Telefono: ${quote.client.phone}`);
+    doc.fillColor(palette.mutedColor).text(`Telefono: ${quote.client.phone}`);
   }
 
   doc.moveDown(1);
-  doc.fillColor('#111827').font('Helvetica-Bold').fontSize(12).text('Righe preventivo');
+  doc.fillColor(palette.secondaryColor).font('Helvetica-Bold').fontSize(12).text('Righe preventivo');
   doc.moveDown(0.4);
 
   const columns = buildColumns(doc);
   ensureVerticalSpace(doc, 30, () => {
-    drawTableHeader(doc, columns);
+    drawTableHeader(doc, columns, palette);
   });
-  drawTableHeader(doc, columns);
+  drawTableHeader(doc, columns, palette);
 
   if (quote.lines.length === 0) {
     ensureVerticalSpace(doc, 30, () => {
-      drawTableHeader(doc, columns);
+      drawTableHeader(doc, columns, palette);
     });
-    drawTableRow(doc, columns, {
+    drawTableRow(doc, columns, palette, {
       title: 'Nessuna riga presente',
       qty: '-',
       unitPrice: '-',
@@ -209,9 +387,9 @@ export const renderQuotePdf = async (
       const rowHeight = Math.max(22, titleHeight + 12);
 
       ensureVerticalSpace(doc, rowHeight + 4, () => {
-        drawTableHeader(doc, columns);
+        drawTableHeader(doc, columns, palette);
       });
-      drawTableRow(doc, columns, {
+      drawTableRow(doc, columns, palette, {
         title: line.title,
         qty: formatQty(line.qty),
         unitPrice: formatMoney(line.unitPrice),
@@ -226,12 +404,13 @@ export const renderQuotePdf = async (
   doc
     .font('Helvetica-Bold')
     .fontSize(11)
-    .fillColor('#111827')
+    .fillColor(palette.secondaryColor)
     .text('Totale', columns.unitPrice.x + 5, doc.y, {
       width: columns.unitPrice.width + columns.lineTotal.width - 10,
       align: 'right',
     });
   doc
+    .fillColor(palette.primaryColor)
     .fontSize(18)
     .text(formatMoney(quote.total), columns.unitPrice.x + 5, doc.y + 4, {
       width: columns.unitPrice.width + columns.lineTotal.width - 10,
@@ -241,16 +420,16 @@ export const renderQuotePdf = async (
   if (quote.notes) {
     doc.moveDown(1.6);
     ensureVerticalSpace(doc, 80);
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text('Note');
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(palette.secondaryColor).text('Note');
     doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(10).fillColor('#374151').text(quote.notes, {
+    doc.font('Helvetica').fontSize(10).fillColor(palette.mutedColor).text(quote.notes, {
       width: columns.tableWidth,
     });
   }
 
   doc.moveDown(1.2);
   ensureVerticalSpace(doc, 45);
-  doc.font('Helvetica').fontSize(9).fillColor('#6b7280');
+  doc.font('Helvetica').fontSize(9).fillColor(palette.mutedColor);
   doc.text(`Stato: ${STATUS_LABELS[quote.status]} (${quote.status})`);
   doc.text(`Creato: ${formatDateTime(quote.createdAt)} | Aggiornato: ${formatDateTime(quote.updatedAt)}`);
 

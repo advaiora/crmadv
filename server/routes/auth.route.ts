@@ -21,6 +21,7 @@ import { moduleRepository } from '../repositories/module.repository.js';
 import { prisma } from '../prisma.js';
 import { rbacRepository } from '../repositories/rbac.repository.js';
 import { userRepository } from '../repositories/user.repository.js';
+import { workspaceBrandingService } from '../services/workspace-branding.service.js';
 import {
   resolveOrCreateWorkspaceForGoogle,
   upsertGoogleUser,
@@ -527,13 +528,16 @@ const createSessionPayload = async ({
   isNewUser?: boolean;
   isNewWorkspace?: boolean;
 }) => {
-  const accessToken = await signAccessToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    workspaceId: workspace.id,
-    workspaceSlug: workspace.slug,
-  });
+  const [accessToken, branding] = await Promise.all([
+    signAccessToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      workspaceId: workspace.id,
+      workspaceSlug: workspace.slug,
+    }),
+    workspaceBrandingService.getWorkspaceBranding(workspace),
+  ]);
 
   return {
     token: accessToken,
@@ -544,6 +548,7 @@ const createSessionPayload = async ({
       role: user.role,
     },
     workspace,
+    branding,
     ...(typeof onboardingRequired === 'boolean' ? { onboardingRequired } : {}),
     ...(typeof isNewUser === 'boolean' ? { isNewUser } : {}),
     ...(typeof isNewWorkspace === 'boolean' ? { isNewWorkspace } : {}),
@@ -1040,11 +1045,12 @@ const authRoute: FastifyPluginAsync = async (app) => {
     );
     const effectiveUserRole = repairedRole?.assignedUserRole ?? user.role;
 
-    const [enabledModules, permissions, roles, recentActivity] = await Promise.all([
+    const [enabledModules, permissions, roles, recentActivity, branding] = await Promise.all([
       moduleRepository.listEnabledModules(activeMembership.workspace.id),
       rbacRepository.listUserPermissions(user.id, activeMembership.workspace.id),
       rbacRepository.listUserRoles(user.id, activeMembership.workspace.id),
       auditRepository.listRecentByWorkspace(activeMembership.workspace.id, 8),
+      workspaceBrandingService.getWorkspaceBranding(activeMembership.workspace),
     ]);
 
     await audit.log({
@@ -1081,6 +1087,7 @@ const authRoute: FastifyPluginAsync = async (app) => {
         role: effectiveUserRole,
       },
       workspace: activeMembership.workspace,
+      branding,
       memberships: memberships.map((membership) => ({
         workspaceId: membership.workspaceId,
         status: membership.status,

@@ -1,6 +1,7 @@
 import classNames from 'classnames';
 import { Badge, Dropdown } from 'react-bootstrap';
 import { MoreVertical } from 'react-feather';
+import { readBrandingColor } from '../../../lib/brandingColors';
 
 //Images
 import avatar2 from '../../../assets/img/avatar2.jpg';
@@ -8,6 +9,8 @@ import avatar7 from '../../../assets/img/avatar7.jpg';
 import avatar9 from '../../../assets/img/avatar9.jpg';
 import avatar10 from '../../../assets/img/avatar10.jpg';
 import avatar15 from '../../../assets/img/avatar15.jpg';
+
+const brandingPrimaryColor = readBrandingColor('--bs-primary', '#0d6efd');
 
 
 const avatarFormater = (cell) => {
@@ -55,7 +58,7 @@ const statusFormater = (cell) => {
                     <Dropdown.Item data-color="#5e7d8a">On Hold</Dropdown.Item>
                     <Dropdown.Item data-color="#FFC400">In Progress</Dropdown.Item>
                     <Dropdown.Item data-color="#9e9e9e">To-Do</Dropdown.Item>
-                    <Dropdown.Item data-color="#007D88">Done</Dropdown.Item>
+                    <Dropdown.Item data-color={brandingPrimaryColor}>Done</Dropdown.Item>
                     <Dropdown.Item data-color="#FF0101">Pending</Dropdown.Item>
                 </Dropdown.Menu>
             </Dropdown>
@@ -79,7 +82,7 @@ const actionFormater = (cell) => {
                     <Dropdown.Item data-color="#5e7d8a">On Hold</Dropdown.Item>
                     <Dropdown.Item data-color="#FFC400">In Progress</Dropdown.Item>
                     <Dropdown.Item data-color="#9e9e9e">To-Do</Dropdown.Item>
-                    <Dropdown.Item data-color="#007D88">Done</Dropdown.Item>
+                    <Dropdown.Item data-color={brandingPrimaryColor}>Done</Dropdown.Item>
                     <Dropdown.Item data-color="#FF0101">Pending</Dropdown.Item>
                 </Dropdown.Menu>
             </Dropdown>

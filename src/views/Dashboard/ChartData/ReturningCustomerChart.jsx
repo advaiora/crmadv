@@ -1,7 +1,11 @@
 import React from 'react';
 import ReactApexChart from 'react-apexcharts';
+import { colorToRgbaString, readBrandingColor } from '../../../lib/brandingColors';
 
 const ReturningCustomerChart = () => {
+    const primaryColor = readBrandingColor('--bs-primary', '#0d6efd');
+    const secondaryColor = colorToRgbaString(primaryColor, 0.55, '#0d6efd');
+
     var options = {
         stroke: {
             lineCap: 'round'
@@ -35,7 +39,7 @@ const ReturningCustomerChart = () => {
                 }
             }
         },
-        colors: ['#007D88', '#25cba1'],
+        colors: [primaryColor, secondaryColor],
         labels: ['Subscriptions', 'Food'],
     };
 

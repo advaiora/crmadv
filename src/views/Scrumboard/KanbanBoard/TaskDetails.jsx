@@ -11,6 +11,7 @@ import HkInlineEdit from '../../../components/@hk-editable-component/HkInlineEdi
 import HkDropZone from '../../../components/@hk-drop-zone/HkDropZone';
 import HkAlert from '../../../components/@hk-alert/@hk-alert';
 import HkChips from '../../../components/@hk-chips/@hk-chips';
+import { readBrandingColor } from '../../../lib/brandingColors';
 
 //Images
 import avatar2 from '../../../assets/img/avatar2.jpg';
@@ -25,6 +26,7 @@ import thumb1 from '../../../assets/img/avatar1.jpg';
 
 
 const TaskDetails = ({ show, onHide }) => {
+    const primaryColor = readBrandingColor('--bs-primary', '#0d6efd');
 
     const [recipients, setRecipients] = useState(["Framework", "Html"]);
     const [checkList, setCheckList] = useState([
@@ -138,7 +140,7 @@ const TaskDetails = ({ show, onHide }) => {
                 enabled: true
             }
         },
-        colors: ['#007D88'],
+        colors: [primaryColor],
         dataLabels: {
             enabled: false
         },

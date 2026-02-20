@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 //scss
+import './styles/tailwind.css';
 import './styles/scss/style.scss';
 import './styles/scss/globals.css';
 import { Provider } from 'react-redux';

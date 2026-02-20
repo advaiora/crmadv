@@ -4,6 +4,7 @@ import { Link, useHistory, useLocation, useParams } from 'react-router-dom';
 import { ToastContainer, toast } from 'react-toastify';
 import AccessDeniedScreen from '../../components/guards/AccessDeniedScreen';
 import ModulePermissionGate from '../../components/guards/ModulePermissionGate';
+import ProjectChecklistPanel from '../../modules/checklists/ui/ProjectChecklistPanel';
 import {
     deleteProject,
     getProjectStageHistory,
@@ -251,6 +252,8 @@ const ProjectDetailContent = ({ access, id }) => {
                 error={historyState.error}
                 onRetry={loadStageHistory}
             />
+
+            <ProjectChecklistPanel project={project} access={access} />
 
             <Modal
                 show={showDeleteConfirm}

@@ -5,6 +5,7 @@ import Calendar from "../views/Calendar";
 import Chats from "../views/Chat/Chats";
 import ChatContacts from "../views/Chat/Contact";
 import ChatGroups from "../views/Chat/Groups";
+import ChecklistsTemplates from "../views/Checklists";
 import ContactCards from "../views/Contact/ContactCards";
 import ContactList from "../views/Contact/ContactList";
 import EditContact from "../views/Contact/EditContact";
@@ -36,6 +37,7 @@ import TaskList from "../views/Todo/Tasklist";
 import Profile from "../views/Profiles/Profile";
 import EditProfile from "../views/Profiles/EditProfile";
 import Account from "../views/Profiles/Account";
+import WorkspaceBranding from "../views/WorkspaceBranding";
 //Auth
 import Login from "../views/Authentication/LogIn/Login/Login";
 import LoginSimple from "../views/Authentication/LogIn/LoginSimple";
@@ -75,6 +77,7 @@ export const routes = [
     { path: 'projects', exact: true, component: ProjectsHome },
     { path: 'projects/settings/pipeline', exact: true, component: ProjectPipelineSettings },
     { path: 'projects/:id', exact: true, component: ProjectDetail },
+    { path: 'checklists/templates', exact: true, component: ChecklistsTemplates },
     { path: 'apps/file-manager/list-view', exact: true, component: ListView },
     { path: 'apps/file-manager/grid-view', exact: true, component: GridView },
     { path: 'apps/gallery', exact: true, component: Gallery },
@@ -94,6 +97,7 @@ export const routes = [
     { path: 'pages/profile', exact: true, component: Profile },
     { path: 'pages/edit-profile', exact: true, component: EditProfile },
     { path: 'pages/account', exact: true, component: Account },
+    { path: 'pages/workspace-branding', exact: true, component: WorkspaceBranding },
     //Error
     { path: 'error-404', exact: true, component: Error404 },
 ]

@@ -424,7 +424,7 @@ const Body = () => {
                                                 </tr>
                                                 <tr>
                                                     <td colSpan={3} className="rounded-bottom-start border-end-0 bg-primary-light-5">
-                                                        <span className="text-dark">Total</span>
+                                                        <span className="invoice-value-text">Total</span>
                                                     </td>
                                                     <td className="rounded-bottom-end  bg-primary-light-5">
                                                         <Form.Control type="text" className="bg-transparent border-0 p-0 totalPrice" value={grossTotal} readOnly />

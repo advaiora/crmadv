@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Button, Col, Form, InputGroup, Modal, Row } from 'react-bootstrap';
 import HkDropZone from '../../components/@hk-drop-zone/HkDropZone';
+import { readBrandingColor } from '../../lib/brandingColors';
 
 const AddNewBoard = ({ show, onHide }) => {
-    const [avatarColor, setAvatarColor] = useState("#009B84");
+    const [avatarColor, setAvatarColor] = useState(() => readBrandingColor("--bs-primary", "#0d6efd"));
 
     return (
         <Modal show={show} onHide={onHide}>

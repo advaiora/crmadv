@@ -1,5 +1,12 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { clearSession, readSession, type SessionState, writeSession } from '../lib/session';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+    clearSession,
+    readSession,
+    SESSION_CHANGED_EVENT,
+    type SessionState,
+    writeSession,
+} from '../lib/session';
+import { applyWorkspaceBranding, type WorkspaceBrandingState } from '../lib/workspaceBranding';
 
 type LoginInput = {
     accessToken: string;
@@ -8,6 +15,7 @@ type LoginInput = {
     userRole: string;
     workspaceId?: string;
     workspaceSlug?: string;
+    workspaceBranding?: WorkspaceBrandingState;
 };
 
 type SessionContextValue = {
@@ -30,6 +38,7 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
             userRole: input.userRole,
             workspaceId: input.workspaceId,
             workspaceSlug: input.workspaceSlug,
+            workspaceBranding: input.workspaceBranding,
         });
 
         setSession(nextSession);
@@ -40,6 +49,28 @@ export const SessionProvider = ({ children }: { children: React.ReactNode }) => 
         clearSession();
         setSession(null);
     }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const syncSessionFromStorage = () => {
+            setSession(readSession());
+        };
+
+        window.addEventListener(SESSION_CHANGED_EVENT, syncSessionFromStorage);
+        window.addEventListener('storage', syncSessionFromStorage);
+
+        return () => {
+            window.removeEventListener(SESSION_CHANGED_EVENT, syncSessionFromStorage);
+            window.removeEventListener('storage', syncSessionFromStorage);
+        };
+    }, []);
+
+    useEffect(() => {
+        applyWorkspaceBranding(session?.workspaceBranding ?? null);
+    }, [session]);
 
     const value = useMemo(
         () => ({

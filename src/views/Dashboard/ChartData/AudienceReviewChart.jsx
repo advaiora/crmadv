@@ -1,7 +1,12 @@
 import React from 'react';
 import ReactApexChart from 'react-apexcharts';
+import { colorToRgbaString, readBrandingColor } from '../../../lib/brandingColors';
 
 const AudienceReviewChart = () => {
+    const primaryColor = readBrandingColor('--bs-primary', '#0d6efd');
+    const secondaryColor = readBrandingColor('--bs-secondary', '#6c757d');
+    const textTertiaryColor = readBrandingColor('--hk-text-tertiary', '#6f6f6f');
+
     var options = {
 
         chart: {
@@ -15,7 +20,7 @@ const AudienceReviewChart = () => {
             zoom: {
                 enabled: false
             },
-            foreColor: "#646A71",
+            foreColor: textTertiaryColor,
             fontFamily: 'DM Sans',
         },
 
@@ -85,7 +90,7 @@ const AudienceReviewChart = () => {
             position: 'top',
             fontSize: '15px',
             labels: {
-                colors: '#6f6f6f',
+                colors: textTertiaryColor,
             },
             markers: {
                 size: 5,
@@ -97,7 +102,7 @@ const AudienceReviewChart = () => {
             },
         },
 
-        colors: ['#007D88', '#25cba1', '#ebf3fe'],
+        colors: [primaryColor, secondaryColor, colorToRgbaString(primaryColor, 0.15, '#0d6efd')],
         fill: {
             opacity: 1
         },

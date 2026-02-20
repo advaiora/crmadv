@@ -11,7 +11,7 @@ const HkTags = ({ options, defaultValue }) => {
             styles={{
                 control: (baseStyles, state) => ({
                     ...baseStyles,
-                    borderColor: state.isFocused ? '#007D88' : '#007D88',
+                    borderColor: state.isFocused ? "var(--bs-primary)" : "var(--bs-primary)",
                 }),
                 multiValue: (styles) => {
                     return {

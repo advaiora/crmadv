@@ -198,16 +198,18 @@ Project:	Jampack
 					min-width: 0;
 					position: relative;
 					overflow: hidden;
-					height: 34px;
-					width: clamp(128px, 9.5vw, 172px);
+					height: var(--workspace-logo-slot-height, 34px);
+					width: var(--workspace-logo-expanded-width, clamp(128px, 9.5vw, 172px));
+					max-width: var(--workspace-logo-max-width, 220px);
 					@include transition(width 0.24s cubic-bezier(0.4, 0, 0.2, 1));
 
 					.advaiora-logo-mark {
 						position: absolute;
 						left: 0;
 						top: 50%;
-						width: 34px;
-						max-width: 34px;
+						width: var(--workspace-logo-mark-size, 34px);
+						max-width: var(--workspace-logo-mark-size, 34px);
+						max-height: var(--workspace-logo-slot-height, 34px);
 						height: auto;
 						object-fit: contain;
 						opacity: 0;
@@ -221,8 +223,9 @@ Project:	Jampack
 						position: absolute;
 						left: 0;
 						top: 50%;
-						width: clamp(128px, 9.5vw, 172px);
+						width: 100%;
 						max-width: 100%;
+						max-height: var(--workspace-logo-slot-height, 34px);
 						height: auto;
 						object-fit: contain;
 						opacity: 1;
@@ -357,7 +360,7 @@ Project:	Jampack
 				.menu-header {
 					>span {
 						.navbar-brand {
-							width: 34px;
+							width: var(--workspace-logo-mark-size, 34px);
 
 							.advaiora-logo-mark {
 								opacity: 1;
@@ -425,7 +428,8 @@ Project:	Jampack
 					.menu-header {
 						>span {
 							.navbar-brand {
-								width: clamp(128px, 9.5vw, 172px);
+								width: var(--workspace-logo-expanded-width, clamp(128px, 9.5vw, 172px));
+								max-width: var(--workspace-logo-max-width, 220px);
 
 								.advaiora-logo-mark {
 									opacity: 0;

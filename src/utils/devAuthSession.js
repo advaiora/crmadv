@@ -22,6 +22,7 @@ export const getDevAuthSession = () => {
         role: session.userRole,
         ...(session.workspaceId ? { workspaceId: session.workspaceId } : {}),
         ...(session.workspaceSlug ? { workspaceSlug: session.workspaceSlug } : {}),
+        ...(session.workspaceBranding ? { workspaceBranding: session.workspaceBranding } : {}),
     };
 };
 
@@ -49,6 +50,7 @@ export const setDevAuthSession = (nextSession) => {
         current?.workspaceSlug ||
         normalizeValue(import.meta.env.VITE_DEV_WORKSPACE_SLUG) ||
         'demo';
+    const workspaceBranding = nextSession?.workspaceBranding || current?.workspaceBranding;
 
     const saved = writeSession({
         accessToken,
@@ -57,6 +59,7 @@ export const setDevAuthSession = (nextSession) => {
         userRole,
         workspaceId,
         workspaceSlug,
+        workspaceBranding,
     });
 
     if (!saved) {
@@ -70,6 +73,7 @@ export const setDevAuthSession = (nextSession) => {
         role: saved.userRole,
         ...(saved.workspaceId ? { workspaceId: saved.workspaceId } : {}),
         ...(saved.workspaceSlug ? { workspaceSlug: saved.workspaceSlug } : {}),
+        ...(saved.workspaceBranding ? { workspaceBranding: saved.workspaceBranding } : {}),
     };
 };
 

@@ -107,6 +107,26 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
+  app.delete<{ Params: TemplateParams }>(
+    '/checklists/templates/:id/permanent',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.delete,
+      );
+
+      await checklistsService.deleteTemplatePermanently({
+        workspaceId: workspace.id,
+        templateId: request.params.id,
+        actorUserId: user.id,
+        request,
+      });
+
+      reply.code(204);
+      return reply.send();
+    },
+  );
+
   app.post<{ Params: TemplateParams; Body: unknown }>(
     '/checklists/templates/:id/items',
     async (request, reply) => {

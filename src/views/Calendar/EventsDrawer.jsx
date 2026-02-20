@@ -11,6 +11,7 @@ import 'animate.css';
 // Own Custom Components
 import HkBadge from '../../components/@hk-badge/@hk-badge';
 import HkChips from '../../components/@hk-chips/@hk-chips';
+import { readBrandingColor } from '../../lib/brandingColors';
 
 //Images
 import avatar11 from '../../assets/img/avatar11.jpg';
@@ -19,7 +20,7 @@ import avatar13 from '../../assets/img/avatar13.jpg';
 
 const EventsDrawer = ({ show, onClose, info, event }) => {
     const [editable, setEditable] = useState(false);
-    const [eventColor, setEventColor] = useState("#009B84");
+    const [eventColor, setEventColor] = useState(() => readBrandingColor("--bs-primary", "#0d6efd"));
 
     const hideCalender = (ev, picker) => {
         picker.container.find(".calendar-table").hide();

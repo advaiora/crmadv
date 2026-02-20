@@ -1,5 +1,6 @@
 import { apiGet } from './apiClient';
 import { readSession, writeSession } from '../lib/session';
+import { applyWorkspaceBranding } from '../lib/workspaceBranding';
 
 export const fetchWorkspaceAccess = async () => {
     const session = readSession();
@@ -9,6 +10,7 @@ export const fetchWorkspaceAccess = async () => {
 
     const result = await apiGet('/auth/me');
     if (result?.token || result?.workspace?.id || result?.workspace?.slug) {
+        const workspaceBranding = result?.branding || session.workspaceBranding;
         writeSession({
             accessToken: result?.token || session.accessToken,
             userId: result?.user?.id || session.userId,
@@ -16,7 +18,9 @@ export const fetchWorkspaceAccess = async () => {
             userRole: result?.user?.role || session.userRole,
             workspaceId: result?.workspace?.id || session.workspaceId,
             workspaceSlug: result?.workspace?.slug || session.workspaceSlug,
+            workspaceBranding,
         });
+        applyWorkspaceBranding(workspaceBranding ?? null);
     }
 
     return result;

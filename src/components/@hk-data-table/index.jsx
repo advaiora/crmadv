@@ -119,13 +119,13 @@ const HkDataTable = ({
                                                     {
                                                         (sortConfig.direction === 'ascending')
                                                             ?
-                                                            <font color="#007D88">
+                                                            <span style={{ color: "var(--bs-primary)" }}>
                                                                 <SortAscending size={14} strokeWidth={2.5} />
-                                                            </font>
+                                                            </span>
                                                             :
-                                                            <font color="#007D88">
+                                                            <span style={{ color: "var(--bs-primary)" }}>
                                                                 <SortDescending size={14} strokeWidth={2.5} />
-                                                            </font>
+                                                            </span>
                                                     }
                                                 </>
                                                 :

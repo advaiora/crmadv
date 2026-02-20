@@ -3,10 +3,17 @@ import * as am5 from "@amcharts/amcharts5";
 import * as am5map from "@amcharts/amcharts5/map";
 import am5geodata_worldLow from "@amcharts/amcharts5-geodata/worldLow";
 import { useTheme } from '../../../utils/theme-provider/theme-provider';
+import { colorToAm5Number, readBrandingColor } from '../../../lib/brandingColors';
 
 const ActiveUserMap = () => {
 
     const { theme } = useTheme();
+    const primaryColor = readBrandingColor('--bs-primary', '#0d6efd');
+    const mutedSurface = readBrandingColor('--hk-bg-tertiary', '#e6e9eb');
+    const darkMutedSurface = readBrandingColor('--hk-border-secondary', '#8f9499');
+    const primaryColorNumber = colorToAm5Number(primaryColor, '#0d6efd');
+    const mutedSurfaceNumber = colorToAm5Number(mutedSurface, '#e6e9eb');
+    const darkMutedSurfaceNumber = colorToAm5Number(darkMutedSurface, '#8f9499');
 
     useEffect(() => {
 
@@ -37,7 +44,7 @@ const ActiveUserMap = () => {
         // https://www.amcharts.com/docs/v5/charts/map-chart/map-polygon-series/#Background_polygon
         var backgroundSeries = chart.series.push(am5map.MapPolygonSeries.new(root, {}));
         backgroundSeries.mapPolygons.template.setAll({
-            fill: am5.color(0xE6E9EB),
+            fill: am5.color(mutedSurfaceNumber),
             fillOpacity: 0,
             strokeOpacity: 0
         });
@@ -54,7 +61,7 @@ const ActiveUserMap = () => {
             am5map.MapPolygonSeries.new(root, {
                 geoJSON: am5geodata_worldLow,
                 exclude: ["AQ"],
-                fill: am5.color(theme === 'light' ? 0xE6E9EB : 0x8F9499), //Map background color
+                fill: am5.color(theme === 'light' ? mutedSurfaceNumber : darkMutedSurfaceNumber), //Map background color
 
             })
         );
@@ -65,7 +72,7 @@ const ActiveUserMap = () => {
         });
 
         polygonSeries.mapPolygons.template.states.create("hover", {
-            fill: am5.color(0xE6E9EB)
+            fill: am5.color(mutedSurfaceNumber)
         });
 
 
@@ -73,7 +80,7 @@ const ActiveUserMap = () => {
         // https://www.amcharts.com/docs/v5/charts/map-chart/map-line-series/
         var lineSeries = chart.series.push(am5map.MapLineSeries.new(root, {}));
         lineSeries.mapLines.template.setAll({
-            stroke: am5.color(0xE6E9EB),
+            stroke: am5.color(mutedSurfaceNumber),
             strokeOpacity: 0.3
         });
 
@@ -95,7 +102,7 @@ const ActiveUserMap = () => {
                 am5.Circle.new(root, {
                     radius: 3,
                     tooltipY: 0,
-                    fill: am5.color(0x007D88),
+                    fill: am5.color(primaryColorNumber),
                     strokeOpacity: 0
                 })
             );
@@ -105,7 +112,7 @@ const ActiveUserMap = () => {
                 am5.Circle.new(root, {
                     radius: 3,
                     tooltipY: 0,
-                    fill: am5.color(0x007D88),
+                    fill: am5.color(primaryColorNumber),
                     strokeOpacity: 0,
                     tooltipText: "{title}"
                 })
@@ -139,126 +146,126 @@ const ActiveUserMap = () => {
                 latitude: 50.8371,
                 longitude: 4.3676,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Copenhagen",
                 latitude: 55.6763,
                 longitude: 12.5681,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Paris",
                 latitude: 48.8567,
                 longitude: 2.351,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Reykjavik",
                 latitude: 64.1353,
                 longitude: -21.8952,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Moscow",
                 latitude: 55.7558,
                 longitude: 37.6176,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Madrid",
                 latitude: 40.4167,
                 longitude: -3.7033,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "London",
                 latitude: 51.5002,
                 longitude: -0.1262,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Peking",
                 latitude: 39.9056,
                 longitude: 116.3958,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "New Delhi",
                 latitude: 28.6353,
                 longitude: 77.225,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Tokyo",
                 latitude: 35.6785,
                 longitude: 139.6823,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Ankara",
                 latitude: 39.9439,
                 longitude: 32.856,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Buenos Aires",
                 latitude: -34.6118,
                 longitude: -58.4173,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Brasilia",
                 latitude: -15.7801,
                 longitude: -47.9292,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Ottawa",
                 latitude: 45.4235,
                 longitude: -75.6979,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Washington",
                 latitude: 38.8921,
                 longitude: -77.0241,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Kinshasa",
                 latitude: -4.3369,
                 longitude: 15.3271,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Cairo",
                 latitude: 30.0571,
                 longitude: 31.2272,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             },
             {
                 title: "Pretoria",
                 latitude: -25.7463,
                 longitude: 28.1876,
                 url: "http://www.amcharts.com",
-                color: '#007D88'
+                color: primaryColor
             }
         ];
 
@@ -279,7 +286,7 @@ const ActiveUserMap = () => {
         chart.appear(1000, 100);
 
         return () => root.dispose();
-    }, [theme]);
+    }, [theme, primaryColor, primaryColorNumber, mutedSurfaceNumber, darkMutedSurfaceNumber]);
 
     return <div id="chartdiv" style={{ width: "100%", height: "300px" }} />;
 };

@@ -370,6 +370,9 @@ export const projectsRepository = {
     sortOrder: number;
     isClosed: boolean;
     color: string | null;
+    isGated: boolean;
+    gateChecklistTemplateId: string | null;
+    autoCreateInstance: boolean;
   }) {
     return prisma.pipelineStage.create({
       data: {
@@ -379,6 +382,9 @@ export const projectsRepository = {
         sortOrder: input.sortOrder,
         isClosed: input.isClosed,
         color: input.color,
+        isGated: input.isGated,
+        gateChecklistTemplateId: input.gateChecklistTemplateId,
+        autoCreateInstance: input.autoCreateInstance,
       },
       select: pipelineStageSelect,
     });
@@ -392,6 +398,9 @@ export const projectsRepository = {
       sortOrder?: number;
       isClosed?: boolean;
       color?: string | null;
+      isGated?: boolean;
+      gateChecklistTemplateId?: string | null;
+      autoCreateInstance?: boolean;
     },
   ) {
     const updated = await prisma.pipelineStage.updateMany({

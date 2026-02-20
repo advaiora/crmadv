@@ -3,6 +3,8 @@ import { prisma } from '../../prisma.js';
 
 const PROJECT_TABLE = 'Project';
 const PIPELINE_STAGE_TABLE = 'PipelineStage';
+const CHECKLIST_ITEM_INCOMPLETE_STATES = ['pending', 'not_started', 'in_progress'] as const;
+const CHECKLIST_ITEM_TERMINAL_STATES = ['completed', 'not_applicable'] as const;
 
 const templateSummarySelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
   id: true,
@@ -83,6 +85,12 @@ const checklistInstanceWithItemsSelect = Prisma.validator<Prisma.ChecklistInstan
   status: true,
   createdAt: true,
   updatedAt: true,
+  template: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
   items: {
     select: checklistInstanceItemSelect,
     orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
@@ -95,6 +103,12 @@ const checklistInstanceSummarySelect = Prisma.validator<Prisma.ChecklistInstance
   pipelineStageId: true,
   status: true,
   createdAt: true,
+  template: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
 });
 
 const checklistInstanceItemWithInstanceSelect =
@@ -233,7 +247,7 @@ const recalculateChecklistInstanceStatusInTx = async (
       instanceId,
       isRequiredSnapshot: true,
       state: {
-        notIn: ['completed', 'not_applicable'],
+        notIn: CHECKLIST_ITEM_TERMINAL_STATES,
       },
     },
   });
@@ -302,7 +316,7 @@ const createChecklistInstanceWithItemsInTx = async (
         requiresEvidenceSnapshot: templateItem.requiresEvidenceSnapshot,
         isCriticalSnapshot: templateItem.isCriticalSnapshot,
         sortOrderSnapshot: templateItem.sortOrder,
-        state: 'pending',
+        state: 'not_started',
       })),
     });
   }
@@ -407,6 +421,47 @@ export const checklistsRepository = {
         where: templateWhereByWorkspaceAndId(workspaceId, templateId),
         select: templateWithItemsSelect,
       });
+    });
+  },
+
+  async getTemplateUsageCounts(workspaceId: string, templateId: string) {
+    const [instanceCount, gatedStageCount] = await Promise.all([
+      prisma.checklistInstance.count({
+        where: {
+          workspaceId,
+          checklistTemplateId: templateId,
+        },
+      }),
+      prisma.pipelineStage.count({
+        where: {
+          workspaceId,
+          gateChecklistTemplateId: templateId,
+        },
+      }),
+    ]);
+
+    return {
+      instanceCount,
+      gatedStageCount,
+    };
+  },
+
+  deleteTemplate(workspaceId: string, templateId: string) {
+    return prisma.$transaction(async (tx) => {
+      const existing = await tx.checklistTemplate.findFirst({
+        where: templateWhereByWorkspaceAndId(workspaceId, templateId),
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return null;
+      }
+
+      await tx.checklistTemplate.delete({
+        where: { id: existing.id },
+      });
+
+      return existing;
     });
   },
 
@@ -706,7 +761,9 @@ export const checklistsRepository = {
           workspaceId,
           instanceId,
           isRequiredSnapshot: true,
-          state: 'pending',
+          state: {
+            in: CHECKLIST_ITEM_INCOMPLETE_STATES,
+          },
         },
         orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
         select: {
@@ -722,7 +779,9 @@ export const checklistsRepository = {
         workspaceId,
         instanceId,
         isRequiredSnapshot: true,
-        state: 'pending',
+        state: {
+          in: CHECKLIST_ITEM_INCOMPLETE_STATES,
+        },
       },
       orderBy: [{ sortOrderSnapshot: 'asc' }, { id: 'asc' }],
       select: {
@@ -741,6 +800,17 @@ export const checklistsRepository = {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       select: checklistInstanceSummarySelect,
+    });
+  },
+
+  listChecklistInstancesByProjectWithItems(workspaceId: string, projectId: string) {
+    return prisma.checklistInstance.findMany({
+      where: {
+        workspaceId,
+        projectId,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      select: checklistInstanceWithItemsSelect,
     });
   },
 
@@ -767,7 +837,9 @@ export const checklistsRepository = {
         where: {
           workspaceId: input.workspaceId,
           id: input.itemId,
-          state: 'pending',
+          state: {
+            in: CHECKLIST_ITEM_INCOMPLETE_STATES,
+          },
         },
         data: {
           state: 'completed',
@@ -821,7 +893,9 @@ export const checklistsRepository = {
         where: {
           workspaceId: input.workspaceId,
           id: input.itemId,
-          state: 'pending',
+          state: {
+            in: CHECKLIST_ITEM_INCOMPLETE_STATES,
+          },
         },
         data: {
           state: 'not_applicable',
@@ -871,7 +945,7 @@ export const checklistsRepository = {
           id: itemId,
         },
         data: {
-          state: 'pending',
+          state: 'not_started',
           evidenceNote: null,
           evidenceUrl: null,
           notApplicableReason: null,
@@ -899,6 +973,81 @@ export const checklistsRepository = {
       await recalculateChecklistInstanceStatusInTx(tx, workspaceId, item.instanceId);
 
       return item;
+    });
+  },
+
+  async updateChecklistItemState(input: {
+    workspaceId: string;
+    itemId: string;
+    state: 'not_started' | 'in_progress' | 'completed';
+    evidenceNote: string | null | undefined;
+    evidenceUrl: string | null | undefined;
+    completedByUserId: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const current = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!current) {
+        return {
+          updated: false as const,
+          current: null,
+          previousState: null,
+        };
+      }
+
+      const previousState = current.state;
+      const completedAt = input.state === 'completed' ? new Date() : null;
+
+      await tx.checklistInstanceItem.updateMany({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        data: {
+          state: input.state,
+          evidenceNote:
+            input.state === 'not_started'
+              ? null
+              : (input.evidenceNote === undefined ? current.evidenceNote : input.evidenceNote),
+          evidenceUrl:
+            input.state === 'not_started'
+              ? null
+              : (input.evidenceUrl === undefined ? current.evidenceUrl : input.evidenceUrl),
+          notApplicableReason: null,
+          completedAt,
+          completedByUserId: completedAt ? input.completedByUserId : null,
+        },
+      });
+
+      const item = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!item) {
+        return {
+          updated: false as const,
+          current,
+          previousState,
+        };
+      }
+
+      await recalculateChecklistInstanceStatusInTx(tx, input.workspaceId, item.instanceId);
+
+      return {
+        updated: true as const,
+        item,
+        previousState,
+      };
     });
   },
 

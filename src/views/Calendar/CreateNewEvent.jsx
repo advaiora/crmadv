@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Button, Col, Form, InputGroup, Modal, Row } from 'react-bootstrap';
 import DateRangePicker from 'react-bootstrap-daterangepicker';
+import { readBrandingColor } from '../../lib/brandingColors';
 
 const CreateNewEvent = ({ show, hide, calendarRef }) => {
 
     const [title, setTitle] = useState("");
     const [start, setStart] = useState(new Date());
     const [end, setEnd] = useState(new Date());
-    const [backgroundColor, setBackgroundColor] = useState("#009B84");
+    const [backgroundColor, setBackgroundColor] = useState(() => readBrandingColor("--bs-primary", "#0d6efd"));
 
     const updateEventList = (e) => {
         e.preventDefault()

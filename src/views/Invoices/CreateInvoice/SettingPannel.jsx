@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Button, ButtonGroup, Card, Form, InputGroup } from 'react-bootstrap';
 import SimpleBar from 'simplebar-react';
+import { readBrandingColor } from '../../../lib/brandingColors';
 
 const SettingPannel = ({ onHide }) => {
 
-    const [accentClr, setAccentClr] = useState("#007D88");
-    const [headingClr, setHeadingClr] = useState("#1F2327");
-    const [textClr, setTextClr] = useState("#646A71")
+    const [accentClr, setAccentClr] = useState(() => readBrandingColor("--bs-primary", "#0d6efd"));
+    const [headingClr, setHeadingClr] = useState(() => readBrandingColor("--hk-text-primary", "#1f2327"));
+    const [textClr, setTextClr] = useState(() => readBrandingColor("--hk-text-tertiary", "#646a71"))
 
     return (
         <div className="invoice-settings">

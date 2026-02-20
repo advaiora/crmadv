@@ -12,6 +12,7 @@ import HkInlineEdit from '../../../components/@hk-editable-component/HkInlineEdi
 import HkFileInput from '../../../components/@hk-imag-uploader/HkFileInput';
 import HkAlert from '../../../components/@hk-alert/@hk-alert';
 import HkChips from '../../../components/@hk-chips/@hk-chips';
+import { readBrandingColor } from '../../../lib/brandingColors';
 
 
 //Images
@@ -28,6 +29,7 @@ import img2 from '../../../assets/img/2image.png';
 import thumb1 from '../../../assets/img/img-thumb1.jpg';
 
 const TaskInfo = ({ close }) => {
+    const primaryColor = readBrandingColor('--bs-primary', '#0d6efd');
     const [recipients, setRecipients] = useState(["Framework", "Html"]);
     const [checkList, setCheckList] = useState([
         { label: "Video conference with canada Team", checked: true, editable: false },
@@ -140,7 +142,7 @@ const TaskInfo = ({ close }) => {
                 enabled: true
             }
         },
-        colors: ['#007D88'],
+        colors: [primaryColor],
         dataLabels: {
             enabled: false
         },

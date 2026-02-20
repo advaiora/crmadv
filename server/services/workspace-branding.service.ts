@@ -2,12 +2,14 @@ import { badRequest } from '../core/errors.js';
 import { brandingRepository } from '../repositories/branding.repository.js';
 
 const HEX_COLOR_REGEX = /^#[A-Fa-f0-9]{6}$/;
+const DATA_IMAGE_URL_REGEX = /^data:image\/[a-zA-Z0-9+.-]+;base64,[A-Za-z0-9+/=]+$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_COMPANY_NAME_LENGTH = 80;
 const MAX_LOGO_URL_LENGTH = 2048;
+const MAX_LOGO_DATA_URL_LENGTH = 2_800_000;
 const MAX_SUPPORT_EMAIL_LENGTH = 320;
 const DEFAULT_PRIMARY_COLOR = '#000000';
-const DEFAULT_ACCENT_COLOR = '#ffffff';
+const DEFAULT_SECONDARY_COLOR = '#ffffff';
 
 type WorkspaceRecord = {
   id: string;
@@ -18,6 +20,7 @@ type WorkspaceRecord = {
 type BrandingPayload = {
   logoUrl: string | null;
   primaryColor: string;
+  secondaryColor: string;
   accentColor: string;
   companyName: string | null;
   supportEmail: string | null;
@@ -26,7 +29,7 @@ type BrandingPayload = {
 type BrandingChanges = Partial<{
   logoUrl: { from: string | null; to: string | null };
   primaryColor: { from: string; to: string };
-  accentColor: { from: string; to: string };
+  secondaryColor: { from: string; to: string };
   companyName: { from: string | null; to: string | null };
   supportEmail: { from: string | null; to: string | null };
 }>;
@@ -34,7 +37,7 @@ type BrandingChanges = Partial<{
 type BrandingUpdateInput = {
   logoUrl?: string | null;
   primaryColor?: string | null;
-  accentColor?: string | null;
+  secondaryColor?: string | null;
   companyName?: string | null;
   supportEmail?: string | null;
 };
@@ -55,6 +58,7 @@ const mapBrandingRecord = (record: {
 }): BrandingPayload => ({
   logoUrl: record.logoUrl,
   primaryColor: record.primaryColor,
+  secondaryColor: record.secondaryColor,
   accentColor: record.secondaryColor,
   companyName: record.workspaceName,
   supportEmail: record.supportEmail,
@@ -72,7 +76,7 @@ export const workspaceBrandingService = {
       logoUrl: null,
       supportEmail: null,
       primaryColor: DEFAULT_PRIMARY_COLOR,
-      secondaryColor: DEFAULT_ACCENT_COLOR,
+      secondaryColor: DEFAULT_SECONDARY_COLOR,
     });
 
     return mapBrandingRecord(createdBranding);
@@ -86,6 +90,7 @@ export const workspaceBrandingService = {
     const allowedKeys = new Set([
       'logoUrl',
       'primaryColor',
+      'secondaryColor',
       'accentColor',
       'companyName',
       'supportEmail',
@@ -109,23 +114,39 @@ export const workspaceBrandingService = {
         if (!normalized) {
           throw badRequest('logoUrl cannot be empty');
         }
-        if (normalized.length > MAX_LOGO_URL_LENGTH) {
-          throw badRequest('logoUrl is too long', {
-            maxLength: MAX_LOGO_URL_LENGTH,
-          });
+
+        if (normalized.startsWith('data:image/')) {
+          if (!DATA_IMAGE_URL_REGEX.test(normalized)) {
+            throw badRequest('logoUrl data URI must be a valid base64 image');
+          }
+          if (normalized.length > MAX_LOGO_DATA_URL_LENGTH) {
+            throw badRequest('logoUrl data URI is too long', {
+              maxLength: MAX_LOGO_DATA_URL_LENGTH,
+            });
+          }
+
+          parsedInput.logoUrl = normalized;
         }
 
-        let parsedUrl: URL;
-        try {
-          parsedUrl = new URL(normalized);
-        } catch {
-          throw badRequest('logoUrl must be a valid URL');
-        }
-        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-          throw badRequest('logoUrl must use http or https');
-        }
+        if (!normalized.startsWith('data:image/')) {
+          if (normalized.length > MAX_LOGO_URL_LENGTH) {
+            throw badRequest('logoUrl is too long', {
+              maxLength: MAX_LOGO_URL_LENGTH,
+            });
+          }
 
-        parsedInput.logoUrl = normalized;
+          let parsedUrl: URL;
+          try {
+            parsedUrl = new URL(normalized);
+          } catch {
+            throw badRequest('logoUrl must be a valid URL');
+          }
+          if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            throw badRequest('logoUrl must use http or https');
+          }
+
+          parsedInput.logoUrl = normalized;
+        }
       } else {
         throw badRequest('logoUrl must be a string or null');
       }
@@ -146,19 +167,48 @@ export const workspaceBrandingService = {
       }
     }
 
-    if ('accentColor' in body) {
-      const value = body.accentColor;
+    const parseSecondaryColorField = (
+      value: unknown,
+      fieldName: 'secondaryColor' | 'accentColor',
+    ): string | null => {
       if (value === null) {
-        parsedInput.accentColor = null;
-      } else if (typeof value === 'string') {
-        const normalized = value.trim();
-        if (!isValidHexColor(normalized)) {
-          throw badRequest('accentColor must be a valid hex color (#RRGGBB)');
-        }
-        parsedInput.accentColor = normalized;
-      } else {
-        throw badRequest('accentColor must be a string or null');
+        return null;
       }
+      if (typeof value !== 'string') {
+        throw badRequest(`${fieldName} must be a string or null`);
+      }
+
+      const normalized = value.trim();
+      if (!isValidHexColor(normalized)) {
+        throw badRequest(`${fieldName} must be a valid hex color (#RRGGBB)`);
+      }
+
+      return normalized;
+    };
+
+    let parsedSecondaryColor: string | null | undefined;
+    if ('secondaryColor' in body) {
+      parsedSecondaryColor = parseSecondaryColorField(body.secondaryColor, 'secondaryColor');
+    }
+
+    if ('accentColor' in body) {
+      const parsedLegacyAccentColor = parseSecondaryColorField(body.accentColor, 'accentColor');
+
+      if (
+        parsedSecondaryColor !== undefined &&
+        parsedLegacyAccentColor !== undefined &&
+        parsedSecondaryColor !== parsedLegacyAccentColor
+      ) {
+        throw badRequest('secondaryColor and accentColor must match when both are provided');
+      }
+
+      if (parsedSecondaryColor === undefined) {
+        parsedSecondaryColor = parsedLegacyAccentColor;
+      }
+    }
+
+    if (parsedSecondaryColor !== undefined) {
+      parsedInput.secondaryColor = parsedSecondaryColor;
     }
 
     if ('companyName' in body) {
@@ -219,10 +269,11 @@ export const workspaceBrandingService = {
     const currentRecord = await brandingRepository.findByWorkspaceId(workspace.id);
     const previousState: BrandingPayload = currentRecord
       ? mapBrandingRecord(currentRecord)
-      : {
+        : {
           logoUrl: null,
           primaryColor: DEFAULT_PRIMARY_COLOR,
-          accentColor: DEFAULT_ACCENT_COLOR,
+          secondaryColor: DEFAULT_SECONDARY_COLOR,
+          accentColor: DEFAULT_SECONDARY_COLOR,
           companyName: workspace.name,
           supportEmail: null,
         };
@@ -238,9 +289,9 @@ export const workspaceBrandingService = {
           ? (updates.primaryColor ?? DEFAULT_PRIMARY_COLOR)
           : previousState.primaryColor,
       secondaryColor:
-        updates.accentColor !== undefined
-          ? (updates.accentColor ?? DEFAULT_ACCENT_COLOR)
-          : previousState.accentColor,
+        updates.secondaryColor !== undefined
+          ? (updates.secondaryColor ?? DEFAULT_SECONDARY_COLOR)
+          : previousState.secondaryColor,
     });
 
     const nextState = mapBrandingRecord(upsertedRecord);
@@ -252,8 +303,8 @@ export const workspaceBrandingService = {
     if (previousState.primaryColor !== nextState.primaryColor) {
       changes.primaryColor = { from: previousState.primaryColor, to: nextState.primaryColor };
     }
-    if (previousState.accentColor !== nextState.accentColor) {
-      changes.accentColor = { from: previousState.accentColor, to: nextState.accentColor };
+    if (previousState.secondaryColor !== nextState.secondaryColor) {
+      changes.secondaryColor = { from: previousState.secondaryColor, to: nextState.secondaryColor };
     }
     if (previousState.companyName !== nextState.companyName) {
       changes.companyName = { from: previousState.companyName, to: nextState.companyName };

@@ -92,18 +92,16 @@ export const SidebarMenu = [
       },
       {
         id: "ops_checklists",
-        name: "Checklist",
+        name: "Memo Operativi",
         icon: <Icons.ListDetails />,
-        path: "/apps/todo",
+        path: "/checklists/templates",
+        requiredModule: "checklists",
+        requiredPermission: "checklists.view",
         childrens: [
           {
-            name: "Task List",
-            path: "/apps/todo/task-list",
-            grp_name: "apps",
-          },
-          {
-            name: "Gantt",
-            path: "/apps/todo/gantt",
+            name: "Libreria Memo",
+            path: "/checklists/templates",
+            requiredPermission: "checklists.view",
             grp_name: "apps",
           },
         ],
@@ -190,6 +188,13 @@ export const SidebarMenu = [
           {
             name: "Impostazioni Account",
             path: "/pages/account",
+            grp_name: "apps",
+          },
+          {
+            name: "Branding Workspace",
+            path: "/pages/workspace-branding",
+            requiredModule: "branding",
+            requiredPermission: "branding.manage",
             grp_name: "apps",
           },
         ],

@@ -150,7 +150,9 @@ const Signup = () => {
   const isGoogleWorkspaceConfirmDisabled = isBusy || workspaceNameError;
   const isGoogleWorkspaceNameValid = isGoogleWorkspaceStep && !workspaceNameError;
   const showGoogleWorkspaceRequired = isGoogleWorkspaceStep && (touched.workspaceName || submitAttempted) && workspaceNameError;
-  const resolvePostAuthPath = (onboardingRequired) => (onboardingRequired ? "/dashboard?onboarding=1" : "/dashboard");
+  const resolvePostAuthPath = (onboardingRequired) => (
+    onboardingRequired ? "/pages/workspace-branding?onboarding=1" : "/dashboard"
+  );
 
   const applyGooglePrefill = useCallback(
     ({ idToken = "", suggestedEmail = "", suggestedName = "" }) => {
@@ -326,6 +328,7 @@ const Signup = () => {
       const token = responseData?.token;
       const user = responseData?.user;
       const workspace = responseData?.workspace;
+      const branding = responseData?.branding;
       const onboardingRequired = responseData?.onboardingRequired === true;
 
       if (!token || !user?.id || !user?.email || !user?.role) {
@@ -340,6 +343,7 @@ const Signup = () => {
         userRole: user.role,
         workspaceId: workspace?.id,
         workspaceSlug: workspace?.slug,
+        workspaceBranding: branding,
       });
 
       setSuccessMessage("Account creato con successo. Reindirizzamento...");
@@ -412,7 +416,7 @@ const Signup = () => {
             mode: "login",
             idToken,
           });
-          const { token, user, workspace, onboardingRequired } = result;
+          const { token, user, workspace, branding, onboardingRequired } = result;
 
           login({
             accessToken: token,
@@ -421,6 +425,7 @@ const Signup = () => {
             userRole: user.role,
             workspaceId: workspace?.id,
             workspaceSlug: workspace?.slug,
+            workspaceBranding: branding,
           });
 
           setSuccessMessage("Accesso effettuato. Reindirizzamento...");
@@ -481,7 +486,7 @@ const Signup = () => {
           idToken: googlePendingIdToken,
         });
       }
-      const { token, user, workspace, onboardingRequired } = result;
+      const { token, user, workspace, branding, onboardingRequired } = result;
 
       login({
         accessToken: token,
@@ -490,6 +495,7 @@ const Signup = () => {
         userRole: user.role,
         workspaceId: workspace?.id,
         workspaceSlug: workspace?.slug,
+        workspaceBranding: branding,
       });
 
       setGooglePendingIdToken("");
@@ -516,8 +522,8 @@ const Signup = () => {
     }
   };
 
-  // Coerente con il giallo usato nella Login (Advaiora)
   const leftPanelBackground = "var(--primary, #facc15)";
+  const leftPanelTextColor = "var(--primary-foreground, #111111)";
 
   return (
     <div className="hk-pg-wrapper py-0" data-bs-theme="dark">
@@ -533,7 +539,7 @@ const Signup = () => {
               style={{
                 background: leftPanelBackground,
                 overflow: "hidden",
-                color: "#000", // FORZA TESTO NERO SU TUTTO IL PANNELLO
+                color: leftPanelTextColor,
               }}
             >
               {/* Immagine tenue sopra il giallo (senza blend mode, così il testo resta nero) */}
@@ -635,9 +641,8 @@ const Signup = () => {
                               <div
                                 className="rounded-3 p-3"
                                 style={{
-                                  border: "1px solid rgba(250, 204, 21, 0.35)",
-                                  background:
-                                    "linear-gradient(135deg, rgba(250, 204, 21, 0.12) 0%, rgba(15, 23, 42, 0.45) 100%)",
+                                  border: "1px solid rgba(var(--bs-primary-rgb), 0.35)",
+                                  background: "var(--hk-bg-primary)",
                                   boxShadow: "0 10px 24px rgba(0, 0, 0, 0.18)",
                                 }}
                               >
@@ -648,13 +653,13 @@ const Signup = () => {
                                       style={{
                                         width: 30,
                                         height: 30,
-                                        background: "rgba(250, 204, 21, 0.22)",
-                                        color: "#facc15",
+                                        background: "rgba(var(--bs-primary-rgb), 0.22)",
+                                        color: "var(--bs-primary)",
                                       }}
                                     >
                                       <FontAwesomeIcon icon={faGoogle} />
                                     </span>
-                                    <p className="mb-0 fw-semibold" style={{ color: "#f8fafc" }}>
+                                    <p className="mb-0 fw-semibold" style={{ color: "var(--foreground)" }}>
                                       Dati precompilati da Google
                                     </p>
                                   </div>
@@ -686,14 +691,14 @@ const Signup = () => {
                                         style={{
                                           fontSize: "0.65rem",
                                           letterSpacing: "0.05em",
-                                          color: "rgba(226, 232, 240, 0.72)",
+                                          color: "var(--muted-foreground)",
                                         }}
                                       >
                                         Nome
                                       </p>
                                       <p
                                         className="mb-0 fw-medium text-truncate"
-                                        style={{ color: "#f8fafc" }}
+                                        style={{ color: "var(--foreground)" }}
                                         title={normalizedName || "-"}
                                       >
                                         {normalizedName || "-"}
@@ -713,14 +718,14 @@ const Signup = () => {
                                         style={{
                                           fontSize: "0.65rem",
                                           letterSpacing: "0.05em",
-                                          color: "rgba(226, 232, 240, 0.72)",
+                                          color: "var(--muted-foreground)",
                                         }}
                                       >
                                         Email
                                       </p>
                                       <p
                                         className="mb-0 fw-medium text-truncate"
-                                        style={{ color: "#f8fafc" }}
+                                        style={{ color: "var(--foreground)" }}
                                         title={normalizedEmail || "-"}
                                       >
                                         {normalizedEmail || "-"}

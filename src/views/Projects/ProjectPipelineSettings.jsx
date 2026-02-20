@@ -4,6 +4,7 @@ import { Plus, Pencil, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
+import { useChecklistTemplates } from "../../modules/checklists/hooks/useChecklistsQueries";
 import { isApiError } from "../../modules/projects/api/projects.api";
 import {
   useCreateCategory,
@@ -21,6 +22,7 @@ import EmptyState from "../../modules/projects/ui/states/EmptyState";
 import ErrorState from "../../modules/projects/ui/states/ErrorState";
 import LoadingState from "../../modules/projects/ui/states/LoadingState";
 import "../../styles/css/project-pipeline-settings.css";
+import { readBrandingColor } from "../../lib/brandingColors";
 
 const PIPELINE_SETTINGS_PERMISSION = "projects.edit"; // TODO: replace with a dedicated pipeline-manage permission when available.
 
@@ -69,11 +71,13 @@ const isInUseError = (error) => isApiError(error) && (error.code === "IN_USE" ||
 const isLastStageError = (error) => isApiError(error) && (error.code === "LAST_STAGE_REQUIRED" || error.status === 400);
 
 const PipelineSettingsContent = () => {
+  const defaultStageColor = readBrandingColor("--bs-primary", "#0d6efd");
   const categoriesQuery = usePipelineCategories();
   const categories = useMemo(() => sortCategories(categoriesQuery.data || []), [categoriesQuery.data]);
 
   const { categoryId, setCategoryId } = useSelectedPipelineCategoryId(categories);
   const stagesQuery = usePipelineStages(categoryId);
+  const checklistTemplatesQuery = useChecklistTemplates();
 
   const createCategoryMutation = useCreateCategory();
   const updateCategoryMutation = useUpdateCategory();
@@ -91,7 +95,10 @@ const PipelineSettingsContent = () => {
   const [showCreateStageForm, setShowCreateStageForm] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const [newStageIsClosed, setNewStageIsClosed] = useState(false);
-  const [newStageColor, setNewStageColor] = useState("#0d6efd");
+  const [newStageColor, setNewStageColor] = useState(defaultStageColor);
+  const [newStageIsGated, setNewStageIsGated] = useState(false);
+  const [newStageGateTemplateId, setNewStageGateTemplateId] = useState("");
+  const [newStageAutoCreateInstance, setNewStageAutoCreateInstance] = useState(true);
 
   const [editingStage, setEditingStage] = useState(null);
   const [deletingStage, setDeletingStage] = useState(null);
@@ -100,6 +107,15 @@ const PipelineSettingsContent = () => {
   useEffect(() => {
     setLocalStages(sortStages(stagesQuery.data || []));
   }, [stagesQuery.data]);
+
+  const activeChecklistTemplates = useMemo(
+    () => (checklistTemplatesQuery.data || []).filter((template) => !template.isArchived),
+    [checklistTemplatesQuery.data],
+  );
+  const checklistTemplateNameById = useMemo(
+    () => new Map(activeChecklistTemplates.map((template) => [template.id, template.name])),
+    [activeChecklistTemplates],
+  );
 
   const selectedCategory = useMemo(() => categories.find((category) => category.id === categoryId) || null, [categories, categoryId]);
 
@@ -176,7 +192,10 @@ const PipelineSettingsContent = () => {
   const resetNewStageForm = () => {
     setNewStageName("");
     setNewStageIsClosed(false);
-    setNewStageColor("#0d6efd");
+    setNewStageColor(defaultStageColor);
+    setNewStageIsGated(false);
+    setNewStageGateTemplateId("");
+    setNewStageAutoCreateInstance(true);
   };
 
   const handleCreateStage = async (event) => {
@@ -192,12 +211,23 @@ const PipelineSettingsContent = () => {
       toast.error("Nome stage obbligatorio");
       return;
     }
+    if (newStageIsGated && !newStageGateTemplateId) {
+      toast.error("Seleziona un template checklist per il gate");
+      return;
+    }
+    if (newStageIsGated && activeChecklistTemplates.length === 0) {
+      toast.error("Nessun template checklist attivo disponibile");
+      return;
+    }
 
     try {
       await createStageMutation.mutate(categoryId, {
         name: normalizedName,
         isClosed: Boolean(newStageIsClosed),
         color: newStageColor || undefined,
+        isGated: Boolean(newStageIsGated),
+        gateChecklistTemplateId: newStageIsGated ? newStageGateTemplateId || null : null,
+        autoCreateInstance: Boolean(newStageAutoCreateInstance),
         sortOrder: localStages.length,
       });
       resetNewStageForm();
@@ -219,12 +249,19 @@ const PipelineSettingsContent = () => {
       toast.error("Nome stage obbligatorio");
       return;
     }
+    if (editingStage.isGated && !editingStage.gateChecklistTemplateId) {
+      toast.error("Seleziona un template checklist per il gate");
+      return;
+    }
 
     try {
       await updateStageMutation.mutate(editingStage.id, {
         name: normalizedName,
         isClosed: Boolean(editingStage.isClosed),
         color: editingStage.color || null,
+        isGated: Boolean(editingStage.isGated),
+        gateChecklistTemplateId: editingStage.isGated ? editingStage.gateChecklistTemplateId || null : null,
+        autoCreateInstance: Boolean(editingStage.autoCreateInstance),
       });
       setEditingStage(null);
       await stagesQuery.refetch();
@@ -487,7 +524,60 @@ const PipelineSettingsContent = () => {
                               />
                             </Form.Group>
                           </Col>
+                          <Col md={4}>
+                            <Form.Group className="h-100 d-flex align-items-end">
+                              <Form.Check
+                                type="switch"
+                                id="stage-is-gated"
+                                label="Checklist gate"
+                                checked={newStageIsGated}
+                                onChange={(event) => {
+                                  setNewStageIsGated(event.target.checked);
+                                  if (!event.target.checked) {
+                                    setNewStageGateTemplateId("");
+                                  }
+                                }}
+                                disabled={createStageMutation.loading}
+                              />
+                            </Form.Group>
+                          </Col>
+                          <Col md={4}>
+                            <Form.Group>
+                              <Form.Label>Template Gate</Form.Label>
+                              <Form.Select
+                                value={newStageGateTemplateId}
+                                onChange={(event) => setNewStageGateTemplateId(event.target.value)}
+                                disabled={!newStageIsGated || createStageMutation.loading}
+                              >
+                                <option value="">Seleziona template</option>
+                                {activeChecklistTemplates.map((template) => (
+                                  <option key={template.id} value={template.id}>
+                                    {template.name}
+                                  </option>
+                                ))}
+                              </Form.Select>
+                            </Form.Group>
+                          </Col>
+                          <Col md={4}>
+                            <Form.Group className="h-100 d-flex align-items-end">
+                              <Form.Check
+                                type="switch"
+                                id="stage-autocreate-checklist"
+                                label="Auto-create instance"
+                                checked={newStageAutoCreateInstance}
+                                onChange={(event) => setNewStageAutoCreateInstance(event.target.checked)}
+                                disabled={!newStageIsGated || createStageMutation.loading}
+                              />
+                            </Form.Group>
+                          </Col>
                         </Row>
+                        {newStageIsGated && (
+                          <Alert variant={activeChecklistTemplates.length > 0 ? "info" : "warning"} className="mt-3 mb-0 py-2">
+                            {activeChecklistTemplates.length > 0
+                              ? "Gate attivo: lo stage richiedera il completamento checklist prima del passaggio."
+                              : "Per usare il gate, crea prima almeno un template checklist attivo."}
+                          </Alert>
+                        )}
                         <div className="d-flex justify-content-end gap-2 mt-3">
                           <Button
                             type="button"
@@ -540,6 +630,12 @@ const PipelineSettingsContent = () => {
                           )}
                           <span className="fw-semibold">{stage.name}</span>
                           {stage.isClosed && <Badge bg="secondary">Chiuso</Badge>}
+                          {stage.isGated && <Badge bg="warning" text="dark">Gated</Badge>}
+                          {stage.isGated && stage.gateChecklistTemplateId && (
+                            <Badge bg="light" text="dark">
+                              Template: {checklistTemplateNameById.get(stage.gateChecklistTemplateId) || stage.gateChecklistTemplateId}
+                            </Badge>
+                          )}
                         </div>
 
                         <div className="d-flex align-items-center gap-1">
@@ -570,7 +666,10 @@ const PipelineSettingsContent = () => {
                                 id: stage.id,
                                 name: stage.name,
                                 isClosed: Boolean(stage.isClosed),
-                                color: stage.color || "#0d6efd",
+                                color: stage.color || defaultStageColor,
+                                isGated: Boolean(stage.isGated),
+                                gateChecklistTemplateId: stage.gateChecklistTemplateId || "",
+                                autoCreateInstance: stage.autoCreateInstance !== false,
                               })
                             }
                           >
@@ -653,7 +752,7 @@ const PipelineSettingsContent = () => {
             <Form.Label>Colore</Form.Label>
             <Form.Control
               type="color"
-              value={editingStage?.color || "#0d6efd"}
+              value={editingStage?.color || defaultStageColor}
               onChange={(event) =>
                 setEditingStage((current) => ({
                   ...(current || {}),
@@ -671,6 +770,54 @@ const PipelineSettingsContent = () => {
               setEditingStage((current) => ({
                 ...(current || {}),
                 isClosed: event.target.checked,
+              }))
+            }
+          />
+          <Form.Check
+            type="switch"
+            id="edit-stage-is-gated"
+            label="Checklist gate"
+            className="mt-3"
+            checked={Boolean(editingStage?.isGated)}
+            onChange={(event) =>
+              setEditingStage((current) => ({
+                ...(current || {}),
+                isGated: event.target.checked,
+                ...(event.target.checked ? {} : { gateChecklistTemplateId: "" }),
+              }))
+            }
+          />
+          <Form.Group className="mt-3">
+            <Form.Label>Template gate</Form.Label>
+            <Form.Select
+              value={editingStage?.gateChecklistTemplateId || ""}
+              disabled={!editingStage?.isGated}
+              onChange={(event) =>
+                setEditingStage((current) => ({
+                  ...(current || {}),
+                  gateChecklistTemplateId: event.target.value,
+                }))
+              }
+            >
+              <option value="">Seleziona template</option>
+              {activeChecklistTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Form.Select>
+          </Form.Group>
+          <Form.Check
+            type="switch"
+            id="edit-stage-auto-create"
+            className="mt-3"
+            label="Auto-create checklist instance"
+            checked={Boolean(editingStage?.autoCreateInstance)}
+            disabled={!editingStage?.isGated}
+            onChange={(event) =>
+              setEditingStage((current) => ({
+                ...(current || {}),
+                autoCreateInstance: event.target.checked,
               }))
             }
           />

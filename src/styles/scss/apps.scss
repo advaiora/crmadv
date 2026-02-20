@@ -8611,6 +8611,8 @@ header.contact-header {
 					.template-invoice-wrap,
 					.create-invoice-wrap {
 						border: 1px solid var(--hk-border-primary); // <-- THEMED
+						background: var(--hk-bg-primary);
+						border-radius: 0.75rem;
 
 						.invoice-table {
 							thead {
@@ -8659,6 +8661,69 @@ header.contact-header {
 							}
 						}
 					}
+
+					.invoice-templates-panel {
+						border: 1px solid var(--hk-border-primary);
+						border-radius: 1rem;
+						background: var(--hk-bg-primary);
+						padding: 1.25rem;
+						box-shadow: 0 12px 24px rgba(var(--hk-shadow-rgb), 0.06);
+
+						.invoice-templates-subtitle {
+							color: var(--hk-text-secondary);
+						}
+					}
+
+					.invoice-template-filters {
+						padding: 0.875rem;
+						border: 1px solid var(--hk-border-primary);
+						border-radius: 0.75rem;
+						background: var(--hk-bg-secondary);
+						margin-bottom: 1.5rem;
+					}
+
+					.invoice-template-card-link {
+						text-decoration: none;
+						color: var(--hk-text-primary);
+
+						.invoice-template-name {
+							color: var(--hk-text-primary);
+							@include transition(color 0.2s ease);
+						}
+					}
+
+					.invoice-template-card {
+						position: relative;
+						border-radius: 0.85rem;
+						overflow: hidden;
+						border-color: var(--hk-border-primary) !important;
+						background: var(--hk-bg-primary);
+						box-shadow: 0 8px 18px rgba(var(--hk-shadow-rgb), 0.08);
+						@include transition(transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease);
+
+						.invoice-template-thumb {
+							aspect-ratio: 3 / 4;
+							object-fit: cover;
+							background: var(--hk-bg-secondary);
+						}
+					}
+
+					.invoice-template-card-link:hover,
+					.invoice-template-card-link:focus {
+						.invoice-template-card {
+							border-color: var(--bs-primary) !important;
+							box-shadow: 0 12px 24px rgba(var(--hk-shadow-rgb), 0.14);
+							@include transform(translateY(-4px));
+						}
+
+						.invoice-template-name {
+							color: var(--bs-primary);
+						}
+					}
+
+					.invoice-value-text {
+						color: var(--hk-text-primary) !important;
+					}
 				}
 			}
 
@@ -8703,6 +8768,55 @@ header.contact-header {
 
 		.invoiceapp-content {
 			padding-left: 0;
+		}
+	}
+}
+
+[data-bs-theme="dark"] {
+	.invoiceapp-wrap {
+		.invoiceapp-content .invoiceapp-detail-wrap .invoice-body .nicescroll-bar {
+			.invoice-templates-panel {
+				background: var(--hk-bg-secondary);
+			}
+
+			.invoice-template-filters {
+				background: var(--hk-bg-tertiary);
+			}
+
+			.invoice-template-filters .form-control,
+			.invoice-template-filters .form-select {
+				background-color: var(--hk-bg-primary);
+				border-color: var(--hk-border-primary);
+				color: var(--hk-text-primary);
+			}
+
+			.invoice-template-card {
+				background: var(--hk-bg-secondary);
+			}
+
+			.invoice-template-thumb {
+				filter: brightness(0.82) contrast(1.04) saturate(0.9);
+			}
+
+			.template-invoice-wrap,
+			.create-invoice-wrap {
+				background: var(--hk-bg-secondary);
+			}
+
+			.bg-grey-light-5 {
+				background-color: var(--hk-bg-tertiary) !important;
+			}
+
+			.bg-primary-light-5 {
+				background-color: rgba(var(--bs-primary-rgb), 0.18) !important;
+				color: var(--hk-text-primary) !important;
+			}
+
+			.bg-primary-light-5 .form-control,
+			.bg-primary-light-5 .form-select {
+				background: transparent !important;
+				color: var(--hk-text-primary) !important;
+			}
 		}
 	}
 }

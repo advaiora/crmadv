@@ -71,12 +71,15 @@ const Login = ({ history }) => {
 
   const { apiBaseUrl, googleClientId, googleRedirectUri, googleDebugRawResponse } = getClientRuntimeConfig();
   const isBusy = loading || googleLoading;
-  const resolvePostAuthPath = (onboardingRequired) => (onboardingRequired ? "/dashboard?onboarding=1" : "/dashboard");
+  const resolvePostAuthPath = (onboardingRequired) => (
+    onboardingRequired ? "/pages/workspace-branding?onboarding=1" : "/dashboard"
+  );
 
-  const leftPanelBackground = "var(--hk-menu-bg, #2563eb)";
-  const leftPanelTextColor = "#ffffff";
+  const leftPanelBackground = "var(--secondary, #0f172a)";
+  const leftPanelTextColor = "var(--secondary-foreground, #ffffff)";
+  const leftPanelMutedTextColor = "var(--hk-menu-header-text, rgba(255,255,255,0.82))";
   const rightPanelBackground = "var(--primary, #facc15)";
-  const rightPanelTextColor = "#ffffff";
+  const rightPanelTextColor = "var(--primary-foreground, #111111)";
 
   const clearFieldError = (fieldName) => {
     if (!fieldErrors[fieldName]) {
@@ -125,6 +128,7 @@ const Login = ({ history }) => {
       const user = result?.user;
       const workspace = result?.workspace;
       const token = result?.token;
+      const branding = result?.branding;
       const onboardingRequired = result?.onboardingRequired === true;
 
       if (!token || !user?.id || !user?.email || !user?.role) {
@@ -139,6 +143,7 @@ const Login = ({ history }) => {
         userRole: user.role,
         workspaceId: workspace?.id,
         workspaceSlug: workspace?.slug,
+        workspaceBranding: branding,
       });
 
       history.push(resolvePostAuthPath(onboardingRequired));
@@ -195,7 +200,7 @@ const Login = ({ history }) => {
         mode: "login",
         idToken: requestedIdToken,
       });
-      const { token, user, workspace, onboardingRequired } = result;
+      const { token, user, workspace, branding, onboardingRequired } = result;
 
       login({
         accessToken: token,
@@ -204,6 +209,7 @@ const Login = ({ history }) => {
         userRole: user.role,
         workspaceId: workspace?.id,
         workspaceSlug: workspace?.slug,
+        workspaceBranding: branding,
       });
 
       history.push(resolvePostAuthPath(onboardingRequired));
@@ -251,7 +257,7 @@ const Login = ({ history }) => {
                   <Card.Body className="p-4 p-md-5">
                     <div className="text-center mb-4">
                       <h4 className="mt-1 mb-1">Accedi</h4>
-                      <p className="mb-0" style={{ color: "rgba(255,255,255,0.82)" }}>
+                      <p className="mb-0" style={{ color: leftPanelMutedTextColor }}>
                         Inserisci email e password
                       </p>
                     </div>
@@ -342,8 +348,8 @@ const Login = ({ history }) => {
                       </Button>
                       {/* Sotto al bottone Accedi */}
                       <div className="text-center mt-3">
-                        <span style={{ color: "rgba(255,255,255,0.82)" }}>Non hai un account?</span>{" "}
-                        <Link to="/auth/signup" className="text-white text-decoration-underline">
+                        <span style={{ color: leftPanelMutedTextColor }}>Non hai un account?</span>{" "}
+                        <Link to="/auth/signup" className="text-decoration-underline" style={{ color: leftPanelTextColor }}>
                           Registrati
                         </Link>
                       </div>
@@ -358,8 +364,8 @@ const Login = ({ history }) => {
               className="d-none d-lg-flex align-items-center justify-content-center"
               style={{
                 color: rightPanelTextColor,
-                background: `linear-gradient(90deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0) 14px), ${rightPanelBackground}`,
-                boxShadow: "inset 1px 0 0 rgba(255,255,255,0.22)",
+                background: rightPanelBackground,
+                boxShadow: "none",
               }}
             >
               <div className="text-center px-4 w-100">
