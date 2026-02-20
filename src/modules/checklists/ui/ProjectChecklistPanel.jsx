@@ -3,12 +3,10 @@ import {
   AlertTriangle,
   Ban,
   CheckCircle2,
-  CheckSquare2,
   CircleDashed,
   Loader2,
   PlayCircle,
   PlusCircle,
-  Square,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Badge } from '../../../components/ui/badge';
@@ -163,7 +161,9 @@ const ChecklistInstanceCard = ({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <ItemStateIcon state={normalizedState} />
-                  <p className="mb-0 text-sm font-medium text-slate-900">{item.title}</p>
+                  <p className={`mb-0 text-sm font-medium text-slate-900 ${isDone ? 'line-through opacity-70' : ''}`}>
+                    {item.title}
+                  </p>
                   {item.isRequired ? <Badge variant="warning">Obbligatorio</Badge> : <Badge variant="outline">Facoltativo</Badge>}
                   <Badge variant={normalizedState === 'completed' ? 'success' : normalizedState === 'not_applicable' ? 'secondary' : 'outline'}>
                     {stateLabel}
@@ -195,19 +195,20 @@ const ChecklistInstanceCard = ({
               <div className="w-full md:w-[240px]">
                 {canCompleteItem ? (
                   <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition ${
-                        isDone
-                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700'
-                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                      onClick={() => onToggleItemDone(item, !isDone)}
-                      disabled={updatingItemId === item.id}
-                    >
-                      {isDone ? <CheckSquare2 className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                      {isDone ? 'Completato' : 'Segna completato'}
-                    </button>
+                    <div className="flex items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2">
+                      <label className="inline-flex items-center gap-2 text-sm checklists-checkbox-label">
+                        <input
+                          type="checkbox"
+                          className="checklists-checkbox"
+                          checked={isDone}
+                          onChange={(event) => onToggleItemDone(item, event.target.checked)}
+                          disabled={updatingItemId === item.id}
+                          aria-label={`Segna lo step "${item.title}" come completato`}
+                        />
+                        <span className="font-medium">{isDone ? 'Fatto' : 'Da fare'}</span>
+                      </label>
+                      {updatingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
+                    </div>
 
                     <div className="flex items-center gap-2">
                       <Button

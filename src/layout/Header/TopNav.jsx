@@ -1,23 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import SimpleBar from 'simplebar-react';
-import { AlignLeft, Bell, CheckSquare, CreditCard, Inbox, Search, Settings, Tag } from 'react-feather';
-import { Button, Container, Dropdown, Form, InputGroup, Nav, Navbar } from 'react-bootstrap';
-import { toggleCollapsedNav } from '../../redux/action/Theme';
+import { AlignLeft, Bell, LogOut, Settings } from 'react-feather';
+import { Button, Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { connect } from 'react-redux';
 import { Link, useHistory } from 'react-router-dom';
-import classNames from 'classnames';
-import { motion } from 'framer-motion';
 import HkBadge from '../../components/@hk-badge/@hk-badge';
+import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
 import { fetchWorkspaceAccess } from '../../utils/workspaceAccess';
 import { apiPost } from '../../utils/apiClient';
 import { useSession } from '../../hooks/useSession';
 import { resetGoogleIdentitySession } from '../../utils/googleIdentity';
-
-// Images
-import avatar3 from '../../assets/img/avatar3.jpg';
-import avatar4 from '../../assets/img/avatar4.jpg';
-import avatar12 from '../../assets/img/avatar12.jpg';
 
 const ACTION_LABELS = {
     'me.view': 'Profilo e permessi visualizzati',
@@ -88,32 +81,10 @@ const buildInitials = (value) => {
 
 const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const history = useHistory();
-    const { logout } = useSession();
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [searchValue, setSearchValue] = useState('');
+    const { logout, session } = useSession();
     const [navbarData, setNavbarData] = useState(null);
     const [loadingNavbarData, setLoadingNavbarData] = useState(false);
     const [navbarDataError, setNavbarDataError] = useState('');
-
-    const closeSearchInput = () => {
-        setSearchValue('');
-        setShowDropdown(false);
-    };
-
-    const pageVariants = {
-        initial: {
-            opacity: 0,
-            y: 10,
-        },
-        open: {
-            opacity: 1,
-            y: 0,
-        },
-        close: {
-            opacity: 0,
-            y: 10,
-        },
-    };
 
     const loadNavbarData = useCallback(async () => {
         setLoadingNavbarData(true);
@@ -154,166 +125,58 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const user = navbarData?.user;
     const workspace = navbarData?.workspace;
     const branding = navbarData?.branding;
+    const canManageBranding = permissions.includes('branding.manage');
 
     const notificationCount = recentActivity.length;
-    const userDisplayName = user?.name || user?.email || 'Utente';
-    const userEmail = user?.email || '-';
-    const workspaceName = branding?.companyName || workspace?.name || 'Workspace';
+    const userDisplayName = user?.name || user?.email || session?.userEmail || 'Utente';
+    const userEmail = user?.email || session?.userEmail || '-';
+    const workspaceName = branding?.companyName || session?.workspaceBranding?.companyName || workspace?.name || 'Workspace';
     const userInitials = useMemo(() => buildInitials(userDisplayName), [userDisplayName]);
 
     return (
-        <Navbar expand="xl" className="hk-navbar navbar-light fixed-top">
+        <Navbar expand="xl" className="hk-navbar navbar-light fixed-top app-topnav">
             <Container fluid>
-                {/* Start Nav */}
                 <div className="nav-start-wrap">
                     <Button
                         variant="flush-dark"
                         onClick={() => toggleCollapsedNav(!navCollapsed)}
-                        className="btn-icon btn-rounded flush-soft-hover navbar-toggle d-xl-none"
+                        className="btn-icon btn-rounded flush-soft-hover navbar-toggle d-xl-none topnav-action-btn"
                     >
                         <span className="icon">
                             <span className="feather-icon"><AlignLeft /></span>
                         </span>
                     </Button>
-                    {/* Search */}
-                    <Dropdown as={Form} className="navbar-search" show={showDropdown} autoClose="outside">
-                        <Dropdown.Toggle as="div" className="no-caret bg-transparent">
-                            <Button
-                                variant="flush-dark"
-                                className="btn-icon btn-rounded flush-soft-hover d-xl-none"
-                                onClick={() => setShowDropdown(!showDropdown)}
-                            >
-                                <span className="icon">
-                                    <span className="feather-icon"><Search /></span>
-                                </span>
-                            </Button>
-                            <InputGroup className="d-xl-flex d-none">
-                                <span className="input-affix-wrapper input-search affix-border">
-                                    <Form.Control
-                                        type="text"
-                                        className="bg-transparent"
-                                        data-navbar-search-close="false"
-                                        placeholder="Search..."
-                                        aria-label="Search"
-                                        onFocus={() => setShowDropdown(true)}
-                                        onBlur={() => setShowDropdown(false)}
-                                        value={searchValue}
-                                        onChange={(e) => setSearchValue(e.target.value)}
-                                    />
-                                    <span className="input-suffix" onClick={() => setSearchValue('')}>
-                                        <span>/</span>
-                                        <span className="btn-input-clear">
-                                            <i className="bi bi-x-circle-fill" />
-                                        </span>
-                                        <span className="spinner-border spinner-border-sm input-loader text-primary" role="status">
-                                            <span className="sr-only">Loading...</span>
-                                        </span>
-                                    </span>
-                                </span>
-                            </InputGroup>
-                        </Dropdown.Toggle>
-                        <Dropdown.Menu
-                            as={motion.div}
-                            initial="initial"
-                            animate={showDropdown ? 'open' : 'close'}
-                            variants={pageVariants}
-                            transition={{ duration: 0.3 }}
-                            className={classNames('p-0')}
-                        >
-                            {/* Mobile Search */}
-                            <Dropdown.Item className="d-xl-none bg-transparent">
-                                <InputGroup className="mobile-search">
-                                    <span className="input-affix-wrapper input-search">
-                                        <Form.Control
-                                            type="text"
-                                            placeholder="Search..."
-                                            aria-label="Search"
-                                            value={searchValue}
-                                            onChange={(e) => setSearchValue(e.target.value)}
-                                            onFocus={() => setShowDropdown(true)}
-                                            autoFocus
-                                        />
-                                        <span className="input-suffix" onClick={closeSearchInput}>
-                                            <span className="btn-input-clear">
-                                                <i className="bi bi-x-circle-fill" />
-                                            </span>
-                                            <span className="spinner-border spinner-border-sm input-loader text-primary" role="status">
-                                                <span className="sr-only">Loading...</span>
-                                            </span>
-                                        </span>
-                                    </span>
-                                </InputGroup>
-                            </Dropdown.Item>
-                            {/* /Mobile Search */}
-                            <SimpleBar className="dropdown-body p-2">
-                                <Dropdown.Header>Recent Search</Dropdown.Header>
-                                <Dropdown.Item className="bg-transparent">
-                                    <HkBadge bg="secondary" soft pill className="me-1">React</HkBadge>
-                                    <HkBadge bg="secondary" soft pill className="me-1">Node JS</HkBadge>
-                                    <HkBadge bg="secondary" soft pill>SCSS</HkBadge>
-                                </Dropdown.Item>
-                                <Dropdown.Divider as="div" />
-                                <Dropdown.Header>Users</Dropdown.Header>
-                                <Dropdown.Item as={Link} to="#">
-                                    <div className="media align-items-center">
-                                        <div className="media-head me-2">
-                                            <div className="avatar avatar-xs avatar-rounded">
-                                                <img src={avatar3} alt="user" className="avatar-img" />
-                                            </div>
-                                        </div>
-                                        <div className="media-body">Sarah Jone</div>
-                                    </div>
-                                </Dropdown.Item>
-                                <Dropdown.Item as={Link} to="#">
-                                    <div className="media align-items-center">
-                                        <div className="media-head me-2">
-                                            <div className="avatar avatar-xs avatar-soft-primary avatar-rounded">
-                                                <span className="initial-wrap">J</span>
-                                            </div>
-                                        </div>
-                                        <div className="media-body">Joe Jackson</div>
-                                    </div>
-                                </Dropdown.Item>
-                                <Dropdown.Item as={Link} to="#">
-                                    <div className="media align-items-center">
-                                        <div className="media-head me-2">
-                                            <div className="avatar avatar-xs avatar-rounded">
-                                                <img src={avatar4} alt="user" className="avatar-img" />
-                                            </div>
-                                        </div>
-                                        <div className="media-body">Maria Richard</div>
-                                    </div>
-                                </Dropdown.Item>
-                            </SimpleBar>
-                            <div className="dropdown-footer d-xl-flex d-none">
-                                <Link to="#">
-                                    <u>Search all</u>
-                                </Link>
-                            </div>
-                        </Dropdown.Menu>
-                    </Dropdown>
+
+                    <div className="app-topnav-workspace d-none d-sm-flex">
+                        <span className="app-topnav-workspace-label">Workspace</span>
+                        <span className="app-topnav-workspace-name" title={workspaceName}>
+                            {workspaceName}
+                        </span>
+                    </div>
                 </div>
-                {/* /Start Nav */}
-                {/* End Nav */}
+
                 <div className="nav-end-wrap">
                     <Nav className="navbar-nav flex-row">
                         <Nav.Item className="ms-2">
                             <ThemeSwitcher />
                         </Nav.Item>
-                        <Nav.Item>
-                            <Button variant="flush-dark" as={Link} to="/apps/email" className="btn-icon btn-rounded flush-soft-hover">
-                                <span className="icon">
-                                    <span className="position-relative">
-                                        <span className="feather-icon"><Inbox /></span>
-                                        {notificationCount > 0 && (
-                                            <HkBadge bg="primary" soft pill size="sm" className="position-top-end-overflow-1">
-                                                {notificationCount}
-                                            </HkBadge>
-                                        )}
+
+                        {canManageBranding && (
+                            <Nav.Item>
+                                <Button
+                                    as={Link}
+                                    to="/pages/workspace-branding"
+                                    variant="flush-dark"
+                                    className="btn-icon btn-rounded flush-soft-hover topnav-action-btn"
+                                    title="Branding workspace"
+                                >
+                                    <span className="icon">
+                                        <span className="feather-icon"><Settings /></span>
                                     </span>
-                                </span>
-                            </Button>
-                        </Nav.Item>
+                                </Button>
+                            </Nav.Item>
+                        )}
+
                         <Nav.Item>
                             <Dropdown
                                 className="dropdown-notifications"
@@ -323,7 +186,10 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                     }
                                 }}
                             >
-                                <Dropdown.Toggle variant="flush-dark" className="btn-icon btn-rounded flush-soft-hover no-caret">
+                                <Dropdown.Toggle
+                                    variant="flush-dark"
+                                    className="btn-icon btn-rounded flush-soft-hover no-caret topnav-action-btn"
+                                >
                                     <span className="icon">
                                         <span className="position-relative">
                                             <span className="feather-icon"><Bell /></span>
@@ -335,8 +201,12 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                 </Dropdown.Toggle>
                                 <Dropdown.Menu align="end" className="p-0">
                                     <Dropdown.Header className="px-4 fs-6">
-                                        Notifications
-                                        <Button variant="flush-dark" className="btn-icon btn-rounded flush-soft-hover">
+                                        Notifiche
+                                        <Button
+                                            variant="flush-dark"
+                                            className="btn-icon btn-rounded flush-soft-hover topnav-action-btn"
+                                            onClick={() => void loadNavbarData()}
+                                        >
                                             <span className="icon">
                                                 <span className="feather-icon"><Settings /></span>
                                             </span>
@@ -385,85 +255,57 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                         })}
                                     </SimpleBar>
                                     <div className="dropdown-footer">
-                                        <Link to="/apps/email">
-                                            <u>Vai alla inbox</u>
+                                        <Link to="/pages/profile">
+                                            <u>Apri profilo</u>
                                         </Link>
                                     </div>
                                 </Dropdown.Menu>
                             </Dropdown>
                         </Nav.Item>
+
                         <Nav.Item>
                             <Dropdown className="ps-2">
-                                <Dropdown.Toggle as={Link} to="#" className="no-caret">
-                                    <div className="avatar avatar-rounded avatar-xs">
-                                        <img src={avatar12} alt="user" className="avatar-img" />
-                                    </div>
+                                <Dropdown.Toggle
+                                    variant="flush-dark"
+                                    className="no-caret btn-icon btn-rounded flush-soft-hover app-topnav-avatar-trigger"
+                                >
+                                    <span className="app-topnav-avatar">{userInitials}</span>
                                 </Dropdown.Toggle>
-                                <Dropdown.Menu align="end">
-                                    <div className="p-2">
-                                        <div className="media">
-                                            <div className="media-head me-2">
-                                                <div className="avatar avatar-primary avatar-sm avatar-rounded">
-                                                    <span className="initial-wrap">{userInitials}</span>
-                                                </div>
+                                <Dropdown.Menu align="end" className="app-topnav-user-menu">
+                                    <div className="p-3">
+                                        <div className="d-flex align-items-start gap-2">
+                                            <span className="app-topnav-avatar app-topnav-avatar-lg">{userInitials}</span>
+                                            <div>
+                                                <span className="d-block fw-medium app-topnav-user-name">{userDisplayName}</span>
+                                                <div className="fs-7 app-topnav-user-email">{userEmail}</div>
+                                                <div className="fs-8 app-topnav-user-workspace">{workspaceName}</div>
                                             </div>
-                                            <div className="media-body">
-                                                <span className="d-block fw-medium text-dark">{userDisplayName}</span>
-                                                <div className="fs-7">{userEmail}</div>
-                                                <div className="fs-8 text-muted">{workspaceName}</div>
-                                                <Link to="#" onClick={handleSignOut} className="d-block fs-8 link-secondary mt-1">
-                                                    <u>Sign Out</u>
-                                                </Link>
-                                            </div>
+                                        </div>
+                                        <div className="app-topnav-user-meta mt-2">
+                                            <span>Ruoli: {roles.length}</span>
+                                            <span>Permessi: {permissions.length}</span>
                                         </div>
                                     </div>
                                     <Dropdown.Divider as="div" />
-                                    <Dropdown.Item as={Link} to="/pages/profile">Profile</Dropdown.Item>
+                                    <Dropdown.Item as={Link} to="/pages/profile">Profilo</Dropdown.Item>
                                     <Dropdown.Item as={Link} to="/pages/account">Account</Dropdown.Item>
-                                    <Dropdown.Item>
-                                        <span className="me-2">Ruoli</span>
-                                        <span className="badge badge-sm badge-soft-success">{roles.length}</span>
-                                    </Dropdown.Item>
-                                    <Dropdown.Item>
-                                        <span className="me-2">Permessi</span>
-                                        <span className="badge badge-sm badge-soft-pink">{permissions.length}</span>
-                                    </Dropdown.Item>
+                                    {canManageBranding && (
+                                        <Dropdown.Item as={Link} to="/pages/workspace-branding">
+                                            Branding Workspace
+                                        </Dropdown.Item>
+                                    )}
                                     <Dropdown.Divider as="div" />
-                                    <h6 className="dropdown-header">Manage Account</h6>
-                                    <Dropdown.Item>
+                                    <Dropdown.Item onClick={handleSignOut}>
                                         <span className="dropdown-icon feather-icon">
-                                            <CreditCard />
+                                            <LogOut />
                                         </span>
-                                        <span>Payment methods</span>
+                                        <span>Esci</span>
                                     </Dropdown.Item>
-                                    <Dropdown.Item>
-                                        <span className="dropdown-icon feather-icon">
-                                            <CheckSquare />
-                                        </span>
-                                        <span>Subscriptions</span>
-                                    </Dropdown.Item>
-                                    <Dropdown.Item>
-                                        <span className="dropdown-icon feather-icon">
-                                            <Settings />
-                                        </span>
-                                        <span>Settings</span>
-                                    </Dropdown.Item>
-                                    <Dropdown.Divider as="div" />
-                                    <Dropdown.Item>
-                                        <span className="dropdown-icon feather-icon">
-                                            <Tag />
-                                        </span>
-                                        <span>Raise a ticket</span>
-                                    </Dropdown.Item>
-                                    <Dropdown.Divider as="div" />
-                                    <Dropdown.Item>Terms &amp; Conditions</Dropdown.Item>
-                                    <Dropdown.Item>Help &amp; Support</Dropdown.Item>
                                 </Dropdown.Menu>
                             </Dropdown>
                         </Nav.Item>
                     </Nav>
                 </div>
-                {/* /End Nav */}
             </Container>
         </Navbar>
     );

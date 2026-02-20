@@ -1,115 +1,177 @@
-import React, { useEffect } from 'react';
-import { Col, Container, Form, InputGroup, Nav, Row, Tab } from 'react-bootstrap';
-import DateRangePicker from 'react-bootstrap-daterangepicker';
-import moment from 'moment';
-import { Calendar } from 'react-feather';
-import ActiveUserCard from './ActiveUserCard';
-import AudienceReviewCard from './AudienceReviewCard';
-import CustomerTable from './CustomerTable';
-import ReturningCustomersCard from './ReturningCustomersCard';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Card, Col, Container, Row } from 'react-bootstrap';
 import { connect } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
+import { fetchWorkspaceAccess, hasPermission } from '../../utils/workspaceAccess';
+import '../../styles/css/dashboard-ui.css';
 
-const Dashboard = ({ navCollapsed, toggleCollapsedNav }) => {
+const Dashboard = ({ toggleCollapsedNav }) => {
+    const [access, setAccess] = useState(null);
+    const [loadingAccess, setLoadingAccess] = useState(false);
+    const [accessError, setAccessError] = useState('');
+
+    const loadDashboardAccess = useCallback(async () => {
+        setLoadingAccess(true);
+        setAccessError('');
+
+        try {
+            const result = await fetchWorkspaceAccess();
+            setAccess(result);
+        } catch (error) {
+            setAccess(null);
+            setAccessError(error?.message || 'Impossibile caricare i dati dashboard.');
+        } finally {
+            setLoadingAccess(false);
+        }
+    }, []);
 
     useEffect(() => {
         toggleCollapsedNav(false);
+        void loadDashboardAccess();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-    return (
-        <>
-            <Container>
-                <Tab.Container activeKey="overview">
-                    {/* Page Header */}
-                    <div className="hk-pg-header pg-header-wth-tab pt-7">
-                        <div className="d-flex">
-                            <div className="d-flex flex-wrap justify-content-between flex-1">
-                                <div className="mb-lg-0 mb-2 me-8">
-                                    <h1 className="pg-title">Welcome back</h1>
-                                    <p>Create pages using a variety of features that leverage jampack components</p>
-                                </div>
-                                <div className="pg-header-action-wrap">
-                                    <InputGroup className="w-300p">
-                                        <span className="input-affix-wrapper">
-                                            <span className="input-prefix">
-                                                <span className="feather-icon">
-                                                    <Calendar />
-                                                </span>
-                                            </span>
-                                            <DateRangePicker
-                                                initialSettings={{
-                                                    timePicker: true,
-                                                    startDate: moment().startOf('hour').toDate(),
-                                                    endDate: moment().startOf('hour').add(32, 'hour').toDate(),
-                                                    locale: {
-                                                        format: 'M/DD hh:mm A',
-                                                    },
-                                                }}
-                                            >
-                                                <Form.Control type="text" name="datetimes" />
-                                            </DateRangePicker>
-                                        </span>
-                                    </InputGroup>
-                                </div>
-                            </div>
-                        </div>
-                        <Nav variant="tabs" className="nav-light nav-line">
-                            <Nav.Item>
-                                <Nav.Link eventKey="overview" >
-                                    <span className="nav-link-text">Overview</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                            <Nav.Item>
-                                <Nav.Link eventKey="demo_nav_1">
-                                    <span className="nav-link-text">Analytics</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                            <Nav.Item>
-                                <Nav.Link eventKey="demo_nav_2">
-                                    <span className="nav-link-text">Operations</span>
-                                </Nav.Link>
-                            </Nav.Item>
-                        </Nav>
-                    </div>
-                    {/* /Page Header */}
-                    {/* Page Body */}
-                    <div className="hk-pg-body">
-                        <Tab.Content>
-                            <Tab.Pane eventKey="overview" >
-                                <Row>
-                                    <Col xxl={9} lg={8} md={7} className="mb-md-4 mb-3">
-                                        <AudienceReviewCard />
-                                    </Col>
-                                    <Col xxl={3} lg={4} md={5} className="mb-md-4 mb-3">
-                                        <ReturningCustomersCard />
-                                    </Col>
-                                </Row>
-                                <Row>
-                                    <Col md={12} className="mb-md-4 mb-3">
-                                        <ActiveUserCard />
-                                    </Col>
-                                </Row>
-                                <Row>
-                                    <Col md={12} className="mb-md-4 mb-3">
-                                        <CustomerTable />
-                                    </Col>
-                                </Row>
-                            </Tab.Pane>
-                            <Tab.Pane eventKey="demo_nav_1" />
-                            <Tab.Pane eventKey="demo_nav_2" />
-                        </Tab.Content>
-                    </div>
-                    {/* /Page Body */}
-                </Tab.Container>
-            </Container>
-        </>
-    )
-}
+    }, []);
 
-// export default Dashboard
-const mapStateToProps = ({ theme }) => {
-    const { navCollapsed } = theme;
-    return { navCollapsed }
+    const workspaceName = access?.branding?.companyName || access?.workspace?.name || 'Workspace';
+    const recentActivity = access?.recentActivity || [];
+    const permissions = access?.permissions || [];
+    const enabledModules = access?.enabledModules || [];
+    const roles = access?.roles || [];
+
+    const canViewClients = hasPermission(access, 'clients.view');
+    const canViewProjects = hasPermission(access, 'projects.view');
+    const canViewChecklists = hasPermission(access, 'checklists.view');
+    const canManageBranding = hasPermission(access, 'branding.manage');
+
+    const kpiItems = useMemo(() => ([
+        {
+            label: 'Moduli attivi',
+            value: enabledModules.length,
+            helper: 'Feature abilitate nel workspace',
+        },
+        {
+            label: 'Permessi utente',
+            value: permissions.length,
+            helper: 'Permessi attivi nel tuo ruolo',
+        },
+        {
+            label: 'Ruoli assegnati',
+            value: roles.length,
+            helper: 'Ruoli attivi per il tuo account',
+        },
+        {
+            label: 'Attivita recenti',
+            value: recentActivity.length,
+            helper: 'Eventi tracciati di recente',
+        },
+    ]), [enabledModules.length, permissions.length, recentActivity.length, roles.length]);
+
+    const formatActivityTime = (isoDate) => {
+        if (!isoDate) {
+            return '';
+        }
+
+        const parsedDate = new Date(isoDate);
+        if (Number.isNaN(parsedDate.getTime())) {
+            return '';
+        }
+
+        return parsedDate.toLocaleString('it-IT', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    const getActivityActor = (item) => item?.actor?.name || item?.actor?.email || 'Sistema';
+
+    return (
+        <Container fluid className="dashboard-shell py-4">
+            <div className="dashboard-hero mb-4">
+                <div className="dashboard-hero-content">
+                    <h1 className="dashboard-title mb-1">Dashboard Operativa</h1>
+                    <p className="dashboard-subtitle mb-0">
+                        Panoramica del workspace <strong>{workspaceName}</strong> con metriche e attivita principali.
+                    </p>
+                </div>
+                <div className="dashboard-hero-actions">
+                    {canViewProjects && (
+                        <Button as={Link} to="/projects" variant="primary" size="sm">
+                            Vai ai progetti
+                        </Button>
+                    )}
+                    {canViewClients && (
+                        <Button as={Link} to="/apps/clients" variant="outline-primary" size="sm">
+                            Lista clienti
+                        </Button>
+                    )}
+                    {canViewChecklists && (
+                        <Button as={Link} to="/checklists/templates" variant="outline-primary" size="sm">
+                            Memo operativi
+                        </Button>
+                    )}
+                    {canManageBranding && (
+                        <Button as={Link} to="/pages/workspace-branding" variant="outline-primary" size="sm">
+                            Branding workspace
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {accessError && (
+                <Alert variant="danger" className="mb-4">
+                    {accessError}
+                </Alert>
+            )}
+
+            <Row className="g-3 mb-4">
+                {kpiItems.map((item) => (
+                    <Col key={item.label} xxl={3} md={6}>
+                        <Card className="card-border h-100 dashboard-kpi-card">
+                            <Card.Body>
+                                <div className="dashboard-kpi-label">{item.label}</div>
+                                <div className="dashboard-kpi-value">{loadingAccess ? '...' : item.value}</div>
+                                <div className="dashboard-kpi-helper">{item.helper}</div>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                ))}
+            </Row>
+
+            <Row className="g-3 mb-3">
+                <Col md={12}>
+                    <Card className="card-border h-100">
+                        <Card.Header className="card-header-action">
+                            <h6>Attivita recenti</h6>
+                        </Card.Header>
+                        <Card.Body className="dashboard-activity-body">
+                            {loadingAccess && <div className="text-muted fs-7">Caricamento attivita...</div>}
+                            {!loadingAccess && recentActivity.length === 0 && (
+                                <div className="text-muted fs-7">Nessuna attivita recente disponibile.</div>
+                            )}
+                            {!loadingAccess && recentActivity.length > 0 && (
+                                <ul className="dashboard-activity-list mb-0">
+                                    {recentActivity.slice(0, 6).map((item) => (
+                                        <li key={item.id} className="dashboard-activity-item">
+                                            <div className="dashboard-activity-title">
+                                                {String(item.action || 'Evento').replaceAll('.', ' ')}
+                                            </div>
+                                            <div className="dashboard-activity-meta">
+                                                {getActivityActor(item)}
+                                                {item.entityType ? ` - ${item.entityType}` : ''}
+                                                {item.createdAt ? ` - ${formatActivityTime(item.createdAt)}` : ''}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </Container>
+    );
 };
 
-export default connect(mapStateToProps, { toggleCollapsedNav })(Dashboard);
+export default connect(null, { toggleCollapsedNav })(Dashboard);

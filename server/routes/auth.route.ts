@@ -1049,7 +1049,7 @@ const authRoute: FastifyPluginAsync = async (app) => {
       moduleRepository.listEnabledModules(activeMembership.workspace.id),
       rbacRepository.listUserPermissions(user.id, activeMembership.workspace.id),
       rbacRepository.listUserRoles(user.id, activeMembership.workspace.id),
-      auditRepository.listRecentByWorkspace(activeMembership.workspace.id, 8),
+      auditRepository.listRecentBusinessByWorkspace(activeMembership.workspace.id, 8),
       workspaceBrandingService.getWorkspaceBranding(activeMembership.workspace),
     ]);
 

@@ -28,6 +28,35 @@ const auditListSelect = {
   },
 } as const;
 
+const BUSINESS_ACTION_PREFIXES = [
+  'clients.',
+  'projects.',
+  'checklists.',
+  'quotes.',
+  'branding.',
+  'role.',
+  'modules.',
+] as const;
+
+const TECHNICAL_ACTION_PREFIXES = ['auth.', 'me.', 'rbac.', 'debug.'] as const;
+const TECHNICAL_ACTION_SUFFIXES = ['.list', '.view', '.preview', '.pdf'] as const;
+
+const isBusinessAction = (action: string) => {
+  if (!action) {
+    return false;
+  }
+
+  if (TECHNICAL_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix))) {
+    return false;
+  }
+
+  if (TECHNICAL_ACTION_SUFFIXES.some((suffix) => action.endsWith(suffix))) {
+    return false;
+  }
+
+  return BUSINESS_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix));
+};
+
 export const auditRepository = {
   create(input: CreateAuditLogInput) {
     return prisma.auditLog.create({
@@ -58,5 +87,23 @@ export const auditRepository = {
       take: Math.max(1, Math.min(limit, 20)),
       select: auditListSelect,
     });
+  },
+
+  async listRecentBusinessByWorkspace(workspaceId: string, limit = 6) {
+    const safeLimit = Math.max(1, Math.min(limit, 20));
+    const fetchLimit = Math.max(24, safeLimit * 4);
+
+    const items = await prisma.auditLog.findMany({
+      where: {
+        workspaceId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: fetchLimit,
+      select: auditListSelect,
+    });
+
+    return items.filter((item) => isBusinessAction(item.action)).slice(0, safeLimit);
   },
 };

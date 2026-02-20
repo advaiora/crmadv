@@ -17,7 +17,7 @@ const meRoute: FastifyPluginAsync = async (app) => {
       moduleRepository.listEnabledModules(workspace.id),
       rbacRepository.listUserPermissions(user.id, workspace.id),
       rbacRepository.listUserRoles(user.id, workspace.id),
-      auditRepository.listRecentByWorkspace(workspace.id, 8),
+      auditRepository.listRecentBusinessByWorkspace(workspace.id, 8),
       workspaceBrandingService.getWorkspaceBranding(workspace),
     ]);
 

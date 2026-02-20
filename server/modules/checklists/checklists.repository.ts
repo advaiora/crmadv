@@ -5,6 +5,9 @@ const PROJECT_TABLE = 'Project';
 const PIPELINE_STAGE_TABLE = 'PipelineStage';
 const CHECKLIST_ITEM_INCOMPLETE_STATES = ['pending', 'not_started', 'in_progress'] as const;
 const CHECKLIST_ITEM_TERMINAL_STATES = ['completed', 'not_applicable'] as const;
+const normalizeChecklistItemStateForPersistence = (
+  state: 'pending' | 'not_started' | 'in_progress' | 'completed',
+) => (state === 'completed' ? 'completed' : 'pending');
 
 const templateSummarySelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
   id: true,
@@ -316,7 +319,7 @@ const createChecklistInstanceWithItemsInTx = async (
         requiresEvidenceSnapshot: templateItem.requiresEvidenceSnapshot,
         isCriticalSnapshot: templateItem.isCriticalSnapshot,
         sortOrderSnapshot: templateItem.sortOrder,
-        state: 'not_started',
+        state: 'pending',
       })),
     });
   }
@@ -945,7 +948,7 @@ export const checklistsRepository = {
           id: itemId,
         },
         data: {
-          state: 'not_started',
+          state: 'pending',
           evidenceNote: null,
           evidenceUrl: null,
           notApplicableReason: null,
@@ -1002,7 +1005,8 @@ export const checklistsRepository = {
       }
 
       const previousState = current.state;
-      const completedAt = input.state === 'completed' ? new Date() : null;
+      const nextState = normalizeChecklistItemStateForPersistence(input.state);
+      const completedAt = nextState === 'completed' ? new Date() : null;
 
       await tx.checklistInstanceItem.updateMany({
         where: {
@@ -1010,13 +1014,13 @@ export const checklistsRepository = {
           id: input.itemId,
         },
         data: {
-          state: input.state,
+          state: nextState,
           evidenceNote:
-            input.state === 'not_started'
+            nextState === 'pending'
               ? null
               : (input.evidenceNote === undefined ? current.evidenceNote : input.evidenceNote),
           evidenceUrl:
-            input.state === 'not_started'
+            nextState === 'pending'
               ? null
               : (input.evidenceUrl === undefined ? current.evidenceUrl : input.evidenceUrl),
           notApplicableReason: null,
