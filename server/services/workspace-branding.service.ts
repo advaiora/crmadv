@@ -8,6 +8,9 @@ const MAX_COMPANY_NAME_LENGTH = 80;
 const MAX_LOGO_URL_LENGTH = 2048;
 const MAX_LOGO_DATA_URL_LENGTH = 2_800_000;
 const MAX_SUPPORT_EMAIL_LENGTH = 320;
+const MAX_SUPPORT_PHONE_LENGTH = 60;
+const MAX_SUPPORT_ADDRESS_LENGTH = 240;
+const MAX_SIGNATURE_URL_LENGTH = 2048;
 const DEFAULT_PRIMARY_COLOR = '#000000';
 const DEFAULT_SECONDARY_COLOR = '#ffffff';
 
@@ -24,6 +27,9 @@ type BrandingPayload = {
   accentColor: string;
   companyName: string | null;
   supportEmail: string | null;
+  supportPhone: string | null;
+  supportAddress: string | null;
+  pdfSignatureUrl: string | null;
 };
 
 type BrandingChanges = Partial<{
@@ -32,6 +38,9 @@ type BrandingChanges = Partial<{
   secondaryColor: { from: string; to: string };
   companyName: { from: string | null; to: string | null };
   supportEmail: { from: string | null; to: string | null };
+  supportPhone: { from: string | null; to: string | null };
+  supportAddress: { from: string | null; to: string | null };
+  pdfSignatureUrl: { from: string | null; to: string | null };
 }>;
 
 type BrandingUpdateInput = {
@@ -40,6 +49,9 @@ type BrandingUpdateInput = {
   secondaryColor?: string | null;
   companyName?: string | null;
   supportEmail?: string | null;
+  supportPhone?: string | null;
+  supportAddress?: string | null;
+  pdfSignatureUrl?: string | null;
 };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -55,6 +67,9 @@ const mapBrandingRecord = (record: {
   secondaryColor: string;
   workspaceName: string | null;
   supportEmail: string | null;
+  supportPhone: string | null;
+  supportAddress: string | null;
+  pdfSignatureUrl: string | null;
 }): BrandingPayload => ({
   logoUrl: record.logoUrl,
   primaryColor: record.primaryColor,
@@ -62,7 +77,48 @@ const mapBrandingRecord = (record: {
   accentColor: record.secondaryColor,
   companyName: record.workspaceName,
   supportEmail: record.supportEmail,
+  supportPhone: record.supportPhone,
+  supportAddress: record.supportAddress,
+  pdfSignatureUrl: record.pdfSignatureUrl,
 });
+
+const parseOptionalUrlOrDataImage = (value: string, fieldName: string, maxLength: number) => {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw badRequest(`${fieldName} cannot be empty`);
+  }
+
+  if (normalized.startsWith('data:image/')) {
+    if (!DATA_IMAGE_URL_REGEX.test(normalized)) {
+      throw badRequest(`${fieldName} data URI must be a valid base64 image`);
+    }
+    if (normalized.length > MAX_LOGO_DATA_URL_LENGTH) {
+      throw badRequest(`${fieldName} data URI is too long`, {
+        maxLength: MAX_LOGO_DATA_URL_LENGTH,
+      });
+    }
+
+    return normalized;
+  }
+
+  if (normalized.length > maxLength) {
+    throw badRequest(`${fieldName} is too long`, {
+      maxLength,
+    });
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(normalized);
+  } catch {
+    throw badRequest(`${fieldName} must be a valid URL`);
+  }
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw badRequest(`${fieldName} must use http or https`);
+  }
+
+  return normalized;
+};
 
 export const workspaceBrandingService = {
   async getWorkspaceBranding(workspace: WorkspaceRecord) {
@@ -75,6 +131,9 @@ export const workspaceBrandingService = {
       workspaceName: workspace.name,
       logoUrl: null,
       supportEmail: null,
+      supportPhone: null,
+      supportAddress: null,
+      pdfSignatureUrl: null,
       primaryColor: DEFAULT_PRIMARY_COLOR,
       secondaryColor: DEFAULT_SECONDARY_COLOR,
     });
@@ -94,6 +153,9 @@ export const workspaceBrandingService = {
       'accentColor',
       'companyName',
       'supportEmail',
+      'supportPhone',
+      'supportAddress',
+      'pdfSignatureUrl',
     ]);
     const unknownKeys = Object.keys(body).filter((key) => !allowedKeys.has(key));
     if (unknownKeys.length > 0) {
@@ -110,43 +172,7 @@ export const workspaceBrandingService = {
       if (value === null) {
         parsedInput.logoUrl = null;
       } else if (typeof value === 'string') {
-        const normalized = value.trim();
-        if (!normalized) {
-          throw badRequest('logoUrl cannot be empty');
-        }
-
-        if (normalized.startsWith('data:image/')) {
-          if (!DATA_IMAGE_URL_REGEX.test(normalized)) {
-            throw badRequest('logoUrl data URI must be a valid base64 image');
-          }
-          if (normalized.length > MAX_LOGO_DATA_URL_LENGTH) {
-            throw badRequest('logoUrl data URI is too long', {
-              maxLength: MAX_LOGO_DATA_URL_LENGTH,
-            });
-          }
-
-          parsedInput.logoUrl = normalized;
-        }
-
-        if (!normalized.startsWith('data:image/')) {
-          if (normalized.length > MAX_LOGO_URL_LENGTH) {
-            throw badRequest('logoUrl is too long', {
-              maxLength: MAX_LOGO_URL_LENGTH,
-            });
-          }
-
-          let parsedUrl: URL;
-          try {
-            parsedUrl = new URL(normalized);
-          } catch {
-            throw badRequest('logoUrl must be a valid URL');
-          }
-          if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-            throw badRequest('logoUrl must use http or https');
-          }
-
-          parsedInput.logoUrl = normalized;
-        }
+        parsedInput.logoUrl = parseOptionalUrlOrDataImage(value, 'logoUrl', MAX_LOGO_URL_LENGTH);
       } else {
         throw badRequest('logoUrl must be a string or null');
       }
@@ -256,6 +282,63 @@ export const workspaceBrandingService = {
       }
     }
 
+    if ('supportPhone' in body) {
+      const value = body.supportPhone;
+      if (value === null) {
+        parsedInput.supportPhone = null;
+      } else if (typeof value === 'string') {
+        const normalized = value.trim();
+        if (!normalized) {
+          throw badRequest('supportPhone cannot be empty');
+        }
+        if (normalized.length > MAX_SUPPORT_PHONE_LENGTH) {
+          throw badRequest('supportPhone is too long', {
+            maxLength: MAX_SUPPORT_PHONE_LENGTH,
+          });
+        }
+
+        parsedInput.supportPhone = normalized;
+      } else {
+        throw badRequest('supportPhone must be a string or null');
+      }
+    }
+
+    if ('supportAddress' in body) {
+      const value = body.supportAddress;
+      if (value === null) {
+        parsedInput.supportAddress = null;
+      } else if (typeof value === 'string') {
+        const normalized = value.trim();
+        if (!normalized) {
+          throw badRequest('supportAddress cannot be empty');
+        }
+        if (normalized.length > MAX_SUPPORT_ADDRESS_LENGTH) {
+          throw badRequest('supportAddress is too long', {
+            maxLength: MAX_SUPPORT_ADDRESS_LENGTH,
+          });
+        }
+
+        parsedInput.supportAddress = normalized;
+      } else {
+        throw badRequest('supportAddress must be a string or null');
+      }
+    }
+
+    if ('pdfSignatureUrl' in body) {
+      const value = body.pdfSignatureUrl;
+      if (value === null) {
+        parsedInput.pdfSignatureUrl = null;
+      } else if (typeof value === 'string') {
+        parsedInput.pdfSignatureUrl = parseOptionalUrlOrDataImage(
+          value,
+          'pdfSignatureUrl',
+          MAX_SIGNATURE_URL_LENGTH,
+        );
+      } else {
+        throw badRequest('pdfSignatureUrl must be a string or null');
+      }
+    }
+
     if (Object.keys(parsedInput).length === 0) {
       throw badRequest('At least one branding field is required');
     }
@@ -269,13 +352,16 @@ export const workspaceBrandingService = {
     const currentRecord = await brandingRepository.findByWorkspaceId(workspace.id);
     const previousState: BrandingPayload = currentRecord
       ? mapBrandingRecord(currentRecord)
-        : {
+      : {
           logoUrl: null,
           primaryColor: DEFAULT_PRIMARY_COLOR,
           secondaryColor: DEFAULT_SECONDARY_COLOR,
           accentColor: DEFAULT_SECONDARY_COLOR,
           companyName: workspace.name,
           supportEmail: null,
+          supportPhone: null,
+          supportAddress: null,
+          pdfSignatureUrl: null,
         };
 
     const upsertedRecord = await brandingRepository.upsertByWorkspaceId(workspace.id, {
@@ -284,6 +370,14 @@ export const workspaceBrandingService = {
       logoUrl: updates.logoUrl !== undefined ? updates.logoUrl : previousState.logoUrl,
       supportEmail:
         updates.supportEmail !== undefined ? updates.supportEmail : previousState.supportEmail,
+      supportPhone:
+        updates.supportPhone !== undefined ? updates.supportPhone : previousState.supportPhone,
+      supportAddress:
+        updates.supportAddress !== undefined ? updates.supportAddress : previousState.supportAddress,
+      pdfSignatureUrl:
+        updates.pdfSignatureUrl !== undefined
+          ? updates.pdfSignatureUrl
+          : previousState.pdfSignatureUrl,
       primaryColor:
         updates.primaryColor !== undefined
           ? (updates.primaryColor ?? DEFAULT_PRIMARY_COLOR)
@@ -311,6 +405,15 @@ export const workspaceBrandingService = {
     }
     if (previousState.supportEmail !== nextState.supportEmail) {
       changes.supportEmail = { from: previousState.supportEmail, to: nextState.supportEmail };
+    }
+    if (previousState.supportPhone !== nextState.supportPhone) {
+      changes.supportPhone = { from: previousState.supportPhone, to: nextState.supportPhone };
+    }
+    if (previousState.supportAddress !== nextState.supportAddress) {
+      changes.supportAddress = { from: previousState.supportAddress, to: nextState.supportAddress };
+    }
+    if (previousState.pdfSignatureUrl !== nextState.pdfSignatureUrl) {
+      changes.pdfSignatureUrl = { from: previousState.pdfSignatureUrl, to: nextState.pdfSignatureUrl };
     }
 
     return {

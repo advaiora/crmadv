@@ -11,6 +11,8 @@ import { fetchWorkspaceAccess } from '../../utils/workspaceAccess';
 import { apiPost } from '../../utils/apiClient';
 import { useSession } from '../../hooks/useSession';
 import { resetGoogleIdentitySession } from '../../utils/googleIdentity';
+import { readUserAvatar, USER_PROFILE_PREFS_CHANGED_EVENT } from '../../lib/userProfilePrefs';
+import { PROFILE_UPDATED_EVENT } from '../../lib/profileEvents';
 
 const ACTION_LABELS = {
     'me.view': 'Profilo e permessi visualizzati',
@@ -85,6 +87,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const [navbarData, setNavbarData] = useState(null);
     const [loadingNavbarData, setLoadingNavbarData] = useState(false);
     const [navbarDataError, setNavbarDataError] = useState('');
+    const [userAvatarUrl, setUserAvatarUrl] = useState('');
 
     const loadNavbarData = useCallback(async () => {
         setLoadingNavbarData(true);
@@ -103,6 +106,17 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
 
     useEffect(() => {
         void loadNavbarData();
+    }, [loadNavbarData]);
+
+    useEffect(() => {
+        const handleProfileUpdated = () => {
+            void loadNavbarData();
+        };
+
+        window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+        return () => {
+            window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated);
+        };
     }, [loadNavbarData]);
 
     const handleSignOut = async (event) => {
@@ -132,6 +146,27 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const userEmail = user?.email || session?.userEmail || '-';
     const workspaceName = branding?.companyName || session?.workspaceBranding?.companyName || workspace?.name || 'Workspace';
     const userInitials = useMemo(() => buildInitials(userDisplayName), [userDisplayName]);
+    const avatarUserId = user?.id || session?.userId || '';
+
+    useEffect(() => {
+        if (!avatarUserId) {
+            setUserAvatarUrl('');
+            return;
+        }
+
+        const syncAvatar = () => {
+            setUserAvatarUrl(readUserAvatar(avatarUserId));
+        };
+
+        syncAvatar();
+        window.addEventListener(USER_PROFILE_PREFS_CHANGED_EVENT, syncAvatar);
+        window.addEventListener('storage', syncAvatar);
+
+        return () => {
+            window.removeEventListener(USER_PROFILE_PREFS_CHANGED_EVENT, syncAvatar);
+            window.removeEventListener('storage', syncAvatar);
+        };
+    }, [avatarUserId]);
 
     return (
         <Navbar expand="xl" className="hk-navbar navbar-light fixed-top app-topnav">
@@ -269,12 +304,32 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                     variant="flush-dark"
                                     className="no-caret btn-icon btn-rounded flush-soft-hover app-topnav-avatar-trigger"
                                 >
-                                    <span className="app-topnav-avatar">{userInitials}</span>
+                                    {userAvatarUrl ? (
+                                        <span className="app-topnav-avatar p-0 overflow-hidden">
+                                            <img
+                                                src={userAvatarUrl}
+                                                alt="Avatar utente"
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            />
+                                        </span>
+                                    ) : (
+                                        <span className="app-topnav-avatar">{userInitials}</span>
+                                    )}
                                 </Dropdown.Toggle>
                                 <Dropdown.Menu align="end" className="app-topnav-user-menu">
                                     <div className="p-3">
                                         <div className="d-flex align-items-start gap-2">
-                                            <span className="app-topnav-avatar app-topnav-avatar-lg">{userInitials}</span>
+                                            {userAvatarUrl ? (
+                                                <span className="app-topnav-avatar app-topnav-avatar-lg p-0 overflow-hidden">
+                                                    <img
+                                                        src={userAvatarUrl}
+                                                        alt="Avatar utente"
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    />
+                                                </span>
+                                            ) : (
+                                                <span className="app-topnav-avatar app-topnav-avatar-lg">{userInitials}</span>
+                                            )}
                                             <div>
                                                 <span className="d-block fw-medium app-topnav-user-name">{userDisplayName}</span>
                                                 <div className="fs-7 app-topnav-user-email">{userEmail}</div>

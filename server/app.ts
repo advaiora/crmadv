@@ -13,12 +13,15 @@ import { prisma } from "./prisma.js";
 import authRoute from "./routes/auth.route.js";
 import workspaceBrandingRoute from "./routes/workspace-branding.route.js";
 import workspaceModulesRoute from "./routes/workspace-modules.route.js";
-import workspaceQuotesRoute from "./routes/workspace-quotes.route.js";
 import workspaceRolesRoute from "./routes/workspace-roles.route.js";
 import clientsRoute from "./modules/clients/routes.js";
 import workspaceChecklistsRoute from "./modules/checklists/routes/workspace-checklists.route.js";
 import workspaceChecklistInstancesRoute from "./modules/checklists/routes/workspace-checklist-instances.route.js";
 import workspaceProjectsRoute from "./modules/projects/routes/workspace-projects.route.js";
+import workspaceQuotesRoute from "./modules/quotes/routes/workspace-quotes.route.js";
+import workspaceQuoteTemplatesRoute from "./modules/quotes/routes/workspace-quote-templates.route.js";
+import workspaceCalendarRoute from "./modules/calendar/routes/workspace-calendar.route.js";
+import workspaceWebAssetsRoute from "./routes/workspace-web-assets.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
 const DEV_DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
@@ -252,6 +255,9 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceBrandingRoute);
   void app.register(workspaceModulesRoute);
   void app.register(workspaceQuotesRoute);
+  void app.register(workspaceQuoteTemplatesRoute);
+  void app.register(workspaceCalendarRoute);
+  void app.register(workspaceWebAssetsRoute);
   void app.register(workspaceRolesRoute);
   void app.register(clientsRoute);
   void app.register(workspaceChecklistsRoute);

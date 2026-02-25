@@ -59,7 +59,7 @@ const AUTH_RATE_LIMIT_CONFIG = {
     timeWindow: '1 minute',
   },
   google: {
-    max: 10,
+    max: 30,
     timeWindow: '1 minute',
   },
 } as const;
@@ -92,8 +92,67 @@ const registerSchema = z.object({
   role: z.enum(REGISTRABLE_WORKSPACE_ROLE_NAMES).optional(),
 });
 
+const updateMeSchema = z
+  .object({
+    name: z
+      .preprocess(
+        (value) => {
+          if (value === undefined || value === null) {
+            return value;
+          }
+
+          if (typeof value !== 'string') {
+            return value;
+          }
+
+          const normalized = value.trim();
+          return normalized.length > 0 ? normalized : null;
+        },
+        z.union([z.string().max(120), z.null()]).optional(),
+      )
+      .optional(),
+    email: z
+      .preprocess(
+        (value) => {
+          if (value === undefined) {
+            return undefined;
+          }
+
+          if (typeof value !== 'string') {
+            return value;
+          }
+
+          const normalized = value.trim().toLowerCase();
+          return normalized.length > 0 ? normalized : value;
+        },
+        z.string().email().optional(),
+      )
+      .optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.name === undefined && value.email === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one field is required',
+        path: ['name'],
+      });
+    }
+  });
+
 const googleAuthSchema = z.object({
-  idToken: z.string().trim().min(1),
+  idToken: z.string().trim().min(1).optional(),
+  credential: z.string().trim().min(1).optional(),
+  id_token: z.string().trim().min(1).optional(),
+  token: z.string().trim().min(1).optional(),
+  googleIdToken: z.string().trim().min(1).optional(),
+  mode: z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim().toLowerCase() : undefined),
+    z.enum(['login', 'signup']).optional(),
+  ),
+  action: z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim().toLowerCase() : undefined),
+    z.enum(['login', 'signup']).optional(),
+  ),
   workspaceName: z.preprocess(
     (value) => {
       if (typeof value !== 'string') {
@@ -120,7 +179,21 @@ const googleAuthSchema = z.object({
     (value) => normalizeWorkspaceSystemRoleName(value),
     z.enum(REGISTRABLE_WORKSPACE_ROLE_NAMES).nullable().optional(),
   ),
-});
+})
+  .superRefine((value, context) => {
+    if (!value.idToken && !value.credential && !value.id_token && !value.token && !value.googleIdToken) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'idToken or credential is required',
+        path: ['idToken'],
+      });
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    mode: value.mode ?? value.action,
+    idToken: value.idToken ?? value.credential ?? value.id_token ?? value.token ?? value.googleIdToken ?? '',
+  }));
 
 type ParsedGoogleAuthPayload = z.infer<typeof googleAuthSchema>;
 type GoogleAuthInternalCode =
@@ -181,6 +254,10 @@ const maskEmailForLog = (email: string | null | undefined) => {
 };
 
 const resolveGoogleAuthMode = (payload: ParsedGoogleAuthPayload): GoogleAuthMode => {
+  if (payload.mode === 'login' || payload.mode === 'signup') {
+    return payload.mode;
+  }
+
   const hasWorkspaceName = Boolean(payload.workspaceName);
   const hasWorkspaceSlug = Boolean(payload.workspaceSlug);
 
@@ -192,7 +269,7 @@ const resolveGoogleAuthMode = (payload: ParsedGoogleAuthPayload): GoogleAuthMode
     return 'login';
   }
 
-  throw badRequest('workspaceName e workspaceSlug devono essere entrambi valorizzati per signup Google');
+  return 'login';
 };
 
 const inferGoogleAuthModeFromRawBody = (body: unknown): GoogleAuthMode => {
@@ -1024,6 +1101,100 @@ const authRoute: FastifyPluginAsync = async (app) => {
       }
     },
   );
+
+  app.patch<{ Body: unknown }>('/auth/me', async (request, reply) => {
+    const { user, tokenClaims } = await requireAuthIdentity(request);
+
+    const parsed = updateMeSchema.safeParse(request.body);
+    if (!parsed.success) {
+      throw badRequest('Invalid profile update payload', {
+        issues: parsed.error.flatten(),
+      });
+    }
+
+    const payload = parsed.data;
+    const patch: Prisma.UserUpdateInput = {};
+    const changedFields: string[] = [];
+
+    if (payload.name !== undefined && payload.name !== user.name) {
+      patch.name = payload.name;
+      changedFields.push('name');
+    }
+
+    if (payload.email !== undefined && payload.email !== user.email) {
+      patch.email = payload.email;
+      changedFields.push('email');
+    }
+
+    if (changedFields.length === 0) {
+      return ok(reply, {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+        changedFields: [],
+      });
+    }
+
+    const memberships = await listMemberships(prisma, user.id);
+    const activeMembership = pickActiveMembership(memberships, tokenClaims.workspaceId);
+    if (!activeMembership) {
+      throw unauthorized('Sessione non valida');
+    }
+
+    try {
+      const updatedUser = await prisma.user.update({
+        where: {
+          id: user.id,
+        },
+        data: patch,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+        },
+      });
+
+      const shouldRefreshToken = updatedUser.email !== user.email;
+      const refreshedToken = shouldRefreshToken
+        ? await signAccessToken({
+            sub: updatedUser.id,
+            email: updatedUser.email,
+            role: updatedUser.role,
+            workspaceId: activeMembership.workspace.id,
+            workspaceSlug: activeMembership.workspace.slug,
+          })
+        : null;
+
+      await audit.log({
+        event: 'me.update',
+        actorUserId: updatedUser.id,
+        workspaceId: activeMembership.workspace.id,
+        entityType: 'user',
+        entityId: updatedUser.id,
+        metadata: {
+          route: '/auth/me',
+          changedFields,
+        },
+        request,
+      });
+
+      return ok(reply, {
+        ...(refreshedToken ? { token: refreshedToken } : {}),
+        user: updatedUser,
+        changedFields,
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error) && getUniqueTargetFields(error).includes('email')) {
+        throw conflict('Email gia in uso');
+      }
+
+      throw error;
+    }
+  });
 
   app.get('/auth/me', async (request, reply) => {
     const { user, tokenClaims } = await requireAuthIdentity(request);

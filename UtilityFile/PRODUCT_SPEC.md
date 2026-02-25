@@ -1,7 +1,9 @@
 # Product Spec – Agency OS
 
 ## 1) Obiettivo
+
 Creare una web app SaaS modulare e rivendibile per agenzie/freelance che standardizzi processi operativi:
+
 - Clienti (CRM leggero)
 - Progetti con pipeline personalizzabile per categoria
 - Checklist operative con gate sugli stati
@@ -11,7 +13,9 @@ Creare una web app SaaS modulare e rivendibile per agenzie/freelance che standar
 - SEO analyzer con suggerimenti + titoli IA
 
 ## 2) Moduli (attivabili/disattivabili per Workspace)
+
 ### Core (sempre attivi)
+
 - Auth & Workspace
 - Module Registry (feature flags)
 - RBAC + Superadmin
@@ -20,6 +24,7 @@ Creare una web app SaaS modulare e rivendibile per agenzie/freelance che standar
 - Dashboard (minima)
 
 ### Moduli business (feature flags)
+
 - team
 - clients
 - projects
@@ -32,7 +37,9 @@ Creare una web app SaaS modulare e rivendibile per agenzie/freelance che standar
 Regola: modulo disabilitato => **API 403 + UI nascosta**.
 
 ## 3) Ruoli
+
 Ruoli base:
+
 - Superadmin (decide tutto nel workspace)
 - Admin
 - Manager
@@ -41,6 +48,7 @@ Ruoli base:
 - Cliente (opzionale, non MVP)
 
 Superadmin può:
+
 - attivare/disattivare moduli
 - creare/modificare ruoli e permessi
 - configurare branding (logo/colori/nome)
@@ -50,8 +58,10 @@ Superadmin può:
 - gestire policy Vault
 
 ## 4) Permessi (RBAC) – Convenzione
+
 Formato: `{module}.{action}` (stringhe stabili)
 Esempi:
+
 - `modules.manage`
 - `branding.manage`
 - `clients.view|create|edit|delete`
@@ -64,7 +74,9 @@ Esempi:
 - `audit.view`
 
 ## 5) Branding (white-label)
+
 Configurabile dal Superadmin per workspace:
+
 - logo
 - primary_color
 - secondary_color
@@ -73,6 +85,7 @@ Configurabile dal Superadmin per workspace:
 Applicazione: UI + PDF preventivi.
 
 ## 6) Checklist & Gate (cuore operativo)
+
 - Esistono Checklist Template e Checklist Instance.
 - Le checklist possono essere agganciate a:
   - stage della pipeline (projects)
@@ -85,7 +98,9 @@ Applicazione: UI + PDF preventivi.
 - Audit completamenti: user + timestamp + item.
 
 ## 7) Ordine obbligatorio di implementazione
+
 ### MVP 1 (vendibile)
+
 1. Bootstrap boilerplate + env + prisma migrate/seed
 2. Module registry + middleware + menu dinamico
 3. RBAC + Superadmin + permission checks API
@@ -96,14 +111,17 @@ Applicazione: UI + PDF preventivi.
 8. quotes (base)
 
 ### MVP 2
+
 9. web (almeno “Siti Web”)
 10. vault (cifratura + reveal + audit)
 11. scadenziario WEB
 
 ### MVP 3
+
 12. seo analyzer + IA + export
 13. report cliente (se serve)
 
 ## 8) Vincoli
+
 - Non aggiungere funzionalità non richieste.
 - Se manca un dettaglio: scegliere la soluzione più semplice e documentarla in `ARCHITECTURE.md`.

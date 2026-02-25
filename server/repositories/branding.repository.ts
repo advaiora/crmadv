@@ -5,6 +5,9 @@ const brandingSelect = {
   workspaceName: true,
   logoUrl: true,
   supportEmail: true,
+  supportPhone: true,
+  supportAddress: true,
+  pdfSignatureUrl: true,
   primaryColor: true,
   secondaryColor: true,
 } as const;
@@ -17,6 +20,9 @@ type UpsertWorkspaceBrandingInput = {
   workspaceName: string | null;
   logoUrl: string | null;
   supportEmail: string | null;
+  supportPhone: string | null;
+  supportAddress: string | null;
+  pdfSignatureUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
 };
@@ -40,6 +46,9 @@ export const brandingRepository = {
         workspaceName: input.workspaceName,
         logoUrl: input.logoUrl,
         supportEmail: input.supportEmail,
+        supportPhone: input.supportPhone,
+        supportAddress: input.supportAddress,
+        pdfSignatureUrl: input.pdfSignatureUrl,
         primaryColor: input.primaryColor,
         secondaryColor: input.secondaryColor,
       },
@@ -48,6 +57,9 @@ export const brandingRepository = {
         workspaceName: input.workspaceName,
         logoUrl: input.logoUrl,
         supportEmail: input.supportEmail,
+        supportPhone: input.supportPhone,
+        supportAddress: input.supportAddress,
+        pdfSignatureUrl: input.pdfSignatureUrl,
         primaryColor: input.primaryColor,
         secondaryColor: input.secondaryColor,
       },

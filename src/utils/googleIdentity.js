@@ -102,9 +102,9 @@ const ensureGoogleInitialized = (clientId, diagnostics) => {
   googleAccountsApi.initialize({
     client_id: clientId,
     auto_select: false,
-    // FedCM is mandatory in modern Chrome; keep GIS configuration minimal and compatible.
+    // Avoid forcing FedCM in all environments: some browser/site configurations can block it.
     itp_support: true,
-    use_fedcm_for_prompt: true,
+    use_fedcm_for_prompt: false,
     callback: (response) => {
       if (!pendingRequest) {
         return;
@@ -118,12 +118,14 @@ const ensureGoogleInitialized = (clientId, diagnostics) => {
         }
       }
 
-      if (!response?.credential) {
+      const credential = typeof response?.credential === "string" ? response.credential.trim() : "";
+
+      if (!credential) {
         settlePendingRequest(pendingRequest.reject, buildPromptError("credential_missing"));
         return;
       }
 
-      settlePendingRequest(pendingRequest.resolve, response.credential);
+      settlePendingRequest(pendingRequest.resolve, credential);
     },
   });
 

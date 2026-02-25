@@ -1,0 +1,86 @@
+.quotes-page-shell {
+  max-width: 1400px;
+}
+
+.quote-status-badge {
+  letter-spacing: 0.03em;
+  font-size: 0.72rem;
+}
+
+.quote-step-chip {
+  border: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quote-step-chip .quote-step-index {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 999px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--bs-gray-200);
+  color: var(--bs-body-color);
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.quote-step-chip.is-active {
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
+.quote-step-chip.is-active .quote-step-index {
+  background: var(--bs-primary);
+  color: #fff;
+}
+
+.quote-items-table td,
+.quote-items-table th {
+  vertical-align: top;
+}
+
+.quote-money-cell {
+  white-space: nowrap;
+  padding-left: 0.95rem !important;
+  padding-right: 0.95rem !important;
+}
+
+.quote-totals-summary {
+  position: sticky;
+  top: 1rem;
+}
+
+.quote-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.quote-clickable-row {
+  cursor: pointer;
+}
+
+.quote-clickable-row:hover {
+  background: rgba(13, 110, 253, 0.05);
+}
+
+@media (max-width: 991px) {
+  .quote-totals-summary {
+    position: static;
+  }
+}
+
+@media (max-width: 767px) {
+  .quote-step-chip {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

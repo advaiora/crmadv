@@ -15,8 +15,8 @@ const AccessDeniedScreen = () => {
                 >
                     <ShieldAlert size={22} />
                 </span>
-                <h5 className="mb-2">Access denied</h5>
-                <p className="mb-4 text-muted">Non hai i permessi per accedere a questa sezione.</p>
+                <h5 className="mb-2">Non hai permessi</h5>
+                <p className="mb-4 text-muted">Il tuo ruolo non permette questa operazione in questo workspace.</p>
                 <Button variant="outline-secondary" onClick={() => history.goBack()}>
                     Torna indietro
                 </Button>

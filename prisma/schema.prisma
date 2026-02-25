@@ -8,9 +8,16 @@ datasource db {
 }
 
 enum QuoteStatus {
-  draft
-  sent
-  accepted
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum QuoteDiscountType {
+  PERCENT
+  FIXED
 }
 
 enum QuoteEmailLogType {
@@ -28,6 +35,13 @@ enum ClientType {
   company
 }
 
+enum WebAssetStatus {
+  ACTIVE
+  MAINTENANCE
+  PAUSED
+  ARCHIVED
+}
+
 model Workspace {
   id                     String                  @id @default(cuid())
   name                   String
@@ -40,11 +54,19 @@ model Workspace {
   roles                  Role[]
   userRoles              UserRole[]
   branding               WorkspaceBranding?
+  quoteNotificationSettings QuoteNotificationSettings?
   projects               Project[]
   projectCategories      ProjectCategory[]
   pipelineStages         PipelineStage[]
   quotes                 Quote[]
+  quoteItems             QuoteItem[]
+  quoteTemplates         QuoteTemplate[]
+  quoteTemplateItems     QuoteTemplateItem[]
   quoteEmailLogs         QuoteEmailLog[]
+  calendarEvents         CalendarEvent[]
+  websiteAssets          WebsiteAsset[]
+  webAppAssets           WebAppAsset[]
+  ecommerceAssets        EcommerceAsset[]
   auditLogs              AuditLog[]
   checklistTemplates     ChecklistTemplate[]
   checklistTemplateItems ChecklistTemplateItem[]
@@ -63,6 +85,12 @@ model User {
   updatedAt               DateTime                @updatedAt
   memberships             Membership[]
   userRoles               UserRole[]
+  createdQuotes           Quote[]                 @relation("QuoteCreatedByUser")
+  createdCalendarEvents   CalendarEvent[]         @relation("CalendarEventCreatedByUser")
+  updatedCalendarEvents   CalendarEvent[]         @relation("CalendarEventUpdatedByUser")
+  ownedWebsiteAssets      WebsiteAsset[]          @relation("WebsiteAssetOwner")
+  ownedWebAppAssets       WebAppAsset[]           @relation("WebAppAssetOwner")
+  ownedEcommerceAssets    EcommerceAsset[]        @relation("EcommerceAssetOwner")
   auditLogs               AuditLog[]              @relation("AuditActor")
   completedChecklistItems ChecklistInstanceItem[]
 }
@@ -83,27 +111,30 @@ model Membership {
 }
 
 model Client {
-  id          String     @id @default(cuid())
-  workspaceId String
-  type        ClientType @default(person)
-  name        String
-  email       String?
-  phone       String?
-  vatNumber   String?
-  taxCode     String?
-  street      String?
-  city        String?
-  zip         String?
-  province    String?
-  country     String?
-  notes       String?
-  tags        String[]   @default([])
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  quotes      Quote[]
-  projects    Project[]
+  id           String          @id @default(cuid())
+  workspaceId  String
+  type         ClientType      @default(person)
+  name         String
+  email        String?
+  phone        String?
+  vatNumber    String?
+  taxCode      String?
+  street       String?
+  city         String?
+  zip          String?
+  province     String?
+  country      String?
+  notes        String?
+  tags         String[]        @default([])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quotes       Quote[]
+  projects     Project[]
   projectLinks ProjectClient[]
+  websiteAssets WebsiteAsset[]   @relation("WebsiteAssetClient")
+  webAppAssets  WebAppAsset[]    @relation("WebAppAssetClient")
+  ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetClient")
 
   @@index([workspaceId, name])
   @@index([workspaceId, email])
@@ -112,7 +143,7 @@ model Client {
 }
 
 model Project {
-  id              String         @id @default(cuid())
+  id              String          @id @default(cuid())
   workspaceId     String
   clientId        String?
   name            String
@@ -120,12 +151,16 @@ model Project {
   value           Float?
   dueDate         DateTime?
   pipelineStageId String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client          Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
   clientLinks     ProjectClient[]
-  pipelineStage   PipelineStage? @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  pipelineStage   PipelineStage?  @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  quotes          Quote[]
+  websiteAssets   WebsiteAsset[]  @relation("WebsiteAssetProject")
+  webAppAssets    WebAppAsset[]   @relation("WebAppAssetProject")
+  ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetProject")
 
   @@index([workspaceId, name])
   @@index([workspaceId, clientId])
@@ -267,6 +302,81 @@ model ChecklistInstanceItem {
   @@index([workspaceId, instanceId, sortOrderSnapshot])
 }
 
+model WebsiteAsset {
+  id          String         @id @default(cuid())
+  workspaceId String
+  clientId    String?
+  projectId   String?
+  ownerUserId String?
+  name        String
+  url         String         @db.VarChar(2048)
+  status      WebAssetStatus @default(ACTIVE)
+  version     String?        @db.VarChar(64)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client      Client?        @relation("WebsiteAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
+  project     Project?       @relation("WebsiteAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser   User?          @relation("WebsiteAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, url])
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, projectId])
+}
+
+model WebAppAsset {
+  id          String         @id @default(cuid())
+  workspaceId String
+  clientId    String?
+  projectId   String?
+  ownerUserId String?
+  name        String
+  url         String         @db.VarChar(2048)
+  status      WebAssetStatus @default(ACTIVE)
+  version     String?        @db.VarChar(64)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client      Client?        @relation("WebAppAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
+  project     Project?       @relation("WebAppAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser   User?          @relation("WebAppAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, url])
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, projectId])
+}
+
+model EcommerceAsset {
+  id          String         @id @default(cuid())
+  workspaceId String
+  clientId    String?
+  projectId   String?
+  ownerUserId String?
+  name        String
+  url         String         @db.VarChar(2048)
+  status      WebAssetStatus @default(ACTIVE)
+  version     String?        @db.VarChar(64)
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client      Client?        @relation("EcommerceAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
+  project     Project?       @relation("EcommerceAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser   User?          @relation("EcommerceAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, url])
+  @@index([workspaceId, updatedAt])
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, projectId])
+}
+
 model Module {
   id               String            @id @default(cuid())
   key              String            @unique
@@ -356,6 +466,9 @@ model WorkspaceBranding {
   workspaceName  String?
   logoUrl        String?
   supportEmail   String?
+  supportPhone   String?
+  supportAddress String?
+  pdfSignatureUrl String?
   primaryColor   String    @default("#0d6efd")
   secondaryColor String    @default("#6c757d")
   createdAt      DateTime  @default(now())
@@ -363,37 +476,109 @@ model WorkspaceBranding {
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
-model Quote {
-  id          String          @id @default(cuid())
-  workspaceId String
-  clientId    String?
-  clientName  String
-  clientEmail String?
-  clientPhone String?
-  status      QuoteStatus     @default(draft)
-  total       Decimal         @db.Decimal(12, 2)
-  notes       String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client      Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  lines       QuoteLine[]
-  emailLogs   QuoteEmailLog[]
-
-  @@index([workspaceId, status])
+model QuoteNotificationSettings {
+  id              String    @id @default(cuid())
+  workspaceId     String    @unique
+  enabled         Boolean   @default(true)
+  sentSubject     String?
+  sentBody        String?
+  acceptedSubject String?
+  acceptedBody    String?
+  rejectedSubject String?
+  rejectedBody    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
-model QuoteLine {
-  id        String   @id @default(cuid())
-  quoteId   String
-  title     String
-  qty       Int      @default(1)
-  unitPrice Decimal  @db.Decimal(12, 2)
-  lineTotal Decimal? @db.Decimal(12, 2)
-  order     Int?
-  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+model Quote {
+  id              String          @id @default(cuid())
+  workspaceId     String
+  clientId        String
+  projectId       String?
+  templateId      String?
+  createdByUserId String?
+  status          QuoteStatus     @default(DRAFT)
+  currency        String          @default("EUR") @db.VarChar(3)
+  subtotal        Decimal         @db.Decimal(12, 2)
+  taxTotal        Decimal         @db.Decimal(12, 2)
+  total           Decimal         @db.Decimal(12, 2)
+  taxRate         Decimal?        @db.Decimal(5, 2)
+  issueDate       DateTime?
+  validUntil      DateTime?
+  notes           String?
+  internalNotes   String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  template        QuoteTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdByUser   User?           @relation("QuoteCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  items           QuoteItem[]
+  emailLogs       QuoteEmailLog[]
 
-  @@index([quoteId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, projectId])
+  @@index([workspaceId, templateId])
+}
+
+model QuoteItem {
+  id            String             @id @default(cuid())
+  workspaceId   String
+  quoteId       String
+  position      Int
+  title         String
+  description   String?
+  quantity      Decimal            @db.Decimal(12, 2)
+  unitPrice     Decimal            @db.Decimal(12, 2)
+  discountType  QuoteDiscountType?
+  discountValue Decimal?           @db.Decimal(12, 2)
+  lineTotal     Decimal            @db.Decimal(12, 2)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quote         Quote              @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, quoteId])
+  @@index([quoteId, position])
+}
+
+model QuoteTemplate {
+  id           String              @id @default(cuid())
+  workspaceId  String
+  name         String
+  description  String?
+  defaultNotes String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  workspace    Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items        QuoteTemplateItem[]
+  quotes       Quote[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, updatedAt])
+}
+
+model QuoteTemplateItem {
+  id            String             @id @default(cuid())
+  workspaceId   String
+  templateId    String
+  position      Int
+  title         String
+  description   String?
+  quantity      Decimal            @db.Decimal(12, 2)
+  unitPrice     Decimal            @db.Decimal(12, 2)
+  discountType  QuoteDiscountType?
+  discountValue Decimal?           @db.Decimal(12, 2)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  workspace     Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  template      QuoteTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, templateId])
+  @@index([templateId, position])
 }
 
 model QuoteEmailLog {
@@ -418,6 +603,29 @@ model QuoteEmailLog {
 
   @@index([workspaceId, quoteId, createdAt])
   @@index([quoteId])
+}
+
+model CalendarEvent {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  createdByUserId String?
+  updatedByUserId String?
+  title           String
+  description     String?
+  location        String?
+  category        String?   @db.VarChar(60)
+  color           String?   @db.VarChar(20)
+  startAt         DateTime
+  endAt           DateTime?
+  allDay          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?     @relation("CalendarEventCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser   User?     @relation("CalendarEventUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, startAt])
+  @@index([workspaceId, updatedAt])
 }
 
 model AuditLog {

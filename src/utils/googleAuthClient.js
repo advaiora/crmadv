@@ -116,9 +116,10 @@ const mapErrorFromResponse = (status, payload) => {
   }
 
   if (serverCode === ERROR_CODE.BAD_REQUEST) {
+    const serverMessage = readServerMessage(payload);
     return {
       code: ERROR_CODE.BAD_REQUEST,
-      message: "Richiesta Google non valida. Controlla i dati e riprova.",
+      message: serverMessage || "Richiesta Google non valida. Controlla i dati e riprova.",
     };
   }
 
@@ -138,6 +139,13 @@ const mapErrorFromResponse = (status, payload) => {
 
   if (status === 409) {
     return resolve409Mapping(readServerMessage(payload));
+  }
+
+  if (status === 429) {
+    return {
+      code: ERROR_CODE.UNKNOWN,
+      message: "Troppi tentativi di login Google. Attendi un minuto e riprova.",
+    };
   }
 
   return {
@@ -166,6 +174,8 @@ const safeParseJson = async (response) => {
     return null;
   }
 };
+
+const normalizeGoogleIdToken = (value) => (typeof value === "string" ? value.trim() : "");
 
 const logGoogleConfigHints = (message, { origin, redirectUri, clientId } = {}) => {
   if (!import.meta.env.DEV) {
@@ -277,13 +287,22 @@ export const authenticateWithGoogle = async ({
   }
 
   try {
-    const providedIdToken = typeof idToken === "string" ? idToken.trim() : "";
-    const googleIdToken =
+    const providedIdToken = normalizeGoogleIdToken(idToken);
+    const googleIdTokenRaw =
       providedIdToken ||
       (await requestGoogleIdToken(googleClientId, {
         redirectUri,
         debugRawResponse,
       }));
+    const googleIdToken = normalizeGoogleIdToken(googleIdTokenRaw);
+
+    if (!googleIdToken) {
+      throw new GoogleAuthError({
+        status: 400,
+        code: ERROR_CODE.BAD_REQUEST,
+        message: "Google non ha restituito un token valido. Riprova.",
+      });
+    }
 
     if (import.meta.env.DEV) {
       console.info("[GoogleAuth] Received Google ID token", {
@@ -296,11 +315,17 @@ export const authenticateWithGoogle = async ({
     const requestBody =
       mode === GOOGLE_AUTH_MODE.signup
         ? {
+            mode,
             idToken: googleIdToken,
+            credential: googleIdToken,
             workspaceName,
             workspaceSlug,
           }
-        : { idToken: googleIdToken };
+        : {
+            mode,
+            idToken: googleIdToken,
+            credential: googleIdToken,
+          };
 
     const response = await fetch(`${apiBaseUrl}/auth/google`, {
       method: "POST",

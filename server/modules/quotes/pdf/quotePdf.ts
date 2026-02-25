@@ -1,14 +1,25 @@
 import type { QuoteStatus } from '@prisma/client';
 import PDFDocument from 'pdfkit';
-import type { QuotePdfData } from '../../../services/workspace-quotes.service.js';
+import { isIP } from 'node:net';
+import type { QuotePdfData } from '../service.js';
 import { formatDateTime, formatMoney, formatQty } from './format.js';
 
 type WorkspacePdfData = {
   name: string;
   supportEmail: string | null;
+  supportPhone: string | null;
+  supportAddress: string | null;
   logoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+};
+
+type QuotePdfRenderOptions = {
+  includeItems?: boolean;
+  includeCompanyFooter?: boolean;
+  headerTitle?: string;
+  footerNote?: string;
+  signatureUrl?: string | null;
 };
 
 type TableColumn = {
@@ -35,9 +46,11 @@ type BrandPalette = {
 };
 
 const STATUS_LABELS: Record<QuoteStatus, string> = {
-  draft: 'Bozza',
-  sent: 'Inviato',
-  accepted: 'Accettato',
+  DRAFT: 'Bozza',
+  SENT: 'Inviato',
+  ACCEPTED: 'Accettato',
+  REJECTED: 'Rifiutato',
+  EXPIRED: 'Scaduto',
 };
 
 const HEX_COLOR_REGEX = /^#[A-Fa-f0-9]{6}$/;
@@ -45,7 +58,13 @@ const DEFAULT_PRIMARY_COLOR = '#0d6efd';
 const DEFAULT_SECONDARY_COLOR = '#111827';
 const LOGO_FETCH_TIMEOUT_MS = 4000;
 const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const LOGO_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_LOGO_CACHE_ITEMS = 50;
 const SUPPORTED_LOGO_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+const BLOCKED_HOSTNAME_SUFFIXES = ['.local', '.internal', '.localhost'];
+
+const remoteImageCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
 
 const toBuffer = (doc: PDFKit.PDFDocument) =>
   new Promise<Buffer>((resolve, reject) => {
@@ -153,7 +172,113 @@ const parseLogoDataUrl = (logoUrl: string) => {
   }
 };
 
+const isPrivateIpv4Address = (host: string) => {
+  const parts = host.split('.').map((segment) => Number.parseInt(segment, 10));
+  if (parts.length !== 4 || parts.some((segment) => Number.isNaN(segment) || segment < 0 || segment > 255)) {
+    return false;
+  }
+
+  if (parts[0] === 10) {
+    return true;
+  }
+  if (parts[0] === 127) {
+    return true;
+  }
+  if (parts[0] === 169 && parts[1] === 254) {
+    return true;
+  }
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
+    return true;
+  }
+  if (parts[0] === 192 && parts[1] === 168) {
+    return true;
+  }
+
+  return false;
+};
+
+const isBlockedHostname = (hostname: string) => {
+  const normalized = hostname.trim().toLowerCase();
+  if (!normalized) {
+    return true;
+  }
+
+  if (LOCAL_HOSTNAMES.has(normalized)) {
+    return true;
+  }
+
+  if (BLOCKED_HOSTNAME_SUFFIXES.some((suffix) => normalized.endsWith(suffix))) {
+    return true;
+  }
+
+  const ipVersion = isIP(normalized);
+  if (ipVersion === 4 && isPrivateIpv4Address(normalized)) {
+    return true;
+  }
+  if (ipVersion === 6 && (normalized === '::1' || normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))) {
+    return true;
+  }
+
+  return false;
+};
+
+const isAllowedRemoteImageUrl = (rawUrl: string) => {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && parsed.protocol === 'http:')) {
+    return false;
+  }
+
+  if (isBlockedHostname(parsed.hostname)) {
+    return false;
+  }
+
+  return true;
+};
+
+const getCachedImageBuffer = (url: string) => {
+  const cached = remoteImageCache.get(url);
+  if (!cached) {
+    return null;
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    remoteImageCache.delete(url);
+    return null;
+  }
+
+  return cached.buffer;
+};
+
+const setCachedImageBuffer = (url: string, buffer: Buffer) => {
+  if (remoteImageCache.size >= MAX_LOGO_CACHE_ITEMS) {
+    const oldest = remoteImageCache.keys().next();
+    if (!oldest.done) {
+      remoteImageCache.delete(oldest.value);
+    }
+  }
+
+  remoteImageCache.set(url, {
+    buffer,
+    expiresAt: Date.now() + LOGO_CACHE_TTL_MS,
+  });
+};
+
 const fetchLogoBuffer = async (logoUrl: string) => {
+  if (!isAllowedRemoteImageUrl(logoUrl)) {
+    return null;
+  }
+
+  const cached = getCachedImageBuffer(logoUrl);
+  if (cached) {
+    return cached;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), LOGO_FETCH_TIMEOUT_MS);
 
@@ -179,6 +304,7 @@ const fetchLogoBuffer = async (logoUrl: string) => {
       return null;
     }
 
+    setCachedImageBuffer(logoUrl, buffer);
     return buffer;
   } catch {
     return null;
@@ -302,9 +428,11 @@ const drawTableRow = (
 export const renderQuotePdf = async (
   quote: QuotePdfData,
   workspace: WorkspacePdfData,
+  options: QuotePdfRenderOptions = {},
 ) => {
   const palette = buildBrandPalette(workspace);
   const logoBuffer = await resolveLogoBuffer(workspace.logoUrl);
+  const signatureBuffer = await resolveLogoBuffer(options.signatureUrl ?? null);
   const doc = new PDFDocument({
     size: 'A4',
     margin: 50,
@@ -317,6 +445,9 @@ export const renderQuotePdf = async (
 
   const bufferPromise = toBuffer(doc);
   const shortId = quote.id.slice(0, 8).toUpperCase();
+  const includeItems = options.includeItems ?? true;
+  const includeCompanyFooter = options.includeCompanyFooter ?? true;
+  const headerTitle = options.headerTitle?.trim() || 'Preventivo';
 
   const headerStartY = doc.y;
   const logoMaxWidth = 128;
@@ -333,7 +464,7 @@ export const renderQuotePdf = async (
     }
   }
 
-  doc.fillColor(palette.primaryColor).font('Helvetica-Bold').fontSize(24).text('Preventivo', titleX, headerStartY);
+  doc.fillColor(palette.primaryColor).font('Helvetica-Bold').fontSize(24).text(headerTitle, titleX, headerStartY);
   doc.fontSize(10).font('Helvetica').fillColor(palette.mutedColor).text(`ID: ${shortId}`, titleX, headerStartY + 28);
   doc.y = Math.max(doc.y, headerStartY + (logoBuffer ? logoMaxHeight : 42));
 
@@ -359,63 +490,121 @@ export const renderQuotePdf = async (
     doc.fillColor(palette.mutedColor).text(`Telefono: ${quote.client.phone}`);
   }
 
-  doc.moveDown(1);
-  doc.fillColor(palette.secondaryColor).font('Helvetica-Bold').fontSize(12).text('Righe preventivo');
-  doc.moveDown(0.4);
+  const addressParts = [
+    quote.client.street,
+    [quote.client.zip, quote.client.city].filter(Boolean).join(' '),
+    quote.client.province,
+    quote.client.country,
+  ].filter((part) => part && part.trim().length > 0);
+
+  if (addressParts.length > 0) {
+    doc.fillColor(palette.mutedColor).text(`Indirizzo: ${addressParts.join(', ')}`);
+  }
 
   const columns = buildColumns(doc);
-  ensureVerticalSpace(doc, 30, () => {
-    drawTableHeader(doc, columns, palette);
-  });
-  drawTableHeader(doc, columns, palette);
+  if (includeItems) {
+    doc.moveDown(1);
+    doc.fillColor(palette.secondaryColor).font('Helvetica-Bold').fontSize(12).text('Righe preventivo');
+    doc.moveDown(0.4);
 
-  if (quote.lines.length === 0) {
     ensureVerticalSpace(doc, 30, () => {
       drawTableHeader(doc, columns, palette);
     });
-    drawTableRow(doc, columns, palette, {
-      title: 'Nessuna riga presente',
-      qty: '-',
-      unitPrice: '-',
-      lineTotal: '-',
-    });
-  } else {
-    for (const line of quote.lines) {
-      const titleHeight = doc.heightOfString(line.title, {
-        width: columns.title.width - 10,
-      });
-      const rowHeight = Math.max(22, titleHeight + 12);
+    drawTableHeader(doc, columns, palette);
 
-      ensureVerticalSpace(doc, rowHeight + 4, () => {
+    if (quote.lines.length === 0) {
+      ensureVerticalSpace(doc, 30, () => {
         drawTableHeader(doc, columns, palette);
       });
       drawTableRow(doc, columns, palette, {
-        title: line.title,
-        qty: formatQty(line.qty),
-        unitPrice: formatMoney(line.unitPrice),
-        lineTotal: formatMoney(line.lineTotal),
+        title: 'Nessuna riga presente',
+        qty: '-',
+        unitPrice: '-',
+        lineTotal: '-',
       });
+    } else {
+      for (const line of quote.lines) {
+        const titleHeight = doc.heightOfString(line.title, {
+          width: columns.title.width - 10,
+        });
+        const rowHeight = Math.max(22, titleHeight + 12);
+
+        ensureVerticalSpace(doc, rowHeight + 4, () => {
+          drawTableHeader(doc, columns, palette);
+        });
+        drawTableRow(doc, columns, palette, {
+          title: line.title,
+          qty: formatQty(line.qty),
+          unitPrice: formatMoney(line.unitPrice, quote.currency),
+          lineTotal: formatMoney(line.lineTotal, quote.currency),
+        });
+      }
     }
   }
 
   doc.moveDown(1);
-  ensureVerticalSpace(doc, 60);
+  ensureVerticalSpace(doc, 110);
+
+  const summaryRightX = columns.unitPrice.x + 5;
+  const summaryRightWidth = columns.unitPrice.width + columns.lineTotal.width - 10;
+  const summaryStartY = doc.y;
+  const summarySubtotalLabelY = summaryStartY;
+  const summarySubtotalValueY = summaryStartY + 14;
+  const summaryTaxLabelY = summaryStartY + 30;
+  const summaryTaxValueY = summaryStartY + 44;
+  const summaryTotalLabelY = summaryStartY + 62;
+  const summaryTotalValueY = summaryStartY + 80;
+
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(palette.secondaryColor)
+    .text('Subtotale', summaryRightX, summarySubtotalLabelY, {
+      width: summaryRightWidth,
+      align: 'right',
+    });
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(palette.secondaryColor)
+    .text(formatMoney(quote.subtotal, quote.currency), summaryRightX, summarySubtotalValueY, {
+      width: summaryRightWidth,
+      align: 'right',
+    });
+
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(palette.secondaryColor)
+    .text('IVA', summaryRightX, summaryTaxLabelY, {
+      width: summaryRightWidth,
+      align: 'right',
+    });
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(palette.secondaryColor)
+    .text(formatMoney(quote.taxTotal, quote.currency), summaryRightX, summaryTaxValueY, {
+      width: summaryRightWidth,
+      align: 'right',
+    });
 
   doc
     .font('Helvetica-Bold')
     .fontSize(11)
     .fillColor(palette.secondaryColor)
-    .text('Totale', columns.unitPrice.x + 5, doc.y, {
-      width: columns.unitPrice.width + columns.lineTotal.width - 10,
+    .text('Totale', summaryRightX, summaryTotalLabelY, {
+      width: summaryRightWidth,
       align: 'right',
     });
   doc
     .fillColor(palette.primaryColor)
     .fontSize(18)
-    .text(formatMoney(quote.total), columns.unitPrice.x + 5, doc.y + 4, {
-      width: columns.unitPrice.width + columns.lineTotal.width - 10,
+    .text(formatMoney(quote.total, quote.currency), summaryRightX, summaryTotalValueY, {
+      width: summaryRightWidth,
       align: 'right',
     });
+  doc.y = summaryStartY + 106;
 
   if (quote.notes) {
     doc.moveDown(1.6);
@@ -428,10 +617,56 @@ export const renderQuotePdf = async (
   }
 
   doc.moveDown(1.2);
-  ensureVerticalSpace(doc, 45);
+  ensureVerticalSpace(doc, 120);
   doc.font('Helvetica').fontSize(9).fillColor(palette.mutedColor);
+  if (quote.issueDate) {
+    doc.text(`Emissione: ${formatDateTime(quote.issueDate)}`);
+  }
+  if (quote.validUntil) {
+    doc.text(`Preventivo valido fino a: ${formatDateTime(quote.validUntil)}`);
+  }
   doc.text(`Stato: ${STATUS_LABELS[quote.status]} (${quote.status})`);
   doc.text(`Creato: ${formatDateTime(quote.createdAt)} | Aggiornato: ${formatDateTime(quote.updatedAt)}`);
+
+  if (options.footerNote?.trim()) {
+    doc.moveDown(0.5);
+    doc.text(options.footerNote.trim());
+  }
+
+  if (includeCompanyFooter) {
+    doc.moveDown(0.6);
+    doc.font('Helvetica-Bold').fillColor(palette.secondaryColor).text(workspace.name);
+    doc.font('Helvetica').fillColor(palette.mutedColor);
+    if (workspace.supportAddress) {
+      doc.text(workspace.supportAddress);
+    }
+    if (workspace.supportPhone) {
+      doc.text(`Tel: ${workspace.supportPhone}`);
+    }
+    if (workspace.supportEmail) {
+      doc.text(`Email: ${workspace.supportEmail}`);
+    }
+    if (!workspace.supportAddress && !workspace.supportPhone && !workspace.supportEmail) {
+      // TODO: show richer company contacts when workspace settings include legal/billing fields.
+      doc.text('Contatti aziendali non configurati.');
+    }
+  }
+
+  if (signatureBuffer) {
+    try {
+      const signatureWidth = 120;
+      const signatureHeight = 44;
+      ensureVerticalSpace(doc, signatureHeight + 8);
+      doc.moveDown(0.5);
+      doc.image(signatureBuffer, doc.page.width - doc.page.margins.right - signatureWidth, doc.y, {
+        fit: [signatureWidth, signatureHeight],
+        align: 'right',
+      });
+      doc.moveDown(2.6);
+    } catch {
+      // Ignore signature parsing/render failures to keep export resilient.
+    }
+  }
 
   doc.end();
   return bufferPromise;

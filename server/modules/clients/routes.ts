@@ -8,6 +8,7 @@ import { clientsService } from './service.js';
 
 type ClientsListQuery = {
   query?: string;
+  search?: string;
   type?: string;
   page?: string;
   pageSize?: string;

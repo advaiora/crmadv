@@ -1,0 +1,29 @@
+.web-assets-page .card {
+  border-radius: 14px;
+}
+
+.web-assets-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.web-assets-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.web-assets-table td,
+.web-assets-table th {
+  vertical-align: middle;
+}
+
+.web-assets-url {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+

@@ -5,13 +5,15 @@
   --chk-text: var(--hk-text-primary);
   --chk-surface: var(--hk-bg-primary);
   --chk-surface-elev: var(--hk-bg-secondary);
-  --chk-surface-soft: linear-gradient(180deg, var(--hk-bg-primary) 0%, var(--hk-bg-secondary) 100%);
+  --chk-surface-soft: var(--hk-bg-primary);
   --chk-shadow: 0 12px 30px rgba(var(--hk-shadow-rgb), 0.08);
-  --chk-chip-bg: rgba(var(--bs-primary-rgb), 0.08);
-  --chk-chip-border: rgba(var(--bs-primary-rgb), 0.22);
-  --chk-chip-color: var(--bs-primary);
-  --chk-active-bg: rgba(var(--bs-primary-rgb), 0.12);
-  --chk-active-border: rgba(var(--bs-primary-rgb), 0.35);
+  --chk-chip-bg: rgba(var(--hk-shadow-rgb), 0.04);
+  --chk-chip-border: var(--chk-border);
+  --chk-chip-color: var(--chk-text);
+  --chk-active-bg: var(--hk-bg-secondary);
+  --chk-active-border: var(--chk-border-strong);
+  --chk-control-bg: #334155;
+  --chk-control-outline: rgba(51, 65, 85, 0.35);
 }
 
 .checklists-hero {
@@ -20,8 +22,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  background: radial-gradient(circle at 12% 10%, rgba(var(--bs-primary-rgb), 0.22) 0%, transparent 52%),
-    var(--chk-surface-soft);
+  background: var(--chk-surface-soft);
   border: 1px solid var(--chk-border);
   border-radius: 16px;
   padding: 18px 20px;
@@ -95,7 +96,7 @@
 }
 
 .checklists-template-list::-webkit-scrollbar-thumb {
-  background: rgba(var(--bs-secondary-rgb), 0.4);
+  background: rgba(var(--hk-shadow-rgb), 0.18);
   border-radius: 999px;
 }
 
@@ -118,7 +119,7 @@
 .checklists-template-item:hover {
   transform: translateY(-1px);
   border-color: var(--chk-active-border);
-  background: rgba(var(--bs-primary-rgb), 0.08);
+  background: var(--chk-active-bg);
 }
 
 .checklists-template-item.is-active {
@@ -138,14 +139,14 @@
 
 .checklists-item-row:hover {
   border-color: var(--chk-active-border);
-  background: rgba(var(--bs-primary-rgb), 0.08);
+  background: var(--chk-active-bg);
   box-shadow: 0 8px 22px rgba(var(--hk-shadow-rgb), 0.14);
 }
 
 .checklists-progress-track {
   height: 8px;
   border-radius: 999px;
-  background: rgba(var(--bs-secondary-rgb), 0.24);
+  background: rgba(var(--hk-shadow-rgb), 0.14);
   overflow: hidden;
 }
 
@@ -190,9 +191,9 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(var(--bs-primary-rgb), 0.32);
-  background: rgba(var(--bs-primary-rgb), 0.12);
-  color: var(--bs-primary);
+  border: 1px solid var(--chk-active-border);
+  background: var(--chk-active-bg);
+  color: var(--chk-text);
   padding: 2px 8px;
   font-size: 11px;
   font-weight: 600;
@@ -200,7 +201,7 @@
 
 .checklists-transition-box {
   border-color: var(--chk-active-border);
-  background: rgba(var(--bs-primary-rgb), 0.08);
+  background: var(--chk-active-bg);
 }
 
 .checklists-checkbox-label {
@@ -219,8 +220,8 @@
 }
 
 .checklists-checkbox:checked {
-  border-color: #2563eb;
-  background: #2563eb;
+  border-color: var(--chk-control-bg);
+  background: var(--chk-control-bg);
 }
 
 .checklists-checkbox:checked::after {
@@ -236,7 +237,7 @@
 }
 
 .checklists-checkbox:focus-visible {
-  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline: 2px solid var(--chk-control-outline);
   outline-offset: 1px;
 }
 
@@ -249,10 +250,12 @@
   --chk-surface-elev: #161f2d;
   --chk-surface-soft: #111824;
   --chk-shadow: 0 16px 36px rgba(0, 0, 0, 0.42);
-  --chk-chip-bg: rgba(var(--bs-primary-rgb), 0.22);
-  --chk-chip-border: rgba(var(--bs-primary-rgb), 0.38);
-  --chk-active-bg: rgba(var(--bs-primary-rgb), 0.18);
-  --chk-active-border: rgba(var(--bs-primary-rgb), 0.5);
+  --chk-chip-bg: rgba(255, 255, 255, 0.03);
+  --chk-chip-border: rgba(255, 255, 255, 0.14);
+  --chk-active-bg: rgba(255, 255, 255, 0.03);
+  --chk-active-border: rgba(255, 255, 255, 0.2);
+  --chk-control-bg: #6b7280;
+  --chk-control-outline: rgba(107, 114, 128, 0.45);
 }
 
 [data-bs-theme="dark"] .checklists-hero {
@@ -294,7 +297,7 @@
 
 [data-bs-theme="dark"] .checklists-shell .bg-muted,
 [data-bs-theme="dark"] .checklists-shell .hover\:bg-muted:hover {
-  background-color: rgba(var(--bs-secondary-rgb), 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
 }
 
 [data-bs-theme="dark"] .checklists-shell .text-foreground {
@@ -302,22 +305,18 @@
 }
 
 [data-bs-theme="dark"] .checklists-shell .hover\:bg-slate-50:hover {
-  background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
-}
-
-[data-bs-theme="dark"] .checklists-shell .bg-blue-50 {
   background-color: var(--chk-active-bg) !important;
 }
 
 [data-bs-theme="dark"] .checklists-shell .checklists-transition-box {
   border-color: var(--chk-active-border) !important;
-  background: rgba(var(--bs-primary-rgb), 0.2) !important;
+  background: var(--chk-active-bg) !important;
 }
 
 [data-bs-theme="dark"] .checklists-shell .checklists-current-stage-pill {
-  border-color: rgba(var(--bs-primary-rgb), 0.52);
-  background: rgba(var(--bs-primary-rgb), 0.24);
-  color: #d8e7ff;
+  border-color: var(--chk-active-border);
+  background: var(--chk-active-bg);
+  color: var(--chk-text);
 }
 
 [data-bs-theme="dark"] .checklists-shell input,

@@ -699,12 +699,13 @@ export const clientsService = {
       sortDirection = normalizedSort.startsWith('-') ? 'desc' : 'asc';
     }
 
+    const rawSearch = query.query !== undefined ? query.query : query.search;
     let normalizedQuery: string | undefined;
-    if (query.query !== undefined) {
-      if (typeof query.query !== 'string') {
+    if (rawSearch !== undefined) {
+      if (typeof rawSearch !== 'string') {
         throw badRequest('query must be a string');
       }
-      const trimmed = query.query.trim();
+      const trimmed = rawSearch.trim();
       if (trimmed.length > MAX_SEARCH_LENGTH) {
         throw badRequest('query is too long', {
           maxLength: MAX_SEARCH_LENGTH,

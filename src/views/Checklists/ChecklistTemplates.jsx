@@ -343,7 +343,7 @@ const ChecklistTemplatesContent = ({ access }) => {
   return (
     <div className="container-fluid py-4 checklists-shell">
       <div className="mb-3">
-        <Link to="/projects" className="text-primary">
+        <Link to="/projects" className="text-slate-600 hover:text-slate-900">
           &larr; Torna a Progetti
         </Link>
       </div>
@@ -351,7 +351,7 @@ const ChecklistTemplatesContent = ({ access }) => {
       <div className="checklists-hero mb-4">
         <div className="checklists-hero-title">
           <h3 className="mb-1 flex items-center gap-2">
-            <Sparkles size={18} className="text-blue-600" />
+            <Sparkles size={18} className="text-slate-600" />
             Memo Operativi
           </h3>
           <p className="text-muted mb-0">
@@ -424,7 +424,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                     type="button"
                     className={`w-full rounded-md border px-3 py-2 text-left transition checklists-template-item ${
                       selectedTemplateId === template.id
-                        ? 'border-primary bg-blue-50 is-active'
+                        ? 'is-active'
                         : 'border-slate-200 bg-white hover:bg-slate-50'
                     }`}
                     onClick={() => setSelectedTemplateId(template.id)}
