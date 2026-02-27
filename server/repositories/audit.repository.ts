@@ -33,6 +33,8 @@ const BUSINESS_ACTION_PREFIXES = [
   'projects.',
   'checklists.',
   'quotes.',
+  'web.',
+  'web_assets.',
   'branding.',
   'role.',
   'modules.',
@@ -105,5 +107,61 @@ export const auditRepository = {
     });
 
     return items.filter((item) => isBusinessAction(item.action)).slice(0, safeLimit);
+  },
+
+  async listWebAssetActivityByWorkspace(input: {
+    workspaceId: string;
+    page: number;
+    pageSize: number;
+    action?: string;
+    assetId?: string;
+  }) {
+    const page = Math.max(1, Math.floor(input.page || 1));
+    const pageSize = Math.max(1, Math.min(Math.floor(input.pageSize || 20), 100));
+    const where: Prisma.AuditLogWhereInput = {
+      workspaceId: input.workspaceId,
+      ...(input.action
+        ? { action: input.action }
+        : {
+            OR: [
+              { action: { startsWith: 'web.' } },
+              { action: { startsWith: 'web_assets.' } },
+            ],
+          }),
+      ...(input.assetId
+        ? {
+            entityType: 'web_asset',
+            entityId: input.assetId,
+          }
+        : {}),
+    };
+
+    const [totalItems, items] = await Promise.all([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        where,
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: auditListSelect,
+      }),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage = Math.min(page, totalPages);
+
+    return {
+      items,
+      pageInfo: {
+        page: safePage,
+        pageSize,
+        totalItems,
+        totalPages,
+        hasPrevPage: safePage > 1,
+        hasNextPage: safePage < totalPages,
+      },
+    };
   },
 };

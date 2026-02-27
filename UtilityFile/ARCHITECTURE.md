@@ -95,3 +95,24 @@ Business (MVP 1):
 - Tags are stored as `String[]` (`TEXT[]` in PostgreSQL) to keep MVP simple and avoid extra relations.
 - API path is `/clients` (workspace resolved from `x-workspace-id` or `x-workspace-slug`) to stay coherent with current Fastify routes.
 - UI module gating uses data from `/me`: menu item is hidden if module `clients` is disabled; route pages show "Modulo non attivo" instead of failing.
+
+## 11) Web Assets Security & Audit (Phase 5, 2026-02-26)
+- All `web-assets` API handlers pass through centralized policy `ensureWebAssetsAccess`:
+  - `requireAuth`
+  - `requireWorkspace`
+  - `requireModuleEnabled("web")`
+  - `requirePermission("web.*")` per action
+- Feature-flag rule is strict: if module `web` is disabled for the workspace, API responds `403`.
+- Repository hardening: web-assets repository uses a centralized `whereWorkspace(workspaceId, where)` helper to prevent tenant scope omissions on Prisma queries.
+- RBAC enforcement is server-side; UI visibility is only a UX layer.
+- Critical audit actions for Web Asset Management:
+  - `web.asset.create`
+  - `web.asset.update`
+  - `web.asset.delete`
+  - `web.asset.publish`
+  - `web.asset.unpublish`
+  - `web.version.create`
+  - `web.version.rollback`
+  - `web.asset.link_client`
+  - `web.asset.link_project`
+- Audit metadata must never include secrets; only operational non-sensitive fields are allowed (status transitions, linked entity IDs, version transitions).

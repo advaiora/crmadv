@@ -27,3 +27,13 @@
   white-space: nowrap;
 }
 
+.web-assets-row-selected td {
+  background: #eef4ff;
+}
+
+.web-assets-detail-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}

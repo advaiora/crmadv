@@ -42,6 +42,50 @@ enum WebAssetStatus {
   ARCHIVED
 }
 
+enum WebAssetVersionStatus {
+  DRAFT
+  STAGED
+  LIVE
+}
+
+enum WebAssetDeploymentEnvironment {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+enum WebAssetHealthStatus {
+  UP
+  DEGRADED
+  DOWN
+}
+
+enum WebAssetMaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum WebAssetAlertType {
+  DOWNTIME
+  PERFORMANCE
+  ERROR_RATE
+  MAINTENANCE
+}
+
+enum WebAssetAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum WebAssetAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 model Workspace {
   id                     String                  @id @default(cuid())
   name                   String
@@ -67,6 +111,13 @@ model Workspace {
   websiteAssets          WebsiteAsset[]
   webAppAssets           WebAppAsset[]
   ecommerceAssets        EcommerceAsset[]
+  webAssetVersions       WebAssetVersion[]
+  webAssetHealthChecks   WebAssetHealthCheck[]
+  webAssetSeoReports     WebAssetSeoReport[]
+  webAssetAnalyticsSnapshots WebAssetAnalyticsSnapshot[]
+  webAssetAnalyticsEvents WebAssetAnalyticsEvent[]
+  webAssetMaintenanceWindows WebAssetMaintenanceWindow[]
+  webAssetAlerts         WebAssetAlert[]
   auditLogs              AuditLog[]
   checklistTemplates     ChecklistTemplate[]
   checklistTemplateItems ChecklistTemplateItem[]
@@ -91,6 +142,14 @@ model User {
   ownedWebsiteAssets      WebsiteAsset[]          @relation("WebsiteAssetOwner")
   ownedWebAppAssets       WebAppAsset[]           @relation("WebAppAssetOwner")
   ownedEcommerceAssets    EcommerceAsset[]        @relation("EcommerceAssetOwner")
+  createdWebAssetVersions WebAssetVersion[]       @relation("WebAssetVersionCreatedByUser")
+  createdWebAssetHealthChecks WebAssetHealthCheck[] @relation("WebAssetHealthCheckCreatedByUser")
+  createdWebAssetSeoReports WebAssetSeoReport[]   @relation("WebAssetSeoReportCreatedByUser")
+  createdWebAssetAnalyticsSnapshots WebAssetAnalyticsSnapshot[] @relation("WebAssetAnalyticsSnapshotCreatedByUser")
+  createdWebAssetAnalyticsEvents WebAssetAnalyticsEvent[] @relation("WebAssetAnalyticsEventCreatedByUser")
+  createdWebAssetMaintenanceWindows WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowCreatedByUser")
+  updatedWebAssetMaintenanceWindows WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowUpdatedByUser")
+  createdWebAssetAlerts   WebAssetAlert[]         @relation("WebAssetAlertCreatedByUser")
   auditLogs               AuditLog[]              @relation("AuditActor")
   completedChecklistItems ChecklistInstanceItem[]
 }
@@ -311,6 +370,7 @@ model WebsiteAsset {
   name        String
   url         String         @db.VarChar(2048)
   status      WebAssetStatus @default(ACTIVE)
+  deploymentEnvironment WebAssetDeploymentEnvironment @default(DEVELOPMENT)
   version     String?        @db.VarChar(64)
   metadata    Json?
   createdAt   DateTime       @default(now())
@@ -323,6 +383,7 @@ model WebsiteAsset {
   @@unique([workspaceId, url])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, status])
+  @@index([workspaceId, deploymentEnvironment])
   @@index([workspaceId, clientId])
   @@index([workspaceId, projectId])
 }
@@ -336,6 +397,7 @@ model WebAppAsset {
   name        String
   url         String         @db.VarChar(2048)
   status      WebAssetStatus @default(ACTIVE)
+  deploymentEnvironment WebAssetDeploymentEnvironment @default(DEVELOPMENT)
   version     String?        @db.VarChar(64)
   metadata    Json?
   createdAt   DateTime       @default(now())
@@ -348,6 +410,7 @@ model WebAppAsset {
   @@unique([workspaceId, url])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, status])
+  @@index([workspaceId, deploymentEnvironment])
   @@index([workspaceId, clientId])
   @@index([workspaceId, projectId])
 }
@@ -361,6 +424,7 @@ model EcommerceAsset {
   name        String
   url         String         @db.VarChar(2048)
   status      WebAssetStatus @default(ACTIVE)
+  deploymentEnvironment WebAssetDeploymentEnvironment @default(DEVELOPMENT)
   version     String?        @db.VarChar(64)
   metadata    Json?
   createdAt   DateTime       @default(now())
@@ -373,8 +437,180 @@ model EcommerceAsset {
   @@unique([workspaceId, url])
   @@index([workspaceId, updatedAt])
   @@index([workspaceId, status])
+  @@index([workspaceId, deploymentEnvironment])
   @@index([workspaceId, clientId])
   @@index([workspaceId, projectId])
+}
+
+model WebAssetVersion {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  assetType       String                @db.VarChar(20)
+  assetId         String
+  versionNumber   String?               @db.VarChar(64)
+  versionStatus   WebAssetVersionStatus @default(DRAFT)
+  changelog       String?               @db.VarChar(2000)
+  releaseNotes    String?               @db.VarChar(4000)
+  sourceAction    String                @db.VarChar(60)
+  isRollback      Boolean               @default(false)
+  sourceVersionId String?
+  snapshot        Json
+  createdByUserId String?
+  createdAt       DateTime              @default(now())
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("WebAssetVersionCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, createdAt(sort: Desc)])
+  @@index([workspaceId, createdAt(sort: Desc)])
+  @@index([createdByUserId])
+}
+
+model WebAssetHealthCheck {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  assetType       String                @db.VarChar(20)
+  assetId         String
+  environment     WebAssetDeploymentEnvironment
+  status          WebAssetHealthStatus
+  url             String                @db.VarChar(2048)
+  httpStatus      Int?
+  responseTimeMs  Int?
+  errorCode       String?               @db.VarChar(120)
+  errorMessage    String?               @db.VarChar(1000)
+  createdByUserId String?
+  checkedAt       DateTime              @default(now())
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("WebAssetHealthCheckCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, checkedAt(sort: Desc)])
+  @@index([workspaceId, status, checkedAt(sort: Desc)])
+  @@index([createdByUserId])
+}
+
+model WebAssetSeoReport {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  assetType       String                @db.VarChar(20)
+  assetId         String
+  score           Int
+  status          WebAssetVersionStatus @default(DRAFT)
+  metaTitle       String?               @db.VarChar(255)
+  metaDescription String?               @db.VarChar(512)
+  h1Count         Int                   @default(0)
+  keywordList     String[]              @default([])
+  issues          Json?
+  suggestions     Json?
+  createdByUserId String?
+  createdAt       DateTime              @default(now())
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("WebAssetSeoReportCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, createdAt(sort: Desc)])
+  @@index([workspaceId, score, createdAt(sort: Desc)])
+  @@index([createdByUserId])
+}
+
+model WebAssetAnalyticsSnapshot {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  assetType       String                @db.VarChar(20)
+  assetId         String
+  environment     WebAssetDeploymentEnvironment
+  provider        String                @db.VarChar(60)
+  sourceLabel     String?               @db.VarChar(160)
+  periodStart     DateTime
+  periodEnd       DateTime
+  sessions        Int                   @default(0)
+  users           Int                   @default(0)
+  pageViews       Int                   @default(0)
+  bounceRate      Decimal?              @db.Decimal(5, 2)
+  avgLoadTimeMs   Int?
+  uptimePercent   Decimal?              @db.Decimal(5, 2)
+  errorRate       Decimal?              @db.Decimal(5, 2)
+  topPages        Json?
+  customEvents    Json?
+  createdByUserId String?
+  createdAt       DateTime              @default(now())
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("WebAssetAnalyticsSnapshotCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, periodEnd(sort: Desc)])
+  @@index([workspaceId, provider, periodEnd(sort: Desc)])
+  @@index([createdByUserId])
+}
+
+model WebAssetAnalyticsEvent {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  assetType       String                @db.VarChar(20)
+  assetId         String
+  environment     WebAssetDeploymentEnvironment
+  eventName       String                @db.VarChar(120)
+  eventLabel      String?               @db.VarChar(255)
+  count           Int                   @default(1)
+  metadata        Json?
+  createdByUserId String?
+  occurredAt      DateTime              @default(now())
+  createdAt       DateTime              @default(now())
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("WebAssetAnalyticsEventCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, occurredAt(sort: Desc)])
+  @@index([workspaceId, eventName, occurredAt(sort: Desc)])
+  @@index([createdByUserId])
+}
+
+model WebAssetMaintenanceWindow {
+  id              String                   @id @default(cuid())
+  workspaceId     String
+  assetType       String                   @db.VarChar(20)
+  assetId         String
+  startsAt        DateTime
+  endsAt          DateTime
+  timezone        String?                  @db.VarChar(120)
+  reason          String?                  @db.VarChar(1000)
+  status          WebAssetMaintenanceStatus @default(SCHEDULED)
+  notifyEmail     String?                  @db.VarChar(255)
+  notifySms       String?                  @db.VarChar(60)
+  lastNotifiedAt  DateTime?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  workspace       Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                    @relation("WebAssetMaintenanceWindowCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser   User?                    @relation("WebAssetMaintenanceWindowUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, startsAt(sort: Desc)])
+  @@index([workspaceId, status, startsAt(sort: Desc)])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+}
+
+model WebAssetAlert {
+  id                  String              @id @default(cuid())
+  workspaceId         String
+  assetType           String              @db.VarChar(20)
+  assetId             String
+  type                WebAssetAlertType
+  severity            WebAssetAlertSeverity
+  status              WebAssetAlertStatus @default(OPEN)
+  title               String              @db.VarChar(200)
+  message             String              @db.VarChar(1000)
+  metadata            Json?
+  acknowledgedAt      DateTime?
+  resolvedAt          DateTime?
+  emailNotifiedAt     DateTime?
+  smsNotifiedAt       DateTime?
+  createdByUserId     String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser       User?               @relation("WebAssetAlertCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, assetType, assetId, createdAt(sort: Desc)])
+  @@index([workspaceId, type, status, createdAt(sort: Desc)])
+  @@index([createdByUserId])
 }
 
 model Module {

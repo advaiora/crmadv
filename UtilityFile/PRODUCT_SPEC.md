@@ -68,7 +68,7 @@ Esempi:
 - `projects.view|create|edit|delete|move_stage`
 - `checklists.view|manage_templates|complete_item|override_gate`
 - `quotes.view|create|send|accept|manage_templates`
-- `web.view|create|edit|delete`
+- `web.view|create|edit|delete|publish`
 - `vault.view_list|create|edit|reveal|delete`
 - `seo.view|run_scan|export|manage_settings`
 - `audit.view`
@@ -125,3 +125,13 @@ Applicazione: UI + PDF preventivi.
 
 - Non aggiungere funzionalità non richieste.
 - Se manca un dettaglio: scegliere la soluzione più semplice e documentarla in `ARCHITECTURE.md`.
+
+## 9) Web Module Activation (Operational Notes)
+
+- Per attivare Web Asset Management in un workspace:
+  1. abilitare il modulo `web` in `workspaceModules`
+  2. assegnare ai ruoli i permessi `web.view|create|edit|delete|publish`
+  3. assegnare `audit.view` per accesso alla dashboard audit
+- Comportamento atteso con modulo web disabilitato:
+  - API `/web-assets*` sempre `403`
+  - UI nascosta o bloccata tramite module gate
