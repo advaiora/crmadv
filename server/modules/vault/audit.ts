@@ -163,8 +163,6 @@ type AuditVaultRevealInput = {
 };
 
 export const auditVaultReveal = async (input: AuditVaultRevealInput) => {
-  // Phase 2 scaffold: reveal endpoint is not implemented yet.
-  // This helper is ready to be called by reveal service/route in Phase 4.
   return logVaultAuditEvent({
     action: VaultAuditActions.reveal,
     workspaceId: input.workspaceId,
@@ -174,4 +172,3 @@ export const auditVaultReveal = async (input: AuditVaultRevealInput) => {
     request: input.request,
   });
 };
-

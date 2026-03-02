@@ -183,6 +183,7 @@ export const vaultRepo = {
   async createVaultItem(workspaceId: string, data: CreateVaultItemInput): Promise<VaultItemRecord> {
     const item = await prisma.vaultItem.create({
       data: {
+        ...(data.id ? { id: data.id } : {}),
         workspaceId,
         name: data.name,
         username: data.username ?? null,
@@ -246,4 +247,3 @@ export const vaultRepo = {
     return deleted.count > 0;
   },
 };
-

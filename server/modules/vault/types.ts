@@ -15,6 +15,12 @@ export type VaultItemEncryptedPayload = {
   version: number;
 };
 
+export type VaultSecretPayload = {
+  password: string;
+  notes: string | null;
+  extra: Record<string, unknown> | null;
+};
+
 export type VaultItemRecord = VaultItemMeta &
   VaultItemEncryptedPayload & {
     workspaceId: string;
@@ -35,6 +41,7 @@ export type ListVaultItemsResult = {
 };
 
 export type CreateVaultItemInput = {
+  id?: string;
   name: string;
   username?: string | null;
   url?: string | null;
@@ -51,4 +58,3 @@ export type UpdateVaultItemInput = {
   payload?: VaultItemEncryptedPayload;
   actorUserId?: string;
 };
-
