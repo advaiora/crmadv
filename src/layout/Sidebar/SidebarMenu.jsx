@@ -143,51 +143,13 @@ export const SidebarMenu = [
     group: "Comunicazioni",
     contents: [
       {
-        name: "Email",
+        id: "comm_messaging",
+        name: "Messaggi",
         icon: <Icons.Inbox />,
         path: "/apps/email",
+        requiredModule: "team",
+        requiredPermission: "team.view",
         grp_name: "apps",
-      },
-      {
-        id: "comm_chat",
-        name: "Chat",
-        icon: <Icons.MessageDots />,
-        path: "/apps/chat",
-        childrens: [
-          {
-            name: "Conversazioni",
-            path: "/apps/chat/chats",
-            grp_name: "apps",
-          },
-          {
-            name: "Gruppi",
-            path: "/apps/chat/chat-groups",
-            grp_name: "apps",
-          },
-          {
-            name: "Contatti Chat",
-            path: "/apps/chat/chat-contact",
-            grp_name: "apps",
-          },
-        ],
-      },
-      {
-        id: "comm_chatbot",
-        name: "Chatbot",
-        icon: <Icons.MessageCircle />,
-        path: "/apps/chat-bot",
-        childrens: [
-          {
-            name: "Direct Message",
-            path: "/apps/chat-bot/chatpopup",
-            grp_name: "apps",
-          },
-          {
-            name: "Assistente",
-            path: "/apps/chat-bot/chatbot",
-            grp_name: "apps",
-          },
-        ],
       },
     ],
   },

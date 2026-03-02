@@ -21,6 +21,7 @@ import workspaceProjectsRoute from "./modules/projects/routes/workspace-projects
 import workspaceQuotesRoute from "./modules/quotes/routes/workspace-quotes.route.js";
 import workspaceQuoteTemplatesRoute from "./modules/quotes/routes/workspace-quote-templates.route.js";
 import workspaceCalendarRoute from "./modules/calendar/routes/workspace-calendar.route.js";
+import workspaceMessagingRoute from "./modules/messaging/routes/workspace-messaging.route.js";
 import workspaceWebAssetsRoute from "./routes/workspace-web-assets.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
@@ -257,6 +258,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceQuotesRoute);
   void app.register(workspaceQuoteTemplatesRoute);
   void app.register(workspaceCalendarRoute);
+  void app.register(workspaceMessagingRoute);
   void app.register(workspaceWebAssetsRoute);
   void app.register(workspaceRolesRoute);
   void app.register(clientsRoute);

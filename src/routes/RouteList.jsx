@@ -2,9 +2,6 @@ import AddNewPost from "../views/Blog/AddNewPost";
 import PostDetail from "../views/Blog/PostDetails";
 import Posts from "../views/Blog/Posts";
 import Calendar from "../views/Calendar";
-import Chats from "../views/Chat/Chats";
-import ChatContacts from "../views/Chat/Contact";
-import ChatGroups from "../views/Chat/Groups";
 import ChecklistsTemplates from "../views/Checklists";
 import ContactCards from "../views/Contact/ContactCards";
 import ContactList from "../views/Contact/ContactList";
@@ -56,19 +53,12 @@ import LockScreen from "../views/Authentication/LockScreen";
 import ResetPassword from "../views/Authentication/ResetPassword";
 import Error404 from "../views/Authentication/Error404/Error404";
 import Error503 from "../views/Authentication/Error503/Error503";
-import ChatPopup from "../views/ChatPopup/DirectMessage";
-import ChatBot from "../views/ChatPopup/ChatBot";
 
 
 export const routes = [
 
     { path: 'dashboard', exact: true, component: Dashboard },
     //Apps
-    { path: 'apps/chat/chats', exact: true, component: Chats },
-    { path: 'apps/chat/chat-groups', exact: true, component: ChatGroups },
-    { path: 'apps/chat/chat-contact', exact: true, component: ChatContacts },
-    { path: 'apps/chat-bot/chatpopup', exact: true, component: ChatPopup },
-    { path: 'apps/chat-bot/chatbot', exact: true, component: ChatBot },
     { path: 'apps/calendar', exact: true, component: Calendar },
     { path: 'apps/email', exact: true, component: Email },
     { path: 'apps/taskboard/projects-board', exact: true, component: ProjectsBoard },

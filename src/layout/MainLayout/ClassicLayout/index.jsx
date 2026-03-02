@@ -7,14 +7,12 @@ import PageFooter from '../../Footer/PageFooter';
 import TopNav from '../../Header/TopNav';
 import Sidebar from '../../Sidebar/Sidebar';
 import { useWindowWidth } from '@react-hook/window-size';
-import ChatBotInterface from '../../../views/ChatPopup/ChatBot/ChatBotInterface';
 
 const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapsedNav, maximize }) => {
 
     const [dataHover, setDataHover] = useState(navCollapsed);
     const appRoutes = useRouteMatch('/apps/');
     const errro404Route = useRouteMatch('/error-404');
-    const dashboardRoute = useRouteMatch("/dashboard");
     const windowWidth = useWindowWidth();
 
     useEffect(() => {
@@ -46,8 +44,6 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
             <TopNav />
             {/* Vertical Nav */}
             <Sidebar />
-            {/* Chat-bot */}
-            {dashboardRoute && <ChatBotInterface show={false} />}
             <div className={classNames("hk-pg-wrapper", { "pb-0": appRoutes })}>
                 {children}
                 {!appRoutes && <PageFooter />}

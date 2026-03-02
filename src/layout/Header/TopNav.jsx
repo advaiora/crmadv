@@ -1,18 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SimpleBar from 'simplebar-react';
 import { AlignLeft, Bell, LogOut, Settings } from 'react-feather';
 import { Button, Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { connect } from 'react-redux';
-import { Link, useHistory } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
 import HkBadge from '../../components/@hk-badge/@hk-badge';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
-import { fetchWorkspaceAccess } from '../../utils/workspaceAccess';
+import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
 import { apiPost } from '../../utils/apiClient';
 import { useSession } from '../../hooks/useSession';
 import { resetGoogleIdentitySession } from '../../utils/googleIdentity';
 import { readUserAvatar, USER_PROFILE_PREFS_CHANGED_EVENT } from '../../lib/userProfilePrefs';
 import { PROFILE_UPDATED_EVENT } from '../../lib/profileEvents';
+import { listMessagingUsers } from '../../modules/messaging/api/messagingApi';
+import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from '../../modules/messaging/ui/constants';
+import 'react-toastify/dist/ReactToastify.css';
 
 const ACTION_LABELS = {
     'me.view': 'Profilo e permessi visualizzati',
@@ -31,6 +35,27 @@ const ACTION_LABELS = {
     'modules.enable': 'Modulo attivato',
     'modules.disable': 'Modulo disattivato',
     'branding.update': 'Branding workspace aggiornato',
+};
+
+const MESSAGING_POLL_INTERVAL_MS = 2000;
+const MESSAGING_NOTIFICATIONS_CONTAINER_ID = 'workspace-messaging-notifications';
+
+const normalizeUnreadCount = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+};
+
+const truncateText = (value, maxLength = 80) => {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+
+    const normalized = value.trim();
+    if (normalized.length <= maxLength) {
+        return normalized;
+    }
+
+    return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
 const prettifyAction = (action) => {
@@ -83,11 +108,16 @@ const buildInitials = (value) => {
 
 const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const history = useHistory();
+    const location = useLocation();
     const { logout, session } = useSession();
     const [navbarData, setNavbarData] = useState(null);
     const [loadingNavbarData, setLoadingNavbarData] = useState(false);
     const [navbarDataError, setNavbarDataError] = useState('');
     const [userAvatarUrl, setUserAvatarUrl] = useState('');
+    const [messagingUnreadCount, setMessagingUnreadCount] = useState(0);
+    const [messagingPollingBlocked, setMessagingPollingBlocked] = useState(false);
+    const unreadByUserRef = useRef(new Map());
+    const hasMessagingBaselineRef = useRef(false);
 
     const loadNavbarData = useCallback(async () => {
         setLoadingNavbarData(true);
@@ -130,6 +160,10 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
         logout();
         setNavbarData(null);
         setNavbarDataError('');
+        setMessagingUnreadCount(0);
+        setMessagingPollingBlocked(false);
+        unreadByUserRef.current = new Map();
+        hasMessagingBaselineRef.current = false;
         history.push('/login');
     };
 
@@ -140,13 +174,86 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const workspace = navbarData?.workspace;
     const branding = navbarData?.branding;
     const canManageBranding = permissions.includes('branding.manage');
-
-    const notificationCount = recentActivity.length;
+    const canViewMessaging = hasModuleEnabled(navbarData, MESSAGING_MODULE_KEY)
+        && hasPermission(navbarData, MESSAGING_PERMISSIONS.view);
+    const onMessagingPage = location.pathname.startsWith('/apps/email');
+    const activityNotificationCount = recentActivity.length;
+    const notificationCount = activityNotificationCount + messagingUnreadCount;
     const userDisplayName = user?.name || user?.email || session?.userEmail || 'Utente';
     const userEmail = user?.email || session?.userEmail || '-';
     const workspaceName = branding?.companyName || session?.workspaceBranding?.companyName || workspace?.name || 'Workspace';
     const userInitials = useMemo(() => buildInitials(userDisplayName), [userDisplayName]);
     const avatarUserId = user?.id || session?.userId || '';
+
+    const pollMessagingUnread = useCallback(async () => {
+        if (!session?.accessToken || !canViewMessaging || messagingPollingBlocked) {
+            return;
+        }
+
+        try {
+            const result = await listMessagingUsers({ limit: 80 });
+            const contacts = Array.isArray(result?.items) ? result.items : [];
+
+            const nextUnreadByUser = new Map();
+            let nextUnreadCount = 0;
+
+            contacts.forEach((contact) => {
+                const unreadCount = normalizeUnreadCount(contact?.unreadCount);
+                nextUnreadCount += unreadCount;
+                nextUnreadByUser.set(contact.userId, {
+                    ...contact,
+                    unreadCount,
+                });
+            });
+
+            if (hasMessagingBaselineRef.current && !onMessagingPage) {
+                contacts.forEach((contact) => {
+                    const previousUnreadCount = normalizeUnreadCount(
+                        unreadByUserRef.current.get(contact.userId)?.unreadCount,
+                    );
+                    const currentUnreadCount = normalizeUnreadCount(contact?.unreadCount);
+                    const unreadDelta = currentUnreadCount - previousUnreadCount;
+
+                    if (unreadDelta <= 0) {
+                        return;
+                    }
+
+                    const senderName = contact?.name || contact?.email || 'utente';
+                    const preview = truncateText(contact?.lastMessagePreview, 72);
+                    const toastMessage = unreadDelta > 1
+                        ? `${senderName} ti ha inviato ${unreadDelta} nuovi messaggi.`
+                        : `Nuovo messaggio da ${senderName}${preview ? `: ${preview}` : ''}`;
+
+                    toast.info(toastMessage, {
+                        containerId: MESSAGING_NOTIFICATIONS_CONTAINER_ID,
+                        autoClose: 5000,
+                        onClick: () => history.push('/apps/email'),
+                    });
+                });
+            }
+
+            unreadByUserRef.current = nextUnreadByUser;
+            hasMessagingBaselineRef.current = true;
+            setMessagingUnreadCount(nextUnreadCount);
+        } catch (error) {
+            if (Number(error?.status) === 401) {
+                return;
+            }
+
+            if (Number(error?.status) === 403 || Number(error?.status) === 404) {
+                setMessagingPollingBlocked(true);
+                setMessagingUnreadCount(0);
+                unreadByUserRef.current = new Map();
+                hasMessagingBaselineRef.current = false;
+            }
+        }
+    }, [
+        canViewMessaging,
+        history,
+        messagingPollingBlocked,
+        onMessagingPage,
+        session?.accessToken,
+    ]);
 
     useEffect(() => {
         if (!avatarUserId) {
@@ -168,9 +275,62 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
         };
     }, [avatarUserId]);
 
+    useEffect(() => {
+        if (!session?.accessToken || !canViewMessaging || messagingPollingBlocked) {
+            setMessagingUnreadCount(0);
+            unreadByUserRef.current = new Map();
+            hasMessagingBaselineRef.current = false;
+            return undefined;
+        }
+
+        let timeoutId;
+        let cancelled = false;
+
+        const runPollingCycle = async () => {
+            if (cancelled) {
+                return;
+            }
+
+            await pollMessagingUnread();
+
+            if (cancelled) {
+                return;
+            }
+
+            timeoutId = window.setTimeout(runPollingCycle, MESSAGING_POLL_INTERVAL_MS);
+        };
+
+        void runPollingCycle();
+
+        return () => {
+            cancelled = true;
+            if (timeoutId) {
+                window.clearTimeout(timeoutId);
+            }
+        };
+    }, [canViewMessaging, messagingPollingBlocked, pollMessagingUnread, session?.accessToken]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined') {
+            return undefined;
+        }
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                void pollMessagingUnread();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [pollMessagingUnread]);
+
     return (
-        <Navbar expand="xl" className="hk-navbar navbar-light fixed-top app-topnav">
-            <Container fluid>
+        <>
+            <Navbar expand="xl" className="hk-navbar navbar-light fixed-top app-topnav">
+                <Container fluid>
                 <div className="nav-start-wrap">
                     <Button
                         variant="flush-dark"
@@ -248,13 +408,38 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                         </Button>
                                     </Dropdown.Header>
                                     <SimpleBar className="dropdown-body p-2">
+                                        {canViewMessaging && (
+                                            <Dropdown.Item as={Link} to="/apps/email">
+                                                <div className="media">
+                                                    <div className="media-head">
+                                                        <div className="avatar avatar-icon avatar-sm avatar-soft-light avatar-rounded">
+                                                            <span className="initial-wrap">
+                                                                <span className="feather-icon"><Bell /></span>
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="media-body">
+                                                        <div>
+                                                            <div className="notifications-text">Messaggi interni</div>
+                                                            <div className="notifications-info">
+                                                                {messagingUnreadCount > 0 ? (
+                                                                    <HkBadge bg="danger" soft>{messagingUnreadCount} non letti</HkBadge>
+                                                                ) : (
+                                                                    <div className="notifications-time">Nessun messaggio non letto</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </Dropdown.Item>
+                                        )}
                                         {loadingNavbarData && (
                                             <div className="px-2 py-3 fs-7 text-muted">Caricamento notifiche...</div>
                                         )}
                                         {!loadingNavbarData && navbarDataError && (
                                             <div className="px-2 py-3 fs-7 text-danger">{navbarDataError}</div>
                                         )}
-                                        {!loadingNavbarData && !navbarDataError && recentActivity.length === 0 && (
+                                        {!loadingNavbarData && !navbarDataError && recentActivity.length === 0 && !canViewMessaging && (
                                             <div className="px-2 py-3 fs-7 text-muted">Nessuna attivita recente.</div>
                                         )}
                                         {!loadingNavbarData && !navbarDataError && recentActivity.map((item) => {
@@ -361,8 +546,19 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                         </Nav.Item>
                     </Nav>
                 </div>
-            </Container>
-        </Navbar>
+                </Container>
+            </Navbar>
+            <ToastContainer
+                containerId={MESSAGING_NOTIFICATIONS_CONTAINER_ID}
+                position="bottom-right"
+                theme="light"
+                newestOnTop
+                closeOnClick
+                pauseOnFocusLoss
+                pauseOnHover
+                limit={4}
+            />
+        </>
     );
 };
 

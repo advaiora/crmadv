@@ -26,14 +26,12 @@ import {
   listWebAssetAuditLogs,
   listWebAssetHealth,
   listWebAssetMaintenance,
-  listWebAssetSeoReports,
   listWebAssetVersions,
   listWebAssets,
   lookupWebAssetClients,
   lookupWebAssetOwners,
   lookupWebAssetProjects,
   runWebAssetHealthCheck,
-  runWebAssetSeoScan,
   rollbackWebAssetVersion,
   setWebAssetPublished,
   switchWebAssetDeployment,
@@ -271,11 +269,6 @@ const WebAssetsPage = () => {
   const [healthData, setHealthData] = useState({ checks: [], summary: null, alerts: [] });
   const [healthMessage, setHealthMessage] = useState('');
 
-  const [seoLoading, setSeoLoading] = useState(false);
-  const [seoReports, setSeoReports] = useState([]);
-  const [seoMessage, setSeoMessage] = useState('');
-  const [seoKeywords, setSeoKeywords] = useState('');
-
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsData, setAnalyticsData] = useState({ snapshots: [], events: [], summary: null, topEvents: [] });
   const [analyticsMessage, setAnalyticsMessage] = useState('');
@@ -465,23 +458,6 @@ const WebAssetsPage = () => {
     }
   }, []);
 
-  const loadSeoReports = useCallback(async (assetId) => {
-    if (!assetId) {
-      setSeoReports([]);
-      return;
-    }
-
-    setSeoLoading(true);
-    try {
-      const result = await listWebAssetSeoReports(assetId, { limit: 20 });
-      setSeoReports(Array.isArray(result?.items) ? result.items : []);
-    } catch (_error) {
-      setSeoReports([]);
-    } finally {
-      setSeoLoading(false);
-    }
-  }, []);
-
   const loadAnalytics = useCallback(async (assetId) => {
     if (!assetId) {
       setAnalyticsData({ snapshots: [], events: [], summary: null, topEvents: [] });
@@ -545,12 +521,11 @@ const WebAssetsPage = () => {
     await Promise.all([
       loadVersions(assetId),
       loadHealth(assetId),
-      loadSeoReports(assetId),
       loadAnalytics(assetId),
       loadMaintenance(assetId),
       loadAlerts(assetId),
     ]);
-  }, [loadAlerts, loadAnalytics, loadHealth, loadMaintenance, loadSeoReports, loadVersions]);
+  }, [loadAlerts, loadAnalytics, loadHealth, loadMaintenance, loadVersions]);
 
   const loadAudit = useCallback(async (overrides = {}) => {
     const nextPage = overrides.page || auditPage;
@@ -958,28 +933,6 @@ const WebAssetsPage = () => {
       setHealthMessage(getApiErrorMessage(checkError, 'Health check non riuscito'));
     } finally {
       setHealthLoading(false);
-    }
-  };
-
-  const handleRunSeoScan = async () => {
-    if (!selectedAsset?.id) {
-      return;
-    }
-
-    setSeoMessage('');
-    setSeoLoading(true);
-    try {
-      const keywords = seoKeywords
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-      await runWebAssetSeoScan(selectedAsset.id, { keywords });
-      setSeoMessage('SEO scan completata.');
-      await loadSeoReports(selectedAsset.id);
-    } catch (scanError) {
-      setSeoMessage(getApiErrorMessage(scanError, 'SEO scan non riuscita'));
-    } finally {
-      setSeoLoading(false);
     }
   };
 
@@ -1795,15 +1748,7 @@ const WebAssetsPage = () => {
                           </Card.Body>
                         </Card>
                       </Col>
-                      <Col md={4}>
-                        <Card>
-                          <Card.Body>
-                            <div className="small text-muted">Ultimo SEO score</div>
-                            <h4 className="mb-0">{seoReports[0]?.score ?? '-'}</h4>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                      <Col md={4}>
+                      <Col md={6}>
                         <Card>
                           <Card.Body>
                             <div className="small text-muted">Uptime</div>
@@ -2144,39 +2089,7 @@ const WebAssetsPage = () => {
 
                     {(detailSection === 'monitoring' || detailSection === 'analytics') && (
                       <Row className="g-3 mb-3">
-                      <Col lg={6}>
-                        <Card>
-                          <Card.Body>
-                            <h6 className="mb-2">SEO Reports</h6>
-                            {seoMessage && (
-                              <Alert variant={seoMessage.includes('non') ? 'danger' : 'success'} className="py-2">
-                                {seoMessage}
-                              </Alert>
-                            )}
-                            <div className="d-flex gap-2 mb-2">
-                              <Form.Control
-                                value={seoKeywords}
-                                onChange={(event) => setSeoKeywords(event.target.value)}
-                                placeholder="keyword1, keyword2"
-                              />
-                              {canEdit && (
-                                <Button
-                                  type="button"
-                                  variant="outline-secondary"
-                                  disabled={seoLoading}
-                                  onClick={() => void handleRunSeoScan()}
-                                >
-                                  {seoLoading ? 'Scansione...' : 'Scan SEO'}
-                                </Button>
-                              )}
-                            </div>
-                            <div className="small text-muted">
-                              Ultimo score: {seoReports[0]?.score ?? '-'} / 100
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                      <Col lg={6}>
+                      <Col lg={12}>
                         <Card>
                           <Card.Body>
                             <h6 className="mb-2">Analytics Summary</h6>

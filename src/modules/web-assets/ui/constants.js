@@ -46,7 +46,6 @@ export const WEB_ASSET_AUDIT_ACTION_OPTIONS = [
   { value: 'web.version.create', label: 'Version Create' },
   { value: 'web.version.rollback', label: 'Version Rollback' },
   { value: 'web.health.check', label: 'Health Check' },
-  { value: 'web.seo.scan', label: 'SEO Scan' },
   { value: 'web.analytics.snapshot.create', label: 'Analytics Snapshot' },
   { value: 'web.analytics.event.create', label: 'Analytics Event' },
   { value: 'web.maintenance.create', label: 'Maintenance Create' },

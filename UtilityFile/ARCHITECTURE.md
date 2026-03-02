@@ -116,3 +116,14 @@ Business (MVP 1):
   - `web.asset.link_client`
   - `web.asset.link_project`
 - Audit metadata must never include secrets; only operational non-sensitive fields are allowed (status transitions, linked entity IDs, version transitions).
+
+## 12) Internal Messaging (2026-03-02)
+- La vecchia UI "Email" e stata convertita in messaggistica interna 1:1 tra utenti dello stesso workspace.
+- Non viene usato un provider email esterno: nessun invio SMTP, solo persistenza su DB (`WorkspaceMessage`).
+- Scope multi-tenant obbligatorio: ogni messaggio e legato a `workspaceId`, e le conversazioni sono consentite solo tra membri attivi dello stesso workspace.
+- API esposte:
+  - `GET /messages/users`
+  - `GET /messages/conversations/:userId`
+  - `POST /messages/conversations/:userId/messages`
+  - `POST /messages/conversations/:userId/read`
+- Enforcement RBAC: riuso del modulo/permesso `team.view` (modulo `team`) per accesso lettura/scrittura messaggi nel MVP.

@@ -69,12 +69,6 @@ export const listWebAssetHealth = (assetId, params = {}) =>
 export const runWebAssetHealthCheck = (assetId) =>
   apiPost(`/web-assets/${assetId}/health/check`);
 
-export const listWebAssetSeoReports = (assetId, params = {}) =>
-  apiGet(withQuery(`/web-assets/${assetId}/seo/reports`, params));
-
-export const runWebAssetSeoScan = (assetId, payload = {}) =>
-  apiPost(`/web-assets/${assetId}/seo/scan`, payload);
-
 export const listWebAssetAnalytics = (assetId, params = {}) =>
   apiGet(withQuery(`/web-assets/${assetId}/analytics`, params));
 
