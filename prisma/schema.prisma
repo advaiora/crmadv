@@ -87,74 +87,78 @@ enum WebAssetAlertStatus {
 }
 
 model Workspace {
-  id                     String                  @id @default(cuid())
-  name                   String
-  slug                   String                  @unique
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
-  memberships            Membership[]
-  clients                Client[]
-  workspaceModules       WorkspaceModule[]
-  roles                  Role[]
-  userRoles              UserRole[]
-  branding               WorkspaceBranding?
-  quoteNotificationSettings QuoteNotificationSettings?
-  projects               Project[]
-  projectCategories      ProjectCategory[]
-  pipelineStages         PipelineStage[]
-  quotes                 Quote[]
-  quoteItems             QuoteItem[]
-  quoteTemplates         QuoteTemplate[]
-  quoteTemplateItems     QuoteTemplateItem[]
-  quoteEmailLogs         QuoteEmailLog[]
-  calendarEvents         CalendarEvent[]
-  websiteAssets          WebsiteAsset[]
-  webAppAssets           WebAppAsset[]
-  ecommerceAssets        EcommerceAsset[]
-  webAssetVersions       WebAssetVersion[]
-  webAssetHealthChecks   WebAssetHealthCheck[]
-  webAssetSeoReports     WebAssetSeoReport[]
+  id                         String                      @id @default(cuid())
+  name                       String
+  slug                       String                      @unique
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  memberships                Membership[]
+  clients                    Client[]
+  workspaceModules           WorkspaceModule[]
+  roles                      Role[]
+  userRoles                  UserRole[]
+  branding                   WorkspaceBranding?
+  quoteNotificationSettings  QuoteNotificationSettings?
+  projects                   Project[]
+  projectCategories          ProjectCategory[]
+  pipelineStages             PipelineStage[]
+  quotes                     Quote[]
+  quoteItems                 QuoteItem[]
+  quoteTemplates             QuoteTemplate[]
+  quoteTemplateItems         QuoteTemplateItem[]
+  quoteEmailLogs             QuoteEmailLog[]
+  calendarEvents             CalendarEvent[]
+  websiteAssets              WebsiteAsset[]
+  webAppAssets               WebAppAsset[]
+  ecommerceAssets            EcommerceAsset[]
+  webAssetVersions           WebAssetVersion[]
+  webAssetHealthChecks       WebAssetHealthCheck[]
+  webAssetSeoReports         WebAssetSeoReport[]
   webAssetAnalyticsSnapshots WebAssetAnalyticsSnapshot[]
-  webAssetAnalyticsEvents WebAssetAnalyticsEvent[]
+  webAssetAnalyticsEvents    WebAssetAnalyticsEvent[]
   webAssetMaintenanceWindows WebAssetMaintenanceWindow[]
-  webAssetAlerts         WebAssetAlert[]
-  auditLogs              AuditLog[]
-  workspaceMessages      WorkspaceMessage[]
-  checklistTemplates     ChecklistTemplate[]
-  checklistTemplateItems ChecklistTemplateItem[]
-  checklistInstances     ChecklistInstance[]
-  checklistInstanceItems ChecklistInstanceItem[]
+  webAssetAlerts             WebAssetAlert[]
+  auditLogs                  AuditLog[]
+  workspaceMessages          WorkspaceMessage[]
+  vaultItems                 VaultItem[]
+  vaultKey                   WorkspaceVaultKey?
+  checklistTemplates         ChecklistTemplate[]
+  checklistTemplateItems     ChecklistTemplateItem[]
+  checklistInstances         ChecklistInstance[]
+  checklistInstanceItems     ChecklistInstanceItem[]
 }
 
 model User {
-  id                      String                  @id @default(cuid())
-  email                   String                  @unique
-  googleSub               String?                 @unique
-  name                    String?
-  passwordHash            String?
-  role                    String                  @default("member")
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
-  memberships             Membership[]
-  userRoles               UserRole[]
-  createdQuotes           Quote[]                 @relation("QuoteCreatedByUser")
-  createdCalendarEvents   CalendarEvent[]         @relation("CalendarEventCreatedByUser")
-  updatedCalendarEvents   CalendarEvent[]         @relation("CalendarEventUpdatedByUser")
-  ownedWebsiteAssets      WebsiteAsset[]          @relation("WebsiteAssetOwner")
-  ownedWebAppAssets       WebAppAsset[]           @relation("WebAppAssetOwner")
-  ownedEcommerceAssets    EcommerceAsset[]        @relation("EcommerceAssetOwner")
-  createdWebAssetVersions WebAssetVersion[]       @relation("WebAssetVersionCreatedByUser")
-  createdWebAssetHealthChecks WebAssetHealthCheck[] @relation("WebAssetHealthCheckCreatedByUser")
-  createdWebAssetSeoReports WebAssetSeoReport[]   @relation("WebAssetSeoReportCreatedByUser")
+  id                                String                      @id @default(cuid())
+  email                             String                      @unique
+  googleSub                         String?                     @unique
+  name                              String?
+  passwordHash                      String?
+  role                              String                      @default("member")
+  createdAt                         DateTime                    @default(now())
+  updatedAt                         DateTime                    @updatedAt
+  memberships                       Membership[]
+  userRoles                         UserRole[]
+  createdQuotes                     Quote[]                     @relation("QuoteCreatedByUser")
+  createdCalendarEvents             CalendarEvent[]             @relation("CalendarEventCreatedByUser")
+  updatedCalendarEvents             CalendarEvent[]             @relation("CalendarEventUpdatedByUser")
+  ownedWebsiteAssets                WebsiteAsset[]              @relation("WebsiteAssetOwner")
+  ownedWebAppAssets                 WebAppAsset[]               @relation("WebAppAssetOwner")
+  ownedEcommerceAssets              EcommerceAsset[]            @relation("EcommerceAssetOwner")
+  createdWebAssetVersions           WebAssetVersion[]           @relation("WebAssetVersionCreatedByUser")
+  createdWebAssetHealthChecks       WebAssetHealthCheck[]       @relation("WebAssetHealthCheckCreatedByUser")
+  createdWebAssetSeoReports         WebAssetSeoReport[]         @relation("WebAssetSeoReportCreatedByUser")
   createdWebAssetAnalyticsSnapshots WebAssetAnalyticsSnapshot[] @relation("WebAssetAnalyticsSnapshotCreatedByUser")
-  createdWebAssetAnalyticsEvents WebAssetAnalyticsEvent[] @relation("WebAssetAnalyticsEventCreatedByUser")
+  createdWebAssetAnalyticsEvents    WebAssetAnalyticsEvent[]    @relation("WebAssetAnalyticsEventCreatedByUser")
   createdWebAssetMaintenanceWindows WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowCreatedByUser")
   updatedWebAssetMaintenanceWindows WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowUpdatedByUser")
-  createdWebAssetAlerts   WebAssetAlert[]         @relation("WebAssetAlertCreatedByUser")
-  sentWorkspaceMessages   WorkspaceMessage[]      @relation("WorkspaceMessageSender")
-  receivedWorkspaceMessages WorkspaceMessage[]    @relation("WorkspaceMessageRecipient")
-  auditLogs               AuditLog[]              @relation("AuditActor")
-  completedChecklistItems ChecklistInstanceItem[]
+  createdWebAssetAlerts             WebAssetAlert[]             @relation("WebAssetAlertCreatedByUser")
+  sentWorkspaceMessages             WorkspaceMessage[]          @relation("WorkspaceMessageSender")
+  receivedWorkspaceMessages         WorkspaceMessage[]          @relation("WorkspaceMessageRecipient")
+  createdVaultItems                 VaultItem[]                 @relation("VaultItemCreatedByUser")
+  updatedVaultItems                 VaultItem[]                 @relation("VaultItemUpdatedByUser")
+  auditLogs                         AuditLog[]                  @relation("AuditActor")
+  completedChecklistItems           ChecklistInstanceItem[]
 }
 
 model Membership {
@@ -173,29 +177,29 @@ model Membership {
 }
 
 model Client {
-  id           String          @id @default(cuid())
-  workspaceId  String
-  type         ClientType      @default(person)
-  name         String
-  email        String?
-  phone        String?
-  vatNumber    String?
-  taxCode      String?
-  street       String?
-  city         String?
-  zip          String?
-  province     String?
-  country      String?
-  notes        String?
-  tags         String[]        @default([])
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  quotes       Quote[]
-  projects     Project[]
-  projectLinks ProjectClient[]
-  websiteAssets WebsiteAsset[]   @relation("WebsiteAssetClient")
-  webAppAssets  WebAppAsset[]    @relation("WebAppAssetClient")
+  id              String           @id @default(cuid())
+  workspaceId     String
+  type            ClientType       @default(person)
+  name            String
+  email           String?
+  phone           String?
+  vatNumber       String?
+  taxCode         String?
+  street          String?
+  city            String?
+  zip             String?
+  province        String?
+  country         String?
+  notes           String?
+  tags            String[]         @default([])
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  quotes          Quote[]
+  projects        Project[]
+  projectLinks    ProjectClient[]
+  websiteAssets   WebsiteAsset[]   @relation("WebsiteAssetClient")
+  webAppAssets    WebAppAsset[]    @relation("WebAppAssetClient")
   ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetClient")
 
   @@index([workspaceId, name])
@@ -205,7 +209,7 @@ model Client {
 }
 
 model Project {
-  id              String          @id @default(cuid())
+  id              String           @id @default(cuid())
   workspaceId     String
   clientId        String?
   name            String
@@ -213,15 +217,15 @@ model Project {
   value           Float?
   dueDate         DateTime?
   pipelineStageId String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client          Client?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
   clientLinks     ProjectClient[]
-  pipelineStage   PipelineStage?  @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  pipelineStage   PipelineStage?   @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
   quotes          Quote[]
-  websiteAssets   WebsiteAsset[]  @relation("WebsiteAssetProject")
-  webAppAssets    WebAppAsset[]   @relation("WebAppAssetProject")
+  websiteAssets   WebsiteAsset[]   @relation("WebsiteAssetProject")
+  webAppAssets    WebAppAsset[]    @relation("WebAppAssetProject")
   ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetProject")
 
   @@index([workspaceId, name])
@@ -365,23 +369,23 @@ model ChecklistInstanceItem {
 }
 
 model WebsiteAsset {
-  id          String         @id @default(cuid())
-  workspaceId String
-  clientId    String?
-  projectId   String?
-  ownerUserId String?
-  name        String
-  url         String         @db.VarChar(2048)
-  status      WebAssetStatus @default(ACTIVE)
+  id                    String                        @id @default(cuid())
+  workspaceId           String
+  clientId              String?
+  projectId             String?
+  ownerUserId           String?
+  name                  String
+  url                   String                        @db.VarChar(2048)
+  status                WebAssetStatus                @default(ACTIVE)
   deploymentEnvironment WebAssetDeploymentEnvironment @default(DEVELOPMENT)
-  version     String?        @db.VarChar(64)
-  metadata    Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client      Client?        @relation("WebsiteAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
-  project     Project?       @relation("WebsiteAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
-  ownerUser   User?          @relation("WebsiteAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  version               String?                       @db.VarChar(64)
+  metadata              Json?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  workspace             Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client                Client?                       @relation("WebsiteAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
+  project               Project?                      @relation("WebsiteAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser             User?                         @relation("WebsiteAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, url])
   @@index([workspaceId, updatedAt])
@@ -392,23 +396,23 @@ model WebsiteAsset {
 }
 
 model WebAppAsset {
-  id          String         @id @default(cuid())
-  workspaceId String
-  clientId    String?
-  projectId   String?
-  ownerUserId String?
-  name        String
-  url         String         @db.VarChar(2048)
-  status      WebAssetStatus @default(ACTIVE)
+  id                    String                        @id @default(cuid())
+  workspaceId           String
+  clientId              String?
+  projectId             String?
+  ownerUserId           String?
+  name                  String
+  url                   String                        @db.VarChar(2048)
+  status                WebAssetStatus                @default(ACTIVE)
   deploymentEnvironment WebAssetDeploymentEnvironment @default(DEVELOPMENT)
-  version     String?        @db.VarChar(64)
-  metadata    Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client      Client?        @relation("WebAppAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
-  project     Project?       @relation("WebAppAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
-  ownerUser   User?          @relation("WebAppAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  version               String?                       @db.VarChar(64)
+  metadata              Json?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  workspace             Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client                Client?                       @relation("WebAppAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
+  project               Project?                      @relation("WebAppAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser             User?                         @relation("WebAppAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, url])
   @@index([workspaceId, updatedAt])
@@ -419,23 +423,23 @@ model WebAppAsset {
 }
 
 model EcommerceAsset {
-  id          String         @id @default(cuid())
-  workspaceId String
-  clientId    String?
-  projectId   String?
-  ownerUserId String?
-  name        String
-  url         String         @db.VarChar(2048)
-  status      WebAssetStatus @default(ACTIVE)
+  id                    String                        @id @default(cuid())
+  workspaceId           String
+  clientId              String?
+  projectId             String?
+  ownerUserId           String?
+  name                  String
+  url                   String                        @db.VarChar(2048)
+  status                WebAssetStatus                @default(ACTIVE)
   deploymentEnvironment WebAssetDeploymentEnvironment @default(DEVELOPMENT)
-  version     String?        @db.VarChar(64)
-  metadata    Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client      Client?        @relation("EcommerceAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
-  project     Project?       @relation("EcommerceAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
-  ownerUser   User?          @relation("EcommerceAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  version               String?                       @db.VarChar(64)
+  metadata              Json?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  workspace             Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client                Client?                       @relation("EcommerceAssetClient", fields: [clientId], references: [id], onDelete: SetNull)
+  project               Project?                      @relation("EcommerceAssetProject", fields: [projectId], references: [id], onDelete: SetNull)
+  ownerUser             User?                         @relation("EcommerceAssetOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, url])
   @@index([workspaceId, updatedAt])
@@ -469,21 +473,21 @@ model WebAssetVersion {
 }
 
 model WebAssetHealthCheck {
-  id              String                @id @default(cuid())
+  id              String                        @id @default(cuid())
   workspaceId     String
-  assetType       String                @db.VarChar(20)
+  assetType       String                        @db.VarChar(20)
   assetId         String
   environment     WebAssetDeploymentEnvironment
   status          WebAssetHealthStatus
-  url             String                @db.VarChar(2048)
+  url             String                        @db.VarChar(2048)
   httpStatus      Int?
   responseTimeMs  Int?
-  errorCode       String?               @db.VarChar(120)
-  errorMessage    String?               @db.VarChar(1000)
+  errorCode       String?                       @db.VarChar(120)
+  errorMessage    String?                       @db.VarChar(1000)
   createdByUserId String?
-  checkedAt       DateTime              @default(now())
-  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdByUser   User?                 @relation("WebAssetHealthCheckCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  checkedAt       DateTime                      @default(now())
+  workspace       Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                         @relation("WebAssetHealthCheckCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, assetType, assetId, checkedAt(sort: Desc)])
   @@index([workspaceId, status, checkedAt(sort: Desc)])
@@ -514,28 +518,28 @@ model WebAssetSeoReport {
 }
 
 model WebAssetAnalyticsSnapshot {
-  id              String                @id @default(cuid())
+  id              String                        @id @default(cuid())
   workspaceId     String
-  assetType       String                @db.VarChar(20)
+  assetType       String                        @db.VarChar(20)
   assetId         String
   environment     WebAssetDeploymentEnvironment
-  provider        String                @db.VarChar(60)
-  sourceLabel     String?               @db.VarChar(160)
+  provider        String                        @db.VarChar(60)
+  sourceLabel     String?                       @db.VarChar(160)
   periodStart     DateTime
   periodEnd       DateTime
-  sessions        Int                   @default(0)
-  users           Int                   @default(0)
-  pageViews       Int                   @default(0)
-  bounceRate      Decimal?              @db.Decimal(5, 2)
+  sessions        Int                           @default(0)
+  users           Int                           @default(0)
+  pageViews       Int                           @default(0)
+  bounceRate      Decimal?                      @db.Decimal(5, 2)
   avgLoadTimeMs   Int?
-  uptimePercent   Decimal?              @db.Decimal(5, 2)
-  errorRate       Decimal?              @db.Decimal(5, 2)
+  uptimePercent   Decimal?                      @db.Decimal(5, 2)
+  errorRate       Decimal?                      @db.Decimal(5, 2)
   topPages        Json?
   customEvents    Json?
   createdByUserId String?
-  createdAt       DateTime              @default(now())
-  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdByUser   User?                 @relation("WebAssetAnalyticsSnapshotCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime                      @default(now())
+  workspace       Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                         @relation("WebAssetAnalyticsSnapshotCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, assetType, assetId, periodEnd(sort: Desc)])
   @@index([workspaceId, provider, periodEnd(sort: Desc)])
@@ -543,20 +547,20 @@ model WebAssetAnalyticsSnapshot {
 }
 
 model WebAssetAnalyticsEvent {
-  id              String                @id @default(cuid())
+  id              String                        @id @default(cuid())
   workspaceId     String
-  assetType       String                @db.VarChar(20)
+  assetType       String                        @db.VarChar(20)
   assetId         String
   environment     WebAssetDeploymentEnvironment
-  eventName       String                @db.VarChar(120)
-  eventLabel      String?               @db.VarChar(255)
-  count           Int                   @default(1)
+  eventName       String                        @db.VarChar(120)
+  eventLabel      String?                       @db.VarChar(255)
+  count           Int                           @default(1)
   metadata        Json?
   createdByUserId String?
-  occurredAt      DateTime              @default(now())
-  createdAt       DateTime              @default(now())
-  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdByUser   User?                 @relation("WebAssetAnalyticsEventCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  occurredAt      DateTime                      @default(now())
+  createdAt       DateTime                      @default(now())
+  workspace       Workspace                     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                         @relation("WebAssetAnalyticsEventCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, assetType, assetId, occurredAt(sort: Desc)])
   @@index([workspaceId, eventName, occurredAt(sort: Desc)])
@@ -564,25 +568,25 @@ model WebAssetAnalyticsEvent {
 }
 
 model WebAssetMaintenanceWindow {
-  id              String                   @id @default(cuid())
+  id              String                    @id @default(cuid())
   workspaceId     String
-  assetType       String                   @db.VarChar(20)
+  assetType       String                    @db.VarChar(20)
   assetId         String
   startsAt        DateTime
   endsAt          DateTime
-  timezone        String?                  @db.VarChar(120)
-  reason          String?                  @db.VarChar(1000)
+  timezone        String?                   @db.VarChar(120)
+  reason          String?                   @db.VarChar(1000)
   status          WebAssetMaintenanceStatus @default(SCHEDULED)
-  notifyEmail     String?                  @db.VarChar(255)
-  notifySms       String?                  @db.VarChar(60)
+  notifyEmail     String?                   @db.VarChar(255)
+  notifySms       String?                   @db.VarChar(60)
   lastNotifiedAt  DateTime?
   createdByUserId String?
   updatedByUserId String?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  workspace       Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdByUser   User?                    @relation("WebAssetMaintenanceWindowCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  updatedByUser   User?                    @relation("WebAssetMaintenanceWindowUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  workspace       Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                     @relation("WebAssetMaintenanceWindowCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser   User?                     @relation("WebAssetMaintenanceWindowUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, assetType, assetId, startsAt(sort: Desc)])
   @@index([workspaceId, status, startsAt(sort: Desc)])
@@ -591,25 +595,25 @@ model WebAssetMaintenanceWindow {
 }
 
 model WebAssetAlert {
-  id                  String              @id @default(cuid())
-  workspaceId         String
-  assetType           String              @db.VarChar(20)
-  assetId             String
-  type                WebAssetAlertType
-  severity            WebAssetAlertSeverity
-  status              WebAssetAlertStatus @default(OPEN)
-  title               String              @db.VarChar(200)
-  message             String              @db.VarChar(1000)
-  metadata            Json?
-  acknowledgedAt      DateTime?
-  resolvedAt          DateTime?
-  emailNotifiedAt     DateTime?
-  smsNotifiedAt       DateTime?
-  createdByUserId     String?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdByUser       User?               @relation("WebAssetAlertCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  id              String                @id @default(cuid())
+  workspaceId     String
+  assetType       String                @db.VarChar(20)
+  assetId         String
+  type            WebAssetAlertType
+  severity        WebAssetAlertSeverity
+  status          WebAssetAlertStatus   @default(OPEN)
+  title           String                @db.VarChar(200)
+  message         String                @db.VarChar(1000)
+  metadata        Json?
+  acknowledgedAt  DateTime?
+  resolvedAt      DateTime?
+  emailNotifiedAt DateTime?
+  smsNotifiedAt   DateTime?
+  createdByUserId String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("WebAssetAlertCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, assetType, assetId, createdAt(sort: Desc)])
   @@index([workspaceId, type, status, createdAt(sort: Desc)])
@@ -700,19 +704,19 @@ model UserRole {
 }
 
 model WorkspaceBranding {
-  id             String    @id @default(cuid())
-  workspaceId    String    @unique
-  workspaceName  String?
-  logoUrl        String?
-  supportEmail   String?
-  supportPhone   String?
-  supportAddress String?
+  id              String    @id @default(cuid())
+  workspaceId     String    @unique
+  workspaceName   String?
+  logoUrl         String?
+  supportEmail    String?
+  supportPhone    String?
+  supportAddress  String?
   pdfSignatureUrl String?
-  primaryColor   String    @default("#0d6efd")
-  secondaryColor String    @default("#6c757d")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  primaryColor    String    @default("#0d6efd")
+  secondaryColor  String    @default("#6c757d")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model QuoteNotificationSettings {
@@ -901,4 +905,40 @@ model WorkspaceMessage {
   @@index([workspaceId, senderUserId, recipientUserId, createdAt(sort: Desc)])
   @@index([workspaceId, recipientUserId, readAt, createdAt(sort: Desc)])
   @@index([workspaceId, createdAt(sort: Desc)])
+}
+
+model VaultItem {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String    @db.VarChar(255)
+  username        String?   @db.VarChar(255)
+  url             String?   @db.VarChar(2048)
+  tags            String[]  @default([])
+  ciphertext      String    @db.Text
+  iv              String    @db.VarChar(255)
+  authTag         String    @db.VarChar(255)
+  version         Int       @default(1)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?     @relation("VaultItemCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  updatedByUser   User?     @relation("VaultItemUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, name])
+  @@index([workspaceId, updatedAt(sort: Desc)])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+}
+
+model WorkspaceVaultKey {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  wrappedKey  String    @db.Text
+  keyVersion  Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
