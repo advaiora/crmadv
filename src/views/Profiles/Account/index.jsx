@@ -8,6 +8,7 @@ import { useWorkspaceAccess } from '../../../hooks/useWorkspaceAccess';
 const MODULE_ROUTES = {
   clients: '/apps/clients',
   quotes: '/apps/quotes',
+  vault: '/apps/vault',
   projects: '/projects',
   checklists: '/checklists/templates',
   calendar: '/apps/calendar',
@@ -17,6 +18,7 @@ const MODULE_ROUTES = {
 const MODULE_LABELS = {
   clients: 'Clienti',
   quotes: 'Preventivi',
+  vault: 'Vault',
   projects: 'Progetti',
   checklists: 'Memo Operativi',
   calendar: 'Calendario',
@@ -29,6 +31,8 @@ const CORE_PERMISSIONS = [
   'quotes.view',
   'quotes.create',
   'quotes.send',
+  'vault.view_list',
+  'vault.reveal',
   'projects.view',
   'projects.edit',
   'calendar.view',
@@ -122,7 +126,10 @@ const Account = ({ toggleCollapsedNav }) => {
       .map((moduleKey) => {
         const isEnabled = enabledModules.includes(moduleKey);
         const route = MODULE_ROUTES[moduleKey] || null;
-        const hasViewPermission = permissionSet.has(`${moduleKey}.view`) || permissionSet.has(`${moduleKey}.manage`);
+        const hasViewPermission =
+          permissionSet.has(`${moduleKey}.view`)
+          || permissionSet.has(`${moduleKey}.manage`)
+          || permissionSet.has(`${moduleKey}.view_list`);
 
         return {
           moduleKey,

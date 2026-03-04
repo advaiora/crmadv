@@ -1,0 +1,25 @@
+.vault-page-shell {
+    max-width: 1220px;
+}
+
+.vault-secret-preview {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    word-break: break-all;
+}
+
+.vault-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.vault-tag-chip {
+    border-radius: 999px;
+}
+
+.vault-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+}

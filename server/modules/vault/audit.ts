@@ -4,6 +4,9 @@ import { audit } from '../../audit/audit.js';
 
 export const VaultAuditActions = {
   reveal: 'vault.reveal',
+  revealDenied: 'vault.reveal_denied',
+  unlockSuccess: 'vault.unlock_success',
+  unlockFail: 'vault.unlock_fail',
   create: 'vault.create',
   edit: 'vault.edit',
   delete: 'vault.delete',
@@ -29,6 +32,13 @@ const SENSITIVE_KEY_MARKERS = [
   'authtag',
   'auth_tag',
   'iv',
+  'wrappedkey',
+  'wrapped_key',
+  'encryption_key',
+  'sessionhash',
+  'session_hash',
+  'stepup',
+  'dek',
   'raw',
 ] as const;
 

@@ -18,7 +18,8 @@
     "db:reset": "prisma migrate reset",
     "test:unit": "node --test --import tsx \"server/**/*.test.ts\"",
     "test:integration": "node --test --import tsx \"server/**/*.smoke.ts\"",
-    "test:backend": "npm run test:unit && npm run test:integration"
+    "test:backend": "npm run test:unit && npm run test:integration",
+    "security:vault-hygiene": "node scripts/security/vault-hygiene-check.mjs"
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.14.4",
@@ -84,6 +85,7 @@
     "react-simple-star-rating": "^5.1.7",
     "react-split": "^2.0.14",
     "react-toastify": "^11.0.5",
+    "recharts": "^3.7.0",
     "redux": "^5.0.1",
     "remixicon": "^4.7.0",
     "simplebar-react": "^3.3.2",

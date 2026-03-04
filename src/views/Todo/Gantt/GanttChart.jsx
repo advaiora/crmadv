@@ -95,8 +95,6 @@ const GanttChart = ({ ganttViewMode, vm }) => {
                         <HkGantt
                             tasks={tasks}
                             viewMode={vm}
-                            onProgressChange={(task, progress) => console.log(task, progress)}
-                            onDateChange={(task, start, end) => console.log(task, start, end)}
                         />
                     </span>
                 </span>

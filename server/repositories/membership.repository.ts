@@ -9,11 +9,14 @@ export const membershipRepository = {
           userId,
         },
       },
+      // Only active memberships grant workspace access.
+      // Inactive/pending memberships must be treated as non-members for guards.
       select: {
         id: true,
+        status: true,
       },
     });
 
-    return Boolean(membership);
+    return membership?.status === 'ACTIVE';
   },
 };

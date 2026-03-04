@@ -28,7 +28,6 @@ const InboxList = ({ toggleSidebar, show, StartConversation, startChating, toggl
         if (width <= 991) {
             StartConversation(!startChating);
             toggleTopNav(!topNavCollapsed);
-            console.log(startChating);
         }
     }
 

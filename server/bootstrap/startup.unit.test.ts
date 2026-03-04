@@ -15,6 +15,7 @@ test('bootstrapRuntime validates env without initializing Prisma', async () => {
           API_HOST: '127.0.0.1',
           API_PORT: '4101',
           AUTH_JWT_SECRET: 'unit-test-super-secret',
+          ENCRYPTION_KEY: '12345678901234567890123456789012',
         },
         loadDotenv: false,
       }),
@@ -29,6 +30,7 @@ test('bootstrapRuntime validates env without initializing Prisma', async () => {
       API_HOST: '127.0.0.1',
       API_PORT: '4102',
       AUTH_JWT_SECRET: 'unit-test-super-secret',
+      ENCRYPTION_KEY: '12345678901234567890123456789012',
     },
     loadDotenv: false,
   });

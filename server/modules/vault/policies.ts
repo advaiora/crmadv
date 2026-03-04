@@ -7,6 +7,7 @@ export const VaultPermissions = {
   edit: 'vault.edit',
   reveal: 'vault.reveal',
   delete: 'vault.delete',
+  manageSettings: 'vault.manage_settings',
 } as const;
 
 export type VaultPermissionKey =
@@ -40,4 +41,3 @@ export const isVaultCriticalAction = (action: VaultAction): boolean =>
 
 export const isVaultAuditRequiredAction = (action: VaultAction): boolean =>
   action === VaultActions.reveal;
-

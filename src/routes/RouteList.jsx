@@ -11,6 +11,7 @@ import ClientEdit from "../views/Clients/ClientEdit";
 import ClientsList from "../views/Clients/ClientsList";
 import ClientNew from "../views/Clients/ClientNew";
 import Dashboard from "../views/Dashboard";
+import Team from "../views/Team";
 import Email from "../views/Email";
 import GridView from "../views/FileManager/GridView";
 import ListView from "../views/FileManager/ListView";
@@ -31,6 +32,7 @@ import QuotesList from "../views/Quotes/QuotesList";
 import ProjectDetail from "../views/Projects/ProjectDetail";
 import ProjectPipelineSettings from "../views/Projects/ProjectPipelineSettings";
 import ProjectsHome from "../views/Projects/ProjectsBoard";
+import Vault from "../views/Vault";
 import WebAssets from "../views/WebAssets";
 import KanbanBoard from "../views/Scrumboard/KanbanBoard/Index";
 import Pipeline from "../views/Scrumboard/Pipeline";
@@ -71,6 +73,7 @@ export const routes = [
     { path: 'apps/clients/new', exact: true, component: ClientNew },
     { path: 'apps/clients/:id/edit', exact: true, component: ClientEdit },
     { path: 'apps/clients/:id', exact: true, component: ClientDetail },
+    { path: 'apps/team', exact: true, component: Team },
     { path: 'apps/quotes', exact: true, component: QuotesList },
     { path: 'apps/quotes/new', exact: true, component: QuoteFormPage },
     { path: 'apps/quotes/templates', exact: true, component: QuoteTemplatesList },
@@ -79,6 +82,7 @@ export const routes = [
     { path: 'apps/quotes/notifications', exact: true, component: QuoteNotificationsSettings },
     { path: 'apps/quotes/:id/edit', exact: true, component: QuoteFormPage },
     { path: 'apps/quotes/:id', exact: true, component: QuoteDetail },
+    { path: 'apps/vault', exact: true, component: Vault },
     { path: 'apps/web-assets', exact: true, component: WebAssets },
     { path: 'projects', exact: true, component: ProjectsHome },
     { path: 'projects/settings/pipeline', exact: true, component: ProjectPipelineSettings },

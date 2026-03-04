@@ -1,13 +1,13 @@
-import type {
-  Prisma,
-  WebAssetAlertSeverity,
-  WebAssetAlertStatus,
-  WebAssetAlertType,
-  WebAssetDeploymentEnvironment,
-  WebAssetHealthStatus,
-  WebAssetMaintenanceStatus,
-  WebAssetStatus,
-  WebAssetVersionStatus,
+import {
+  type Prisma,
+  type WebAssetAlertSeverity,
+  type WebAssetAlertStatus,
+  type WebAssetAlertType,
+  type WebAssetDeploymentEnvironment,
+  type WebAssetHealthStatus,
+  type WebAssetMaintenanceStatus,
+  type WebAssetStatus,
+  type WebAssetVersionStatus,
 } from '@prisma/client';
 import { prisma } from '../../prisma.js';
 
@@ -866,6 +866,7 @@ export const webAssetsRepository = {
     return prisma.membership.findFirst({
       where: whereWorkspace<Prisma.MembershipWhereInput>(workspaceId, {
         userId,
+        status: 'ACTIVE',
       }),
       select: { id: true },
     });
@@ -962,7 +963,7 @@ export const webAssetsRepository = {
   ): Promise<WebAssetLookupItem[]> {
     const memberships = await prisma.membership.findMany({
       where: whereWorkspace<Prisma.MembershipWhereInput>(workspaceId, {
-        status: 'active',
+        status: 'ACTIVE',
         ...(filters.q
           ? {
               user: {

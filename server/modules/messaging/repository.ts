@@ -62,7 +62,7 @@ export const messagingRepository = {
     const items = await prisma.membership.findMany({
       where: {
         workspaceId: input.workspaceId,
-        status: 'active',
+        status: 'ACTIVE',
         ...(input.excludeUserId
           ? {
               userId: {
@@ -122,7 +122,7 @@ export const messagingRepository = {
       where: {
         workspaceId,
         userId,
-        status: 'active',
+        status: 'ACTIVE',
       },
       select: {
         userId: true,

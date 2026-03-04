@@ -6,6 +6,7 @@ import { auditVaultReveal, logVaultAuditEvent, VaultAuditActions } from './audit
 import { decryptAESGCM, encryptAESGCM } from './crypto/aesGcm.js';
 import { getOrCreateWorkspaceDEK } from './keys.js';
 import { vaultRepo } from './repo.js';
+import { toSafeVaultError } from './safeError.js';
 import type { VaultItemEncryptedPayload, VaultSecretPayload } from './types.js';
 
 const MAX_LIST_LIMIT = 100;
@@ -20,6 +21,8 @@ const MAX_NOTES_LENGTH = 10000;
 const MAX_EXTRA_KEY_COUNT = 50;
 const MAX_EXTRA_KEY_LENGTH = 120;
 const VAULT_SECRET_PAYLOAD_VERSION = 1;
+const MAX_CLIENT_LOOKUP_LIMIT = 200;
+const DEFAULT_CLIENT_LOOKUP_LIMIT = 100;
 
 type VaultListQuery = {
   search?: string;
@@ -29,6 +32,7 @@ type VaultListQuery = {
 };
 
 type ParsedCreatePayload = {
+  clientId: string | null;
   name: string;
   username: string | null;
   url: string | null;
@@ -39,6 +43,7 @@ type ParsedCreatePayload = {
 };
 
 type ParsedUpdatePayload = {
+  clientId?: string | null;
   name?: string;
   username?: string | null;
   url?: string | null;
@@ -46,6 +51,11 @@ type ParsedUpdatePayload = {
   password?: string;
   notes?: string | null;
   extra?: Record<string, unknown> | null;
+};
+
+type VaultClientLookupQuery = {
+  search?: string;
+  limit: number;
 };
 
 const nullableTrimmedStringForCreate = (maxLength: number) =>
@@ -116,7 +126,13 @@ const listQuerySchema = z.object({
   cursor: z.string().trim().min(1).max(191).optional(),
 });
 
+const lookupQuerySchema = z.object({
+  search: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(MAX_CLIENT_LOOKUP_LIMIT).optional(),
+});
+
 const createPayloadSchema = z.object({
+  clientId: z.string().trim().min(1).max(191).nullable().optional(),
   name: z.string().trim().min(1).max(MAX_NAME_LENGTH),
   username: nullableTrimmedStringForCreate(MAX_USERNAME_LENGTH),
   url: nullableTrimmedStringForCreate(MAX_URL_LENGTH),
@@ -132,6 +148,7 @@ const createPayloadSchema = z.object({
 
 const updatePayloadSchema = z
   .object({
+    clientId: z.string().trim().min(1).max(191).nullable().optional(),
     name: z.string().trim().min(1).max(MAX_NAME_LENGTH).optional(),
     username: nullableTrimmedStringForUpdate(MAX_USERNAME_LENGTH),
     url: nullableTrimmedStringForUpdate(MAX_URL_LENGTH),
@@ -142,6 +159,8 @@ const updatePayloadSchema = z
   })
   .superRefine((value, ctx) => {
     const hasMetadataChange =
+      value.clientId !== undefined
+      ||
       value.name !== undefined
       || value.username !== undefined
       || value.url !== undefined
@@ -201,9 +220,18 @@ const parseVaultListQuery = (query: unknown): VaultListQuery => {
   };
 };
 
+const parseVaultClientLookupQuery = (query: unknown): VaultClientLookupQuery => {
+  const parsed = parseWithSchema(lookupQuerySchema, query ?? {}, 'Invalid vault clients lookup query');
+  return {
+    search: parsed.search?.trim() || undefined,
+    limit: parsed.limit ?? DEFAULT_CLIENT_LOOKUP_LIMIT,
+  };
+};
+
 const parseVaultCreatePayload = (payload: unknown): ParsedCreatePayload => {
   const parsed = parseWithSchema(createPayloadSchema, payload ?? {}, 'Invalid vault item payload');
   return {
+    clientId: parsed.clientId ?? null,
     name: parsed.name,
     username: parsed.username,
     url: parsed.url,
@@ -218,6 +246,7 @@ const parseVaultUpdatePayload = (payload: unknown): ParsedUpdatePayload => {
   const parsed = parseWithSchema(updatePayloadSchema, payload ?? {}, 'Invalid vault update payload');
 
   return {
+    ...(parsed.clientId !== undefined ? { clientId: parsed.clientId ?? null } : {}),
     ...(parsed.name !== undefined ? { name: parsed.name } : {}),
     ...(parsed.username !== undefined ? { username: parsed.username } : {}),
     ...(parsed.url !== undefined ? { url: parsed.url } : {}),
@@ -256,7 +285,7 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
   }): Promise<VaultItemEncryptedPayload> => {
     const workspaceDEK = await dependencies.getWorkspaceDekFn(input.workspaceId);
     const encrypted = dependencies.encryptFn({
-      key: workspaceDEK,
+      key: workspaceDEK.key,
       plaintext: toSecretPayloadBuffer(input.payload),
       aad: buildVaultItemAAD(input.workspaceId, input.vaultItemId),
     });
@@ -266,6 +295,7 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
       iv: encrypted.iv.toString('base64'),
       authTag: encrypted.authTag.toString('base64'),
       version: VAULT_SECRET_PAYLOAD_VERSION,
+      keyVersion: workspaceDEK.keyVersion,
     };
   };
 
@@ -275,20 +305,21 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
     ciphertext: string;
     iv: string;
     authTag: string;
+    keyVersion: number;
   }): Promise<VaultSecretPayload> => {
-    const workspaceDEK = await dependencies.getWorkspaceDekFn(input.workspaceId);
+    const workspaceDEK = await dependencies.getWorkspaceDekFn(input.workspaceId, input.keyVersion);
 
     let plaintext: Buffer;
     try {
       plaintext = dependencies.decryptFn({
-        key: workspaceDEK,
+        key: workspaceDEK.key,
         ciphertext: Buffer.from(input.ciphertext, 'base64'),
         iv: Buffer.from(input.iv, 'base64'),
         authTag: Buffer.from(input.authTag, 'base64'),
         aad: buildVaultItemAAD(input.workspaceId, input.vaultItemId),
       });
-    } catch {
-      throw badRequest('Invalid vault payload');
+    } catch (error) {
+      throw toSafeVaultError(error);
     }
 
     let parsedJson: unknown;
@@ -310,9 +341,20 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
     };
   };
 
+  const assertWorkspaceClient = async (workspaceId: string, clientId: string) => {
+    const client = await dependencies.vaultRepoApi.findWorkspaceClientById(workspaceId, clientId);
+    if (!client) {
+      throw badRequest('Client not found in workspace');
+    }
+  };
+
   return {
     parseListQuery(query: unknown): VaultListQuery {
       return parseVaultListQuery(query);
+    },
+
+    parseClientLookupQuery(query: unknown): VaultClientLookupQuery {
+      return parseVaultClientLookupQuery(query);
     },
 
     parseCreatePayload(payload: unknown): ParsedCreatePayload {
@@ -328,6 +370,11 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
       return dependencies.vaultRepoApi.listVaultItems(workspaceId, parsedQuery);
     },
 
+    async listVaultClients(workspaceId: string, query: unknown) {
+      const parsedQuery = parseVaultClientLookupQuery(query);
+      return dependencies.vaultRepoApi.listWorkspaceClients(workspaceId, parsedQuery);
+    },
+
     async createVaultItem(input: {
       workspaceId: string;
       actorUserId: string;
@@ -335,6 +382,9 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
       request?: FastifyRequest;
     }) {
       const payload = parseVaultCreatePayload(input.body);
+      if (payload.clientId) {
+        await assertWorkspaceClient(input.workspaceId, payload.clientId);
+      }
       const vaultItemId = dependencies.createIdFn();
 
       const encryptedPayload = await encryptSecretPayload({
@@ -349,6 +399,7 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
 
       const created = await dependencies.vaultRepoApi.createVaultItem(input.workspaceId, {
         id: vaultItemId,
+        clientId: payload.clientId,
         name: payload.name,
         username: payload.username,
         url: payload.url,
@@ -379,6 +430,9 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
       request?: FastifyRequest;
     }) {
       const payload = parseVaultUpdatePayload(input.body);
+      if (payload.clientId) {
+        await assertWorkspaceClient(input.workspaceId, payload.clientId);
+      }
 
       const hasSecretPayload =
         payload.password !== undefined
@@ -398,6 +452,7 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
         : undefined;
 
       const updated = await dependencies.vaultRepoApi.updateVaultItem(input.workspaceId, input.vaultItemId, {
+        ...(payload.clientId !== undefined ? { clientId: payload.clientId } : {}),
         ...(payload.name !== undefined ? { name: payload.name } : {}),
         ...(payload.username !== undefined ? { username: payload.username } : {}),
         ...(payload.url !== undefined ? { url: payload.url } : {}),
@@ -430,7 +485,6 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
       vaultItemId: string;
       request?: FastifyRequest;
     }) {
-      // TODO(vault-phase-4): enforce requireStepUp() before revealing decrypted payloads.
       const item = await dependencies.vaultRepoApi.getVaultItemById(input.workspaceId, input.vaultItemId);
       if (!item) {
         throw notFound('Vault item not found');
@@ -446,6 +500,7 @@ export const buildVaultService = (dependencies: VaultServiceDependencies = defau
         ciphertext: item.ciphertext,
         iv: item.iv,
         authTag: item.authTag,
+        keyVersion: item.keyVersion,
       });
 
       await dependencies.auditRevealFn({

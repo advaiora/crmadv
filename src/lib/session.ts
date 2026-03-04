@@ -77,8 +77,7 @@ export const readSession = (): SessionState | null => {
     try {
         const parsed = JSON.parse(rawValue) as unknown;
         return normalizeSession(parsed);
-    } catch (error) {
-        console.warn('Invalid stored session, clearing.', error);
+    } catch {
         localStorage.removeItem(SESSION_STORAGE_KEY);
         notifySessionChanged();
         return null;

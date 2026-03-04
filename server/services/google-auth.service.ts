@@ -99,6 +99,96 @@ export const verifyGoogleIdToken = async ({
   };
 };
 
+const parseStringField = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const parseBooleanField = (value: unknown): boolean =>
+  value === true || value === 'true' || value === 1 || value === '1';
+
+export const verifyGoogleAccessToken = async ({
+  accessToken,
+  audience,
+}: {
+  accessToken: string;
+  audience: string;
+}): Promise<VerifiedGoogleIdentity> => {
+  const normalizedAccessToken = accessToken.trim();
+  if (!normalizedAccessToken) {
+    throw unauthorized('Token Google non valido', googleErrorDetails('INVALID_TOKEN'));
+  }
+
+  let tokenInfoPayload: Record<string, unknown> | null = null;
+  try {
+    const tokenInfoResponse = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(normalizedAccessToken)}`,
+    );
+
+    if (!tokenInfoResponse.ok) {
+      throw new Error('tokeninfo request failed');
+    }
+
+    const rawTokenInfo = await tokenInfoResponse.json();
+    tokenInfoPayload = typeof rawTokenInfo === 'object' && rawTokenInfo !== null
+      ? rawTokenInfo as Record<string, unknown>
+      : null;
+  } catch {
+    throw unauthorized('Token Google non valido', googleErrorDetails('INVALID_TOKEN'));
+  }
+
+  const audienceFromTokenInfo = parseStringField(tokenInfoPayload?.aud);
+  const authorizedPartyFromTokenInfo = parseStringField(tokenInfoPayload?.azp);
+  const isAudienceValid =
+    audienceFromTokenInfo === audience || authorizedPartyFromTokenInfo === audience;
+
+  if (!isAudienceValid) {
+    throw unauthorized('Token Google non valido', googleErrorDetails('INVALID_TOKEN'));
+  }
+
+  let userInfoPayload: Record<string, unknown> | null = null;
+  try {
+    const userInfoResponse = await fetch(
+      'https://openidconnect.googleapis.com/v1/userinfo',
+      {
+        headers: {
+          Authorization: `Bearer ${normalizedAccessToken}`,
+        },
+      },
+    );
+
+    if (!userInfoResponse.ok) {
+      throw new Error('userinfo request failed');
+    }
+
+    const rawUserInfo = await userInfoResponse.json();
+    userInfoPayload = typeof rawUserInfo === 'object' && rawUserInfo !== null
+      ? rawUserInfo as Record<string, unknown>
+      : null;
+  } catch {
+    throw unauthorized('Token Google non valido', googleErrorDetails('INVALID_TOKEN'));
+  }
+
+  const email = parseStringField(userInfoPayload?.email)?.toLowerCase() ?? null;
+  const googleSub = parseStringField(userInfoPayload?.sub);
+  const emailVerified = parseBooleanField(userInfoPayload?.email_verified);
+
+  if (!email || !emailVerified || !googleSub) {
+    throw unauthorized('Token Google non valido', googleErrorDetails('INVALID_TOKEN'));
+  }
+
+  return {
+    email,
+    sub: googleSub,
+    name: normalizeName(userInfoPayload?.name),
+    picture: parseStringField(userInfoPayload?.picture),
+  };
+};
+
 export const upsertGoogleUser = async (
   tx: Prisma.TransactionClient,
   identity: VerifiedGoogleIdentity,
@@ -222,7 +312,7 @@ export const resolveOrCreateWorkspaceForGoogle = async ({
     const membership = await tx.membership.findFirst({
       where: {
         userId,
-        status: 'active',
+        status: 'ACTIVE',
       },
       orderBy: {
         createdAt: 'desc',
@@ -269,7 +359,7 @@ export const resolveOrCreateWorkspaceForGoogle = async ({
       data: {
         workspaceId: workspace.id,
         userId,
-        status: 'active',
+        status: 'ACTIVE',
       },
     });
 

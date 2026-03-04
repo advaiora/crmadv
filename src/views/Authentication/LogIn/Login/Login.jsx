@@ -168,17 +168,6 @@ const Login = ({ history }) => {
       return;
     }
 
-    if (import.meta.env.DEV) {
-      console.info("[GoogleSignIn] Starting login flow", {
-        googleClientId,
-        googleClientIdLength: googleClientId.length,
-        redirectUri: googleRedirectUri || "(not-used-in-gis-popup-flow)",
-        origin: window.location.origin,
-        apiBaseUrl,
-        googleDebugRawResponse,
-      });
-    }
-
     setError("");
     setGoogleErrorCode("");
     setGoogleLoading(true);

@@ -178,7 +178,7 @@ const EditProfile = ({ toggleCollapsedNav }) => {
                               <td>{membership.workspace?.name || '-'}</td>
                               <td className="text-muted">{membership.workspace?.slug || '-'}</td>
                               <td>
-                                <Badge bg={membership.status === 'active' ? 'success' : 'secondary'}>
+                                <Badge bg={String(membership.status || '').toUpperCase() === 'ACTIVE' ? 'success' : 'secondary'}>
                                   {membership.status || '-'}
                                 </Badge>
                               </td>

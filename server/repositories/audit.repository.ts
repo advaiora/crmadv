@@ -33,6 +33,7 @@ const BUSINESS_ACTION_PREFIXES = [
   'projects.',
   'checklists.',
   'quotes.',
+  'team.',
   'web.',
   'web_assets.',
   'branding.',

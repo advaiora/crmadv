@@ -9,6 +9,9 @@ const DEFAULT_PRISMA_ENGINE = 'binary';
 const AUTH_JWT_SECRET_KEY = 'AUTH_JWT_SECRET';
 const AUTH_JWT_EXPIRES_IN_KEY = 'AUTH_JWT_EXPIRES_IN_SECONDS';
 const DEFAULT_AUTH_JWT_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
+const ENCRYPTION_KEY_ENV_KEY = 'ENCRYPTION_KEY';
+const ENCRYPTION_KEY_LENGTH_BYTES = 32;
+const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
 export type RuntimeEnvOptions = {
   env?: NodeJS.ProcessEnv;
@@ -196,6 +199,30 @@ const validateAuthJwtExpiresInSeconds = (rawValue: string | undefined | null) =>
   return parsed;
 };
 
+const validateEncryptionKey = (rawKey: string | undefined | null) => {
+  if (isBlank(rawKey)) {
+    throw new Error(
+      'Missing ENCRYPTION_KEY. Define a 32-byte key in .env for Vault encryption/decryption.',
+    );
+  }
+
+  const normalized = String(rawKey).trim();
+  if (Buffer.byteLength(normalized, 'utf8') === ENCRYPTION_KEY_LENGTH_BYTES) {
+    return;
+  }
+
+  if (BASE64_PATTERN.test(normalized)) {
+    const decoded = Buffer.from(normalized, 'base64');
+    if (decoded.length === ENCRYPTION_KEY_LENGTH_BYTES) {
+      return;
+    }
+  }
+
+  throw new Error(
+    'Invalid ENCRYPTION_KEY format. Expected 32-byte raw text or base64-encoded 32-byte key.',
+  );
+};
+
 export const getSafeDatabaseTarget = (databaseUrl: string) => {
   const parsed = new URL(databaseUrl);
   const database = parsed.pathname.replace(/^\/+/, '') || '(default)';
@@ -231,6 +258,7 @@ export const loadAndValidateRuntimeEnv = (options: RuntimeEnvOptions = {}): Runt
   const apiPort = validateApiPort(env.API_PORT);
   const authJwtSecret = validateAuthJwtSecret(env[AUTH_JWT_SECRET_KEY]);
   const authJwtExpiresInSeconds = validateAuthJwtExpiresInSeconds(env[AUTH_JWT_EXPIRES_IN_KEY]);
+  validateEncryptionKey(env[ENCRYPTION_KEY_ENV_KEY]);
   const prismaEngine = normalizePrismaEngineType(env, databaseUrl);
 
   const dotenvParsed = dotenvResult?.parsed ?? {};

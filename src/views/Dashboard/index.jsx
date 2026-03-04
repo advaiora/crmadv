@@ -1,177 +1,198 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Container, Row } from 'react-bootstrap';
+import { AlertTriangle, LayoutDashboard, Plus } from 'lucide-react';
 import { connect } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent } from '../../components/ui/card';
+import { Skeleton } from '../../components/ui/skeleton';
+import { getDashboardHome } from '../../modules/dashboard/api/dashboardApi';
+import DashboardShell from '../../modules/dashboard/ui/DashboardShell';
+import DashboardModuleGate from '../../modules/dashboard/ui/DashboardModuleGate';
+import { formatRelativeTime } from '../../modules/dashboard/ui/formatters';
+import WidgetRenderer from '../../modules/dashboard/ui/WidgetRenderer';
+import { DASHBOARD_PERMISSIONS } from '../../modules/dashboard/ui/constants';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
-import { fetchWorkspaceAccess, hasPermission } from '../../utils/workspaceAccess';
-import '../../styles/css/dashboard-ui.css';
+import { hasPermission } from '../../utils/workspaceAccess';
 
-const Dashboard = ({ toggleCollapsedNav }) => {
-    const [access, setAccess] = useState(null);
-    const [loadingAccess, setLoadingAccess] = useState(false);
-    const [accessError, setAccessError] = useState('');
-
-    const loadDashboardAccess = useCallback(async () => {
-        setLoadingAccess(true);
-        setAccessError('');
-
-        try {
-            const result = await fetchWorkspaceAccess();
-            setAccess(result);
-        } catch (error) {
-            setAccess(null);
-            setAccessError(error?.message || 'Impossibile caricare i dati dashboard.');
-        } finally {
-            setLoadingAccess(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        toggleCollapsedNav(false);
-        void loadDashboardAccess();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const workspaceName = access?.branding?.companyName || access?.workspace?.name || 'Workspace';
-    const recentActivity = access?.recentActivity || [];
-    const permissions = access?.permissions || [];
-    const enabledModules = access?.enabledModules || [];
-    const roles = access?.roles || [];
-
-    const canViewClients = hasPermission(access, 'clients.view');
-    const canViewProjects = hasPermission(access, 'projects.view');
-    const canViewChecklists = hasPermission(access, 'checklists.view');
-    const canManageBranding = hasPermission(access, 'branding.manage');
-
-    const kpiItems = useMemo(() => ([
-        {
-            label: 'Moduli attivi',
-            value: enabledModules.length,
-            helper: 'Feature abilitate nel workspace',
-        },
-        {
-            label: 'Permessi utente',
-            value: permissions.length,
-            helper: 'Permessi attivi nel tuo ruolo',
-        },
-        {
-            label: 'Ruoli assegnati',
-            value: roles.length,
-            helper: 'Ruoli attivi per il tuo account',
-        },
-        {
-            label: 'Attivita recenti',
-            value: recentActivity.length,
-            helper: 'Eventi tracciati di recente',
-        },
-    ]), [enabledModules.length, permissions.length, recentActivity.length, roles.length]);
-
-    const formatActivityTime = (isoDate) => {
-        if (!isoDate) {
-            return '';
-        }
-
-        const parsedDate = new Date(isoDate);
-        if (Number.isNaN(parsedDate.getTime())) {
-            return '';
-        }
-
-        return parsedDate.toLocaleString('it-IT', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
-
-    const getActivityActor = (item) => item?.actor?.name || item?.actor?.email || 'Sistema';
-
-    return (
-        <Container fluid className="dashboard-shell py-4">
-            <div className="dashboard-hero mb-4">
-                <div className="dashboard-hero-content">
-                    <h1 className="dashboard-title mb-1">Dashboard Operativa</h1>
-                    <p className="dashboard-subtitle mb-0">
-                        Panoramica del workspace <strong>{workspaceName}</strong> con metriche e attivita principali.
-                    </p>
-                </div>
-                <div className="dashboard-hero-actions">
-                    {canViewProjects && (
-                        <Button as={Link} to="/projects" variant="primary" size="sm">
-                            Vai ai progetti
-                        </Button>
-                    )}
-                    {canViewClients && (
-                        <Button as={Link} to="/apps/clients" variant="outline-primary" size="sm">
-                            Lista clienti
-                        </Button>
-                    )}
-                    {canViewChecklists && (
-                        <Button as={Link} to="/checklists/templates" variant="outline-primary" size="sm">
-                            Memo operativi
-                        </Button>
-                    )}
-                    {canManageBranding && (
-                        <Button as={Link} to="/pages/workspace-branding" variant="outline-primary" size="sm">
-                            Branding workspace
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {accessError && (
-                <Alert variant="danger" className="mb-4">
-                    {accessError}
-                </Alert>
-            )}
-
-            <Row className="g-3 mb-4">
-                {kpiItems.map((item) => (
-                    <Col key={item.label} xxl={3} md={6}>
-                        <Card className="card-border h-100 dashboard-kpi-card">
-                            <Card.Body>
-                                <div className="dashboard-kpi-label">{item.label}</div>
-                                <div className="dashboard-kpi-value">{loadingAccess ? '...' : item.value}</div>
-                                <div className="dashboard-kpi-helper">{item.helper}</div>
-                            </Card.Body>
-                        </Card>
-                    </Col>
-                ))}
-            </Row>
-
-            <Row className="g-3 mb-3">
-                <Col md={12}>
-                    <Card className="card-border h-100">
-                        <Card.Header className="card-header-action">
-                            <h6>Attivita recenti</h6>
-                        </Card.Header>
-                        <Card.Body className="dashboard-activity-body">
-                            {loadingAccess && <div className="text-muted fs-7">Caricamento attivita...</div>}
-                            {!loadingAccess && recentActivity.length === 0 && (
-                                <div className="text-muted fs-7">Nessuna attivita recente disponibile.</div>
-                            )}
-                            {!loadingAccess && recentActivity.length > 0 && (
-                                <ul className="dashboard-activity-list mb-0">
-                                    {recentActivity.slice(0, 6).map((item) => (
-                                        <li key={item.id} className="dashboard-activity-item">
-                                            <div className="dashboard-activity-title">
-                                                {String(item.action || 'Evento').replaceAll('.', ' ')}
-                                            </div>
-                                            <div className="dashboard-activity-meta">
-                                                {getActivityActor(item)}
-                                                {item.entityType ? ` - ${item.entityType}` : ''}
-                                                {item.createdAt ? ` - ${formatActivityTime(item.createdAt)}` : ''}
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </Card.Body>
-                    </Card>
-                </Col>
-            </Row>
-        </Container>
-    );
+const ROLE_LABEL = {
+  superadmin: 'Superadmin',
+  admin: 'Admin',
+  manager: 'Manager',
+  operativo: 'Operativo',
+  viewer: 'Viewer',
 };
 
-export default connect(null, { toggleCollapsedNav })(Dashboard);
+const getDashboardErrorMessage = (error) => {
+  const status = Number(error?.status);
+  if (status === 403) {
+    return 'Non hai i permessi necessari per visualizzare la dashboard.';
+  }
+  if (status === 404) {
+    return 'Dashboard non disponibile per questo workspace.';
+  }
+  if (status >= 500) {
+    return 'Errore interno durante il caricamento dashboard. Riprova.';
+  }
+  return error?.message || 'Impossibile caricare i dati dashboard.';
+};
+
+const SkeletonCard = ({ className }) => (
+  <Card className={className || 'rounded-2xl border border-[var(--border)] shadow-sm'}>
+    <CardContent className="space-y-3 p-4 md:p-6">
+      <Skeleton className="h-5 w-36" />
+      <Skeleton className="h-9 w-28" />
+      <Skeleton className="h-4 w-3/4" />
+    </CardContent>
+  </Card>
+);
+
+const DashboardHomeSkeleton = () => (
+  <div className="space-y-6">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard />
+      <SkeletonCard />
+    </div>
+
+    <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
+      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-7" />
+      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-5" />
+    </div>
+
+    <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
+      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-7" />
+      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-5" />
+    </div>
+  </div>
+);
+
+const DashboardWorkspacePage = ({ access, toggleCollapsedNav, reloadWorkspaceAccess }) => {
+  const [home, setHome] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [lastLoadedAt, setLastLoadedAt] = useState(null);
+  const [nowTick, setNowTick] = useState(() => new Date());
+
+  useEffect(() => {
+    toggleCollapsedNav(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const loadHome = useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const data = await getDashboardHome();
+      setHome(data);
+      setLastLoadedAt(new Date());
+    } catch (apiError) {
+      setHome(null);
+      setError(getDashboardErrorMessage(apiError));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHome();
+  }, [loadHome]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTick(new Date());
+    }, 15000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const widgets = home?.widgets || [];
+  const roleTier = home?.role || 'viewer';
+  const roleLabel = ROLE_LABEL[roleTier] || 'Viewer';
+  const workspaceName = access?.branding?.workspaceName || access?.workspace?.name || 'Workspace';
+
+  const canViewProjects = hasPermission(access, 'projects.view');
+  const canViewClients = hasPermission(access, 'clients.view');
+
+  const subtitle = useMemo(
+    () => `Panoramica operativa del workspace ${workspaceName} (${roleLabel}).`,
+    [roleLabel, workspaceName],
+  );
+
+  const lastUpdatedLabel = useMemo(
+    () => formatRelativeTime(lastLoadedAt, nowTick),
+    [lastLoadedAt, nowTick],
+  );
+
+  return (
+    <DashboardShell
+      title="Dashboard"
+      subtitle={subtitle}
+      lastUpdatedLabel={lastUpdatedLabel}
+      onRefresh={() => {
+        void loadHome();
+        if (typeof reloadWorkspaceAccess === 'function') {
+          void reloadWorkspaceAccess();
+        }
+      }}
+      isRefreshing={loading}
+    >
+      {error ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-[var(--destructive)] bg-[rgba(239,68,68,0.08)] px-4 py-4 text-sm text-[var(--destructive)]">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p className="mb-0">{error}</p>
+        </div>
+      ) : null}
+
+      {!error && loading ? <DashboardHomeSkeleton /> : null}
+
+      {!error && !loading && widgets.length > 0 ? <WidgetRenderer widgets={widgets} /> : null}
+
+      {!error && !loading && widgets.length === 0 ? (
+        <Card className="rounded-2xl border border-[var(--border)] shadow-sm">
+          <CardContent className="space-y-4 p-5 md:p-6">
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-8 text-center">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--muted)] text-[var(--hk-text-tertiary)]">
+                <LayoutDashboard className="h-4 w-4" />
+              </span>
+              <p className="mb-0 text-sm text-[var(--hk-text-tertiary)]">
+                Nessun widget disponibile per il tuo profilo nel workspace attuale.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2">
+              {canViewProjects ? (
+                <Button size="sm" variant="outline" onClick={() => window.location.assign('/projects')}>
+                  <Plus className="h-4 w-4" />
+                  Crea progetto
+                </Button>
+              ) : null}
+
+              {canViewClients ? (
+                <Button size="sm" variant="outline" onClick={() => window.location.assign('/apps/clients/new')}>
+                  <Plus className="h-4 w-4" />
+                  Nuovo cliente
+                </Button>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+    </DashboardShell>
+  );
+};
+
+const DashboardPage = ({ toggleCollapsedNav }) => (
+  <DashboardModuleGate requiredPermission={DASHBOARD_PERMISSIONS.view}>
+    {({ access, reload }) => (
+      <DashboardWorkspacePage
+        access={access}
+        toggleCollapsedNav={toggleCollapsedNav}
+        reloadWorkspaceAccess={reload}
+      />
+    )}
+  </DashboardModuleGate>
+);
+
+export default connect(null, { toggleCollapsedNav })(DashboardPage);
+

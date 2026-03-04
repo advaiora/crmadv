@@ -176,38 +176,20 @@ const safeParseJson = async (response) => {
 };
 
 const normalizeGoogleIdToken = (value) => (typeof value === "string" ? value.trim() : "");
+const isLikelyJwtToken = (value) => {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const parts = value.split(".");
+  return parts.length === 3 && parts.every((part) => part.length > 0);
+};
 
 const logGoogleConfigHints = (message, { origin, redirectUri, clientId } = {}) => {
-  if (!import.meta.env.DEV) {
-    return;
-  }
-
-  const lowerMessage = String(message || "").toLowerCase();
-  const isOriginIssue =
-    lowerMessage.includes("origin") ||
-    lowerMessage.includes("unregistered_origin") ||
-    lowerMessage.includes("not available for this origin");
-  const isClientIssue =
-    lowerMessage.includes("invalid_client") || lowerMessage.includes("missing_client_id");
-  const isFedCmIssue = lowerMessage.includes("fedcm") || lowerMessage.includes("networkerror") || lowerMessage.includes("issuing_failed");
-
-  if (!isOriginIssue && !isClientIssue && !isFedCmIssue) {
-    return;
-  }
-
-  console.warn("[GoogleAuth] Possible OAuth configuration issue", {
-    message,
-    origin: origin || (typeof window !== "undefined" ? window.location.origin : "(unknown-origin)"),
-    redirectUri: redirectUri || "(not-used-in-gis-popup-flow)",
-    clientId,
-    hints: [
-      "Verifica Authorized JavaScript origins nel Google Cloud Console",
-      "Verifica che VITE_GOOGLE_CLIENT_ID e GOOGLE_CLIENT_ID coincidano",
-      "Se usi redirect flow, verifica Authorized redirect URIs",
-      "Verifica CSP connect-src/script-src verso https://accounts.google.com",
-      "Se in iframe, verifica allow=\"identity-credentials-get\" sul frame parent",
-    ],
-  });
+  void message;
+  void origin;
+  void redirectUri;
+  void clientId;
 };
 
 export const maskEmail = (email) => {
@@ -288,15 +270,15 @@ export const authenticateWithGoogle = async ({
 
   try {
     const providedIdToken = normalizeGoogleIdToken(idToken);
-    const googleIdTokenRaw =
+    const googleCredentialTokenRaw =
       providedIdToken ||
       (await requestGoogleIdToken(googleClientId, {
         redirectUri,
         debugRawResponse,
       }));
-    const googleIdToken = normalizeGoogleIdToken(googleIdTokenRaw);
+    const googleCredentialToken = normalizeGoogleIdToken(googleCredentialTokenRaw);
 
-    if (!googleIdToken) {
+    if (!googleCredentialToken) {
       throw new GoogleAuthError({
         status: 400,
         code: ERROR_CODE.BAD_REQUEST,
@@ -304,27 +286,27 @@ export const authenticateWithGoogle = async ({
       });
     }
 
-    if (import.meta.env.DEV) {
-      console.info("[GoogleAuth] Received Google ID token", {
-        idTokenLength: googleIdToken.length,
-        origin: typeof window !== "undefined" ? window.location.origin : "(unknown-origin)",
-        redirectUri: redirectUri || "(not-used-in-gis-popup-flow)",
-      });
-    }
+    const isIdToken = isLikelyJwtToken(googleCredentialToken);
+    const tokenPayload = isIdToken
+      ? {
+          idToken: googleCredentialToken,
+          credential: googleCredentialToken,
+        }
+      : {
+          accessToken: googleCredentialToken,
+        };
 
     const requestBody =
       mode === GOOGLE_AUTH_MODE.signup
         ? {
             mode,
-            idToken: googleIdToken,
-            credential: googleIdToken,
+            ...tokenPayload,
             workspaceName,
             workspaceSlug,
           }
         : {
             mode,
-            idToken: googleIdToken,
-            credential: googleIdToken,
+            ...tokenPayload,
           };
 
     const response = await fetch(`${apiBaseUrl}/auth/google`, {
@@ -338,14 +320,6 @@ export const authenticateWithGoogle = async ({
     });
 
     const payload = await safeParseJson(response);
-
-    if (import.meta.env.DEV) {
-      console.info("[GoogleAuth] /auth/google response", {
-        status: response.status,
-        ok: response.ok,
-        payload,
-      });
-    }
 
     if (!response.ok) {
       const mappedError = mapErrorFromResponse(response.status, payload);
@@ -376,10 +350,6 @@ export const authenticateWithGoogle = async ({
         code: ERROR_CODE.UNKNOWN,
         message: "Risposta di autenticazione non valida.",
       });
-    }
-
-    if (import.meta.env.DEV) {
-      console.info(`[GoogleAuth] ${mode} ok per ${maskEmail(user.email)}`);
     }
 
     return {

@@ -29,8 +29,6 @@ const AppHeader = ({ topNavCollapsed, toggleTopNav, toggleSidebar, showSidebar, 
         }
     }
 
-    console.log(vm);
-
     return (
         <header className="todo-header">
             <div className="d-flex align-items-center flex-1">

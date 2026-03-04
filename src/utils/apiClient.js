@@ -41,10 +41,19 @@ const parseResponsePayload = async (response) => {
 
 const apiRequest = async (
     path,
-    { method = 'GET', headers = {}, body, signal, expectData = true, skipAuthHeaders = false } = {},
+    {
+        method = 'GET',
+        headers = {},
+        body,
+        signal,
+        expectData = true,
+        skipAuthHeaders = false,
+        ...requestOptions
+    } = {},
 ) => {
     const isFormDataBody = body instanceof FormData;
     const response = await apiFetch(path, {
+        ...requestOptions,
         method,
         skipAuthHeaders,
         headers: {

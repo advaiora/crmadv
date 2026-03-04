@@ -14,6 +14,7 @@ export type AccessTokenClaims = {
   role: string;
   workspaceId?: string;
   workspaceSlug?: string;
+  issuedAt?: number;
   type: 'access';
 };
 
@@ -88,6 +89,7 @@ export const verifyAccessToken = async (token: string): Promise<AccessTokenClaim
       role: payload.role,
       workspaceId: typeof payload.workspaceId === 'string' ? payload.workspaceId : undefined,
       workspaceSlug: typeof payload.workspaceSlug === 'string' ? payload.workspaceSlug : undefined,
+      issuedAt: typeof payload.iat === 'number' ? payload.iat : undefined,
       type: 'access',
     };
   } catch {

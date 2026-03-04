@@ -5,6 +5,7 @@ import AppRoutes from './routes/AppRoutes'
 import "bootstrap/js/src/collapse";
 import ScrollToTop from './utils/ScrollToTop';
 import Login from './views/Authentication/LogIn/Login/Login';
+import AcceptInvite from './views/Authentication/AcceptInvite';
 import { readSession } from './lib/session';
 
 const isAuthenticated = () => Boolean(readSession());
@@ -36,6 +37,7 @@ function App() {
             <Redirect exact from="/" to="/dashboard" />
             <LoginRoute exact path="/login" />
             <LoginRoute exact path="/auth/login" />
+            <Route exact path="/accept-invite" component={AcceptInvite} />
             <Route path="/auth" render={(props) => <AuthRoutes {...props} />} />
             <ProtectedRoute path="/" render={(props) => <AppRoutes {...props} />} />
           </Switch>

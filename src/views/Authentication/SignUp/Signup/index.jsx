@@ -386,18 +386,6 @@ const Signup = () => {
       return;
     }
 
-    if (import.meta.env.DEV) {
-      console.info("[GoogleSignIn] Starting signup flow", {
-        googleClientId,
-        googleClientIdLength: googleClientId.length,
-        redirectUri: googleRedirectUri || "(not-used-in-gis-popup-flow)",
-        origin: window.location.origin,
-        apiBaseUrl,
-        googleDebugRawResponse,
-        isGoogleWorkspaceStep,
-      });
-    }
-
     setGoogleLoading(true);
 
     try {

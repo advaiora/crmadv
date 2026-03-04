@@ -12,10 +12,6 @@ const HkFileInput = ({ children, className }) => {
             'image/gif': ['.gif'],
         },
         maxFiles: 1,
-        onDrop: (acceptedFiles) => {
-            console.log('Files dropped:', acceptedFiles);
-            // Handle file upload logic here
-        },
     });
 
     return (

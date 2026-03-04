@@ -1,81 +1,65 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import {
+  SYSTEM_MODULE_CATALOG,
+  SYSTEM_PERMISSION_CATALOG,
+  SYSTEM_ROLE_DEFINITIONS,
+  SYSTEM_ROLE_NAME,
+  type PermissionSelection,
+} from '../server/auth/rbac-catalog.js';
 
 const prisma = new PrismaClient();
 
-const MODULES = [
-  { key: 'modules', name: 'Module Registry', isCore: true },
-  { key: 'branding', name: 'Branding', isCore: true },
-  { key: 'audit', name: 'Audit', isCore: true },
-  { key: 'team', name: 'Team', isCore: false },
-  { key: 'clients', name: 'Clients', isCore: false },
-  { key: 'projects', name: 'Projects', isCore: false },
-  { key: 'checklists', name: 'Checklists', isCore: false },
-  { key: 'calendar', name: 'Calendar', isCore: false },
-  { key: 'quotes', name: 'Quotes', isCore: false },
-  { key: 'web', name: 'Web', isCore: false },
-  { key: 'vault', name: 'Vault', isCore: false },
-  { key: 'seo', name: 'SEO', isCore: false },
-] as const;
+const resolvePermissionKeys = (
+  permissionSelection: PermissionSelection,
+  allPermissionKeys: string[],
+) => {
+  if (permissionSelection === 'all') {
+    return [...allPermissionKeys];
+  }
 
-const PERMISSIONS = [
-  { key: 'modules.manage', moduleKey: 'modules', description: 'Manage workspace modules' },
-  { key: 'branding.manage', moduleKey: 'branding', description: 'Manage workspace branding' },
-  { key: 'audit.view', moduleKey: 'audit', description: 'View audit logs' },
-  { key: 'roles.view', moduleKey: 'team', description: 'View workspace roles' },
-  { key: 'roles.manage', moduleKey: 'team', description: 'Manage workspace roles' },
-  { key: 'roles.assign', moduleKey: 'team', description: 'Assign roles to workspace users' },
-  { key: 'team.view', moduleKey: 'team', description: 'View team members' },
-  { key: 'team.manage', moduleKey: 'team', description: 'Manage team members' },
-  { key: 'clients.view', moduleKey: 'clients', description: 'View clients' },
-  { key: 'clients.create', moduleKey: 'clients', description: 'Create clients' },
-  { key: 'clients.edit', moduleKey: 'clients', description: 'Edit clients' },
-  { key: 'clients.delete', moduleKey: 'clients', description: 'Delete clients' },
-  { key: 'projects.view', moduleKey: 'projects', description: 'View projects' },
-  { key: 'projects.create', moduleKey: 'projects', description: 'Create projects' },
-  { key: 'projects.edit', moduleKey: 'projects', description: 'Edit projects' },
-  { key: 'projects.delete', moduleKey: 'projects', description: 'Delete projects' },
-  { key: 'projects.move_stage', moduleKey: 'projects', description: 'Move projects between stages' },
-  { key: 'checklists.view', moduleKey: 'checklists', description: 'View checklists' },
-  { key: 'checklists.create', moduleKey: 'checklists', description: 'Create checklist templates' },
-  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Edit checklist templates and items' },
-  { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archive checklist templates and delete items' },
-  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Complete checklist instance items' },
-  { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Override checklist gates' },
-  { key: 'calendar.view', moduleKey: 'calendar', description: 'View calendar events' },
-  { key: 'calendar.create', moduleKey: 'calendar', description: 'Create calendar events' },
-  { key: 'calendar.edit', moduleKey: 'calendar', description: 'Edit calendar events' },
-  { key: 'calendar.delete', moduleKey: 'calendar', description: 'Delete calendar events' },
-  { key: 'quotes.view', moduleKey: 'quotes', description: 'View quotes' },
-  { key: 'quotes.create', moduleKey: 'quotes', description: 'Create quotes' },
-  { key: 'quotes.edit', moduleKey: 'quotes', description: 'Edit quotes' },
-  { key: 'quotes.delete', moduleKey: 'quotes', description: 'Delete quotes' },
-  { key: 'quotes.send', moduleKey: 'quotes', description: 'Send quotes' },
-  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Accept quotes' },
-  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Manage quote templates' },
-  { key: 'web.view', moduleKey: 'web', description: 'View web assets' },
-  { key: 'web.create', moduleKey: 'web', description: 'Create web assets' },
-  { key: 'web.edit', moduleKey: 'web', description: 'Edit web assets' },
-  { key: 'web.delete', moduleKey: 'web', description: 'Delete web assets' },
-  { key: 'web.publish', moduleKey: 'web', description: 'Publish or unpublish web assets' },
-  { key: 'vault.view_list', moduleKey: 'vault', description: 'View vault item list' },
-  { key: 'vault.create', moduleKey: 'vault', description: 'Create vault items' },
-  { key: 'vault.edit', moduleKey: 'vault', description: 'Edit vault items' },
-  { key: 'vault.reveal', moduleKey: 'vault', description: 'Reveal vault secrets' },
-  { key: 'vault.delete', moduleKey: 'vault', description: 'Delete vault items' },
-  { key: 'seo.view', moduleKey: 'seo', description: 'View SEO data' },
-  { key: 'seo.run_scan', moduleKey: 'seo', description: 'Run SEO scans' },
-  { key: 'seo.export', moduleKey: 'seo', description: 'Export SEO reports' },
-  { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Manage SEO settings' },
-] as const;
+  if (Array.isArray(permissionSelection)) {
+    return [...permissionSelection];
+  }
 
-const ROLES = [
-  { name: 'Superadmin', description: 'Full control over workspace', isSuperadmin: true },
-  { name: 'Admin', description: 'Administrative role for day-to-day operations', isSuperadmin: false },
-  { name: 'Manager', description: 'Can manage teams and projects', isSuperadmin: false },
-  { name: 'Operativo', description: 'Operational contributor role', isSuperadmin: false },
-  { name: 'Viewer', description: 'Read-only access where allowed', isSuperadmin: false },
-] as const;
+  const excludedKeys = new Set(permissionSelection.exclude);
+  return allPermissionKeys.filter((permissionKey) => !excludedKeys.has(permissionKey));
+};
+
+const syncRolePermissions = async (roleId: string, desiredPermissionIds: string[]) => {
+  const existingRolePermissions = await prisma.rolePermission.findMany({
+    where: { roleId },
+    select: { permissionId: true },
+  });
+
+  const existingIds = new Set(existingRolePermissions.map((item) => item.permissionId));
+  const desiredIds = new Set(desiredPermissionIds);
+  const permissionIdsToAdd = desiredPermissionIds.filter((permissionId) => !existingIds.has(permissionId));
+  const permissionIdsToRemove = existingRolePermissions
+    .map((item) => item.permissionId)
+    .filter((permissionId) => !desiredIds.has(permissionId));
+
+  if (permissionIdsToAdd.length > 0) {
+    await prisma.rolePermission.createMany({
+      data: permissionIdsToAdd.map((permissionId) => ({
+        roleId,
+        permissionId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  if (permissionIdsToRemove.length > 0) {
+    await prisma.rolePermission.deleteMany({
+      where: {
+        roleId,
+        permissionId: {
+          in: permissionIdsToRemove,
+        },
+      },
+    });
+  }
+};
 
 async function main() {
   const superadminPasswordHash = await bcrypt.hash('admin123', 10);
@@ -120,11 +104,11 @@ async function main() {
     where: {
       workspaceId_userId: { workspaceId: workspace.id, userId: superadminUser.id },
     },
-    update: { status: 'active' },
+    update: { status: 'ACTIVE' },
     create: {
       workspaceId: workspace.id,
       userId: superadminUser.id,
-      status: 'active',
+      status: 'ACTIVE',
     },
   });
 
@@ -132,27 +116,27 @@ async function main() {
     where: {
       workspaceId_userId: { workspaceId: workspace.id, userId: adminLoginUser.id },
     },
-    update: { status: 'active' },
+    update: { status: 'ACTIVE' },
     create: {
       workspaceId: workspace.id,
       userId: adminLoginUser.id,
-      status: 'active',
+      status: 'ACTIVE',
     },
   });
 
   const modulesByKey = new Map<string, { id: string; key: string }>();
-  for (const moduleData of MODULES) {
+  for (const moduleData of SYSTEM_MODULE_CATALOG) {
     const moduleRecord = await prisma.module.upsert({
       where: { key: moduleData.key },
       update: {
         name: moduleData.name,
-        description: `${moduleData.name} module`,
+        description: moduleData.description,
         isCore: moduleData.isCore,
       },
       create: {
         key: moduleData.key,
         name: moduleData.name,
-        description: `${moduleData.name} module`,
+        description: moduleData.description,
         isCore: moduleData.isCore,
       },
       select: { id: true, key: true },
@@ -179,7 +163,7 @@ async function main() {
   }
 
   const allPermissions: { id: string; key: string }[] = [];
-  for (const permissionData of PERMISSIONS) {
+  for (const permissionData of SYSTEM_PERMISSION_CATALOG) {
     const moduleRecord = modulesByKey.get(permissionData.moduleKey);
     if (!moduleRecord) {
       throw new Error(`Missing module for permission ${permissionData.key}`);
@@ -202,8 +186,13 @@ async function main() {
     allPermissions.push(permission);
   }
 
+  const allPermissionKeys = allPermissions.map((permission) => permission.key);
+  const permissionIdByKey = new Map(
+    allPermissions.map((permission) => [permission.key, permission.id]),
+  );
+
   const rolesByName = new Map<string, { id: string; name: string }>();
-  for (const roleData of ROLES) {
+  for (const roleData of SYSTEM_ROLE_DEFINITIONS) {
     const role = await prisma.role.upsert({
       where: {
         workspaceId_name: {
@@ -227,27 +216,22 @@ async function main() {
     });
 
     rolesByName.set(roleData.name, role);
+
+    const desiredPermissionKeys = resolvePermissionKeys(roleData.permissions, allPermissionKeys);
+    const desiredPermissionIds = Array.from(
+      new Set(
+        desiredPermissionKeys
+          .map((permissionKey) => permissionIdByKey.get(permissionKey))
+          .filter((permissionId): permissionId is string => typeof permissionId === 'string'),
+      ),
+    );
+
+    await syncRolePermissions(role.id, desiredPermissionIds);
   }
 
-  const superadminRole = rolesByName.get('Superadmin');
+  const superadminRole = rolesByName.get(SYSTEM_ROLE_NAME.superadmin);
   if (!superadminRole) {
     throw new Error('Superadmin role not found after seed');
-  }
-
-  for (const permission of allPermissions) {
-    await prisma.rolePermission.upsert({
-      where: {
-        roleId_permissionId: {
-          roleId: superadminRole.id,
-          permissionId: permission.id,
-        },
-      },
-      update: {},
-      create: {
-        roleId: superadminRole.id,
-        permissionId: permission.id,
-      },
-    });
   }
 
   await prisma.userRole.upsert({
@@ -468,8 +452,8 @@ async function main() {
         entityId: workspace.id,
         metadata: {
           seededBy: 'prisma/seed.ts',
-          modulesEnabled: MODULES.length,
-          permissionsCreated: PERMISSIONS.length,
+          modulesEnabled: SYSTEM_MODULE_CATALOG.length,
+          permissionsCreated: SYSTEM_PERMISSION_CATALOG.length,
         },
       },
     });
@@ -479,8 +463,8 @@ async function main() {
   console.log(`Workspace: ${workspace.slug}`);
   console.log(`User: ${superadminUser.email}`);
   console.log(`User: ${adminLoginUser.email}`);
-  console.log(`Modules: ${MODULES.length}`);
-  console.log(`Permissions: ${PERMISSIONS.length}`);
+  console.log(`Modules: ${SYSTEM_MODULE_CATALOG.length}`);
+  console.log(`Permissions: ${SYSTEM_PERMISSION_CATALOG.length}`);
 }
 
 main()

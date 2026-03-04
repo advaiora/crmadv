@@ -4,12 +4,15 @@ import type {
   ListVaultItemsInput,
   ListVaultItemsResult,
   UpdateVaultItemInput,
+  VaultClientLookupItem,
   VaultItemMeta,
   VaultItemRecord,
 } from './types.js';
 
 const DEFAULT_LIST_LIMIT = 50;
 const MAX_LIST_LIMIT = 100;
+const DEFAULT_CLIENT_LOOKUP_LIMIT = 100;
+const MAX_CLIENT_LOOKUP_LIMIT = 200;
 
 const clampListLimit = (value: number | undefined): number => {
   if (!Number.isFinite(value)) {
@@ -28,8 +31,33 @@ const clampListLimit = (value: number | undefined): number => {
   return integerValue;
 };
 
+const clampClientLookupLimit = (value: number | undefined): number => {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_CLIENT_LOOKUP_LIMIT;
+  }
+
+  const integerValue = Math.floor(value as number);
+  if (integerValue < 1) {
+    return 1;
+  }
+
+  if (integerValue > MAX_CLIENT_LOOKUP_LIMIT) {
+    return MAX_CLIENT_LOOKUP_LIMIT;
+  }
+
+  return integerValue;
+};
+
 const metaSelect = {
   id: true,
+  clientId: true,
+  client: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
   name: true,
   username: true,
   url: true,
@@ -45,12 +73,19 @@ const recordSelect = {
   iv: true,
   authTag: true,
   version: true,
+  keyVersion: true,
   createdByUserId: true,
   updatedByUserId: true,
 } as const;
 
 const mapMeta = (item: {
   id: string;
+  clientId: string | null;
+  client: {
+    id: string;
+    name: string;
+    email: string | null;
+  } | null;
   name: string;
   username: string | null;
   url: string | null;
@@ -59,6 +94,14 @@ const mapMeta = (item: {
   updatedAt: Date;
 }): VaultItemMeta => ({
   id: item.id,
+  clientId: item.clientId,
+  client: item.client
+    ? {
+        id: item.client.id,
+        name: item.client.name,
+        email: item.client.email,
+      }
+    : null,
   name: item.name,
   username: item.username,
   url: item.url,
@@ -69,6 +112,12 @@ const mapMeta = (item: {
 
 const mapRecord = (item: {
   id: string;
+  clientId: string | null;
+  client: {
+    id: string;
+    name: string;
+    email: string | null;
+  } | null;
   workspaceId: string;
   name: string;
   username: string | null;
@@ -78,12 +127,21 @@ const mapRecord = (item: {
   iv: string;
   authTag: string;
   version: number;
+  keyVersion: number;
   createdByUserId: string | null;
   updatedByUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): VaultItemRecord => ({
   id: item.id,
+  clientId: item.clientId,
+  client: item.client
+    ? {
+        id: item.client.id,
+        name: item.client.name,
+        email: item.client.email,
+      }
+    : null,
   workspaceId: item.workspaceId,
   name: item.name,
   username: item.username,
@@ -93,6 +151,7 @@ const mapRecord = (item: {
   iv: item.iv,
   authTag: item.authTag,
   version: item.version,
+  keyVersion: item.keyVersion,
   createdByUserId: item.createdByUserId,
   updatedByUserId: item.updatedByUserId,
   createdAt: item.createdAt,
@@ -100,6 +159,56 @@ const mapRecord = (item: {
 });
 
 export const vaultRepo = {
+  async listWorkspaceClients(
+    workspaceId: string,
+    options: { search?: string; limit?: number } = {},
+  ): Promise<VaultClientLookupItem[]> {
+    const normalizedSearch = options.search?.trim() || undefined;
+    const limit = clampClientLookupLimit(options.limit);
+
+    const clients = await prisma.client.findMany({
+      where: {
+        workspaceId,
+        ...(normalizedSearch
+          ? {
+              OR: [
+                { name: { contains: normalizedSearch, mode: 'insensitive' } },
+                { email: { contains: normalizedSearch, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+      orderBy: [
+        { name: 'asc' },
+        { id: 'asc' },
+      ],
+      take: limit,
+    });
+
+    return clients;
+  },
+
+  async findWorkspaceClientById(workspaceId: string, clientId: string): Promise<VaultClientLookupItem | null> {
+    const client = await prisma.client.findFirst({
+      where: {
+        workspaceId,
+        id: clientId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+
+    return client;
+  },
+
   async listVaultItems(
     workspaceId: string,
     options: ListVaultItemsInput = {},
@@ -185,6 +294,7 @@ export const vaultRepo = {
       data: {
         ...(data.id ? { id: data.id } : {}),
         workspaceId,
+        clientId: data.clientId ?? null,
         name: data.name,
         username: data.username ?? null,
         url: data.url ?? null,
@@ -193,6 +303,7 @@ export const vaultRepo = {
         iv: data.payload.iv,
         authTag: data.payload.authTag,
         version: data.payload.version,
+        keyVersion: data.payload.keyVersion,
         createdByUserId: data.actorUserId ?? null,
         updatedByUserId: data.actorUserId ?? null,
       },
@@ -213,6 +324,7 @@ export const vaultRepo = {
         id,
       },
       data: {
+        ...(data.clientId !== undefined ? { clientId: data.clientId } : {}),
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.username !== undefined ? { username: data.username } : {}),
         ...(data.url !== undefined ? { url: data.url } : {}),
@@ -223,6 +335,7 @@ export const vaultRepo = {
               iv: data.payload.iv,
               authTag: data.payload.authTag,
               version: data.payload.version,
+              keyVersion: data.payload.keyVersion,
             }
           : {}),
         ...(data.actorUserId !== undefined ? { updatedByUserId: data.actorUserId } : {}),

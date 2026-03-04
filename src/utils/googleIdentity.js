@@ -1,40 +1,21 @@
 let initializedClientId = null;
-let pendingRequest = null;
+let pendingPromptRequest = null;
 const DEFAULT_TIMEOUT_MS = 30000;
 const MIN_TIMEOUT_MS = 1000;
+const GOOGLE_OAUTH_SCOPES = "openid email profile";
 
 const getGoogleAccountsApi = () => window.google?.accounts?.id;
-const isRunningInIframe = () => {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true;
-  }
-};
+const getGoogleOauthApi = () => window.google?.accounts?.oauth2;
 
-const settlePendingRequest = (resolver, value) => {
-  if (!pendingRequest) {
+const settlePromptRequest = (resolver, value) => {
+  if (!pendingPromptRequest) {
     return;
   }
 
-  const currentRequest = pendingRequest;
-  pendingRequest = null;
+  const currentRequest = pendingPromptRequest;
+  pendingPromptRequest = null;
   clearTimeout(currentRequest.timeoutId);
   resolver(value);
-};
-
-const summarizeGoogleCallbackResponse = (response) => {
-  const credential = typeof response?.credential === "string" ? response.credential : "";
-  const credentialPreview =
-    credential.length > 16 ? `${credential.slice(0, 8)}...${credential.slice(-8)}` : credential || "(missing)";
-
-  return {
-    ...response,
-    credential: credential ? "[redacted]" : "(missing)",
-    credentialLength: credential.length,
-    credentialPreview,
-    select_by: typeof response?.select_by === "string" ? response.select_by : "(missing)",
-  };
 };
 
 const resolvePromptErrorMessage = (reason) => {
@@ -60,13 +41,25 @@ const resolvePromptErrorMessage = (reason) => {
       return "Browser non supportato da Google Sign-In.";
     case "credential_missing":
       return "Google non ha restituito credenziali valide. Riprova.";
+    case "access_token_missing":
+      return "Google non ha restituito un access token valido. Riprova.";
     case "skipped":
     case "issuing_failed":
       return "Google Sign-In non disponibile. Verifica origin OAuth, CSP e configurazione FedCM.";
+    case "not_displayed":
+      return "Google Sign-In non visualizzato. Verifica origin OAuth e configurazione browser.";
     case "fedcm_iframe_not_allowed":
       return "FedCM bloccato nel frame corrente. Verifica allow=\"identity-credentials-get\" sugli iframe parent.";
     case "fedcm_network_error":
       return "Errore FedCM nel recupero token. Verifica CSP/connect-src verso accounts.google.com.";
+    case "oauth_popup_failed_to_open":
+      return "Popup OAuth non aperto. Abilita i popup e riprova.";
+    case "oauth_popup_closed":
+      return "Popup OAuth chiuso prima del completamento.";
+    case "access_denied":
+      return "Permesso Google negato. Riprova.";
+    case "origin_mismatch":
+      return "Origin non autorizzata nel client OAuth Google.";
     case "flow_restarted":
     case "dismissed":
       return "Google Sign-In non disponibile al momento. Riprova.";
@@ -80,7 +73,39 @@ const buildPromptError = (reason) => {
   return new Error(reason ? `${message} [${reason}]` : message);
 };
 
-const ensureGoogleInitialized = (clientId, diagnostics) => {
+const normalizeToken = (value) => (typeof value === "string" ? value.trim() : "");
+
+const shouldFallbackToOauthPopup = (error) => {
+  const message = String(error instanceof Error ? error.message : "").toLowerCase();
+  if (!message) {
+    return true;
+  }
+
+  if (
+    message.includes("invalid_client")
+    || message.includes("missing_client_id")
+    || message.includes("unregistered_origin")
+    || message.includes("origin_mismatch")
+    || message.includes("secure_http_required")
+    || message.includes("browser_not_supported")
+  ) {
+    return false;
+  }
+
+  if (
+    message.includes("suppressed_by_user")
+    || message.includes("popup_failed_to_open")
+    || message.includes("popup_closed_by_user")
+    || message.includes("user_cancel")
+    || message.includes("cancel_called")
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const ensureGoogleInitialized = (clientId) => {
   const googleAccountsApi = getGoogleAccountsApi();
   if (!googleAccountsApi) {
     throw new Error("Google Identity Services non caricato.");
@@ -90,15 +115,6 @@ const ensureGoogleInitialized = (clientId, diagnostics) => {
     return;
   }
 
-  if (import.meta.env.DEV) {
-    console.info("[GoogleSignIn] Initializing GIS client", {
-      clientId,
-      clientIdLength: clientId.length,
-      origin: diagnostics.origin,
-      redirectUri: diagnostics.redirectUri || "(not-used-in-gis-popup-flow)",
-    });
-  }
-
   googleAccountsApi.initialize({
     client_id: clientId,
     auto_select: false,
@@ -106,60 +122,34 @@ const ensureGoogleInitialized = (clientId, diagnostics) => {
     itp_support: true,
     use_fedcm_for_prompt: false,
     callback: (response) => {
-      if (!pendingRequest) {
+      if (!pendingPromptRequest) {
         return;
-      }
-
-      if (import.meta.env.DEV) {
-        if (diagnostics.debugRawResponse) {
-          console.info("[GoogleSignIn] GIS callback raw response", response);
-        } else {
-          console.info("[GoogleSignIn] GIS callback response", summarizeGoogleCallbackResponse(response));
-        }
       }
 
       const credential = typeof response?.credential === "string" ? response.credential.trim() : "";
 
       if (!credential) {
-        settlePendingRequest(pendingRequest.reject, buildPromptError("credential_missing"));
+        settlePromptRequest(pendingPromptRequest.reject, buildPromptError("credential_missing"));
         return;
       }
 
-      settlePendingRequest(pendingRequest.resolve, credential);
+      settlePromptRequest(pendingPromptRequest.resolve, credential);
     },
   });
 
   initializedClientId = clientId;
 };
 
-export const requestGoogleIdToken = (clientId, options = {}) =>
+const requestIdTokenViaPrompt = (clientId, options = {}) =>
   new Promise((resolve, reject) => {
     if (!clientId || typeof clientId !== "string" || clientId.trim().length === 0) {
       reject(new Error("VITE_GOOGLE_CLIENT_ID mancante."));
       return;
     }
 
-    const diagnostics = {
-      redirectUri: typeof options.redirectUri === "string" ? options.redirectUri.trim() : "",
-      debugRawResponse: options.debugRawResponse === true,
-      origin: typeof window !== "undefined" ? window.location.origin : "(unknown-origin)",
-    };
-
-    if (import.meta.env.DEV) {
-      console.info("[GoogleSignIn] Requesting ID token", {
-        clientId,
-        clientIdLength: clientId.trim().length,
-        origin: diagnostics.origin,
-        redirectUri: diagnostics.redirectUri || "(not-used-in-gis-popup-flow)",
-        timeoutMs: options.timeoutMs,
-        debugRawResponse: diagnostics.debugRawResponse,
-        inIframe: typeof window !== "undefined" ? isRunningInIframe() : false,
-      });
-    }
-
     let googleAccountsApi;
     try {
-      ensureGoogleInitialized(clientId.trim(), diagnostics);
+      ensureGoogleInitialized(clientId.trim());
       googleAccountsApi = getGoogleAccountsApi();
     } catch (error) {
       reject(error instanceof Error ? error : new Error("Inizializzazione Google non riuscita."));
@@ -171,8 +161,8 @@ export const requestGoogleIdToken = (clientId, options = {}) =>
       return;
     }
 
-    if (pendingRequest) {
-      settlePendingRequest(pendingRequest.reject, new Error("Richiesta Google precedente annullata."));
+    if (pendingPromptRequest) {
+      settlePromptRequest(pendingPromptRequest.reject, new Error("Richiesta Google precedente annullata."));
       if (typeof googleAccountsApi.cancel === "function") {
         googleAccountsApi.cancel();
       }
@@ -180,24 +170,106 @@ export const requestGoogleIdToken = (clientId, options = {}) =>
 
     const parsedTimeoutMs = Number(options.timeoutMs);
     const timeoutMs = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= MIN_TIMEOUT_MS ? parsedTimeoutMs : DEFAULT_TIMEOUT_MS;
-    pendingRequest = {
+    pendingPromptRequest = {
       resolve,
       reject,
       timeoutId: setTimeout(() => {
-        settlePendingRequest(reject, buildPromptError("timeout"));
+        settlePromptRequest(reject, buildPromptError("timeout"));
       }, timeoutMs),
     };
 
     googleAccountsApi.prompt();
   });
 
+const requestAccessTokenViaOauthPopup = (clientId, options = {}) =>
+  new Promise((resolve, reject) => {
+    if (!clientId || typeof clientId !== "string" || clientId.trim().length === 0) {
+      reject(new Error("VITE_GOOGLE_CLIENT_ID mancante."));
+      return;
+    }
+
+    const googleOauthApi = getGoogleOauthApi();
+    if (!googleOauthApi || typeof googleOauthApi.initTokenClient !== "function") {
+      reject(buildPromptError("browser_not_supported"));
+      return;
+    }
+
+    const parsedTimeoutMs = Number(options.timeoutMs);
+    const timeoutMs = Number.isFinite(parsedTimeoutMs) && parsedTimeoutMs >= MIN_TIMEOUT_MS ? parsedTimeoutMs : DEFAULT_TIMEOUT_MS;
+    let completed = false;
+    const finish = (resolver, value) => {
+      if (completed) {
+        return;
+      }
+
+      completed = true;
+      clearTimeout(timeoutId);
+      resolver(value);
+    };
+
+    const timeoutId = setTimeout(() => {
+      finish(reject, buildPromptError("timeout"));
+    }, timeoutMs);
+
+    try {
+      const tokenClient = googleOauthApi.initTokenClient({
+        client_id: clientId.trim(),
+        scope: GOOGLE_OAUTH_SCOPES,
+        prompt: "select_account",
+        callback: (response) => {
+          if (!response || typeof response !== "object") {
+            finish(reject, buildPromptError("access_token_missing"));
+            return;
+          }
+
+          const oauthError = typeof response.error === "string" ? response.error : "";
+          if (oauthError) {
+            finish(reject, buildPromptError(oauthError));
+            return;
+          }
+
+          const accessToken = normalizeToken(response.access_token);
+          if (!accessToken) {
+            finish(reject, buildPromptError("access_token_missing"));
+            return;
+          }
+
+          finish(resolve, accessToken);
+        },
+        error_callback: (oauthError) => {
+          const fallbackReason =
+            typeof oauthError?.type === "string"
+              ? oauthError.type
+              : "oauth_popup_failed_to_open";
+          finish(reject, buildPromptError(fallbackReason));
+        },
+      });
+
+      tokenClient.requestAccessToken();
+    } catch {
+      finish(reject, buildPromptError("oauth_popup_failed_to_open"));
+    }
+  });
+
+export const requestGoogleIdToken = async (clientId, options = {}) => {
+  try {
+    return await requestIdTokenViaPrompt(clientId, options);
+  } catch (error) {
+    if (!shouldFallbackToOauthPopup(error)) {
+      throw error;
+    }
+
+    return requestAccessTokenViaOauthPopup(clientId, options);
+  }
+};
+
 export const isGoogleIdentityAvailable = () => Boolean(getGoogleAccountsApi());
 
 export const resetGoogleIdentitySession = () => {
   const googleAccountsApi = getGoogleAccountsApi();
 
-  if (pendingRequest) {
-    settlePendingRequest(pendingRequest.reject, buildPromptError("cancel_called"));
+  if (pendingPromptRequest) {
+    settlePromptRequest(pendingPromptRequest.reject, buildPromptError("cancel_called"));
   }
 
   if (googleAccountsApi && typeof googleAccountsApi.cancel === "function") {

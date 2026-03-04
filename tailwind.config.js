@@ -1,4 +1,7 @@
 /** @type {import('tailwindcss').Config} */
+const withAlpha = (variableName) =>
+  `color-mix(in srgb, var(${variableName}) calc(<alpha-value> * 100%), transparent)`;
+
 export default {
   content: ['./index.html', './src/**/*.{js,jsx,ts,tsx}'],
   corePlugins: {
@@ -7,22 +10,47 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
+        border: withAlpha('--border'),
+        input: withAlpha('--input'),
+        ring: withAlpha('--ring'),
+        background: withAlpha('--background'),
+        foreground: withAlpha('--foreground'),
+        card: {
+          DEFAULT: withAlpha('--card'),
+          foreground: withAlpha('--card-foreground'),
+        },
+        popover: {
+          DEFAULT: withAlpha('--popover'),
+          foreground: withAlpha('--popover-foreground'),
+        },
         primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+          DEFAULT: withAlpha('--primary'),
+          foreground: withAlpha('--primary-foreground'),
+        },
+        secondary: {
+          DEFAULT: withAlpha('--secondary'),
+          foreground: withAlpha('--secondary-foreground'),
         },
         muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
+          DEFAULT: withAlpha('--muted'),
+          foreground: withAlpha('--muted-foreground'),
+        },
+        accent: {
+          DEFAULT: withAlpha('--accent'),
+          foreground: withAlpha('--accent-foreground'),
         },
         destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
+          DEFAULT: withAlpha('--destructive'),
+          foreground: withAlpha('--destructive-foreground'),
+        },
+        success: {
+          DEFAULT: withAlpha('--success'),
+        },
+        warning: {
+          DEFAULT: withAlpha('--warning'),
+        },
+        info: {
+          DEFAULT: withAlpha('--info'),
         },
       },
       borderRadius: {

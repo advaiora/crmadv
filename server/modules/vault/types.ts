@@ -1,5 +1,11 @@
 export type VaultItemMeta = {
   id: string;
+  clientId: string | null;
+  client: {
+    id: string;
+    name: string;
+    email: string | null;
+  } | null;
   name: string;
   username: string | null;
   url: string | null;
@@ -13,6 +19,7 @@ export type VaultItemEncryptedPayload = {
   iv: string;
   authTag: string;
   version: number;
+  keyVersion: number;
 };
 
 export type VaultSecretPayload = {
@@ -42,6 +49,7 @@ export type ListVaultItemsResult = {
 
 export type CreateVaultItemInput = {
   id?: string;
+  clientId?: string | null;
   name: string;
   username?: string | null;
   url?: string | null;
@@ -51,10 +59,17 @@ export type CreateVaultItemInput = {
 };
 
 export type UpdateVaultItemInput = {
+  clientId?: string | null;
   name?: string;
   username?: string | null;
   url?: string | null;
   tags?: string[];
   payload?: VaultItemEncryptedPayload;
   actorUserId?: string;
+};
+
+export type VaultClientLookupItem = {
+  id: string;
+  name: string;
+  email: string | null;
 };

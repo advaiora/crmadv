@@ -5,13 +5,28 @@ import { decryptAESGCM, encryptAESGCM } from './crypto/aesGcm.js';
 import { getMasterKey } from './crypto/masterKey.js';
 
 const WORKSPACE_DEK_LENGTH_BYTES = 32;
-const WORKSPACE_DEK_VERSION = 1;
+const INITIAL_WORKSPACE_KEY_VERSION = 1;
 const LEGACY_PLACEHOLDER_PREFIX = 'phase2-placeholder:';
 
 type WrappedWorkspaceDEK = {
   wrappedKey: string;
   iv: string;
   authTag: string;
+  keyVersion: number;
+};
+
+type WorkspaceDekRecord = {
+  id: string;
+  workspaceId: string;
+  wrappedKey: string;
+  iv: string | null;
+  authTag: string | null;
+  keyVersion: number;
+  isActive: boolean;
+};
+
+export type WorkspaceDEKResult = {
+  key: Buffer;
   keyVersion: number;
 };
 
@@ -39,12 +54,7 @@ const wrapWorkspaceDEK = (workspaceId: string, dek: Buffer, keyVersion: number):
   };
 };
 
-const canUnwrapWorkspaceDEK = (record: {
-  wrappedKey: string;
-  iv: string | null;
-  authTag: string | null;
-  keyVersion: number;
-}) =>
+const canUnwrapWorkspaceDEK = (record: WorkspaceDekRecord) =>
   Boolean(record.iv)
   && Boolean(record.authTag)
   && record.keyVersion >= 1
@@ -80,40 +90,85 @@ const unwrapWorkspaceDEK = (input: {
   return dek;
 };
 
-const createOrRotateWorkspaceKey = async (workspaceId: string, existingId?: string): Promise<Buffer> => {
-  const dek = randomBytes(WORKSPACE_DEK_LENGTH_BYTES);
-  const wrapped = wrapWorkspaceDEK(workspaceId, dek, WORKSPACE_DEK_VERSION);
-
-  if (existingId) {
-    await prisma.workspaceVaultKey.update({
-      where: { id: existingId },
-      data: wrapped,
-    });
-    return dek;
+const unwrapWorkspaceDekRecord = (record: WorkspaceDekRecord): WorkspaceDEKResult => {
+  if (!canUnwrapWorkspaceDEK(record)) {
+    throw new Error('Workspace encryption key material is not usable.');
   }
 
+  return {
+    key: unwrapWorkspaceDEK({
+      workspaceId: record.workspaceId,
+      wrappedKey: record.wrappedKey,
+      iv: record.iv as string,
+      authTag: record.authTag as string,
+      keyVersion: record.keyVersion,
+    }),
+    keyVersion: record.keyVersion,
+  };
+};
+
+const getLatestWorkspaceKeyRecord = (workspaceId: string, tx: Prisma.TransactionClient | typeof prisma = prisma) =>
+  tx.workspaceVaultKey.findFirst({
+    where: { workspaceId },
+    orderBy: { keyVersion: 'desc' },
+  });
+
+const getActiveWorkspaceKeyRecord = (workspaceId: string, tx: Prisma.TransactionClient | typeof prisma = prisma) =>
+  tx.workspaceVaultKey.findFirst({
+    where: {
+      workspaceId,
+      isActive: true,
+    },
+    orderBy: { keyVersion: 'desc' },
+  });
+
+const createWorkspaceKeyVersion = async (input: {
+  workspaceId: string;
+  keyVersion: number;
+  tx?: Prisma.TransactionClient;
+}) => {
+  const tx = input.tx ?? prisma;
+  const dek = randomBytes(WORKSPACE_DEK_LENGTH_BYTES);
+  const wrapped = wrapWorkspaceDEK(input.workspaceId, dek, input.keyVersion);
+
+  await tx.workspaceVaultKey.create({
+    data: {
+      workspaceId: input.workspaceId,
+      ...wrapped,
+      isActive: true,
+    },
+  });
+
+  return {
+    key: dek,
+    keyVersion: input.keyVersion,
+  } satisfies WorkspaceDEKResult;
+};
+
+const resolveActiveWorkspaceDek = async (workspaceId: string): Promise<WorkspaceDEKResult> => {
+  const activeRecord = await getActiveWorkspaceKeyRecord(workspaceId);
+  if (activeRecord) {
+    if (canUnwrapWorkspaceDEK(activeRecord)) {
+      return unwrapWorkspaceDekRecord(activeRecord);
+    }
+
+    // Legacy/incomplete material: keep old version for decrypt compatibility and issue a fresh active key.
+    return rotateWorkspaceKey(workspaceId);
+  }
+
+  const latestRecord = await getLatestWorkspaceKeyRecord(workspaceId);
+  const initialVersion = latestRecord ? latestRecord.keyVersion + 1 : INITIAL_WORKSPACE_KEY_VERSION;
+
   try {
-    await prisma.workspaceVaultKey.create({
-      data: {
-        workspaceId,
-        ...wrapped,
-      },
+    return await createWorkspaceKeyVersion({
+      workspaceId,
+      keyVersion: initialVersion,
     });
-    return dek;
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const latest = await prisma.workspaceVaultKey.findUnique({
-        where: { workspaceId },
-      });
-
-      if (latest && canUnwrapWorkspaceDEK(latest)) {
-        return unwrapWorkspaceDEK({
-          workspaceId,
-          wrappedKey: latest.wrappedKey,
-          iv: latest.iv as string,
-          authTag: latest.authTag as string,
-          keyVersion: latest.keyVersion,
-        });
+      const racedActiveRecord = await getActiveWorkspaceKeyRecord(workspaceId);
+      if (racedActiveRecord && canUnwrapWorkspaceDEK(racedActiveRecord)) {
+        return unwrapWorkspaceDekRecord(racedActiveRecord);
       }
     }
 
@@ -121,26 +176,56 @@ const createOrRotateWorkspaceKey = async (workspaceId: string, existingId?: stri
   }
 };
 
-export const getOrCreateWorkspaceDEK = async (workspaceId: string): Promise<Buffer> => {
-  const existing = await prisma.workspaceVaultKey.findUnique({
+const resolveWorkspaceDekByVersion = async (
+  workspaceId: string,
+  keyVersion: number,
+): Promise<WorkspaceDEKResult> => {
+  const record = await prisma.workspaceVaultKey.findFirst({
     where: {
       workspaceId,
+      keyVersion,
     },
+    orderBy: { createdAt: 'desc' },
   });
 
-  if (!existing) {
-    return createOrRotateWorkspaceKey(workspaceId);
+  if (!record) {
+    throw new Error('Workspace encryption key version not found.');
   }
 
-  if (canUnwrapWorkspaceDEK(existing)) {
-    return unwrapWorkspaceDEK({
-      workspaceId,
-      wrappedKey: existing.wrappedKey,
-      iv: existing.iv as string,
-      authTag: existing.authTag as string,
-      keyVersion: existing.keyVersion,
-    });
-  }
-
-  return createOrRotateWorkspaceKey(workspaceId, existing.id);
+  return unwrapWorkspaceDekRecord(record);
 };
+
+export const getOrCreateWorkspaceDEK = async (
+  workspaceId: string,
+  keyVersion?: number,
+): Promise<WorkspaceDEKResult> => {
+  if (typeof keyVersion === 'number') {
+    return resolveWorkspaceDekByVersion(workspaceId, keyVersion);
+  }
+
+  return resolveActiveWorkspaceDek(workspaceId);
+};
+
+export const rotateWorkspaceKey = async (workspaceId: string): Promise<WorkspaceDEKResult> => {
+  return prisma.$transaction(async (tx) => {
+    const latest = await getLatestWorkspaceKeyRecord(workspaceId, tx);
+    const nextKeyVersion = latest ? latest.keyVersion + 1 : INITIAL_WORKSPACE_KEY_VERSION;
+
+    await tx.workspaceVaultKey.updateMany({
+      where: {
+        workspaceId,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    return createWorkspaceKeyVersion({
+      workspaceId,
+      keyVersion: nextKeyVersion,
+      tx,
+    });
+  });
+};
+

@@ -25,6 +25,7 @@ import { workspaceBrandingService } from '../services/workspace-branding.service
 import {
   resolveOrCreateWorkspaceForGoogle,
   upsertGoogleUser,
+  verifyGoogleAccessToken,
   verifyGoogleIdToken,
   type GoogleAuthMode,
 } from '../services/google-auth.service.js';
@@ -34,6 +35,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const LOGIN_MIN_PASSWORD_LENGTH = 1;
 const REGISTRATION_GENERIC_ERROR_MESSAGE = 'Errore durante la registrazione';
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const isLikelyJwtToken = (value: string) => value.split('.').length === 3;
 
 const workspaceSelect = {
   id: true,
@@ -145,6 +147,9 @@ const googleAuthSchema = z.object({
   id_token: z.string().trim().min(1).optional(),
   token: z.string().trim().min(1).optional(),
   googleIdToken: z.string().trim().min(1).optional(),
+  accessToken: z.string().trim().min(1).optional(),
+  access_token: z.string().trim().min(1).optional(),
+  googleAccessToken: z.string().trim().min(1).optional(),
   mode: z.preprocess(
     (value) => (typeof value === 'string' ? value.trim().toLowerCase() : undefined),
     z.enum(['login', 'signup']).optional(),
@@ -181,19 +186,42 @@ const googleAuthSchema = z.object({
   ),
 })
   .superRefine((value, context) => {
-    if (!value.idToken && !value.credential && !value.id_token && !value.token && !value.googleIdToken) {
+    if (
+      !value.idToken
+      && !value.credential
+      && !value.id_token
+      && !value.token
+      && !value.googleIdToken
+      && !value.accessToken
+      && !value.access_token
+      && !value.googleAccessToken
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'idToken or credential is required',
+        message: 'idToken/credential/accessToken is required',
         path: ['idToken'],
       });
     }
   })
-  .transform((value) => ({
-    ...value,
-    mode: value.mode ?? value.action,
-    idToken: value.idToken ?? value.credential ?? value.id_token ?? value.token ?? value.googleIdToken ?? '',
-  }));
+  .transform((value) => {
+    const genericToken = value.token ?? '';
+    const idToken = value.idToken
+      ?? value.credential
+      ?? value.id_token
+      ?? value.googleIdToken
+      ?? (genericToken && isLikelyJwtToken(genericToken) ? genericToken : '');
+    const accessToken = value.accessToken
+      ?? value.access_token
+      ?? value.googleAccessToken
+      ?? (genericToken && !isLikelyJwtToken(genericToken) ? genericToken : '');
+
+    return {
+      ...value,
+      mode: value.mode ?? value.action,
+      idToken,
+      accessToken,
+    };
+  });
 
 type ParsedGoogleAuthPayload = z.infer<typeof googleAuthSchema>;
 type GoogleAuthInternalCode =
@@ -478,30 +506,18 @@ const ensureWorkspaceAccessDefaults = async ({
   fallbackUserRole: string | null | undefined;
   sourceAction: string;
 }) => {
-  const [assignedRoleCount, workspaceModuleCount, availableModuleCount, availablePermissionCount] = await Promise.all([
+  const [assignedRoleCount] = await Promise.all([
     tx.userRole.count({
       where: {
         workspaceId,
         userId,
       },
     }),
-    tx.workspaceModule.count({
-      where: {
-        workspaceId,
-      },
-    }),
-    tx.module.count(),
-    tx.permission.count(),
   ]);
 
-  const shouldInitializeModules = workspaceModuleCount === 0;
   const shouldAssignRole = assignedRoleCount === 0;
-  const shouldBootstrapCatalog = availableModuleCount === 0 || availablePermissionCount === 0;
-
-  if (!shouldInitializeModules && !shouldAssignRole && !shouldBootstrapCatalog) {
-    return null;
-  }
-
+  // Always sync RBAC catalogs and system role permissions to prevent permission drift
+  // when new modules/permissions are introduced after workspace creation.
   await ensureWorkspaceSystemRoles({
     tx,
     workspaceId,
@@ -516,7 +532,7 @@ const ensureWorkspaceAccessDefaults = async ({
   const activeWorkspaceUserCount = await tx.membership.count({
     where: {
       workspaceId,
-      status: 'active',
+      status: 'ACTIVE',
     },
   });
 
@@ -552,7 +568,7 @@ const listMemberships = (client: Prisma.TransactionClient | typeof prisma, userI
   client.membership.findMany({
     where: {
       userId,
-      status: 'active',
+      status: 'ACTIVE',
     },
     orderBy: {
       createdAt: 'asc',
@@ -825,7 +841,7 @@ const authRoute: FastifyPluginAsync = async (app) => {
             data: {
               workspaceId: resolvedWorkspace.id,
               userId: createdUser.id,
-              status: 'active',
+              status: 'ACTIVE',
             },
           });
 
@@ -967,10 +983,15 @@ const authRoute: FastifyPluginAsync = async (app) => {
           mode,
           googleClientId,
         });
-        const identity = await verifyGoogleIdToken({
-          idToken: parsed.data.idToken,
-          audience: googleClientId,
-        });
+        const identity = parsed.data.idToken
+          ? await verifyGoogleIdToken({
+              idToken: parsed.data.idToken,
+              audience: googleClientId,
+            })
+          : await verifyGoogleAccessToken({
+              accessToken: parsed.data.accessToken,
+              audience: googleClientId,
+            });
         maskedEmailForAudit = maskEmailForLog(identity.email);
 
         const result = await prisma.$transaction(async (tx) => {

@@ -34,12 +34,12 @@ const main = async () => {
         },
       },
       update: {
-        status: 'active',
+        status: 'ACTIVE',
       },
       create: {
         workspaceId: otherWorkspace.id,
         userId: SUPERADMIN_USER_ID,
-        status: 'active',
+        status: 'ACTIVE',
       },
     });
 
@@ -51,12 +51,12 @@ const main = async () => {
         },
       },
       update: {
-        status: 'active',
+        status: 'ACTIVE',
       },
       create: {
         workspaceId: otherWorkspace.id,
         userId: LIMITED_USER_ID,
-        status: 'active',
+        status: 'ACTIVE',
       },
     });
 

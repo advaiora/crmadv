@@ -13,6 +13,7 @@ const loginUserSelect = {
   name: true,
   role: true,
   passwordHash: true,
+  vaultPasswordHash: true,
 } as const;
 
 export const userRepository = {
@@ -20,6 +21,13 @@ export const userRepository = {
     return prisma.user.findUnique({
       where: { id: userId },
       select: userSelect,
+    });
+  },
+
+  findByIdForLogin(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: loginUserSelect,
     });
   },
 
@@ -33,6 +41,14 @@ export const userRepository = {
   findByEmailForLogin(email: string) {
     return prisma.user.findUnique({
       where: { email: email.toLowerCase() },
+      select: loginUserSelect,
+    });
+  },
+
+  updateVaultPasswordHash(userId: string, vaultPasswordHash: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { vaultPasswordHash },
       select: loginUserSelect,
     });
   },

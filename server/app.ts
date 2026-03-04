@@ -22,16 +22,28 @@ import workspaceQuotesRoute from "./modules/quotes/routes/workspace-quotes.route
 import workspaceQuoteTemplatesRoute from "./modules/quotes/routes/workspace-quote-templates.route.js";
 import workspaceCalendarRoute from "./modules/calendar/routes/workspace-calendar.route.js";
 import workspaceMessagingRoute from "./modules/messaging/routes/workspace-messaging.route.js";
+import workspaceDashboardRoute from "./modules/dashboard/routes/workspace-dashboard.route.js";
+import workspaceTeamRoute from "./modules/team/routes/workspace-team.route.js";
 import workspaceVaultRoute from "./modules/vault/routes/workspace-vault.route.js";
 import workspaceWebAssetsRoute from "./routes/workspace-web-assets.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
 const DEV_DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
 const DEV_EXPECTED_FRONTEND_ORIGIN = "http://localhost:5173";
+const DEV_ALLOWED_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 const CORS_ALLOW_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const CORS_ALLOW_HEADERS = "Content-Type, Authorization, X-Workspace-Id, X-Workspace-Slug, X-Google-Client-Id-Debug";
 
 const sanitizeErrorMessage = (message: string) => message.replace(/\/\/([^:@/\s]+)(?::[^@/\s]*)?@/g, "//***:***@");
+
+const isFastifyClientError = (error: unknown): error is { statusCode: number; code?: string; message?: string } => {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const maybeStatusCode = (error as { statusCode?: unknown }).statusCode;
+  return typeof maybeStatusCode === "number" && maybeStatusCode >= 400 && maybeStatusCode < 500;
+};
 
 const normalizeOrigin = (value: string): string | null => {
   const normalized = value.trim();
@@ -72,6 +84,34 @@ const setCorsHeaders = (reply: { header: (name: string, value: string) => void }
   reply.header("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
   reply.header("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
   reply.header("Vary", "Origin");
+};
+
+const isDevLoopbackOrigin = (origin: string) => {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+    return parsedOrigin.protocol === "http:" && DEV_ALLOWED_LOCALHOST_HOSTNAMES.has(parsedOrigin.hostname);
+  } catch {
+    return false;
+  }
+};
+
+const buildCorsDecision = (requestOriginRaw: string | null, corsAllowedOriginsSet: Set<string>) => {
+  const requestOriginNormalized = requestOriginRaw ? normalizeOrigin(requestOriginRaw) : null;
+  const allowedByList = requestOriginNormalized ? corsAllowedOriginsSet.has(requestOriginNormalized) : false;
+  const allowedByDevLoopback = requestOriginNormalized ? isDevLoopbackOrigin(requestOriginNormalized) : false;
+  const isAllowed = requestOriginNormalized ? (allowedByList || allowedByDevLoopback) : false;
+
+  return {
+    requestOriginRaw,
+    requestOriginNormalized,
+    allowedByList,
+    allowedByDevLoopback,
+    isAllowed,
+  };
 };
 
 const isDatabaseUnavailableError = (error: unknown) => {
@@ -149,39 +189,62 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
 
   app.addHook("onRequest", async (request, reply) => {
     const requestOriginRaw = typeof request.headers.origin === "string" ? request.headers.origin : null;
-    const requestOrigin = requestOriginRaw ? normalizeOrigin(requestOriginRaw) : null;
-    const isAllowedOrigin = requestOrigin ? corsAllowedOriginsSet.has(requestOrigin) : false;
+    const corsDecision = buildCorsDecision(requestOriginRaw, corsAllowedOriginsSet);
+    const isGoogleAuthRoute = request.url.startsWith("/auth/google");
+    const isPreflight = request.method === "OPTIONS";
+    const accessControlRequestMethodHeader =
+      typeof request.headers["access-control-request-method"] === "string"
+        ? request.headers["access-control-request-method"]
+        : null;
+    const accessControlRequestHeadersHeader =
+      typeof request.headers["access-control-request-headers"] === "string"
+        ? request.headers["access-control-request-headers"]
+        : null;
 
-    if (requestOrigin && isAllowedOrigin) {
-      setCorsHeaders(reply, requestOrigin);
-      if (request.url.startsWith("/auth/google")) {
-        request.log.info(
-          {
-            reqId: request.id,
-            requestOrigin,
-            route: request.url,
-          },
-          "CORS allowed for Google auth request",
-        );
-      }
+    if (corsDecision.requestOriginNormalized && corsDecision.isAllowed) {
+      setCorsHeaders(reply, corsDecision.requestOriginNormalized);
     }
 
-    if (request.method !== "OPTIONS") {
+    if (isGoogleAuthRoute && isPreflight) {
+      request.log.info(
+        {
+          reqId: request.id,
+          route: request.url,
+          method: request.method,
+          nodeEnv: process.env.NODE_ENV ?? "(unset)",
+          accessControlRequestMethod: accessControlRequestMethodHeader,
+          accessControlRequestHeaders: accessControlRequestHeadersHeader,
+          corsDecision,
+          corsAllowedOrigins,
+        },
+        "CORS debug: Google auth preflight evaluated",
+      );
+    }
+
+    if (!isPreflight) {
       return;
     }
 
-    if (requestOrigin && !isAllowedOrigin) {
+    if (corsDecision.requestOriginNormalized && !corsDecision.isAllowed) {
       request.log.warn(
         {
           reqId: request.id,
           route: request.url,
-          requestOrigin,
+          requestOrigin: corsDecision.requestOriginNormalized,
+          requestOriginRaw: corsDecision.requestOriginRaw,
+          allowedByList: corsDecision.allowedByList,
+          allowedByDevLoopback: corsDecision.allowedByDevLoopback,
+          nodeEnv: process.env.NODE_ENV ?? "(unset)",
+          accessControlRequestMethod: accessControlRequestMethodHeader,
+          accessControlRequestHeaders: accessControlRequestHeadersHeader,
           corsAllowedOrigins,
         },
         "CORS origin blocked",
       );
+      reply.header("x-cors-debug-id", request.id);
       reply.code(403).send({
         error: "CORS origin not allowed",
+        reqId: request.id,
       });
       return;
     }
@@ -194,6 +257,12 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
 
     if (isHttpError(error)) {
       return fail(reply, error.statusCode, error.code, error.message, error.details);
+    }
+
+    if (isFastifyClientError(error)) {
+      const errorCode = typeof error.code === "string" && error.code.length > 0 ? error.code : "BAD_REQUEST";
+      const errorMessage = typeof error.message === "string" && error.message.length > 0 ? error.message : "Bad request";
+      return fail(reply, error.statusCode, errorCode, errorMessage);
     }
 
     if (isDatabaseUnavailableError(error)) {
@@ -260,6 +329,8 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceQuoteTemplatesRoute);
   void app.register(workspaceCalendarRoute);
   void app.register(workspaceMessagingRoute);
+  void app.register(workspaceDashboardRoute);
+  void app.register(workspaceTeamRoute);
   void app.register(workspaceVaultRoute);
   void app.register(workspaceWebAssetsRoute);
   void app.register(workspaceRolesRoute);
@@ -287,6 +358,21 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
         timestamp: new Date().toISOString(),
       };
     }
+  });
+
+  app.get("/debug/cors", async (request, reply) => {
+    const queryOrigin = typeof (request.query as { origin?: unknown } | undefined)?.origin === "string"
+      ? ((request.query as { origin: string }).origin)
+      : null;
+
+    const corsDecision = buildCorsDecision(queryOrigin, corsAllowedOriginsSet);
+
+    return ok(reply, {
+      nodeEnv: process.env.NODE_ENV ?? "(unset)",
+      corsAllowedOrigins,
+      corsDecision,
+      hint: "Pass ?origin=http://localhost:5174 to evaluate an origin.",
+    });
   });
 
   app.get("/whoami", async (request, reply) => {

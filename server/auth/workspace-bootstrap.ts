@@ -1,110 +1,16 @@
 import type { Prisma } from '@prisma/client';
+import {
+  REGISTRABLE_WORKSPACE_ROLE_NAMES,
+  SYSTEM_MODULE_CATALOG,
+  SYSTEM_PERMISSION_CATALOG,
+  SYSTEM_ROLE_DEFINITIONS,
+  SYSTEM_ROLE_NAME,
+  type PermissionSelection,
+  type WorkspaceSystemRoleName,
+} from './rbac-catalog.js';
 import { badRequest, forbidden, notFound } from '../core/errors.js';
-
-type ModuleCatalogEntry = {
-  key: string;
-  name: string;
-  isCore: boolean;
-  description: string;
-};
-
-type PermissionCatalogEntry = {
-  key: string;
-  moduleKey: string;
-  description: string;
-};
-
-const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
-  { key: 'modules', name: 'Module Registry', isCore: true, description: 'Module registry' },
-  { key: 'branding', name: 'Branding', isCore: true, description: 'Branding module' },
-  { key: 'audit', name: 'Audit', isCore: true, description: 'Audit module' },
-  { key: 'team', name: 'Team', isCore: false, description: 'Team module' },
-  { key: 'clients', name: 'Clients', isCore: false, description: 'Clients module' },
-  { key: 'projects', name: 'Projects', isCore: false, description: 'Projects module' },
-  { key: 'checklists', name: 'Checklists', isCore: false, description: 'Checklists module' },
-  { key: 'calendar', name: 'Calendar', isCore: false, description: 'Calendar module' },
-  { key: 'quotes', name: 'Quotes', isCore: false, description: 'Quotes module' },
-  { key: 'web', name: 'Web', isCore: false, description: 'Web module' },
-  { key: 'vault', name: 'Vault', isCore: false, description: 'Vault module' },
-  { key: 'seo', name: 'SEO', isCore: false, description: 'SEO module' },
-] as const;
-
-const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
-  { key: 'modules.manage', moduleKey: 'modules', description: 'Manage workspace modules' },
-  { key: 'branding.manage', moduleKey: 'branding', description: 'Manage workspace branding' },
-  { key: 'audit.view', moduleKey: 'audit', description: 'View audit logs' },
-  { key: 'roles.view', moduleKey: 'team', description: 'View workspace roles' },
-  { key: 'roles.manage', moduleKey: 'team', description: 'Manage workspace roles' },
-  { key: 'roles.assign', moduleKey: 'team', description: 'Assign roles to workspace users' },
-  { key: 'team.view', moduleKey: 'team', description: 'View team members' },
-  { key: 'team.manage', moduleKey: 'team', description: 'Manage team members' },
-  { key: 'clients.view', moduleKey: 'clients', description: 'View clients' },
-  { key: 'clients.create', moduleKey: 'clients', description: 'Create clients' },
-  { key: 'clients.edit', moduleKey: 'clients', description: 'Edit clients' },
-  { key: 'clients.delete', moduleKey: 'clients', description: 'Delete clients' },
-  { key: 'projects.view', moduleKey: 'projects', description: 'View projects' },
-  { key: 'projects.create', moduleKey: 'projects', description: 'Create projects' },
-  { key: 'projects.edit', moduleKey: 'projects', description: 'Edit projects' },
-  { key: 'projects.delete', moduleKey: 'projects', description: 'Delete projects' },
-  { key: 'projects.move_stage', moduleKey: 'projects', description: 'Move projects between stages' },
-  { key: 'checklists.view', moduleKey: 'checklists', description: 'View checklists' },
-  { key: 'checklists.create', moduleKey: 'checklists', description: 'Create checklist templates' },
-  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Edit checklist templates and items' },
-  { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archive checklist templates and delete items' },
-  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Complete checklist instance items' },
-  { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Override checklist gates' },
-  { key: 'calendar.view', moduleKey: 'calendar', description: 'View calendar events' },
-  { key: 'calendar.create', moduleKey: 'calendar', description: 'Create calendar events' },
-  { key: 'calendar.edit', moduleKey: 'calendar', description: 'Edit calendar events' },
-  { key: 'calendar.delete', moduleKey: 'calendar', description: 'Delete calendar events' },
-  { key: 'quotes.view', moduleKey: 'quotes', description: 'View quotes' },
-  { key: 'quotes.create', moduleKey: 'quotes', description: 'Create quotes' },
-  { key: 'quotes.edit', moduleKey: 'quotes', description: 'Edit quotes' },
-  { key: 'quotes.delete', moduleKey: 'quotes', description: 'Delete quotes' },
-  { key: 'quotes.send', moduleKey: 'quotes', description: 'Send quotes' },
-  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Accept quotes' },
-  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Manage quote templates' },
-  { key: 'web.view', moduleKey: 'web', description: 'View web assets' },
-  { key: 'web.create', moduleKey: 'web', description: 'Create web assets' },
-  { key: 'web.edit', moduleKey: 'web', description: 'Edit web assets' },
-  { key: 'web.delete', moduleKey: 'web', description: 'Delete web assets' },
-  { key: 'web.publish', moduleKey: 'web', description: 'Publish or unpublish web assets' },
-  { key: 'vault.view_list', moduleKey: 'vault', description: 'View vault item list' },
-  { key: 'vault.create', moduleKey: 'vault', description: 'Create vault items' },
-  { key: 'vault.edit', moduleKey: 'vault', description: 'Edit vault items' },
-  { key: 'vault.reveal', moduleKey: 'vault', description: 'Reveal vault secrets' },
-  { key: 'vault.delete', moduleKey: 'vault', description: 'Delete vault items' },
-  { key: 'seo.view', moduleKey: 'seo', description: 'View SEO data' },
-  { key: 'seo.run_scan', moduleKey: 'seo', description: 'Run SEO scans' },
-  { key: 'seo.export', moduleKey: 'seo', description: 'Export SEO reports' },
-  { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Manage SEO settings' },
-] as const;
-
-export const SYSTEM_ROLE_NAME = {
-  superadmin: 'Superadmin',
-  admin: 'Admin',
-  manager: 'Manager',
-  operativo: 'Operativo',
-  viewer: 'Viewer',
-} as const;
-
-export const REGISTRABLE_WORKSPACE_ROLE_NAMES = [
-  SYSTEM_ROLE_NAME.admin,
-  SYSTEM_ROLE_NAME.manager,
-  SYSTEM_ROLE_NAME.operativo,
-  SYSTEM_ROLE_NAME.viewer,
-] as const;
-
-export type WorkspaceSystemRoleName =
-  (typeof SYSTEM_ROLE_NAME)[keyof typeof SYSTEM_ROLE_NAME];
-
-type SystemRoleDefinition = {
-  name: WorkspaceSystemRoleName;
-  description: string;
-  isSuperadmin: boolean;
-  userRole: string;
-  permissions: readonly string[] | 'all';
-};
+export { REGISTRABLE_WORKSPACE_ROLE_NAMES, SYSTEM_ROLE_NAME };
+export type { WorkspaceSystemRoleName } from './rbac-catalog.js';
 
 type RoleCatalogEntry = {
   id: string;
@@ -120,98 +26,6 @@ const SYSTEM_ROLE_PRIORITY: Record<WorkspaceSystemRoleName, number> = {
   [SYSTEM_ROLE_NAME.operativo]: 20,
   [SYSTEM_ROLE_NAME.viewer]: 10,
 };
-
-const ADMIN_ASSIGNABLE_ROLE_NAMES = new Set<WorkspaceSystemRoleName>([
-  SYSTEM_ROLE_NAME.manager,
-  SYSTEM_ROLE_NAME.operativo,
-  SYSTEM_ROLE_NAME.viewer,
-]);
-
-const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
-  {
-    name: SYSTEM_ROLE_NAME.superadmin,
-    description: 'Full control over workspace and permissions',
-    isSuperadmin: true,
-    userRole: 'superadmin',
-    permissions: 'all',
-  },
-  {
-    name: SYSTEM_ROLE_NAME.admin,
-    description: 'High-privilege workspace administrator',
-    isSuperadmin: false,
-    userRole: 'admin',
-    permissions: 'all',
-  },
-  {
-    name: SYSTEM_ROLE_NAME.manager,
-    description: 'Manage operational workflows (projects/checklists/quotes/web)',
-    isSuperadmin: false,
-    userRole: 'manager',
-    permissions: [
-      'team.view',
-      'clients.view',
-      'clients.create',
-      'clients.edit',
-      'projects.view',
-      'projects.create',
-      'projects.edit',
-      'projects.move_stage',
-      'checklists.view',
-      'checklists.create',
-      'checklists.edit',
-      'checklists.complete_item',
-      'calendar.view',
-      'calendar.create',
-      'calendar.edit',
-      'calendar.delete',
-      'quotes.view',
-      'quotes.create',
-      'quotes.edit',
-      'quotes.send',
-      'web.view',
-      'web.create',
-      'web.edit',
-      'web.delete',
-      'web.publish',
-    ],
-  },
-  {
-    name: SYSTEM_ROLE_NAME.operativo,
-    description: 'Operational contributor with limited edit permissions',
-    isSuperadmin: false,
-    userRole: 'operativo',
-    permissions: [
-      'team.view',
-      'clients.view',
-      'clients.edit',
-      'projects.view',
-      'checklists.view',
-      'checklists.complete_item',
-      'calendar.view',
-      'calendar.create',
-      'calendar.edit',
-      'quotes.view',
-      'web.view',
-    ],
-  },
-  {
-    name: SYSTEM_ROLE_NAME.viewer,
-    description: 'Read-only access',
-    isSuperadmin: false,
-    userRole: 'viewer',
-    permissions: [
-      'team.view',
-      'clients.view',
-      'projects.view',
-      'checklists.view',
-      'calendar.view',
-      'quotes.view',
-      'web.view',
-      'audit.view',
-      'roles.view',
-    ],
-  },
-] as const;
 
 const WORKSPACE_SYSTEM_ROLE_NAME_SET = new Set<WorkspaceSystemRoleName>(
   SYSTEM_ROLE_DEFINITIONS.map((role) => role.name),
@@ -241,13 +55,32 @@ export const normalizeWorkspaceSystemRoleName = (
   return null;
 };
 
+const resolvePermissionKeys = (
+  permissionSelection: PermissionSelection,
+  allPermissionKeys: string[],
+): string[] => {
+  if (permissionSelection === 'all') {
+    return [...allPermissionKeys];
+  }
+
+  if (Array.isArray(permissionSelection)) {
+    return [...permissionSelection];
+  }
+
+  const excludedKeys = new Set(permissionSelection.exclude);
+  return allPermissionKeys.filter((permissionKey) => !excludedKeys.has(permissionKey));
+};
+
 const getPermissionIdsByKeys = (
   permissionKeys: readonly string[],
   permissionsByKey: Map<string, string>,
-) =>
-  permissionKeys
+) => {
+  const ids = permissionKeys
     .map((permissionKey) => permissionsByKey.get(permissionKey))
     .filter((permissionId): permissionId is string => typeof permissionId === 'string');
+
+  return Array.from(new Set(ids));
+};
 
 const syncRolePermissions = async ({
   tx,
@@ -335,7 +168,7 @@ const listWorkspaceMembershipCount = (
   tx.membership.count({
     where: {
       workspaceId,
-      status: 'active',
+      status: 'ACTIVE',
     },
   });
 
@@ -405,7 +238,7 @@ const ensureTargetIsWorkspaceMember = async ({
     where: {
       workspaceId,
       userId: targetUserId,
-      status: 'active',
+      status: 'ACTIVE',
     },
     select: {
       id: true,
@@ -437,23 +270,11 @@ const assertActorCanAssignRole = ({
     return;
   }
 
-  if (actorRoleName !== SYSTEM_ROLE_NAME.admin) {
-    throw forbidden('Only Superadmin and Admin can modify user roles');
-  }
-
-  if (!ADMIN_ASSIGNABLE_ROLE_NAMES.has(nextRoleName)) {
-    throw forbidden('Admin can assign only Manager, Operativo or Viewer roles', {
-      actorRole: actorRoleName,
-      targetRole: nextRoleName,
-    });
-  }
-
-  if (targetCurrentRoleName && !ADMIN_ASSIGNABLE_ROLE_NAMES.has(targetCurrentRoleName)) {
-    throw forbidden('Admin cannot modify Superadmin or Admin roles', {
-      actorRole: actorRoleName,
-      currentTargetRole: targetCurrentRoleName,
-    });
-  }
+  throw forbidden('Only Superadmin can modify user roles', {
+    actorRole: actorRoleName,
+    targetRole: nextRoleName,
+    currentTargetRole: targetCurrentRoleName,
+  });
 };
 
 const resolveRegistrationRoleName = ({
@@ -570,7 +391,6 @@ export const ensureWorkspaceSystemRoles = async ({
   const permissionKeysById = new Map(
     permissions.map((permission) => [permission.id, permission.key]),
   );
-  const allPermissionIds = permissions.map((permission) => permission.id);
   const allPermissionKeys = permissions.map((permission) => permission.key);
 
   const roleCatalog = new Map<WorkspaceSystemRoleName, RoleCatalogEntry>();
@@ -600,10 +420,17 @@ export const ensureWorkspaceSystemRoles = async ({
       },
     });
 
-    const desiredPermissionIds =
-      roleDefinition.permissions === 'all'
-        ? allPermissionIds
-        : getPermissionIdsByKeys(roleDefinition.permissions, permissionsByKey);
+    const desiredPermissionKeys = resolvePermissionKeys(
+      roleDefinition.permissions,
+      allPermissionKeys,
+    );
+    const desiredPermissionIds = getPermissionIdsByKeys(
+      desiredPermissionKeys,
+      permissionsByKey,
+    );
+    const normalizedPermissionKeys = desiredPermissionIds.map(
+      (permissionId) => permissionKeysById.get(permissionId) ?? permissionId,
+    );
 
     await syncRolePermissions({
       tx,
@@ -620,10 +447,7 @@ export const ensureWorkspaceSystemRoles = async ({
       id: roleRecord.id,
       roleName: roleDefinition.name,
       userRole: roleDefinition.userRole,
-      permissionKeys:
-        roleDefinition.permissions === 'all'
-          ? allPermissionKeys
-          : [...roleDefinition.permissions],
+      permissionKeys: normalizedPermissionKeys,
     });
   }
 

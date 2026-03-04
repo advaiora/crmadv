@@ -74,7 +74,6 @@ const Body = () => {
         }
         else if (e.target.name === "discount") {
             newArr[index].discount = e.target.value
-            // console.log("value:" + typeof e.target.value);
 
         }
         else if (e.target.name === "discountType") {

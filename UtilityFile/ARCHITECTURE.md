@@ -127,3 +127,18 @@ Business (MVP 1):
   - `POST /messages/conversations/:userId/messages`
   - `POST /messages/conversations/:userId/read`
 - Enforcement RBAC: riuso del modulo/permesso `team.view` (modulo `team`) per accesso lettura/scrittura messaggi nel MVP.
+
+## 13) Team Phase 1 (2026-03-04)
+- TEAM permissions base introdotte: `team.view`, `team.invite`, `team.edit`, `team.deactivate`, `team.roles_assign`.
+- Membership status passa a enum `MembershipStatus` (`ACTIVE`, `INACTIVE`, `PENDING`) per supportare lifecycle workspace.
+- Catalogo RBAC/moduli centralizzato in `server/auth/rbac-catalog.ts` e riusato da bootstrap auth + seed.
+- Scelta di sicurezza: solo `Superadmin` puo gestire moduli e assegnazioni ruoli/permessi.
+- `Admin` mantiene privilegi operativi elevati, ma senza `modules.manage`, `roles.*`, `team.roles_assign`.
+
+## 14) Team Phase 3 Invites (2026-03-04)
+- Duplicate invite policy: per stessa `workspaceId + email`, se esiste un invito `PENDING` viene rigenerato token/hash e aggiornata scadenza (no nuovo record).
+- Token persistence: il token plain non viene mai salvato; in DB si salva solo `tokenHash` (HMAC-SHA256 con `TEAM_INVITE_TOKEN_SECRET`, fallback `AUTH_JWT_SECRET`).
+- Default expiry: 7 giorni (`expiresInDays` override consentito fino a 30).
+- Accept endpoint usa il workspace dal record invito (no workspace param), quindi il token determina sempre il tenant corretto.
+- Se modulo `team` e disabilitato per il workspace dell'invito, `accept` risponde `403`.
+- In assenza di SMTP, l'invito viene comunque creato; in dev viene restituito `inviteLink` in response per test manuale.

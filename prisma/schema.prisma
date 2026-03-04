@@ -35,6 +35,19 @@ enum ClientType {
   company
 }
 
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum TeamInviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum WebAssetStatus {
   ACTIVE
   MAINTENANCE
@@ -93,6 +106,7 @@ model Workspace {
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
   memberships                Membership[]
+  teamInvites                TeamInvite[]
   clients                    Client[]
   workspaceModules           WorkspaceModule[]
   roles                      Role[]
@@ -121,7 +135,8 @@ model Workspace {
   auditLogs                  AuditLog[]
   workspaceMessages          WorkspaceMessage[]
   vaultItems                 VaultItem[]
-  vaultKey                   WorkspaceVaultKey?
+  vaultKeys                  WorkspaceVaultKey[]
+  vaultPolicy                WorkspaceVaultPolicy?
   checklistTemplates         ChecklistTemplate[]
   checklistTemplateItems     ChecklistTemplateItem[]
   checklistInstances         ChecklistInstance[]
@@ -134,10 +149,13 @@ model User {
   googleSub                         String?                     @unique
   name                              String?
   passwordHash                      String?
+  vaultPasswordHash                 String?
   role                              String                      @default("member")
   createdAt                         DateTime                    @default(now())
   updatedAt                         DateTime                    @updatedAt
   memberships                       Membership[]
+  teamInvitesSent                   TeamInvite[]                @relation("TeamInviteInvitedByUser")
+  teamInvitesAccepted               TeamInvite[]                @relation("TeamInviteAcceptedByUser")
   userRoles                         UserRole[]
   createdQuotes                     Quote[]                     @relation("QuoteCreatedByUser")
   createdCalendarEvents             CalendarEvent[]             @relation("CalendarEventCreatedByUser")
@@ -161,15 +179,38 @@ model User {
   completedChecklistItems           ChecklistInstanceItem[]
 }
 
+model TeamInvite {
+  id               String           @id @default(cuid())
+  workspaceId      String
+  email            String           @db.VarChar(320)
+  tokenHash        String           @unique @db.VarChar(128)
+  expiresAt        DateTime
+  status           TeamInviteStatus @default(PENDING)
+  rolePresetName   String?          @db.VarChar(60)
+  invitedByUserId  String
+  acceptedByUserId String?
+  acceptedAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  workspace        Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedByUser    User             @relation("TeamInviteInvitedByUser", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+  acceptedByUser   User?            @relation("TeamInviteAcceptedByUser", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, status, createdAt(sort: Desc)])
+  @@index([workspaceId, email, status])
+  @@index([workspaceId, expiresAt])
+}
+
 model Membership {
-  id          String    @id @default(cuid())
+  id          String           @id @default(cuid())
   workspaceId String
   userId      String
-  status      String    @default("active")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      MembershipStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
   @@index([workspaceId])
@@ -201,6 +242,7 @@ model Client {
   websiteAssets   WebsiteAsset[]   @relation("WebsiteAssetClient")
   webAppAssets    WebAppAsset[]    @relation("WebAppAssetClient")
   ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetClient")
+  vaultItems      VaultItem[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, email])
@@ -910,6 +952,7 @@ model WorkspaceMessage {
 model VaultItem {
   id              String    @id @default(cuid())
   workspaceId     String
+  clientId        String?
   name            String    @db.VarChar(255)
   username        String?   @db.VarChar(255)
   url             String?   @db.VarChar(2048)
@@ -918,16 +961,20 @@ model VaultItem {
   iv              String    @db.VarChar(255)
   authTag         String    @db.VarChar(255)
   version         Int       @default(1)
+  keyVersion      Int       @default(1)
   createdByUserId String?
   updatedByUserId String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdByUser   User?     @relation("VaultItemCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
   updatedByUser   User?     @relation("VaultItemUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
+  @@index([workspaceId, clientId])
   @@index([workspaceId, name])
+  @@index([workspaceId, keyVersion])
   @@index([workspaceId, updatedAt(sort: Desc)])
   @@index([createdByUserId])
   @@index([updatedByUserId])
@@ -935,12 +982,28 @@ model VaultItem {
 
 model WorkspaceVaultKey {
   id          String    @id @default(cuid())
-  workspaceId String    @unique
+  workspaceId String
   wrappedKey  String    @db.Text
   iv          String?   @db.VarChar(255)
   authTag     String?   @db.VarChar(255)
   keyVersion  Int       @default(1)
+  isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, keyVersion])
+  @@index([workspaceId, isActive])
+}
+
+model WorkspaceVaultPolicy {
+  id                 String    @id @default(cuid())
+  workspaceId        String    @unique
+  masterPasswordHash String    @db.VarChar(255)
+  passwordVersion    Int       @default(1)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  workspace          Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, updatedAt(sort: Desc)])
 }
