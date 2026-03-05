@@ -18,6 +18,8 @@ import { Textarea } from '../../../components/ui/textarea';
 import { hasModuleEnabled, hasPermission } from '../../../utils/workspaceAccess';
 import { isApiError } from '../api/checklists.api';
 import {
+  useAssignChecklistInstanceItem,
+  useChecklistAssignableUsers,
   useChecklistTemplates,
   useCreateProjectChecklistInstance,
   useMarkChecklistInstanceItemNotApplicable,
@@ -79,6 +81,10 @@ const ChecklistInstanceCard = ({
   onToggleInProgress,
   onToggleNotApplicable,
   updatingItemId,
+  assigningItemId,
+  canAssignItem,
+  assignableUsers,
+  onAssignItem,
   currentStageId,
   showOnlyOpenItems,
 }) => {
@@ -151,6 +157,9 @@ const ChecklistInstanceCard = ({
           const isDone = normalizedState === 'completed';
           const isInProgress = normalizedState === 'in_progress';
           const isNotApplicable = normalizedState === 'not_applicable';
+          const hasCurrentAssigneeInOptions = (assignableUsers || []).some(
+            (user) => user.userId === item.assignedToUserId,
+          );
           return (
             <div
               key={item.id}
@@ -190,6 +199,38 @@ const ChecklistInstanceCard = ({
                     Evidenza URL: {item.evidenceUrl}
                   </p>
                 )}
+
+                <div className="mt-2 space-y-1">
+                  <p className="mb-0 text-xs text-textMuted">Assegnatario</p>
+                  {canAssignItem ? (
+                    <Select
+                      value={item.assignedToUserId || ''}
+                      onChange={(event) => onAssignItem(instance.id, item, event.target.value || null)}
+                      disabled={assigningItemId === item.id}
+                      className="h-9 w-full"
+                    >
+                      <option value="">Non assegnato</option>
+                      {(assignableUsers || []).map((user) => (
+                        <option key={user.userId} value={user.userId}>
+                          {user.name}
+                        </option>
+                      ))}
+                      {item.assignedToUserId && !hasCurrentAssigneeInOptions ? (
+                        <option value={item.assignedToUserId}>
+                          {item.assignedToUserInactive
+                            ? 'Utente disattivato'
+                            : (item.assignedToUserName || 'Utente')}
+                        </option>
+                      ) : null}
+                    </Select>
+                  ) : (
+                    <Badge variant="outline">
+                      {item.assignedToUserId
+                        ? (item.assignedToUserInactive ? 'Utente disattivato' : (item.assignedToUserName || 'Utente'))
+                        : 'Non assegnato'}
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               <div className="w-full md:w-[240px]">
@@ -252,18 +293,22 @@ const ProjectChecklistPanel = ({ project, access }) => {
     || hasPermission(access, 'checklists.manage_templates')
     || hasPermission(access, 'checklists.create');
   const canCompleteItems = hasPermission(access, 'checklists.complete_item');
+  const canAssignItems = hasPermission(access, 'checklists.assign');
 
   const currentStageId = project?.stageId || project?.pipelineStageId || '';
   const checklistsQuery = useProjectChecklistInstances(project?.id, { includeItems: true });
   const templatesQuery = useChecklistTemplates();
+  const assignableUsersQuery = useChecklistAssignableUsers({ enabled: canAssignItems });
   const createInstanceMutation = useCreateProjectChecklistInstance();
   const updateItemStateMutation = useUpdateChecklistInstanceItemState();
   const markNotApplicableMutation = useMarkChecklistInstanceItemNotApplicable();
+  const assignChecklistItemMutation = useAssignChecklistInstanceItem();
 
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [transitionState, setTransitionState] = useState(null);
   const [showOnlyOpenItems, setShowOnlyOpenItems] = useState(false);
+  const [assigningItemId, setAssigningItemId] = useState(null);
 
   const activeTemplates = useMemo(
     () => (templatesQuery.data || []).filter((template) => !template.isArchived),
@@ -281,6 +326,11 @@ const ProjectChecklistPanel = ({ project, access }) => {
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
     });
   }, [checklistsQuery.data, currentStageId]);
+
+  const assignableUsers = useMemo(
+    () => (Array.isArray(assignableUsersQuery.data) ? assignableUsersQuery.data : []),
+    [assignableUsersQuery.data],
+  );
 
   const currentStageTemplateIds = useMemo(
     () =>
@@ -441,6 +491,33 @@ const ProjectChecklistPanel = ({ project, access }) => {
     const currentState = normalizeItemState(item.state);
     const nextState = currentState === 'not_applicable' ? 'not_started' : 'not_applicable';
     handleSelectItemState(item, nextState);
+  };
+
+  const handleAssignItem = async (instanceId, item, assignedToUserId) => {
+    if (!canAssignItems) {
+      return;
+    }
+    if (!instanceId || !item?.id) {
+      return;
+    }
+    if ((item.assignedToUserId || null) === (assignedToUserId || null)) {
+      return;
+    }
+
+    setAssigningItemId(item.id);
+    try {
+      await assignChecklistItemMutation.mutate({
+        instanceId,
+        itemInstanceId: item.id,
+        assignedToUserId: assignedToUserId || null,
+      });
+      await checklistsQuery.refetch();
+      toast.success(assignedToUserId ? 'Assegnatario aggiornato' : 'Assegnazione rimossa');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setAssigningItemId(null);
+    }
   };
 
   const handleConfirmTransition = async () => {
@@ -662,11 +739,16 @@ const ProjectChecklistPanel = ({ project, access }) => {
                 instance={instance}
                 canCompleteItem={canCompleteItems}
                 updatingItemId={updatingItemId}
+                assigningItemId={assigningItemId}
+                canAssignItem={canAssignItems}
+                assignableUsers={assignableUsers}
                 currentStageId={currentStageId}
                 showOnlyOpenItems={showOnlyOpenItems}
                 onToggleItemDone={(item, checked) => handleToggleItemDone(item, checked)}
                 onToggleInProgress={(item) => handleToggleInProgress(item)}
                 onToggleNotApplicable={(item) => handleToggleNotApplicable(item)}
+                onAssignItem={(instanceId, item, assignedToUserId) =>
+                  void handleAssignItem(instanceId, item, assignedToUserId)}
               />
             ))}
           </div>

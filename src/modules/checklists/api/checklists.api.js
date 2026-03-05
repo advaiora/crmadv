@@ -111,6 +111,15 @@ export const listProjectChecklistInstances = async (projectId, { includeItems = 
   return normalizeList(result);
 };
 
+export const listChecklistAssignableUsers = async ({ signal } = {}) => {
+  const result = await projectsFetch('/checklists/assignable-users', {
+    method: 'GET',
+    signal,
+  });
+
+  return normalizeList(result);
+};
+
 export const createProjectChecklistInstance = async (projectId, input) => {
   return projectsFetch(`/projects/${projectId}/checklists`, {
     method: 'POST',
@@ -158,6 +167,29 @@ export const markChecklistItemNotApplicable = async (itemId, input) => {
 export const resetChecklistItem = async (itemId) => {
   return projectsFetch(`/checklists/items/${itemId}/reset`, {
     method: 'PATCH',
+  });
+};
+
+export const assignChecklistItem = async (
+  arg1,
+  arg2,
+) => {
+  if (typeof arg1 === 'object' && arg1 !== null && 'instanceId' in arg1 && 'itemInstanceId' in arg1) {
+    const payload = arg1;
+    return projectsFetch(
+      `/checklists/instances/${payload.instanceId}/items/${payload.itemInstanceId}/assignee`,
+      {
+        method: 'PATCH',
+        body: {
+          assignedToUserId: payload.assignedToUserId ?? null,
+        },
+      },
+    );
+  }
+
+  return projectsFetch(`/checklists/items/${arg1}/assignee`, {
+    method: 'PATCH',
+    body: arg2,
   });
 };
 

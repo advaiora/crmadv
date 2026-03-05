@@ -11,6 +11,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { isApiError } from '../../modules/checklists/api/checklists.api';
 import {
   useArchiveChecklistTemplate,
+  useChecklistAssignableUsers,
   useChecklistTemplate,
   useChecklistTemplates,
   useCreateChecklistTemplate,
@@ -37,7 +38,13 @@ const getErrorMessage = (error) => {
 const normalizeTemplateName = (value) => String(value || '').trim().toLowerCase();
 
 const ChecklistTemplatesContent = ({ access }) => {
+  const canManageTemplates = hasPermission(access, 'checklists.manage_templates')
+    || hasPermission(access, 'checklists.edit');
+  const canCreateTemplate = canManageTemplates || hasPermission(access, 'checklists.create');
+  const canDeleteTemplate = canManageTemplates || hasPermission(access, 'checklists.delete');
+
   const templatesQuery = useChecklistTemplates();
+  const assignableUsersQuery = useChecklistAssignableUsers({ enabled: canManageTemplates });
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const selectedTemplateQuery = useChecklistTemplate(selectedTemplateId);
 
@@ -50,11 +57,6 @@ const ChecklistTemplatesContent = ({ access }) => {
   const deleteItemMutation = useDeleteChecklistTemplateItem();
   const reorderItemsMutation = useReorderChecklistTemplateItems();
 
-  const canManageTemplates = hasPermission(access, 'checklists.manage_templates')
-    || hasPermission(access, 'checklists.edit');
-  const canCreateTemplate = canManageTemplates || hasPermission(access, 'checklists.create');
-  const canDeleteTemplate = canManageTemplates || hasPermission(access, 'checklists.delete');
-
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateDescription, setNewTemplateDescription] = useState('');
   const [editingTemplateName, setEditingTemplateName] = useState('');
@@ -65,12 +67,17 @@ const ChecklistTemplatesContent = ({ access }) => {
   const [newItemRequired, setNewItemRequired] = useState(true);
   const [newItemRequiresEvidence, setNewItemRequiresEvidence] = useState(false);
   const [newItemCritical, setNewItemCritical] = useState(false);
+  const [newItemDefaultAssignedToUserId, setNewItemDefaultAssignedToUserId] = useState('');
 
   const [editingItem, setEditingItem] = useState(null);
   const [templateSearch, setTemplateSearch] = useState('');
   const [showArchivedTemplates, setShowArchivedTemplates] = useState(false);
 
   const templates = useMemo(() => templatesQuery.data || [], [templatesQuery.data]);
+  const assignableUsers = useMemo(
+    () => (Array.isArray(assignableUsersQuery.data) ? assignableUsersQuery.data : []),
+    [assignableUsersQuery.data],
+  );
   const visibleTemplates = useMemo(() => {
     const normalizedSearch = templateSearch.trim().toLowerCase();
 
@@ -254,12 +261,14 @@ const ChecklistTemplatesContent = ({ access }) => {
         isRequired: newItemRequired,
         requiresEvidenceSnapshot: newItemRequiresEvidence,
         isCriticalSnapshot: newItemCritical,
+        defaultAssignedToUserId: newItemDefaultAssignedToUserId || null,
       });
       setNewItemTitle('');
       setNewItemDescription('');
       setNewItemRequired(true);
       setNewItemRequiresEvidence(false);
       setNewItemCritical(false);
+      setNewItemDefaultAssignedToUserId('');
       await selectedTemplateQuery.refetch();
       await templatesQuery.refetch();
       toast.success('Step aggiunto');
@@ -286,6 +295,7 @@ const ChecklistTemplatesContent = ({ access }) => {
         isRequired: Boolean(editingItem.isRequired),
         requiresEvidenceSnapshot: Boolean(editingItem.requiresEvidenceSnapshot),
         isCriticalSnapshot: Boolean(editingItem.isCriticalSnapshot),
+        defaultAssignedToUserId: editingItem.defaultAssignedToUserId || null,
       });
       setEditingItem(null);
       await selectedTemplateQuery.refetch();
@@ -640,6 +650,34 @@ const ChecklistTemplatesContent = ({ access }) => {
                               />
                               Step critico
                             </label>
+                            <div className="space-y-1">
+                              <p className="mb-0 text-xs text-textMuted">Assegnatario default</p>
+                              <select
+                                className="form-select"
+                                value={editingItem.defaultAssignedToUserId || ''}
+                                onChange={(event) =>
+                                  setEditingItem((current) => ({
+                                    ...current,
+                                    defaultAssignedToUserId: event.target.value,
+                                  }))
+                                }
+                              >
+                                <option value="">Nessun assegnatario</option>
+                                {assignableUsers.map((user) => (
+                                  <option key={user.userId} value={user.userId}>
+                                    {user.name}
+                                  </option>
+                                ))}
+                                {editingItem.defaultAssignedToUserId
+                                  && !assignableUsers.some(
+                                    (user) => user.userId === editingItem.defaultAssignedToUserId,
+                                  ) ? (
+                                    <option value={editingItem.defaultAssignedToUserId}>
+                                      {item.defaultAssignedToUserName || 'Utente disattivato'}
+                                    </option>
+                                  ) : null}
+                              </select>
+                            </div>
                             <div className="flex items-center gap-2">
                               <Button
                                 type="button"
@@ -666,6 +704,11 @@ const ChecklistTemplatesContent = ({ access }) => {
                                 </Badge>
                                 {item.requiresEvidenceSnapshot && <Badge variant="secondary">Evidenza richiesta</Badge>}
                                 {item.isCriticalSnapshot && <Badge variant="destructive">Critico</Badge>}
+                                {item.defaultAssignedToUserName && (
+                                  <Badge variant="outline">
+                                    Assegnatario default: {item.defaultAssignedToUserName}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-1">
@@ -715,6 +758,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                                       isRequired: item.isRequired,
                                       requiresEvidenceSnapshot: item.requiresEvidenceSnapshot,
                                       isCriticalSnapshot: item.isCriticalSnapshot,
+                                      defaultAssignedToUserId: item.defaultAssignedToUserId || '',
                                     })
                                   }
                                 >
@@ -791,6 +835,22 @@ const ChecklistTemplatesContent = ({ access }) => {
                       />
                       Step critico
                     </label>
+                    <div className="space-y-1">
+                      <p className="mb-0 text-xs text-textMuted">Assegnatario default</p>
+                      <select
+                        className="form-select"
+                        value={newItemDefaultAssignedToUserId}
+                        onChange={(event) => setNewItemDefaultAssignedToUserId(event.target.value)}
+                        disabled={createItemMutation.loading}
+                      >
+                        <option value="">Nessun assegnatario</option>
+                        {assignableUsers.map((user) => (
+                          <option key={user.userId} value={user.userId}>
+                            {user.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <Button type="submit" variant="outline" disabled={createItemMutation.loading}>
                       {createItemMutation.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                       Aggiungi step

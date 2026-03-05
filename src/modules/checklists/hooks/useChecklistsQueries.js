@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   archiveChecklistTemplate,
+  assignChecklistItem,
   createChecklistTemplate,
   createChecklistTemplateItem,
   createProjectChecklistInstance,
@@ -9,6 +10,7 @@ import {
   deleteChecklistTemplatePermanently,
   deleteChecklistTemplateItem,
   getChecklistTemplate,
+  listChecklistAssignableUsers,
   listStageChecklistRules,
   listChecklistTemplates,
   listProjectChecklistInstances,
@@ -235,6 +237,56 @@ export const useProjectChecklistInstances = (projectId, { includeItems = true } 
   };
 };
 
+export const useChecklistAssignableUsers = ({ enabled = true } = {}) => {
+  const [state, setState] = useState(() => createIdleState([]));
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const refetch = useCallback(() => {
+    setReloadKey((current) => current + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      setState(createIdleState([]));
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setState((current) => ({
+      ...current,
+      loading: true,
+      error: null,
+    }));
+
+    listChecklistAssignableUsers({ signal: controller.signal })
+      .then((data) => {
+        setState({
+          data,
+          loading: false,
+          error: null,
+        });
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setState({
+          data: [],
+          loading: false,
+          error,
+        });
+      });
+
+    return () => controller.abort();
+  }, [enabled, reloadKey]);
+
+  return {
+    ...state,
+    refetch,
+  };
+};
+
 export const useCreateChecklistTemplate = () => useMutationAction((input) => createChecklistTemplate(input));
 export const useUpdateChecklistTemplate = () => useMutationAction((templateId, patch) => updateChecklistTemplate(templateId, patch));
 export const useArchiveChecklistTemplate = () => useMutationAction((templateId) => archiveChecklistTemplate(templateId));
@@ -255,6 +307,8 @@ export const useMarkChecklistInstanceItemNotApplicable = () =>
   useMutationAction((itemId, input) => markChecklistItemNotApplicable(itemId, input));
 export const useResetChecklistInstanceItem = () =>
   useMutationAction((itemId) => resetChecklistItem(itemId));
+export const useAssignChecklistInstanceItem = () =>
+  useMutationAction((payload) => assignChecklistItem(payload));
 export const useListStageChecklistRules = () =>
   useMutationAction((categoryId, stageId) => listStageChecklistRules(categoryId, stageId));
 export const useReplaceStageChecklistRules = () =>
