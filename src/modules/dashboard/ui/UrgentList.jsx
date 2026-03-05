@@ -25,7 +25,7 @@ const severityIcon = {
 };
 
 const UrgentRowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <div className="flex items-center justify-between gap-2">
       <Skeleton className="h-5 w-24" />
       <Skeleton className="h-5 w-16" />
@@ -65,21 +65,21 @@ const UrgentList = ({ title = 'Needs attention', items = [], loading = false }) 
           return (
             <div
               key={`${item.type}-${item.href}-${index}`}
-              className="group flex items-start justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]"
+              className="group flex items-start justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-hover"
             >
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--muted)] text-[var(--hk-text-tertiary)]">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-bgSecondary text-textMuted">
                     <Icon className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <p className="mb-0 text-sm font-semibold leading-tight">{item.title}</p>
                 </div>
 
                 {item.description ? (
-                  <p className="mb-0 text-sm text-[var(--hk-text-tertiary)]">{item.description}</p>
+                  <p className="mb-0 text-sm text-textMuted">{item.description}</p>
                 ) : null}
 
-                {createdAt ? <p className="mb-0 text-xs text-[var(--hk-text-tertiary)]">{createdAt}</p> : null}
+                {createdAt ? <p className="mb-0 text-xs text-textMuted">{createdAt}</p> : null}
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
@@ -89,7 +89,7 @@ const UrgentList = ({ title = 'Needs attention', items = [], loading = false }) 
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="text-[var(--hk-text-tertiary)] hover:text-[var(--foreground)]"
+                  className="text-textMuted hover:text-text"
                   onClick={() => window.location.assign(item.href)}
                 >
                   Open

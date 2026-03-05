@@ -44,7 +44,7 @@ const ComposeEmail = ({ Maximize, Minimize, maximize, minimize, composeEmail, Co
         <div className={classNames("compose-email-popup", { "d-block": composeEmail }, { "minimize-email-popup": minimize }, { "maximize-email-popup": maximize })}  >
             <div className="d-flex flex-column h-100">
                 <header className="d-flex align-items-center justify-content-between">
-                    <h6 className="text-white mb-0">Compose Email</h6>
+                    <h6 className="text-[var(--hk-text-on-dark-bg)] mb-0">Compose Email</h6>
                     <div className="d-flex">
                         <Button size="sm" variant="dark" className="btn-icon btn-rounded d-lg-block d-none" onClick={handleMinimize} >
                             <span className="icon">

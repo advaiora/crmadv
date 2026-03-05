@@ -64,14 +64,14 @@ const ChatHeader = ({ topNavCollapsed, toggleTopNav, infoState, infoToggle, invi
                     <div className="media-head">
                         <div className="avatar avatar-sm avatar-primary position-relative avatar-rounded">
                             <img src={avatar1} alt="user" className="avatar-img" />
-                            <div className="badge-icon badge-circle badge-icon-xxs text-white position-bottom-end-overflow-1">
+                            <div className="badge-icon badge-circle badge-icon-xxs text-[var(--hk-text-on-dark-bg)] position-bottom-end-overflow-1">
                                 <div className="badge-icon-wrap">
                                     <i className="ri-group-fill text-light" />
                                 </div>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 141 141">
                                     <g transform="translate(-79 -975)">
-                                        <path d="M70.5,0A70.5,70.5,0,1,1,0,70.5,70.5,70.5,0,0,1,70.5,0Z" transform="translate(79 975)" fill="#fff" />
-                                        <path d="M55.5,0A55.5,55.5,0,1,1,0,55.5,55.5,55.5,0,0,1,55.5,0Z" transform="translate(94 990)" fill="#fff" />
+                                        <path d="M70.5,0A70.5,70.5,0,1,1,0,70.5,70.5,70.5,0,0,1,70.5,0Z" transform="translate(79 975)" fill="currentColor" />
+                                        <path d="M55.5,0A55.5,55.5,0,1,1,0,55.5,55.5,55.5,0,0,1,55.5,0Z" transform="translate(94 990)" fill="currentColor" />
                                     </g>
                                 </svg>
                             </div>

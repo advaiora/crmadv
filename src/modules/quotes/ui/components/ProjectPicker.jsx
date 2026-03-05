@@ -89,7 +89,7 @@ const ProjectPicker = ({
         </Button>
       )}
 
-      <Modal show={open} onHide={() => setOpen(false)} size="lg" centered>
+      <Modal className="quotes-modal" show={open} onHide={() => setOpen(false)} size="lg" centered>
         <Modal.Header closeButton>
           <Modal.Title>Seleziona progetto</Modal.Title>
         </Modal.Header>

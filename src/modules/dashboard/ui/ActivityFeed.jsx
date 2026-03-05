@@ -33,19 +33,19 @@ const ActivityFeed = ({ title = 'Activity feed', items = [], loading = false }) 
     ) : null}
 
     {!loading && items.length > 0 ? (
-      <div className="relative max-h-[360px] space-y-1 overflow-y-auto pr-1 pl-5 before:absolute before:left-[9px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-[var(--border)]">
+      <div className="relative max-h-[360px] space-y-1 overflow-y-auto pr-1 pl-5 before:absolute before:left-[9px] before:top-2 before:h-[calc(100%-16px)] before:w-px before:bg-cardBorder">
         {items.map((item, index) => (
           <div
             key={`${item.id || item.timestamp || 'activity'}-${index}`}
-            className="relative rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]"
+            className="relative rounded-xl px-3 py-3 transition-colors hover:bg-hover"
           >
-            <span className="absolute -left-[16px] top-4 inline-flex h-3 w-3 rounded-full border-2 border-[var(--card)] bg-[var(--primary)]" />
+            <span className="absolute -left-[16px] top-4 inline-flex h-3 w-3 rounded-full border-2 border-card bg-primary" />
 
             <p className="mb-1 text-sm font-medium leading-tight">
               {item.summary || item.action}
             </p>
 
-            <p className="mb-0 text-xs text-[var(--hk-text-tertiary)]">
+            <p className="mb-0 text-xs text-textMuted">
               {(item.actorName || 'Sistema')}
               {item.targetType ? ` - ${item.targetType}` : ''}
               {item.targetId ? ` - ${item.targetId.slice(0, 8)}` : ''}

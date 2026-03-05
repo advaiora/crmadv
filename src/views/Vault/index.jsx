@@ -353,19 +353,22 @@ const VaultWorkspace = ({ access }) => {
 
     if (statusLoading) {
         return (
-            <div className="container-fluid pt-4 d-flex align-items-center text-muted">
-                <Spinner animation="border" size="sm" className="me-2" />
-                Verifica stato Vault workspace...
+            <div className="container-fluid vault-page-container">
+                <div className="vault-page-shell pt-4 d-flex align-items-center text-muted">
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Verifica stato Vault workspace...
+                </div>
             </div>
         );
     }
 
     if (!vaultUnlocked) {
         return (
-            <div className="container-fluid pt-4">
+            <div className="container-fluid vault-page-container">
+                <div className="vault-page-shell pt-4">
                 <Row className="justify-content-center">
                     <Col md={7} lg={6}>
-                        <Card className="card-border shadow-sm">
+                        <Card className="card-border shadow-sm vault-gate-card">
                             <Card.Body className="p-4">
                                 <div className="d-flex align-items-center mb-3">
                                     <ShieldCheck size={18} className="me-2" />
@@ -415,12 +418,13 @@ const VaultWorkspace = ({ access }) => {
                         </Card>
                     </Col>
                 </Row>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container-fluid">
+        <div className="container-fluid vault-page-container">
             <div className="vault-page-shell pt-3">
                 <div className="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
                     <div>
@@ -446,7 +450,7 @@ const VaultWorkspace = ({ access }) => {
                     </Alert>
                 )}
 
-                <Card className="card-border mb-3"><Card.Body className="py-2"><Table responsive hover className="mb-0 align-middle"><thead><tr><th>Nome</th><th>Cliente</th><th>Username</th><th>URL</th><th>Tag</th><th>Aggiornato</th><th className="text-end">Azioni</th></tr></thead><tbody>
+                <Card className="card-border mb-3 vault-data-table-shell"><Card.Body className="py-2"><Table responsive hover className="mb-0 align-middle"><thead><tr><th>Nome</th><th>Cliente</th><th>Username</th><th>URL</th><th>Tag</th><th>Aggiornato</th><th className="text-end">Azioni</th></tr></thead><tbody>
                     {loading && <tr><td colSpan={7} className="text-center py-4 text-muted"><Spinner animation="border" size="sm" className="me-2" />Caricamento...</td></tr>}
                     {!loading && items.length === 0 && <tr><td colSpan={7} className="text-center py-4 text-muted">Nessun elemento trovato.</td></tr>}
                     {!loading && items.map((item) => (
@@ -463,7 +467,7 @@ const VaultWorkspace = ({ access }) => {
                                 )}
                             </td>
                             <td>{item.username || '-'}</td><td>{item.url ? <a href={item.url} target="_blank" rel="noreferrer">{item.url}</a> : '-'}</td>
-                            <td>{Array.isArray(item.tags) && item.tags.length > 0 ? <div className="vault-tags">{item.tags.map((entry) => <Badge key={`${item.id}-${entry}`} bg="light" text="dark">{entry}</Badge>)}</div> : <span className="text-muted small">-</span>}</td>
+                            <td>{Array.isArray(item.tags) && item.tags.length > 0 ? <div className="vault-tags">{item.tags.map((entry) => <Badge key={`${item.id}-${entry}`} bg="transparent" className="vault-tag-chip">{entry}</Badge>)}</div> : <span className="text-muted small">-</span>}</td>
                             <td>{item.updatedAt ? new Date(item.updatedAt).toLocaleString('it-IT') : '-'}</td>
                             <td><div className="vault-actions">
                                 {canReveal && <Button size="sm" variant="outline-primary" onClick={() => void onReveal(item)} disabled={revealingId === item.id}><Eye size={14} className="me-1" />{revealingId === item.id ? 'Attendere...' : 'Reveal'}</Button>}
@@ -475,7 +479,7 @@ const VaultWorkspace = ({ access }) => {
                     ))}
                 </tbody></Table></Card.Body></Card>
             </div>
-            <Modal show={formOpen} onHide={() => !saving && setFormOpen(false)} centered size="lg"><Modal.Header closeButton><Modal.Title>{formMode === 'create' ? 'Nuovo segreto' : 'Modifica segreto'}</Modal.Title></Modal.Header><Form onSubmit={onSave}><Modal.Body><Row className="g-3">
+            <Modal show={formOpen} onHide={() => !saving && setFormOpen(false)} centered size="lg" className="vault-modal" backdropClassName="vault-modal-backdrop"><Modal.Header closeButton><Modal.Title>{formMode === 'create' ? 'Nuovo segreto' : 'Modifica segreto'}</Modal.Title></Modal.Header><Form onSubmit={onSave}><Modal.Body><Row className="g-3">
                 <Col md={12}><Form.Label>Nome *</Form.Label><Form.Control value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required /></Col>
                 <Col md={12}>
                     <Form.Label>Cliente</Form.Label>
@@ -496,17 +500,26 @@ const VaultWorkspace = ({ access }) => {
                 </Col>
                 <Col md={6}><Form.Label>Username</Form.Label><Form.Control value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} /></Col>
                 <Col md={6}><Form.Label>URL</Form.Label><Form.Control value={form.url} onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))} placeholder="https://..." /></Col>
-                <Col md={12}><Form.Label>Tag</Form.Label><Form.Control value={form.tagsText} onChange={(event) => setForm((current) => ({ ...current, tagsText: event.target.value }))} placeholder="tag1, tag2" />{tagsPreview.length > 0 && <div className="vault-tags mt-2">{tagsPreview.map((entry) => <Badge key={`preview-${entry}`} bg="light" text="dark">{entry}</Badge>)}</div>}</Col>
+                <Col md={12}><Form.Label>Tag</Form.Label><Form.Control value={form.tagsText} onChange={(event) => setForm((current) => ({ ...current, tagsText: event.target.value }))} placeholder="tag1, tag2" />{tagsPreview.length > 0 && <div className="vault-tags mt-2">{tagsPreview.map((entry) => <Badge key={`preview-${entry}`} bg="transparent" className="vault-tag-chip">{entry}</Badge>)}</div>}</Col>
                 <Col md={12}><hr className="my-0" /></Col>
                 <Col md={12}><Form.Label>{formMode === 'create' ? 'Password *' : 'Imposta nuova password'}</Form.Label><Form.Control type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} placeholder={formMode === 'edit' ? 'Lascia vuoto per non cambiare il segreto' : ''} /></Col>
                 <Col md={12}><Form.Label>Note segrete (opzionale)</Form.Label><Form.Control as="textarea" rows={3} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></Col>
             </Row>{formError && <Alert variant="danger" className="mt-3 mb-0 py-2">{formError}</Alert>}</Modal.Body><Modal.Footer><Button type="button" variant="outline-secondary" disabled={saving} onClick={() => setFormOpen(false)}>Annulla</Button><Button type="submit" disabled={saving}>{saving ? 'Salvataggio...' : 'Salva'}</Button></Modal.Footer></Form></Modal>
 
-            <Modal show={reveal.open} onHide={closeReveal} centered><Modal.Header closeButton><Modal.Title>Reveal</Modal.Title></Modal.Header><Modal.Body>
-                <div className="small text-muted mb-1">Voce</div><div className="fw-semibold mb-3">{reveal?.item?.name || '-'}</div>
-                <div className="small text-muted mb-1">Password</div><div className="vault-secret-preview mb-3">{reveal.visible ? (reveal?.secret?.password || '-') : maskValue(reveal?.secret?.password)}</div>
-                <div className="small text-muted mb-1">Note</div><div className="vault-secret-preview">{reveal.visible ? (reveal?.secret?.notes || '-') : maskValue(reveal?.secret?.notes || '')}</div>
-                {!reveal.visible && <Alert variant="warning" className="py-2 mt-3 mb-0">Segreto mascherato di default. Usa Mostra per 15s.</Alert>}
+            <Modal show={reveal.open} onHide={closeReveal} centered className="vault-modal" backdropClassName="vault-modal-backdrop"><Modal.Header closeButton><Modal.Title>Reveal</Modal.Title></Modal.Header><Modal.Body>
+                <div className="vault-reveal-panel mb-3">
+                    <div className="vault-reveal-label">Voce</div>
+                    <div className="vault-reveal-value fw-semibold">{reveal?.item?.name || '-'}</div>
+                </div>
+                <div className="vault-reveal-panel mb-3">
+                    <div className="vault-reveal-label">Password</div>
+                    <div className="vault-secret-preview vault-reveal-secret">{reveal.visible ? (reveal?.secret?.password || '-') : maskValue(reveal?.secret?.password)}</div>
+                </div>
+                <div className="vault-reveal-panel">
+                    <div className="vault-reveal-label">Note</div>
+                    <div className="vault-secret-preview vault-reveal-secret">{reveal.visible ? (reveal?.secret?.notes || '-') : maskValue(reveal?.secret?.notes || '')}</div>
+                </div>
+                {!reveal.visible && <Alert variant="warning" className="vault-reveal-warning py-2 mt-3 mb-0">Segreto mascherato di default. Usa Mostra per 15s.</Alert>}
             </Modal.Body><Modal.Footer>
                 {!reveal.visible ? (
                     <Button onClick={() => setReveal((current) => ({ ...current, visible: true, expiresAt: Date.now() + 15000, copied: false }))}><Eye size={14} className="me-1" />Mostra per 15s</Button>

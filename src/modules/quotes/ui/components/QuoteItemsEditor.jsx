@@ -262,7 +262,7 @@ const QuoteItemsEditor = ({
         Righe: {safeItems.length}/{maxItems}
       </div>
 
-      <Modal show={modalOpen} onHide={closeModal} centered>
+      <Modal className="quotes-modal" show={modalOpen} onHide={closeModal} centered>
         <Modal.Header closeButton>
           <Modal.Title>{editingIndex === null ? 'Nuova riga' : 'Modifica riga'}</Modal.Title>
         </Modal.Header>

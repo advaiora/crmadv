@@ -295,7 +295,7 @@ test('web-assets routes request expected permission for each endpoint', async ()
         WEB_ASSETS_PERMISSIONS.edit,
         WEB_ASSETS_PERMISSIONS.edit,
         WEB_ASSETS_PERMISSIONS.delete,
-        WEB_ASSETS_PERMISSIONS.publish,
+        WEB_ASSETS_PERMISSIONS.edit,
         WEB_ASSETS_PERMISSIONS.publish,
         WEB_ASSETS_PERMISSIONS.view,
         WEB_ASSETS_PERMISSIONS.edit,
@@ -390,7 +390,7 @@ test('create route does not require web.publish when requested status is not pub
   }
 });
 
-test('update route requires web.publish when changing publish-controlled status', async () => {
+test('update route requires publish and unpublish permissions when crossing publish-controlled statuses', async () => {
   let app: FastifyInstance | null = null;
   const requiredPermissionCalls: string[] = [];
 
@@ -417,7 +417,10 @@ test('update route requires web.publish when changing publish-controlled status'
     });
 
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(requiredPermissionCalls, [WEB_ASSETS_PERMISSIONS.publish]);
+    assert.deepEqual(
+      requiredPermissionCalls,
+      [WEB_ASSETS_PERMISSIONS.publish, WEB_ASSETS_PERMISSIONS.unpublish],
+    );
   } finally {
     await closeApp(app);
   }

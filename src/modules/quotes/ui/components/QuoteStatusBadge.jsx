@@ -6,7 +6,7 @@ const STATUS_VARIANTS = {
   SENT: { label: 'Inviato', bg: 'info' },
   ACCEPTED: { label: 'Accettato', bg: 'success' },
   REJECTED: { label: 'Rifiutato', bg: 'danger' },
-  EXPIRED: { label: 'Scaduto', bg: 'dark' },
+  EXPIRED: { label: 'Scaduto', bg: 'secondary' },
 };
 
 const QuoteStatusBadge = ({ status }) => {

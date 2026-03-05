@@ -165,4 +165,140 @@ export const auditRepository = {
       },
     };
   },
+
+  async listByWorkspaceWithFilters(input: {
+    workspaceId: string;
+    from?: Date;
+    to?: Date;
+    action?: string;
+    actionPrefix?: string;
+    actor?: string;
+    targetType?: string;
+    q?: string;
+    limit?: number;
+  }) {
+    const safeLimit = Math.max(1, Math.min(input.limit ?? 200, 500));
+    const andFilters: Prisma.AuditLogWhereInput[] = [
+      {
+        workspaceId: input.workspaceId,
+      },
+    ];
+
+    if (input.from || input.to) {
+      andFilters.push({
+        createdAt: {
+          ...(input.from ? { gte: input.from } : {}),
+          ...(input.to ? { lte: input.to } : {}),
+        },
+      });
+    }
+
+    if (input.action) {
+      andFilters.push({
+        action: input.action,
+      });
+    }
+
+    if (input.actionPrefix) {
+      andFilters.push({
+        action: {
+          startsWith: input.actionPrefix,
+        },
+      });
+    }
+
+    if (input.actor) {
+      andFilters.push({
+        OR: [
+          {
+            actorUserId: input.actor,
+          },
+          {
+            actorUserId: {
+              contains: input.actor,
+              mode: 'insensitive',
+            },
+          },
+          {
+            actorUser: {
+              is: {
+                email: {
+                  contains: input.actor,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+          {
+            actorUser: {
+              is: {
+                name: {
+                  contains: input.actor,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    if (input.targetType) {
+      andFilters.push({
+        entityType: input.targetType,
+      });
+    }
+
+    if (input.q) {
+      andFilters.push({
+        OR: [
+          {
+            action: {
+              contains: input.q,
+              mode: 'insensitive',
+            },
+          },
+          {
+            entityId: {
+              contains: input.q,
+              mode: 'insensitive',
+            },
+          },
+          {
+            actorUser: {
+              is: {
+                email: {
+                  contains: input.q,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+          {
+            actorUser: {
+              is: {
+                name: {
+                  contains: input.q,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        ],
+      });
+    }
+
+    const where: Prisma.AuditLogWhereInput = {
+      AND: andFilters,
+    };
+
+    return prisma.auditLog.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: safeLimit,
+      select: auditListSelect,
+    });
+  },
 };

@@ -1,25 +1,279 @@
+.vault-page-container {
+  padding-left: clamp(1rem, 1.5vw, 2rem) !important;
+  padding-right: clamp(1rem, 1.5vw, 2rem) !important;
+}
+
 .vault-page-shell {
-    max-width: 1220px;
+  max-width: 1220px;
+  width: 100%;
+  margin: 0;
+  padding-bottom: 2rem;
+  --vault-surface-2: rgb(var(--surface-2) / 0.9);
+  --vault-surface-3: rgb(var(--surface-3) / 0.84);
+  --vault-border: rgb(var(--border-subtle) / 0.7);
+  --vault-border-soft: rgb(var(--border-subtle) / 0.56);
+  --vault-row-hover: rgb(var(--row-hover) / 0.74);
+  --vault-shadow: 0 1px 2px rgb(var(--surface-1) / 0.22);
+  --vault-chip-bg: rgb(var(--surface-2) / 0.66);
+}
+
+[data-bs-theme="dark"] .vault-page-shell,
+.dark .vault-page-shell {
+  --surface-2: 24 38 60;
+  --surface-3: 30 48 76;
+  --border-subtle: 94 118 152;
+  --row-hover: 50 74 112;
+  --vault-surface-2: rgb(var(--surface-2) / 0.92);
+  --vault-surface-3: rgb(var(--surface-3) / 0.86);
+  --vault-border: rgb(var(--border-subtle) / 0.74);
+  --vault-border-soft: rgb(var(--border-subtle) / 0.6);
+  --vault-row-hover: rgb(var(--row-hover) / 0.8);
+  --vault-chip-bg: rgb(var(--surface-2) / 0.78);
+}
+
+.vault-page-shell .card,
+.vault-page-shell .card-border,
+.vault-page-shell .card-header,
+.vault-page-shell .card-footer,
+.vault-page-shell .form-control,
+.vault-page-shell .form-select,
+.vault-page-shell .input-group-text,
+.vault-page-shell .table,
+.vault-page-shell .table > :not(caption) > * > *,
+.vault-page-shell .btn-outline-secondary,
+.vault-page-shell .btn-outline-primary,
+.vault-page-shell .btn-outline-danger,
+.vault-page-shell .btn-outline-warning,
+.vault-page-shell .border,
+.vault-page-shell hr {
+  border-color: var(--vault-border) !important;
+}
+
+.vault-page-shell .card {
+  background-color: var(--vault-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-page-shell .card-border,
+.vault-page-shell .vault-data-table-shell,
+.vault-page-shell .vault-gate-card {
+  background-color: var(--vault-surface-3) !important;
+  box-shadow: var(--vault-shadow);
+}
+
+.vault-page-shell .card-header,
+.vault-page-shell .card-footer {
+  background-color: rgb(var(--surface-2) / 0.58) !important;
+}
+
+.vault-page-shell .form-label,
+.vault-page-shell .text-muted,
+.vault-page-shell .small.text-muted {
+  color: var(--muted-foreground) !important;
+}
+
+.vault-page-shell .form-control,
+.vault-page-shell .form-select,
+.vault-page-shell textarea {
+  background-color: var(--vault-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-page-shell .form-control::placeholder,
+.vault-page-shell textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.vault-page-shell .form-control:focus,
+.vault-page-shell .form-select:focus,
+.vault-page-shell textarea:focus {
+  border-color: var(--bs-primary) !important;
+  box-shadow: 0 0 0 0.125rem rgb(var(--row-hover) / 0.78) !important;
+}
+
+.vault-page-shell .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--foreground);
+  --bs-table-border-color: var(--vault-border-soft);
+}
+
+.vault-page-shell .table thead th {
+  background-color: rgb(var(--surface-2) / 0.62);
+  border-bottom: 1px solid var(--vault-border) !important;
+  color: var(--foreground);
+}
+
+.vault-page-shell .table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.vault-page-shell .table tbody tr:hover > * {
+  background-color: var(--vault-row-hover) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-page-shell .btn-outline-secondary,
+.vault-page-shell .btn-outline-primary,
+.vault-page-shell .btn-outline-danger,
+.vault-page-shell .btn-outline-warning {
+  background-color: var(--vault-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-page-shell .btn-outline-secondary:hover,
+.vault-page-shell .btn-outline-secondary:focus,
+.vault-page-shell .btn-outline-secondary:active,
+.vault-page-shell .btn-outline-primary:hover,
+.vault-page-shell .btn-outline-primary:focus,
+.vault-page-shell .btn-outline-primary:active,
+.vault-page-shell .btn-outline-danger:hover,
+.vault-page-shell .btn-outline-danger:focus,
+.vault-page-shell .btn-outline-danger:active,
+.vault-page-shell .btn-outline-warning:hover,
+.vault-page-shell .btn-outline-warning:focus,
+.vault-page-shell .btn-outline-warning:active {
+  border-color: var(--bs-primary) !important;
+  background-color: var(--vault-row-hover) !important;
+  color: var(--foreground) !important;
 }
 
 .vault-secret-preview {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  word-break: break-all;
 }
 
 .vault-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
 }
 
 .vault-tag-chip {
-    border-radius: 999px;
+  border-radius: 999px !important;
+  border: 1px solid var(--vault-border) !important;
+  background-color: var(--vault-chip-bg) !important;
+  color: var(--foreground) !important;
+  font-weight: 500;
 }
 
 .vault-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.vault-modal {
+  --vault-modal-surface-2: rgb(var(--surface-2) / 0.92);
+  --vault-modal-surface-3: rgb(var(--surface-3) / 0.95);
+  --vault-modal-border: rgb(var(--border-subtle) / 0.78);
+  --vault-modal-hover: rgb(var(--row-hover) / 0.8);
+}
+
+[data-bs-theme="dark"] .vault-modal,
+.dark .vault-modal {
+  --surface-2: 24 38 60;
+  --surface-3: 30 48 76;
+  --border-subtle: 94 118 152;
+  --row-hover: 50 74 112;
+  --vault-modal-surface-2: rgb(var(--surface-2) / 0.94);
+  --vault-modal-surface-3: rgb(var(--surface-3) / 0.96);
+  --vault-modal-border: rgb(var(--border-subtle) / 0.8);
+  --vault-modal-hover: rgb(var(--row-hover) / 0.84);
+}
+
+.vault-modal .modal-content {
+  background-color: var(--vault-modal-surface-3) !important;
+  border: 1px solid var(--vault-modal-border) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-modal .modal-header,
+.vault-modal .modal-footer {
+  border-color: var(--vault-modal-border) !important;
+  background-color: rgb(var(--surface-2) / 0.58);
+}
+
+.vault-modal .modal-title,
+.vault-modal .modal-body,
+.vault-modal .form-label {
+  color: var(--foreground) !important;
+}
+
+.vault-modal .form-control,
+.vault-modal .form-select,
+.vault-modal textarea,
+.vault-modal .input-group-text {
+  background-color: var(--vault-modal-surface-2) !important;
+  border-color: var(--vault-modal-border) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-modal .form-control::placeholder,
+.vault-modal textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.vault-modal .form-control:focus,
+.vault-modal .form-select:focus,
+.vault-modal textarea:focus {
+  border-color: var(--bs-primary) !important;
+  box-shadow: 0 0 0 0.125rem var(--vault-modal-hover) !important;
+}
+
+.vault-modal .text-muted,
+.vault-modal .small.text-muted {
+  color: var(--muted-foreground) !important;
+}
+
+.vault-modal .btn-outline-secondary,
+.vault-modal .btn-outline-primary,
+.vault-modal .btn-outline-danger {
+  border-color: var(--vault-modal-border) !important;
+  background-color: var(--vault-modal-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-modal .btn-outline-secondary:hover,
+.vault-modal .btn-outline-secondary:focus,
+.vault-modal .btn-outline-secondary:active,
+.vault-modal .btn-outline-primary:hover,
+.vault-modal .btn-outline-primary:focus,
+.vault-modal .btn-outline-primary:active,
+.vault-modal .btn-outline-danger:hover,
+.vault-modal .btn-outline-danger:focus,
+.vault-modal .btn-outline-danger:active {
+  border-color: var(--bs-primary) !important;
+  background-color: var(--vault-modal-hover) !important;
+  color: var(--foreground) !important;
+}
+
+.vault-modal-backdrop.show {
+  background-color: rgb(var(--surface-1) / 0.76) !important;
+  opacity: 1 !important;
+}
+
+.vault-modal .vault-reveal-panel {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.vault-modal .vault-reveal-label {
+  font-size: 0.78rem;
+  color: var(--muted-foreground) !important;
+}
+
+.vault-modal .vault-reveal-value,
+.vault-modal .vault-reveal-secret {
+  border: 1px solid var(--vault-modal-border) !important;
+  border-radius: 0.65rem;
+  background-color: var(--vault-modal-surface-2) !important;
+  color: var(--foreground) !important;
+  padding: 0.6rem 0.75rem;
+}
+
+.vault-modal .vault-reveal-warning {
+  border-color: var(--vault-modal-border) !important;
+  background-color: rgb(var(--row-hover) / 0.58) !important;
+  color: var(--foreground) !important;
 }

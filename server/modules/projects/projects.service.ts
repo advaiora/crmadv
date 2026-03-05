@@ -1399,6 +1399,7 @@ export const projectsService = {
       actorUserId: input.actorUserId,
       request: input.request,
       stageConfig: {
+        categoryId: toStage.categoryId,
         isGated: toStage.isGated,
         gateChecklistTemplateId: toStage.gateChecklistTemplateId,
         autoCreateInstance: toStage.autoCreateInstance,

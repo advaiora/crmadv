@@ -102,8 +102,8 @@ export const reorderChecklistTemplateItems = async (templateId, orderedItemIds) 
   });
 };
 
-export const listProjectChecklistInstances = async (projectId, { includeItems = true, signal } = {}) => {
-  const result = await projectsFetch(withQuery(`/projects/${projectId}/checklists`, { includeItems }), {
+export const listProjectChecklistInstances = async (projectId, { includeItems = true, stageId, signal } = {}) => {
+  const result = await projectsFetch(withQuery(`/projects/${projectId}/checklists`, { includeItems, stageId }), {
     method: 'GET',
     signal,
   });
@@ -117,6 +117,29 @@ export const createProjectChecklistInstance = async (projectId, input) => {
     body: input,
   });
 };
+
+export const ensureProjectStageChecklistInstances = async (projectId, stageId) =>
+  projectsFetch(`/projects/${projectId}/checklists/ensure`, {
+    method: 'POST',
+    body: { stageId },
+  });
+
+export const completeChecklistInstanceItem = async (instanceId, itemInstanceId, input) =>
+  projectsFetch(`/checklists/instances/${instanceId}/items/${itemInstanceId}/complete`, {
+    method: 'POST',
+    body: input,
+  });
+
+export const listStageChecklistRules = async (categoryId, stageId) =>
+  projectsFetch(`/projects/categories/${categoryId}/pipeline/stages/${stageId}/checklist-rules`, {
+    method: 'GET',
+  });
+
+export const replaceStageChecklistRules = async (categoryId, stageId, rules) =>
+  projectsFetch(`/projects/categories/${categoryId}/pipeline/stages/${stageId}/checklist-rules`, {
+    method: 'PUT',
+    body: { rules },
+  });
 
 export const updateChecklistItemState = async (itemId, input) => {
   return projectsFetch(`/checklists/items/${itemId}/state`, {

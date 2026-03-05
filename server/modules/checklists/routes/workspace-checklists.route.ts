@@ -20,6 +20,11 @@ type TemplateItemParams = {
   itemId: string;
 };
 
+type StageRuleParams = {
+  categoryId: string;
+  stageId: string;
+};
+
 const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: ListTemplatesQuery }>(
     '/checklists/templates',
@@ -54,7 +59,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Body: unknown }>('/checklists/templates', async (request, reply) => {
     const { user, workspace } = await ensureChecklistsAccess(
       request,
-      CHECKLISTS_PERMISSIONS.create,
+      CHECKLISTS_PERMISSIONS.manageTemplates,
     );
 
     const template = await checklistsService.createTemplate({
@@ -72,7 +77,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.edit,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       const template = await checklistsService.updateTemplate({
@@ -92,7 +97,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.delete,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       await checklistsService.archiveTemplate({
@@ -112,7 +117,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.delete,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       await checklistsService.deleteTemplatePermanently({
@@ -132,7 +137,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.edit,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       const item = await checklistsService.createTemplateItem({
@@ -152,7 +157,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.edit,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       const item = await checklistsService.updateTemplateItem({
@@ -173,7 +178,7 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.delete,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       await checklistsService.deleteTemplateItem({
@@ -194,12 +199,51 @@ const workspaceChecklistsRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.edit,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
       );
 
       const result = await checklistsService.reorderTemplateItems({
         workspaceId: workspace.id,
         templateId: request.params.id,
+        actorUserId: user.id,
+        body: request.body,
+        request,
+      });
+
+      return ok(reply, result);
+    },
+  );
+
+  app.get<{ Params: StageRuleParams }>(
+    '/projects/categories/:categoryId/pipeline/stages/:stageId/checklist-rules',
+    async (request, reply) => {
+      const { workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.view,
+      );
+
+      const result = await checklistsService.listStageChecklistRules({
+        workspaceId: workspace.id,
+        categoryId: request.params.categoryId,
+        stageId: request.params.stageId,
+      });
+
+      return ok(reply, result);
+    },
+  );
+
+  app.put<{ Params: StageRuleParams; Body: unknown }>(
+    '/projects/categories/:categoryId/pipeline/stages/:stageId/checklist-rules',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.manageTemplates,
+      );
+
+      const result = await checklistsService.replaceStageChecklistRules({
+        workspaceId: workspace.id,
+        categoryId: request.params.categoryId,
+        stageId: request.params.stageId,
         actorUserId: user.id,
         body: request.body,
         request,

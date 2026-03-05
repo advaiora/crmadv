@@ -163,11 +163,11 @@ const ContactAppSidebar = () => {
                             </Button>
                         </div>
                         <div className="tag-cloud">
-                            <HkBadge as={Link} to="#" bg="white" className="badge-light" outline text="dark" >Collaboration</HkBadge>
-                            <HkBadge as={Link} to="#" bg="white" className="badge-light" outline text="dark" >React Developer</HkBadge>
-                            <HkBadge as={Link} to="#" bg="white" className="badge-light" outline text="dark" >Angular Developer</HkBadge>
-                            <HkBadge as={Link} to="#" bg="white" className="badge-light" outline text="dark" >promotion</HkBadge>
-                            <HkBadge as={Link} to="#" bg="white" className="badge-light" outline text="dark" >Advertisement</HkBadge>
+                            <HkBadge as={Link} to="#" bg="light" className="badge-light" outline text="dark" >Collaboration</HkBadge>
+                            <HkBadge as={Link} to="#" bg="light" className="badge-light" outline text="dark" >React Developer</HkBadge>
+                            <HkBadge as={Link} to="#" bg="light" className="badge-light" outline text="dark" >Angular Developer</HkBadge>
+                            <HkBadge as={Link} to="#" bg="light" className="badge-light" outline text="dark" >promotion</HkBadge>
+                            <HkBadge as={Link} to="#" bg="light" className="badge-light" outline text="dark" >Advertisement</HkBadge>
                         </div>
                     </div>
                 </SimpleBar>

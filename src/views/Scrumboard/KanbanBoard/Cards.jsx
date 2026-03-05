@@ -69,7 +69,7 @@ const Cards = (props) => {
                                     </Dropdown>
                                 </div>
                             </div>
-                            <Button variant="white" className="btn-block btn-add-newtask" onClick={() => setAddNewCard(!addNewCard)}  >
+                            <Button variant="light" className="btn-block btn-add-newtask" onClick={() => setAddNewCard(!addNewCard)}  >
                                 <span>
                                     <span className="icon" >
                                         <span className="feather-icon">

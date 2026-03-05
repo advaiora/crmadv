@@ -7,7 +7,7 @@ import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 import { formatDateTime } from './formatters';
 
 const RowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <div className="flex items-center justify-between gap-2">
       <Skeleton className="h-5 w-1/2" />
       <Skeleton className="h-5 w-16" />
@@ -41,13 +41,13 @@ const MyProjectsWidget = ({ title = 'My projects', data, loading = false }) => {
       {!loading && items.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {items.map((item, index) => (
-            <div key={`${item.id || item.href || 'project'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]">
+            <div key={`${item.id || item.href || 'project'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">{item.name}</span>
                 <Badge variant="outline">{item.stage}</Badge>
               </div>
 
-              <p className="mb-2 text-xs text-[var(--hk-text-tertiary)]">
+              <p className="mb-2 text-xs text-textMuted">
                 Aggiornato {formatDateTime(item.updatedAt)}
               </p>
 

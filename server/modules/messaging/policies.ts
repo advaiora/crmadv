@@ -1,14 +1,11 @@
 import type { FastifyRequest } from 'fastify';
-import { requireAuth } from '../../guards/requireAuth.js';
-import { requireModuleEnabled } from '../../guards/requireModule.js';
-import { requirePermission } from '../../guards/requirePermission.js';
-import { requireWorkspace } from '../../guards/requireWorkspace.js';
+import { ensureAccess } from '../../auth/guards.js';
 
-export const MESSAGING_MODULE_KEY = 'team';
+export const MESSAGING_MODULE_KEY = 'messages';
 
 export const MESSAGING_PERMISSIONS = {
-  view: 'team.view',
-  send: 'team.view',
+  view: 'messages.view',
+  send: 'messages.send',
 } as const;
 
 type MessagingPermissionKey =
@@ -18,11 +15,8 @@ export const ensureMessagingAccess = async (
   request: FastifyRequest,
   permissionKey: MessagingPermissionKey,
 ) => {
-  const user = await requireAuth(request);
-  const workspace = await requireWorkspace(request, user.id);
-
-  await requireModuleEnabled(workspace.id, MESSAGING_MODULE_KEY);
-  await requirePermission(user.id, workspace.id, permissionKey);
-
-  return { user, workspace };
+  return ensureAccess(request, {
+    moduleKey: MESSAGING_MODULE_KEY,
+    permission: permissionKey,
+  });
 };

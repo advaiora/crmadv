@@ -13,7 +13,7 @@ const ProfileIntro = () => {
             <Card className="card-flush mw-400p bg-transparent">
                 <Card.Body>
                     <div className="avatar avatar-xxl avatar-rounded position-relative mb-2">
-                        <img src={avatar3} alt="user" className="avatar-img border border-4 border-white" />
+                        <img src={avatar3} alt="user" className="avatar-img border border-4 border-card" />
                         <HkBadge bg="success" indicator className="badge-indicator-xl position-bottom-end-overflow-1 me-1" />
                     </div>
                     <h4>Kate Jones

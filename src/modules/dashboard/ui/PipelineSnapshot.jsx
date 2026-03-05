@@ -6,7 +6,7 @@ import { cn } from '../../../lib/cn';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 
 const PipelineRowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <div className="flex items-center justify-between gap-3">
       <Skeleton className="h-5 w-32" />
       <Skeleton className="h-5 w-10" />
@@ -48,17 +48,17 @@ const PipelineSnapshot = ({ title = 'Pipeline snapshot', items = [], loading = f
             return (
               <div
                 key={stage.stageId}
-                className="rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]"
+                className="rounded-xl px-3 py-3 transition-colors hover:bg-hover"
               >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="mb-0 text-sm font-medium">{stage.stageName}</p>
                   <Badge variant="outline">{count}</Badge>
                 </div>
 
-                <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
+                <div className="h-2 overflow-hidden rounded-full bg-bgSecondary">
                   <div
                     className={cn(
-                      'h-full rounded-full bg-[var(--primary)] transition-all duration-500',
+                      'h-full rounded-full bg-primary transition-all duration-500',
                       widthPercent === 0 ? 'w-0' : '',
                     )}
                     style={widthPercent > 0 ? { width: `${widthPercent}%` } : undefined}

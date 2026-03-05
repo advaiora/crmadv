@@ -41,8 +41,8 @@ const VideoCallModal = ({ show, hide, avatar, userName }) => {
                     {typeof avatar === "object" && <div className={`avatar avatar-${avatar.variant} avatar-rounded avatar-xxl d-20`}>
                         <span className="initial-wrap">{avatar.title}</span>
                     </div>}
-                    <h3 className="text-white mt-3">{userName}</h3>
-                    <p className="text-white">Video Calling<span className="one">.</span><span className="two">.</span><span className="three">.</span></p>
+                    <h3 className="text-[var(--hk-text-on-dark-bg)] mt-3">{userName}</h3>
+                    <p className="text-[var(--hk-text-on-dark-bg)]">Video Calling<span className="one">.</span><span className="two">.</span><span className="three">.</span></p>
                 </Modal.Body>
                 <Modal.Footer>
                     <ul className="chatapp-call-action hk-list">

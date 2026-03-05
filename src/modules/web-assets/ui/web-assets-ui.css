@@ -1,5 +1,140 @@
+.web-assets-page {
+  padding-left: clamp(1rem, 1.5vw, 2rem) !important;
+  padding-right: clamp(1rem, 1.5vw, 2rem) !important;
+  --wa-surface-2: rgb(var(--surface-2) / 0.9);
+  --wa-surface-3: rgb(var(--surface-3) / 0.84);
+  --wa-border: rgb(var(--border-subtle) / 0.7);
+  --wa-border-soft: rgb(var(--border-subtle) / 0.56);
+  --wa-row-hover: rgb(var(--row-hover) / 0.74);
+  --wa-shadow: 0 1px 2px rgb(var(--surface-1) / 0.22);
+}
+
+[data-bs-theme="dark"] .web-assets-page,
+.dark .web-assets-page {
+  --surface-2: 24 38 60;
+  --surface-3: 30 48 76;
+  --border-subtle: 94 118 152;
+  --row-hover: 50 74 112;
+  --wa-surface-2: rgb(var(--surface-2) / 0.92);
+  --wa-surface-3: rgb(var(--surface-3) / 0.86);
+  --wa-border: rgb(var(--border-subtle) / 0.74);
+  --wa-border-soft: rgb(var(--border-subtle) / 0.6);
+  --wa-row-hover: rgb(var(--row-hover) / 0.8);
+}
+
+.web-assets-page .card,
+.web-assets-page .card-border,
+.web-assets-page .card-header,
+.web-assets-page .card-footer,
+.web-assets-page .form-control,
+.web-assets-page .form-select,
+.web-assets-page .input-group-text,
+.web-assets-page .table,
+.web-assets-page .table > :not(caption) > * > *,
+.web-assets-page .btn-outline-secondary,
+.web-assets-page .btn-outline-primary,
+.web-assets-page .btn-outline-danger,
+.web-assets-page .btn-outline-warning,
+.web-assets-page .btn-outline-success,
+.web-assets-page .border,
+.web-assets-page hr {
+  border-color: var(--wa-border) !important;
+}
+
 .web-assets-page .card {
   border-radius: 14px;
+  background-color: var(--wa-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.web-assets-page .card-border {
+  background-color: var(--wa-surface-3) !important;
+  box-shadow: var(--wa-shadow);
+}
+
+.web-assets-page .card-header,
+.web-assets-page .card-footer {
+  background-color: rgb(var(--surface-2) / 0.58) !important;
+}
+
+.web-assets-page .form-label,
+.web-assets-page .text-muted,
+.web-assets-page .small.text-muted {
+  color: var(--muted-foreground) !important;
+}
+
+.web-assets-page .form-control,
+.web-assets-page .form-select,
+.web-assets-page textarea {
+  background-color: var(--wa-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.web-assets-page .input-group-text {
+  background-color: rgb(var(--surface-2) / 0.7) !important;
+  color: var(--muted-foreground) !important;
+}
+
+.web-assets-page .form-control::placeholder,
+.web-assets-page textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.web-assets-page .form-control:focus,
+.web-assets-page .form-select:focus,
+.web-assets-page textarea:focus {
+  border-color: var(--bs-primary) !important;
+  box-shadow: 0 0 0 0.125rem rgb(var(--row-hover) / 0.78) !important;
+}
+
+.web-assets-page .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--foreground);
+  --bs-table-border-color: var(--wa-border-soft);
+}
+
+.web-assets-page .table thead th {
+  background-color: rgb(var(--surface-2) / 0.62);
+  border-bottom: 1px solid var(--wa-border) !important;
+  color: var(--foreground);
+}
+
+.web-assets-page .table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.web-assets-page .table tbody tr:hover > * {
+  background-color: var(--wa-row-hover) !important;
+  color: var(--foreground) !important;
+}
+
+.web-assets-page .btn-outline-secondary,
+.web-assets-page .btn-outline-primary,
+.web-assets-page .btn-outline-danger,
+.web-assets-page .btn-outline-warning,
+.web-assets-page .btn-outline-success {
+  background-color: var(--wa-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.web-assets-page .btn-outline-secondary:hover,
+.web-assets-page .btn-outline-secondary:focus,
+.web-assets-page .btn-outline-secondary:active,
+.web-assets-page .btn-outline-primary:hover,
+.web-assets-page .btn-outline-primary:focus,
+.web-assets-page .btn-outline-primary:active,
+.web-assets-page .btn-outline-danger:hover,
+.web-assets-page .btn-outline-danger:focus,
+.web-assets-page .btn-outline-danger:active,
+.web-assets-page .btn-outline-warning:hover,
+.web-assets-page .btn-outline-warning:focus,
+.web-assets-page .btn-outline-warning:active,
+.web-assets-page .btn-outline-success:hover,
+.web-assets-page .btn-outline-success:focus,
+.web-assets-page .btn-outline-success:active {
+  border-color: var(--bs-primary) !important;
+  background-color: var(--wa-row-hover) !important;
+  color: var(--foreground) !important;
 }
 
 .web-assets-filters {
@@ -28,7 +163,7 @@
 }
 
 .web-assets-row-selected td {
-  background: #eef4ff;
+  background-color: var(--wa-row-hover) !important;
 }
 
 .web-assets-detail-nav {

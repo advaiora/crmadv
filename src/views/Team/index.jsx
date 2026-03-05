@@ -34,6 +34,7 @@ import {
   setTeamMemberActiveState,
 } from '../../modules/team/api/teamApi';
 import { hasPermission } from '../../utils/workspaceAccess';
+import '../../modules/team/ui/team-ui.css';
 import 'react-toastify/dist/ReactToastify.css';
 
 const PAGE_SIZE = 10;
@@ -49,7 +50,7 @@ const statusVariant = (status) => ({
   INACTIVE: 'secondary',
   PENDING: 'warning',
   ACCEPTED: 'success',
-  REVOKED: 'dark',
+  REVOKED: 'secondary',
   EXPIRED: 'danger',
 }[status] || 'secondary');
 const errorMessage = (error, fallback) => {
@@ -348,54 +349,55 @@ const TeamWorkspacePage = ({ access }) => {
   };
 
   return (
-    <div className="container-fluid pt-3">
-      <Card className="card-border mb-3">
-        <Card.Body className="d-flex justify-content-between align-items-start flex-wrap gap-2">
-          <div>
-            <h4 className="mb-1 d-flex align-items-center gap-2"><Users size={18} />Team</h4>
-            <div className="small text-muted">Gestione membri, inviti, ruoli e stato.</div>
-          </div>
-          <div className="d-flex gap-2 flex-wrap">
-            <Button variant="outline-secondary" onClick={() => { void loadMembers(); if (tab === 'invites') void loadInvites(); }} className="d-inline-flex align-items-center gap-1">
-              <RefreshCw size={14} />Aggiorna
-            </Button>
-            {canInvite && (
-              <Button variant="outline-primary" onClick={() => { setCreateMemberOpen(true); setCreateMemberError(''); }} className="d-inline-flex align-items-center gap-1">
-                <UserPlus size={14} />Crea utente
+    <div className="container-fluid pt-3 team-page-container">
+      <div className="team-page-shell">
+        <Card className="card-border mb-3 team-page-header">
+          <Card.Body className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <h4 className="mb-1 d-flex align-items-center gap-2"><Users size={18} />Team</h4>
+              <div className="small text-muted">Gestione membri, inviti, ruoli e stato.</div>
+            </div>
+            <div className="d-flex gap-2 flex-wrap">
+              <Button variant="outline-secondary" onClick={() => { void loadMembers(); if (tab === 'invites') void loadInvites(); }} className="d-inline-flex align-items-center gap-1">
+                <RefreshCw size={14} />Aggiorna
               </Button>
-            )}
-            {canInvite && (
-              <Button onClick={() => { setInviteOpen(true); setInviteError(''); setInviteCreated(null); }} className="d-inline-flex align-items-center gap-1">
-                <MailPlus size={14} />Invita
-              </Button>
-            )}
-          </div>
-        </Card.Body>
-      </Card>
-      <Tabs activeKey={tab} onSelect={(value) => typeof value === 'string' && setTab(value)} className="mb-3">
-        <Tab eventKey="members" title="Membri">
-          <Card className="card-border mb-3">
-            <Card.Body>
-              <Row className="g-2 align-items-end">
-                <Col md={7}>
-                  <Form.Label className="small mb-1">Ricerca</Form.Label>
-                  <Form.Control value={memberSearchDraft} onChange={(event) => setMemberSearchDraft(event.target.value)} placeholder="Nome, email, ruolo..." />
-                </Col>
-                <Col md={3}>
-                  <Form.Label className="small mb-1">Stato</Form.Label>
-                  <Form.Select value={memberStatus} onChange={(event) => setMemberStatus(event.target.value)}>
-                    {TEAM_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </Form.Select>
-                </Col>
-                <Col md={2}><div className="small text-muted">Totale: {memberItems.length}</div></Col>
-              </Row>
-            </Card.Body>
-          </Card>
+              {canInvite && (
+                <Button variant="outline-primary" onClick={() => { setCreateMemberOpen(true); setCreateMemberError(''); }} className="d-inline-flex align-items-center gap-1">
+                  <UserPlus size={14} />Crea utente
+                </Button>
+              )}
+              {canInvite && (
+                <Button onClick={() => { setInviteOpen(true); setInviteError(''); setInviteCreated(null); }} className="d-inline-flex align-items-center gap-1">
+                  <MailPlus size={14} />Invita
+                </Button>
+              )}
+            </div>
+          </Card.Body>
+        </Card>
+        <Tabs activeKey={tab} onSelect={(value) => typeof value === 'string' && setTab(value)} className="mb-3 team-tabs">
+          <Tab eventKey="members" title="Membri">
+            <Card className="card-border mb-3 team-toolbar-card">
+              <Card.Body>
+                <Row className="g-2 align-items-end">
+                  <Col md={7}>
+                    <Form.Label className="small mb-1">Ricerca</Form.Label>
+                    <Form.Control value={memberSearchDraft} onChange={(event) => setMemberSearchDraft(event.target.value)} placeholder="Nome, email, ruolo..." />
+                  </Col>
+                  <Col md={3}>
+                    <Form.Label className="small mb-1">Stato</Form.Label>
+                    <Form.Select value={memberStatus} onChange={(event) => setMemberStatus(event.target.value)}>
+                      {TEAM_STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </Form.Select>
+                  </Col>
+                  <Col md={2}><div className="small text-muted">Totale: {memberItems.length}</div></Col>
+                </Row>
+              </Card.Body>
+            </Card>
           {membersError && <Alert variant="danger">{membersError}</Alert>}
-          <Card className="card-border">
+          <Card className="card-border team-data-table-shell">
             <Card.Body>
               <div className="table-responsive">
-                <Table hover className="mb-0 align-middle">
+                <Table hover className="mb-0 align-middle team-table">
                   <thead><tr><th>Nome</th><th>Email</th><th>Ruoli</th><th>Stato</th><th>Ingresso</th><th className="text-end">Azioni</th></tr></thead>
                   <tbody>
                     {membersLoading && <tr><td colSpan={6} className="text-center py-4 text-muted"><Spinner animation="border" size="sm" className="me-2" />Caricamento...</td></tr>}
@@ -414,7 +416,7 @@ const TeamWorkspacePage = ({ access }) => {
                         <tr key={member.memberId}>
                           <td>{member.name || 'Utente senza nome'}</td>
                           <td>{member.email}</td>
-                          <td><div className="d-flex gap-1 flex-wrap">{(member.roles || []).map((role) => <Badge key={`${member.memberId}-${role}`} bg="light" text="dark" className="border">{role}</Badge>)}</div></td>
+                          <td><div className="d-flex gap-1 flex-wrap">{(member.roles || []).map((role) => <Badge key={`${member.memberId}-${role}`} bg="light" className="border">{role}</Badge>)}</div></td>
                           <td><Badge bg={statusVariant(member.status)}>{member.status}</Badge></td>
                           <td>{formatDateTime(member.createdAt)}</td>
                           <td>
@@ -442,7 +444,7 @@ const TeamWorkspacePage = ({ access }) => {
           </div>
         </Tab>
         <Tab eventKey="invites" title="Inviti">
-          <Card className="card-border mb-3">
+          <Card className="card-border mb-3 team-toolbar-card">
             <Card.Body>
               <Row className="g-2 align-items-end">
                 <Col md={4}>
@@ -456,10 +458,10 @@ const TeamWorkspacePage = ({ access }) => {
             </Card.Body>
           </Card>
           {invitesError && <Alert variant="danger">{invitesError}</Alert>}
-          <Card className="card-border">
+          <Card className="card-border team-data-table-shell">
             <Card.Body>
               <div className="table-responsive">
-                <Table hover className="mb-0 align-middle">
+                <Table hover className="mb-0 align-middle team-table">
                   <thead><tr><th>Email</th><th>Ruolo</th><th>Stato</th><th>Scadenza</th><th>Creato</th><th className="text-end">Azioni</th></tr></thead>
                   <tbody>
                     {invitesLoading && <tr><td colSpan={6} className="text-center py-4 text-muted"><Spinner animation="border" size="sm" className="me-2" />Caricamento...</td></tr>}
@@ -481,7 +483,7 @@ const TeamWorkspacePage = ({ access }) => {
                           <td className="text-end">
                             <div className="d-inline-flex gap-2">
                               <span title={revokeReason}><Button size="sm" variant="outline-danger" disabled={Boolean(revokeReason) || loading} onClick={() => void onRevokeInvite(invite)}>{loading ? 'Revoca...' : 'Revoca'}</Button></span>
-                              <span title={deleteReason}><Button size="sm" variant="outline-dark" disabled={Boolean(deleteReason) || deleting} onClick={() => void onDeleteInvite(invite)}>{deleting ? 'Elimina...' : 'Elimina'}</Button></span>
+                              <span title={deleteReason}><Button size="sm" variant="outline-secondary" disabled={Boolean(deleteReason) || deleting} onClick={() => void onDeleteInvite(invite)}>{deleting ? 'Elimina...' : 'Elimina'}</Button></span>
                             </div>
                           </td>
                         </tr>
@@ -502,7 +504,7 @@ const TeamWorkspacePage = ({ access }) => {
         </Tab>
       </Tabs>
 
-      <Modal show={Boolean(detailMember)} onHide={() => setDetailMember(null)} centered>
+      <Modal className="team-modal" show={Boolean(detailMember)} onHide={() => setDetailMember(null)} centered>
         <Modal.Header closeButton><Modal.Title>Dettaglio membro</Modal.Title></Modal.Header>
         <Modal.Body>
           {detailMember && (
@@ -519,7 +521,7 @@ const TeamWorkspacePage = ({ access }) => {
         <Modal.Footer><Button variant="outline-secondary" onClick={() => setDetailMember(null)}>Chiudi</Button></Modal.Footer>
       </Modal>
 
-      <Modal show={createMemberOpen} onHide={() => !createMemberSubmitting && setCreateMemberOpen(false)} centered backdrop={createMemberSubmitting ? 'static' : true}>
+      <Modal className="team-modal" show={createMemberOpen} onHide={() => !createMemberSubmitting && setCreateMemberOpen(false)} centered backdrop={createMemberSubmitting ? 'static' : true}>
         <Modal.Header closeButton={!createMemberSubmitting}><Modal.Title>Crea utente</Modal.Title></Modal.Header>
         <Form onSubmit={onCreateMemberSubmit}>
           <Modal.Body>
@@ -551,7 +553,7 @@ const TeamWorkspacePage = ({ access }) => {
         </Form>
       </Modal>
 
-      <Modal show={inviteOpen} onHide={() => !inviteSubmitting && setInviteOpen(false)} centered backdrop={inviteSubmitting ? 'static' : true}>
+      <Modal className="team-modal" show={inviteOpen} onHide={() => !inviteSubmitting && setInviteOpen(false)} centered backdrop={inviteSubmitting ? 'static' : true}>
         <Modal.Header closeButton={!inviteSubmitting}><Modal.Title>Invita membro</Modal.Title></Modal.Header>
         <Form onSubmit={onInviteSubmit}>
           <Modal.Body>
@@ -576,7 +578,7 @@ const TeamWorkspacePage = ({ access }) => {
         </Form>
       </Modal>
 
-      <Modal show={rolesDialog.open} onHide={() => !rolesDialog.saving && setRolesDialog({ open: false, member: null, roleName: 'Viewer', saving: false, error: '' })} centered backdrop={rolesDialog.saving ? 'static' : true}>
+      <Modal className="team-modal" show={rolesDialog.open} onHide={() => !rolesDialog.saving && setRolesDialog({ open: false, member: null, roleName: 'Viewer', saving: false, error: '' })} centered backdrop={rolesDialog.saving ? 'static' : true}>
         <Modal.Header closeButton={!rolesDialog.saving}><Modal.Title>Gestione ruolo</Modal.Title></Modal.Header>
         <Form onSubmit={onSaveRoles}>
           <Modal.Body>
@@ -591,7 +593,7 @@ const TeamWorkspacePage = ({ access }) => {
         </Form>
       </Modal>
 
-      <Modal show={stateDialog.open} onHide={() => !stateDialog.saving && setStateDialog({ open: false, member: null, nextActive: false, saving: false, error: '' })} centered backdrop={stateDialog.saving ? 'static' : true}>
+      <Modal className="team-modal" show={stateDialog.open} onHide={() => !stateDialog.saving && setStateDialog({ open: false, member: null, nextActive: false, saving: false, error: '' })} centered backdrop={stateDialog.saving ? 'static' : true}>
         <Modal.Header closeButton={!stateDialog.saving}><Modal.Title>{stateDialog.nextActive ? 'Riattiva membro' : 'Disattiva membro'}</Modal.Title></Modal.Header>
         <Modal.Body>
           {stateDialog.member && <p className="mb-2">Confermi {stateDialog.nextActive ? 'riattivazione' : 'disattivazione'} di <strong>{stateDialog.member.name || stateDialog.member.email}</strong>?</p>}
@@ -603,7 +605,7 @@ const TeamWorkspacePage = ({ access }) => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={deleteDialog.open} onHide={() => !deleteDialog.saving && setDeleteDialog({ open: false, member: null, saving: false, error: '' })} centered backdrop={deleteDialog.saving ? 'static' : true}>
+      <Modal className="team-modal" show={deleteDialog.open} onHide={() => !deleteDialog.saving && setDeleteDialog({ open: false, member: null, saving: false, error: '' })} centered backdrop={deleteDialog.saving ? 'static' : true}>
         <Modal.Header closeButton={!deleteDialog.saving}><Modal.Title>Elimina membro</Modal.Title></Modal.Header>
         <Modal.Body>
           {deleteDialog.member && (
@@ -621,6 +623,7 @@ const TeamWorkspacePage = ({ access }) => {
       </Modal>
 
       <ToastContainer position="bottom-right" theme="light" />
+      </div>
     </div>
   );
 };

@@ -7,7 +7,7 @@ const AddNewFavBoard = ({ show, onHide }) => {
         <Modal show={show} onHide={onHide} centered dialogClassName="mw-400p" >
             <Modal.Header className="header-wth-bg-inv">
                 <Modal.Title as="h5">Add Board</Modal.Title>
-                <Button bsPrefix="btn-close" className="text-white" onClick={onHide} >
+                <Button bsPrefix="btn-close" className="text-[var(--hk-text-on-dark-bg)]" onClick={onHide} >
                     <span aria-hidden="true">×</span>
                 </Button>
             </Modal.Header>

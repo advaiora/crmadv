@@ -31,6 +31,19 @@ const WORKSPACE_SYSTEM_ROLE_NAME_SET = new Set<WorkspaceSystemRoleName>(
   SYSTEM_ROLE_DEFINITIONS.map((role) => role.name),
 );
 
+const resolveWorkspaceDefaultModuleEnabled = (moduleKey: string, isCore: boolean) => {
+  if (isCore) {
+    return true;
+  }
+
+  // Keep SEO off by default until fully configured per workspace.
+  if (moduleKey === 'seo') {
+    return false;
+  }
+
+  return true;
+};
+
 const isWorkspaceSystemRoleName = (value: string): value is WorkspaceSystemRoleName =>
   WORKSPACE_SYSTEM_ROLE_NAME_SET.has(value as WorkspaceSystemRoleName);
 
@@ -369,17 +382,19 @@ export const ensureWorkspaceSystemRoles = async ({
     tx.module.findMany({
       select: {
         id: true,
+        key: true,
+        isCore: true,
       },
     }),
   ]);
 
-  // Keep all modules enabled by default for the workspace. Actual access is still permission-gated.
+  // Keep core modules always enabled and enable business modules by default (except SEO).
   if (modules.length > 0) {
     await tx.workspaceModule.createMany({
       data: modules.map((moduleRecord) => ({
         workspaceId,
         moduleId: moduleRecord.id,
-        enabled: true,
+        enabled: resolveWorkspaceDefaultModuleEnabled(moduleRecord.key, moduleRecord.isCore),
       })),
       skipDuplicates: true,
     });

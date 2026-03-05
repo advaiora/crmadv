@@ -274,9 +274,9 @@ const ClientForm = ({
     };
 
     return (
-        <Form onSubmit={handleSubmit}>
-            <Card className="card-border mb-3">
-                <Card.Header className="bg-transparent py-3">
+        <Form onSubmit={handleSubmit} className="clients-form">
+            <Card className="clients-form-section card-border mb-3">
+                <Card.Header className="clients-form-section-header py-3">
                     <h6 className="mb-0">Sezione 1 - Identita</h6>
                 </Card.Header>
                 <Card.Body>
@@ -326,8 +326,8 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <Card className="card-border mb-3">
-                <Card.Header className="bg-transparent py-3">
+            <Card className="clients-form-section card-border mb-3">
+                <Card.Header className="clients-form-section-header py-3">
                     <h6 className="mb-0">Sezione 2 - Contatti</h6>
                 </Card.Header>
                 <Card.Body>
@@ -384,8 +384,8 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <Card className="card-border mb-3">
-                <Card.Header className="bg-transparent py-3">
+            <Card className="clients-form-section card-border mb-3">
+                <Card.Header className="clients-form-section-header py-3">
                     <h6 className="mb-0">Sezione 3 - Dati fiscali</h6>
                 </Card.Header>
                 <Card.Body>
@@ -432,8 +432,8 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <Card className="card-border mb-3">
-                <Card.Header className="bg-transparent py-3">
+            <Card className="clients-form-section card-border mb-3">
+                <Card.Header className="clients-form-section-header py-3">
                     <h6 className="mb-0">Sezione 4 - Indirizzo</h6>
                 </Card.Header>
                 <Card.Body>
@@ -538,8 +538,8 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <Card className="card-border mb-3">
-                <Card.Header className="bg-transparent py-3">
+            <Card className="clients-form-section card-border mb-3">
+                <Card.Header className="clients-form-section-header py-3">
                     <h6 className="mb-0 d-inline-flex align-items-center gap-2">
                         <StickyNote size={15} />
                         Sezione 5 - Note
@@ -559,8 +559,8 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <Card className="card-border mb-3">
-                <Card.Header className="bg-transparent py-3">
+            <Card className="clients-form-section card-border mb-3">
+                <Card.Header className="clients-form-section-header py-3">
                     <h6 className="mb-0 d-inline-flex align-items-center gap-2">
                         <Tag size={15} />
                         Sezione 6 - Tag
@@ -644,7 +644,7 @@ const ClientForm = ({
                 </Card.Body>
             </Card>
 
-            <div className="d-flex flex-wrap align-items-center gap-2">
+            <div className="clients-form-actions d-flex flex-wrap align-items-center gap-2">
                 <Button type="submit" disabled={loading}>
                     {loading ? 'Salvataggio...' : submitLabel}
                 </Button>

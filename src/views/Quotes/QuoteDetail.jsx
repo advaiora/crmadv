@@ -483,7 +483,7 @@ const QuoteDetail = () => {
               </div>
             </div>
 
-            <Modal show={Boolean(pendingAction)} onHide={() => setPendingAction(null)} centered>
+            <Modal className="quotes-modal" show={Boolean(pendingAction)} onHide={() => setPendingAction(null)} centered>
               <Modal.Header closeButton={!runningAction}>
                 <Modal.Title>{pendingActionConfig?.label || 'Conferma azione'}</Modal.Title>
               </Modal.Header>
@@ -500,7 +500,7 @@ const QuoteDetail = () => {
               </Modal.Footer>
             </Modal>
 
-            <Modal show={showPdfModal} onHide={() => setShowPdfModal(false)} centered>
+            <Modal className="quotes-modal" show={showPdfModal} onHide={() => setShowPdfModal(false)} centered>
               <Modal.Header closeButton={!pdfExporting}>
                 <Modal.Title>Opzioni esportazione PDF</Modal.Title>
               </Modal.Header>

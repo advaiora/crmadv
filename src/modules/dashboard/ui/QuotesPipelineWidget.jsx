@@ -5,7 +5,7 @@ import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 
 const RowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <div className="flex items-center justify-between gap-3">
       <Skeleton className="h-5 w-24" />
       <Skeleton className="h-5 w-10" />
@@ -43,13 +43,13 @@ const QuotesPipelineWidget = ({ title = 'Quotes pipeline', data, loading = false
             const widthPercent = Math.min(100, Math.round((count / maxCount) * 100));
 
             return (
-              <div key={row.status} className="rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]">
+              <div key={row.status} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">{row.status}</span>
                   <Badge variant="outline">{count}</Badge>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[var(--muted)]">
-                  <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${widthPercent}%` }} />
+                <div className="h-2 overflow-hidden rounded-full bg-bgSecondary">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${widthPercent}%` }} />
                 </div>
               </div>
             );

@@ -6,7 +6,7 @@ import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 import { formatDate } from './formatters';
 
 const RowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <Skeleton className="h-5 w-4/5" />
     <Skeleton className="h-4 w-1/3" />
     <Skeleton className="h-8 w-24" />
@@ -37,9 +37,9 @@ const MyTasksWidget = ({ title = 'My tasks', data, loading = false }) => {
       {!loading && items.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {items.map((item, index) => (
-            <div key={`${item.id || item.href || 'task'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]">
+            <div key={`${item.id || item.href || 'task'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
               <p className="mb-1 text-sm font-medium">{item.title}</p>
-              <p className="mb-2 text-xs text-[var(--hk-text-tertiary)]">
+              <p className="mb-2 text-xs text-textMuted">
                 {item.due ? `Scadenza: ${formatDate(item.due)}` : 'Nessuna scadenza'}
               </p>
 

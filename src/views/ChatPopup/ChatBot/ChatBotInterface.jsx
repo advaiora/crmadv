@@ -64,7 +64,7 @@ const ChatBotInterface = ({ show, sendMsg, msg }) => {
                                 </Dropdown.Item>
                             </Dropdown.Menu>
                         </Dropdown>
-                        <span className="text-white">Chat with Us</span>
+                        <span className="text-[var(--hk-text-on-dark-bg)]">Chat with Us</span>
                         <Button variant="dark" size="sm" className="btn-icon btn-rounded" onClick={() => setShowChatbot(!showChatbot)} >
                             <span className="icon">
                                 <span className="feather-icon">

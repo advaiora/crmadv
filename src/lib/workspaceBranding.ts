@@ -89,6 +89,11 @@ const toRgbCsv = (hexColor: string) => {
   return `${r}, ${g}, ${b}`;
 };
 
+const toRgbSpace = (hexColor: string) => {
+  const { r, g, b } = parseHexColor(hexColor);
+  return `${r} ${g} ${b}`;
+};
+
 const toRgba = (hexColor: string, alpha: number) => {
   const { r, g, b } = parseHexColor(hexColor);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
@@ -138,6 +143,8 @@ export const applyWorkspaceBranding = (workspaceBranding?: WorkspaceBrandingStat
   const menuArrowColor = toRgba(secondaryForeground, 0.72);
 
   const rootStyle = document.documentElement.style;
+  rootStyle.setProperty('--branding-primary', toRgbSpace(primaryColor));
+  rootStyle.setProperty('--branding-secondary', toRgbSpace(secondaryColor));
   rootStyle.setProperty('--brand-yellow', primaryColor);
   rootStyle.setProperty('--brand-yellow-hover', primaryHover);
   rootStyle.setProperty('--brand-yellow-active', primaryActive);

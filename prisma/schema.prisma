@@ -99,6 +99,11 @@ enum WebAssetAlertStatus {
   RESOLVED
 }
 
+enum ChecklistTemplateAppliesTo {
+  PROJECT_STAGE
+  WEB_ASSET_STATUS
+}
+
 model Workspace {
   id                         String                      @id @default(cuid())
   name                       String
@@ -141,6 +146,7 @@ model Workspace {
   checklistTemplateItems     ChecklistTemplateItem[]
   checklistInstances         ChecklistInstance[]
   checklistInstanceItems     ChecklistInstanceItem[]
+  stageChecklistRules        StageChecklistRule[]
 }
 
 model User {
@@ -298,6 +304,7 @@ model ProjectCategory {
   updatedAt   DateTime        @updatedAt
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   stages      PipelineStage[]
+  stageChecklistRules StageChecklistRule[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId, sortOrder])
@@ -319,6 +326,7 @@ model PipelineStage {
   workspace               Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   category                ProjectCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   gateChecklistTemplate   ChecklistTemplate? @relation("PipelineStageGateTemplate", fields: [gateChecklistTemplateId], references: [id], onDelete: Restrict)
+  stageChecklistRules     StageChecklistRule[]
   projects                Project[]
 
   @@index([workspaceId, name])
@@ -331,6 +339,7 @@ model ChecklistTemplate {
   id                  String                  @id @default(cuid())
   workspaceId         String
   name                String                  @db.VarChar(80)
+  appliesTo           ChecklistTemplateAppliesTo @default(PROJECT_STAGE)
   description         String?                 @db.VarChar(500)
   isArchived          Boolean                 @default(false)
   createdAt           DateTime                @default(now())
@@ -339,6 +348,7 @@ model ChecklistTemplate {
   items               ChecklistTemplateItem[]
   instances           ChecklistInstance[]
   gatedPipelineStages PipelineStage[]         @relation("PipelineStageGateTemplate")
+  stageChecklistRules StageChecklistRule[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -367,8 +377,9 @@ model ChecklistTemplateItem {
 model ChecklistInstance {
   id                  String                  @id @default(cuid())
   workspaceId         String
-  projectId           String
-  pipelineStageId     String
+  projectId           String?
+  pipelineStageId     String?
+  webAssetId          String?
   checklistTemplateId String
   status              String                  @default("active") @db.VarChar(20)
   createdAt           DateTime                @default(now())
@@ -379,6 +390,26 @@ model ChecklistInstance {
 
   @@unique([workspaceId, projectId, pipelineStageId, checklistTemplateId])
   @@index([workspaceId, projectId])
+  @@index([workspaceId, pipelineStageId])
+  @@index([workspaceId, webAssetId])
+}
+
+model StageChecklistRule {
+  id                  String            @id @default(cuid())
+  workspaceId         String
+  projectCategoryId   String
+  pipelineStageId     String
+  checklistTemplateId String
+  gateEnabled         Boolean           @default(true)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projectCategory     ProjectCategory   @relation(fields: [projectCategoryId], references: [id], onDelete: Cascade)
+  pipelineStage       PipelineStage     @relation(fields: [pipelineStageId], references: [id], onDelete: Cascade)
+  checklistTemplate   ChecklistTemplate @relation(fields: [checklistTemplateId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, projectCategoryId, pipelineStageId, checklistTemplateId])
+  @@index([workspaceId, projectCategoryId, pipelineStageId, gateEnabled])
   @@index([workspaceId, pipelineStageId])
 }
 

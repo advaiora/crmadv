@@ -67,7 +67,8 @@ const auditQuerySchema = z.object({
   assetId: idSchema.optional(),
 }).strict();
 
-const PUBLISH_STATUS_SET = new Set(['ACTIVE', 'PAUSED']);
+const PUBLISHABLE_STATUS = 'ACTIVE';
+const UNPUBLISHABLE_STATUS = 'PAUSED';
 
 type WorkspaceWebAssetsRouteDependencies = {
   ensureWebAssetsAccessFn: typeof ensureWebAssetsAccess;
@@ -194,14 +195,28 @@ const parseAuditQuery = (value: unknown) => {
 };
 
 export const statusRequiresPublishPermission = (status: string) =>
-  PUBLISH_STATUS_SET.has(status);
+  status === PUBLISHABLE_STATUS;
 
-export const statusChangeRequiresPublishPermission = (currentStatus: string, nextStatus: string) => {
+export const statusRequiresUnpublishPermission = (status: string) =>
+  status === UNPUBLISHABLE_STATUS;
+
+export const statusChangePermissionKeys = (currentStatus: string, nextStatus: string) => {
   if (currentStatus === nextStatus) {
-    return false;
+    return [] as string[];
   }
 
-  return statusRequiresPublishPermission(currentStatus) || statusRequiresPublishPermission(nextStatus);
+  const statuses = new Set([currentStatus, nextStatus]);
+  const permissions: string[] = [];
+
+  if (statuses.has(PUBLISHABLE_STATUS)) {
+    permissions.push(WEB_ASSETS_PERMISSIONS.publish);
+  }
+
+  if (statuses.has(UNPUBLISHABLE_STATUS)) {
+    permissions.push(WEB_ASSETS_PERMISSIONS.unpublish);
+  }
+
+  return permissions;
 };
 
 const getStatusFromSnapshot = (snapshot: unknown): string | null => {
@@ -272,6 +287,9 @@ export const buildWorkspaceWebAssetsRoute = (
     const requestedStatus = payload.status ?? 'ACTIVE';
     if (statusRequiresPublishPermission(requestedStatus)) {
       await requirePermissionFn(user.id, workspace.id, WEB_ASSETS_PERMISSIONS.publish);
+    }
+    if (statusRequiresUnpublishPermission(requestedStatus)) {
+      await requirePermissionFn(user.id, workspace.id, WEB_ASSETS_PERMISSIONS.unpublish);
     }
 
     const asset = await webAssetsServiceApi.createWebAsset({
@@ -344,9 +362,12 @@ export const buildWorkspaceWebAssetsRoute = (
 
     if (
       payload.status !== undefined &&
-      statusChangeRequiresPublishPermission(existingAsset.status, payload.status)
+      payload.status !== existingAsset.status
     ) {
-      await requirePermissionFn(user.id, workspace.id, WEB_ASSETS_PERMISSIONS.publish);
+      const permissionKeys = statusChangePermissionKeys(existingAsset.status, payload.status);
+      for (const permissionKey of permissionKeys) {
+        await requirePermissionFn(user.id, workspace.id, permissionKey);
+      }
     }
 
     const asset = await webAssetsServiceApi.updateWebAsset({
@@ -418,9 +439,12 @@ export const buildWorkspaceWebAssetsRoute = (
 
     if (
       payload.status !== undefined &&
-      statusChangeRequiresPublishPermission(existingAsset.status, payload.status)
+      payload.status !== existingAsset.status
     ) {
-      await requirePermissionFn(user.id, workspace.id, WEB_ASSETS_PERMISSIONS.publish);
+      const permissionKeys = statusChangePermissionKeys(existingAsset.status, payload.status);
+      for (const permissionKey of permissionKeys) {
+        await requirePermissionFn(user.id, workspace.id, permissionKey);
+      }
     }
 
     const asset = await webAssetsServiceApi.updateWebAsset({
@@ -507,9 +531,14 @@ export const buildWorkspaceWebAssetsRoute = (
   });
 
   app.post<{ Params: unknown; Body: unknown }>('/web-assets/:id/publish', async (request, reply) => {
-    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.publish);
+    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.edit);
     const params = parseParams(request.params);
     const body = parsePublishBody(request.body);
+    await requirePermissionFn(
+      user.id,
+      workspace.id,
+      body.published ? WEB_ASSETS_PERMISSIONS.publish : WEB_ASSETS_PERMISSIONS.unpublish,
+    );
     const nextStatus = body.published ? 'ACTIVE' : 'PAUSED';
     const currentAsset = await webAssetsServiceApi.getWebAsset(workspace.id, params.id);
 
@@ -587,7 +616,7 @@ export const buildWorkspaceWebAssetsRoute = (
   });
 
   app.post<{ Params: unknown; Body: unknown }>('/web-assets/:id/versions', async (request, reply) => {
-    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.edit);
+    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.versionCreate);
     const params = parseParams(request.params);
     const payload = webAssetsServiceApi.parseVersionPayload(request.body);
     const asset = await webAssetsServiceApi.getWebAsset(workspace.id, params.id);
@@ -633,7 +662,7 @@ export const buildWorkspaceWebAssetsRoute = (
   });
 
   app.post<{ Params: unknown }>('/web-assets/:id/versions/:versionId/rollback', async (request, reply) => {
-    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.edit);
+    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.versionRollback);
     const params = parseVersionParams(request.params);
     const [currentAsset, sourceVersion] = await Promise.all([
       webAssetsServiceApi.getWebAsset(workspace.id, params.id),
@@ -641,11 +670,11 @@ export const buildWorkspaceWebAssetsRoute = (
     ]);
 
     const sourceStatus = getStatusFromSnapshot(sourceVersion.snapshot);
-    if (
-      sourceStatus &&
-      statusChangeRequiresPublishPermission(currentAsset.status, sourceStatus)
-    ) {
-      await requirePermissionFn(user.id, workspace.id, WEB_ASSETS_PERMISSIONS.publish);
+    if (sourceStatus) {
+      const permissionKeys = statusChangePermissionKeys(currentAsset.status, sourceStatus);
+      for (const permissionKey of permissionKeys) {
+        await requirePermissionFn(user.id, workspace.id, permissionKey);
+      }
     }
 
     const rollback = await webAssetsServiceApi.rollbackWebAssetToVersion({

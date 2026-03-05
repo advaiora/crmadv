@@ -38,8 +38,8 @@ const LockScreen = (props) => {
                                                             </svg>
                                                         </div>
                                                     </div>
-                                                    <h4 className="text-white">Jim Carry</h4>
-                                                    <p className="p-sm mb-4 text-white opacity-55">admistrator@jampack.com</p>
+                                                    <h4 className="text-[var(--hk-text-on-dark-bg)]">Jim Carry</h4>
+                                                    <p className="p-sm mb-4 text-[var(--hk-text-on-dark-bg)] opacity-55">admistrator@jampack.com</p>
                                                     <Row className="gx-3">
                                                         <Col as={Form.Group} className="mb-3">
                                                             <Form.Control placeholder="Enter Password" type="password" />

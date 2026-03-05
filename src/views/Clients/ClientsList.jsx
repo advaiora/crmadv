@@ -499,9 +499,9 @@ const ClientsList = () => {
 
               <Card className="clients-list-card card-border mb-3">
                 <Card.Body className="py-2">
-                  <div className="table-responsive d-none d-md-block">
-                    <Table hover className="clients-list-table mb-0">
-                      <thead>
+                  <div className="table-responsive d-none d-md-block data-table-shell clients-list-table-shell">
+                    <Table hover className="clients-list-table mb-0 align-middle">
+                      <thead className="clients-list-table-head">
                         <tr>
                           <th>Nome</th>
                           <th>Tipo</th>

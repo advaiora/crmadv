@@ -507,6 +507,8 @@ export const moveProject = async (id, input) => {
             method: 'PATCH',
             body: {
                 toStageId: input.toStageId,
+                overrideGate: Boolean(input.overrideGate),
+                ...(input.overrideReason ? { overrideReason: input.overrideReason } : {}),
             },
         });
 

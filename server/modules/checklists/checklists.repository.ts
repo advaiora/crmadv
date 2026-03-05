@@ -12,6 +12,7 @@ const normalizeChecklistItemStateForPersistence = (
 const templateSummarySelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
   id: true,
   name: true,
+  appliesTo: true,
   description: true,
   isArchived: true,
   createdAt: true,
@@ -38,6 +39,7 @@ const templateItemSelect = Prisma.validator<Prisma.ChecklistTemplateItemSelect>(
 const templateWithItemsSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
   id: true,
   name: true,
+  appliesTo: true,
   description: true,
   isArchived: true,
   createdAt: true,
@@ -51,6 +53,7 @@ const templateWithItemsSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>
 const templateGateSelect = Prisma.validator<Prisma.ChecklistTemplateSelect>()({
   id: true,
   workspaceId: true,
+  appliesTo: true,
   isArchived: true,
 });
 
@@ -175,9 +178,33 @@ type CreateTemplateItemInput = {
 
 type UpdateTemplateInput = {
   name?: string;
+  appliesTo?: 'PROJECT_STAGE' | 'WEB_ASSET_STATUS';
   description?: string | null;
   isArchived?: boolean;
 };
+
+const stageChecklistRuleSelect = Prisma.validator<Prisma.StageChecklistRuleSelect>()({
+  id: true,
+  workspaceId: true,
+  projectCategoryId: true,
+  pipelineStageId: true,
+  checklistTemplateId: true,
+  gateEnabled: true,
+  createdAt: true,
+  updatedAt: true,
+  checklistTemplate: {
+    select: {
+      id: true,
+      name: true,
+      appliesTo: true,
+      isArchived: true,
+    },
+  },
+});
+
+export type StageChecklistRuleRecord = Prisma.StageChecklistRuleGetPayload<{
+  select: typeof stageChecklistRuleSelect;
+}>;
 
 type UpdateTemplateItemInput = {
   title?: string;
@@ -238,6 +265,18 @@ const tableHasColumns = async (tableName: string, columns: readonly string[]) =>
   const checks = await Promise.all(columns.map((columnName) => tableHasColumn(tableName, columnName)));
   return checks.every(Boolean);
 };
+
+const pipelineStageRuleContextSelect = Prisma.validator<Prisma.PipelineStageSelect>()({
+  id: true,
+  workspaceId: true,
+  categoryId: true,
+});
+
+const projectCategoryRuleContextSelect = Prisma.validator<Prisma.ProjectCategorySelect>()({
+  id: true,
+  workspaceId: true,
+  name: true,
+});
 
 const recalculateChecklistInstanceStatusInTx = async (
   tx: Prisma.TransactionClient,
@@ -376,6 +415,7 @@ export const checklistsRepository = {
   createTemplateWithItems(input: {
     workspaceId: string;
     name: string;
+    appliesTo: 'PROJECT_STAGE' | 'WEB_ASSET_STATUS';
     description: string | null;
     items: CreateTemplateItemInput[];
   }) {
@@ -383,6 +423,7 @@ export const checklistsRepository = {
       data: {
         workspaceId: input.workspaceId,
         name: input.name,
+        appliesTo: input.appliesTo,
         description: input.description,
         ...(input.items.length === 0
           ? {}
@@ -435,10 +476,10 @@ export const checklistsRepository = {
           checklistTemplateId: templateId,
         },
       }),
-      prisma.pipelineStage.count({
+      prisma.stageChecklistRule.count({
         where: {
           workspaceId,
-          gateChecklistTemplateId: templateId,
+          checklistTemplateId: templateId,
         },
       }),
     ]);
@@ -677,6 +718,26 @@ export const checklistsRepository = {
     return rows.length > 0;
   },
 
+  findPipelineStageForRules(workspaceId: string, pipelineStageId: string) {
+    return prisma.pipelineStage.findFirst({
+      where: {
+        workspaceId,
+        id: pipelineStageId,
+      },
+      select: pipelineStageRuleContextSelect,
+    });
+  },
+
+  findProjectCategoryForRules(workspaceId: string, projectCategoryId: string) {
+    return prisma.projectCategory.findFirst({
+      where: {
+        workspaceId,
+        id: projectCategoryId,
+      },
+      select: projectCategoryRuleContextSelect,
+    });
+  },
+
   findActiveTemplateById(
     workspaceId: string,
     templateId: string,
@@ -795,25 +856,114 @@ export const checklistsRepository = {
     return rows.map((row) => row.id);
   },
 
-  listChecklistInstancesByProject(workspaceId: string, projectId: string) {
+  listChecklistInstancesByProject(workspaceId: string, projectId: string, pipelineStageId?: string) {
     return prisma.checklistInstance.findMany({
       where: {
         workspaceId,
         projectId,
+        ...(pipelineStageId ? { pipelineStageId } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       select: checklistInstanceSummarySelect,
     });
   },
 
-  listChecklistInstancesByProjectWithItems(workspaceId: string, projectId: string) {
+  listChecklistInstancesByProjectWithItems(
+    workspaceId: string,
+    projectId: string,
+    pipelineStageId?: string,
+  ) {
     return prisma.checklistInstance.findMany({
       where: {
         workspaceId,
         projectId,
+        ...(pipelineStageId ? { pipelineStageId } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       select: checklistInstanceWithItemsSelect,
+    });
+  },
+
+  listStageChecklistRules(workspaceId: string, projectCategoryId: string, pipelineStageId: string) {
+    return prisma.stageChecklistRule.findMany({
+      where: {
+        workspaceId,
+        projectCategoryId,
+        pipelineStageId,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: stageChecklistRuleSelect,
+    });
+  },
+
+  listEnabledStageChecklistRules(
+    workspaceId: string,
+    projectCategoryId: string,
+    pipelineStageId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (tx) {
+      return tx.stageChecklistRule.findMany({
+        where: {
+          workspaceId,
+          projectCategoryId,
+          pipelineStageId,
+          gateEnabled: true,
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: stageChecklistRuleSelect,
+      });
+    }
+
+    return prisma.stageChecklistRule.findMany({
+      where: {
+        workspaceId,
+        projectCategoryId,
+        pipelineStageId,
+        gateEnabled: true,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: stageChecklistRuleSelect,
+    });
+  },
+
+  async replaceStageChecklistRules(input: {
+    workspaceId: string;
+    projectCategoryId: string;
+    pipelineStageId: string;
+    rules: Array<{ checklistTemplateId: string; gateEnabled: boolean }>;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      await tx.stageChecklistRule.deleteMany({
+        where: {
+          workspaceId: input.workspaceId,
+          projectCategoryId: input.projectCategoryId,
+          pipelineStageId: input.pipelineStageId,
+        },
+      });
+
+      if (input.rules.length > 0) {
+        await tx.stageChecklistRule.createMany({
+          data: input.rules.map((rule) => ({
+            workspaceId: input.workspaceId,
+            projectCategoryId: input.projectCategoryId,
+            pipelineStageId: input.pipelineStageId,
+            checklistTemplateId: rule.checklistTemplateId,
+            gateEnabled: rule.gateEnabled,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return tx.stageChecklistRule.findMany({
+        where: {
+          workspaceId: input.workspaceId,
+          projectCategoryId: input.projectCategoryId,
+          pipelineStageId: input.pipelineStageId,
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        select: stageChecklistRuleSelect,
+      });
     });
   },
 

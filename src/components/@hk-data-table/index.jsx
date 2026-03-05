@@ -29,6 +29,7 @@ const HkDataTable = ({
     searchQuery,
     searchClasses,
     markStarred,
+    shellClasses,
     ...rest
 }) => {
 
@@ -62,6 +63,14 @@ const HkDataTable = ({
         setData(favData)
     }, [favData])
 
+    const responsiveClassName = React.useMemo(() => {
+        if (typeof responsive === 'string' && responsive.trim().length > 0) {
+            return `table-responsive-${responsive}`;
+        }
+
+        return responsive ? 'table-responsive' : '';
+    }, [responsive]);
+
     return (
         <>
             {(searchBar && !searchQuery) && <Form.Group controlId="searchForm" className="mb-3">
@@ -73,107 +82,108 @@ const HkDataTable = ({
                     className={searchClasses}
                 />
             </Form.Group>}
-            <Table
-                bsPrefix={bsPrefix}
-                className={classNames("hk-data-table", classes)}
-                striped={striped}
-                bordered={bordered}
-                borderless={borderless}
-                hover={hover}
-                size={size}
-                variant={variant}
-                responsive={responsive}
-                {...rest}
-            >
-                <thead>
-                    <tr>
-                        {(rowSelection || markStarred) && <th>
-                            {rowSelection ? <Form.Check
-                                type="checkbox"
-                                className="fs-6 mb-0"
-                                checked={selectAll}
-                                onChange={handleSelectAll}
-                            />
-                                :
-                                <></>
-                            }
+            <div className={classNames("data-table-shell", responsiveClassName, shellClasses)}>
+                <Table
+                    bsPrefix={bsPrefix}
+                    className={classNames("hk-data-table", classes)}
+                    striped={striped}
+                    bordered={bordered}
+                    borderless={borderless}
+                    hover={hover}
+                    size={size}
+                    variant={variant}
+                    {...rest}
+                >
+                    <thead>
+                        <tr>
+                            {(rowSelection || markStarred) && <th>
+                                {rowSelection ? <Form.Check
+                                    type="checkbox"
+                                    className="fs-6 mb-0"
+                                    checked={selectAll}
+                                    onChange={handleSelectAll}
+                                />
+                                    :
+                                    <></>
+                                }
 
-                        </th>}
-                        {column.map((cols, index) => (
-                            <th
-                                key={index}
-                                onClick={() => requestSort(cols.sort, cols.accessor)}
-                                className={classNames({ 'd-none': cols.hidden }, { "text-primary": sortConfig !== null && sortConfig.key === cols.accessor }, cols.className)}
-                                rowSpan={cols.rowSpan}
-                            >
-                                <span className="d-flex">
-                                    <span className="flex-grow-1">
-                                        {cols.title}
-                                    </span>
-                                    {
-                                        cols.sort &&
-                                        <span>
-                                            {(sortConfig !== null && cols.accessor === sortConfig.key)
-                                                ?
-                                                <>
-                                                    {
-                                                        (sortConfig.direction === 'ascending')
-                                                            ?
-                                                            <span style={{ color: "var(--bs-primary)" }}>
-                                                                <SortAscending size={14} strokeWidth={2.5} />
-                                                            </span>
-                                                            :
-                                                            <span style={{ color: "var(--bs-primary)" }}>
-                                                                <SortDescending size={14} strokeWidth={2.5} />
-                                                            </span>
-                                                    }
-                                                </>
-                                                :
-                                                <span><ArrowsSort size={14} strokeWidth={2.5} /> </span>}
-                                        </span>
-                                    }
-                                </span>
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {/* slice.map */}
-                    {filteredData.map((row, index) => (
-                        <tr key={index} className={classNames({ "selected": isRowSelected(index) })}>
-                            {(rowSelection || markStarred) && <td>
-                                <div className="d-flex align-items-center">
-                                    {rowSelection && <Form.Check
-                                        type="checkbox"
-                                        className="form-check fs-6 mb-0"
-                                        checked={isRowSelected(index)}
-                                        onChange={() => handleRowSelection(index)}
-                                    />}
-                                    {markStarred && <span className={classNames("fav-star", { "marked": row.starred })} onClick={() => handleStared(index)} >
-                                        <span className="feather-icon">
-                                            <Star />
-                                        </span>
-                                    </span>}
-                                </div>
-                            </td>}
+                            </th>}
                             {column.map((cols, index) => (
-                                <td
+                                <th
                                     key={index}
-                                    className={classNames({ 'd-none': cols.hidden }, cols.tdClasses)}
+                                    onClick={() => requestSort(cols.sort, cols.accessor)}
+                                    className={classNames({ 'd-none': cols.hidden }, { "text-primary": sortConfig !== null && sortConfig.key === cols.accessor }, cols.className)}
+                                    rowSpan={cols.rowSpan}
                                 >
-                                    {
-                                        cols.cellFormatter
-                                            ?
-                                            cols.cellFormatter(row[cols.accessor])
-                                            :
-                                            row[cols.accessor]
-                                    }
-                                </td>
+                                    <span className="d-flex">
+                                        <span className="flex-grow-1">
+                                            {cols.title}
+                                        </span>
+                                        {
+                                            cols.sort &&
+                                            <span>
+                                                {(sortConfig !== null && cols.accessor === sortConfig.key)
+                                                    ?
+                                                    <>
+                                                        {
+                                                            (sortConfig.direction === 'ascending')
+                                                                ?
+                                                                <span style={{ color: "var(--bs-primary)" }}>
+                                                                    <SortAscending size={14} strokeWidth={2.5} />
+                                                                </span>
+                                                                :
+                                                                <span style={{ color: "var(--bs-primary)" }}>
+                                                                    <SortDescending size={14} strokeWidth={2.5} />
+                                                                </span>
+                                                        }
+                                                    </>
+                                                    :
+                                                    <span><ArrowsSort size={14} strokeWidth={2.5} /> </span>}
+                                            </span>
+                                        }
+                                    </span>
+                                </th>
                             ))}
                         </tr>
-                    ))}
-                </tbody>
-            </Table >
+                    </thead>
+                    <tbody>
+                        {/* slice.map */}
+                        {filteredData.map((row, index) => (
+                            <tr key={index} className={classNames({ "selected": isRowSelected(index) })}>
+                                {(rowSelection || markStarred) && <td>
+                                    <div className="d-flex align-items-center">
+                                        {rowSelection && <Form.Check
+                                            type="checkbox"
+                                            className="form-check fs-6 mb-0"
+                                            checked={isRowSelected(index)}
+                                            onChange={() => handleRowSelection(index)}
+                                        />}
+                                        {markStarred && <span className={classNames("fav-star", { "marked": row.starred })} onClick={() => handleStared(index)} >
+                                            <span className="feather-icon">
+                                                <Star />
+                                            </span>
+                                        </span>}
+                                    </div>
+                                </td>}
+                                {column.map((cols, index) => (
+                                    <td
+                                        key={index}
+                                        className={classNames({ 'd-none': cols.hidden }, cols.tdClasses)}
+                                    >
+                                        {
+                                            cols.cellFormatter
+                                                ?
+                                                cols.cellFormatter(row[cols.accessor])
+                                                :
+                                                row[cols.accessor]
+                                        }
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </Table>
+            </div>
             {rowsPerPage && <TableFooter
                 range={range}
                 slice={slice}
@@ -197,7 +207,7 @@ HkDataTable.propTypes = {
     hover: PropTypes.bool,
     size: PropTypes.string,
     variant: PropTypes.string,
-    responsive: PropTypes.bool,
+    responsive: PropTypes.oneOfType([PropTypes.bool, PropTypes.string]),
     rowsPerPage: PropTypes.number,
     paginatorSize: PropTypes.string,
     rowSelection: PropTypes.bool,
@@ -205,6 +215,7 @@ HkDataTable.propTypes = {
     searchQuery: PropTypes.string,
     searchClasses: PropTypes.string,
     markStarred: PropTypes.bool,
+    shellClasses: PropTypes.string,
 }
 
 export default HkDataTable

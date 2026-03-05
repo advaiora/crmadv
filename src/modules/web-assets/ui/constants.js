@@ -6,6 +6,9 @@ export const WEB_ASSETS_PERMISSIONS = {
   edit: 'web.edit',
   delete: 'web.delete',
   publish: 'web.publish',
+  unpublish: 'web.unpublish',
+  versionCreate: 'web.version.create',
+  versionRollback: 'web.version.rollback',
 };
 
 export const WEB_ASSET_TYPES = [

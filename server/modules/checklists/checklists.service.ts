@@ -1,9 +1,9 @@
 import { Prisma } from '@prisma/client';
 import type { FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { requirePermission } from '../../auth/guards.js';
 import { audit } from '../../audit/audit.js';
 import { HttpError, badRequest, notFound } from '../../core/errors.js';
-import { requirePermission } from '../../guards/requirePermission.js';
 import { prisma } from '../../prisma.js';
 import {
   checklistsRepository,
@@ -16,6 +16,11 @@ import {
   type ChecklistTemplateWithItemsRecord,
 } from './checklists.repository.js';
 
+export const checklistsServiceRuntime = {
+  runTransaction: <T>(callback: (tx: Prisma.TransactionClient) => Promise<T>) =>
+    prisma.$transaction(callback),
+};
+
 const MAX_TEMPLATE_NAME_LENGTH = 80;
 const MAX_ITEM_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 500;
@@ -27,6 +32,7 @@ const MAX_GATE_OVERRIDE_REASON_LENGTH = 500;
 const MAX_GATE_OVERRIDE_REASON_AUDIT_LENGTH = 120;
 const CHECKLISTS_OVERRIDE_GATE_PERMISSION = 'checklists.override_gate';
 const CHECKLIST_ITEM_STATE_VALUES = ['not_started', 'in_progress', 'completed'] as const;
+const CHECKLIST_TEMPLATE_APPLIES_TO_VALUES = ['PROJECT_STAGE', 'WEB_ASSET_STATUS'] as const;
 
 const idSchema = z.string().trim().min(1);
 
@@ -50,18 +56,35 @@ const booleanQuerySchema = z.preprocess((value) => {
   return normalized;
 }, z.boolean());
 
+const templateSearchQuerySchema = z.string().trim().min(1).max(MAX_TEMPLATE_NAME_LENGTH);
+
 const listTemplatesQuerySchema = z
   .object({
-    q: z.string().trim().min(1).max(MAX_TEMPLATE_NAME_LENGTH).optional(),
+    q: templateSearchQuerySchema.optional(),
+    query: templateSearchQuerySchema.optional(),
+    search: templateSearchQuerySchema.optional(),
     isArchived: booleanQuerySchema.optional(),
+    archived: booleanQuerySchema.optional(),
   })
-  .strict();
+  .passthrough();
 
 const listProjectChecklistInstancesQuerySchema = z
   .object({
     includeItems: booleanQuerySchema.optional(),
+    stageId: z.string().trim().min(1).optional(),
   })
   .strict();
+
+const checklistRuleEntrySchema = z.object({
+  checklistTemplateId: idSchema,
+  gateEnabled: z.boolean().optional().default(true),
+}).strict();
+
+const upsertStageChecklistRulesBodySchema = z.object({
+  rules: z.array(checklistRuleEntrySchema).default([]),
+}).strict();
+
+const checklistTemplateAppliesToSchema = z.enum(CHECKLIST_TEMPLATE_APPLIES_TO_VALUES);
 
 const createTemplateItemSchema = z
   .object({
@@ -76,6 +99,7 @@ const createTemplateItemSchema = z
 const createTemplateBodySchema = z
   .object({
     name: z.string().trim().min(2).max(MAX_TEMPLATE_NAME_LENGTH),
+    appliesTo: checklistTemplateAppliesToSchema.optional().default('PROJECT_STAGE'),
     description: z.string().trim().max(MAX_DESCRIPTION_LENGTH).optional(),
     items: z.array(createTemplateItemSchema).optional(),
   })
@@ -84,6 +108,7 @@ const createTemplateBodySchema = z
 const updateTemplateBodySchema = z
   .object({
     name: z.string().trim().min(2).max(MAX_TEMPLATE_NAME_LENGTH).optional(),
+    appliesTo: checklistTemplateAppliesToSchema.optional(),
     description: z.union([z.string().trim().max(MAX_DESCRIPTION_LENGTH), z.null()]).optional(),
     isArchived: z.boolean().optional(),
   })
@@ -91,6 +116,7 @@ const updateTemplateBodySchema = z
   .superRefine((value, context) => {
     if (
       value.name === undefined &&
+      value.appliesTo === undefined &&
       value.description === undefined &&
       value.isArchived === undefined
     ) {
@@ -192,6 +218,37 @@ const markChecklistItemNotApplicableBodySchema = z
   })
   .strict();
 
+const toggleChecklistInstanceItemBodySchema = z
+  .object({
+    completed: z.boolean().optional(),
+    notes: optionalTrimmedString(MAX_EVIDENCE_NOTE_LENGTH),
+    evidenceUrl: optionalEvidenceUrlSchema,
+    notApplicable: z.boolean().optional(),
+    notApplicableReason: z.string().trim().max(MAX_DESCRIPTION_LENGTH).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.notApplicable) {
+      const reason = value.notApplicableReason?.trim() ?? '';
+      if (reason.length < MIN_NOT_APPLICABLE_REASON_LENGTH) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['notApplicableReason'],
+          message: `notApplicableReason must be at least ${MIN_NOT_APPLICABLE_REASON_LENGTH} characters`,
+        });
+      }
+      return;
+    }
+
+    if (value.completed === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['completed'],
+        message: 'Either completed or notApplicable flag is required',
+      });
+    }
+  });
+
 const isUniqueConstraintError = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 
@@ -211,6 +268,44 @@ const parseWithSchema = <TSchema extends z.ZodTypeAny>(
   }
 
   return parsed.data;
+};
+
+const readFirstQueryValue = (value: unknown): unknown =>
+  Array.isArray(value) ? value[0] : value;
+
+const normalizeOptionalQuerySearchValue = (value: unknown): string | undefined => {
+  const candidate = readFirstQueryValue(value);
+  if (typeof candidate !== 'string') {
+    return undefined;
+  }
+
+  const normalized = candidate.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  return normalized.slice(0, MAX_TEMPLATE_NAME_LENGTH);
+};
+
+const normalizeOptionalQueryBooleanValue = (value: unknown): boolean | undefined => {
+  const candidate = readFirstQueryValue(value);
+  if (typeof candidate === 'boolean') {
+    return candidate;
+  }
+
+  if (typeof candidate !== 'string') {
+    return undefined;
+  }
+
+  const normalized = candidate.trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+  if (normalized === 'false') {
+    return false;
+  }
+
+  return undefined;
 };
 
 const normalizeOptionalString = (value: string | undefined) => {
@@ -241,6 +336,7 @@ const normalizeChecklistItemState = (state: string) =>
 const mapTemplateSummary = (record: ChecklistTemplateSummaryRecord) => ({
   id: record.id,
   name: record.name,
+  appliesTo: record.appliesTo,
   description: record.description,
   isArchived: record.isArchived,
   itemsCount: record._count.items,
@@ -261,6 +357,7 @@ const mapTemplateItem = (record: ChecklistTemplateItemRecord) => ({
 const mapTemplateWithItems = (record: ChecklistTemplateWithItemsRecord) => ({
   id: record.id,
   name: record.name,
+  appliesTo: record.appliesTo,
   description: record.description,
   isArchived: record.isArchived,
   items: record.items.map((item) => mapTemplateItem(item)),
@@ -301,6 +398,17 @@ const mapChecklistInstanceSummary = (record: ChecklistInstanceSummaryRecord) => 
   pipelineStageId: record.pipelineStageId,
   status: record.status,
   createdAt: record.createdAt,
+});
+
+const mapStageChecklistRule = (rule: Awaited<ReturnType<typeof checklistsRepository.listStageChecklistRules>>[number]) => ({
+  id: rule.id,
+  projectCategoryId: rule.projectCategoryId,
+  pipelineStageId: rule.pipelineStageId,
+  checklistTemplateId: rule.checklistTemplateId,
+  checklistTemplateName: rule.checklistTemplate.name,
+  gateEnabled: rule.gateEnabled,
+  createdAt: rule.createdAt,
+  updatedAt: rule.updatedAt,
 });
 
 const createDuplicateTemplateNameError = (name: string) =>
@@ -354,11 +462,14 @@ const createItemAlreadyCompletedError = (state?: string) =>
   });
 
 const createGateBlockedError = (details: {
-  instanceId: string | null;
-  templateId: string;
-  missingRequiredItemIds: string[];
+  missingItems: Array<{
+    ruleId: string;
+    templateId: string;
+    instanceId: string | null;
+    missingRequiredItemIds: string[];
+  }>;
 }) =>
-  new HttpError(409, 'CHECKLIST_GATE_BLOCKED', 'Checklist gate blocked', details);
+  new HttpError(403, 'GATE_BLOCKED', 'Checklist gate blocked', details);
 
 type ChecklistInstanceLookup = {
   workspaceId: string;
@@ -472,6 +583,10 @@ export const checklistsService = {
     return parseWithSchema(idSchema, rawProjectId, 'Project id is invalid');
   },
 
+  parseCategoryId(rawCategoryId: string) {
+    return parseWithSchema(idSchema, rawCategoryId, 'Project category id is invalid');
+  },
+
   parseChecklistInstanceItemId(rawItemId: string) {
     return parseWithSchema(idSchema, rawItemId, 'Checklist item id is invalid');
   },
@@ -481,11 +596,20 @@ export const checklistsService = {
   },
 
   parseListTemplatesQuery(query: unknown) {
-    return parseWithSchema(
-      listTemplatesQuerySchema,
-      query,
-      'Invalid template list query params',
-    );
+    const source =
+      query && typeof query === 'object'
+        ? (query as Record<string, unknown>)
+        : {};
+
+    return {
+      q:
+        normalizeOptionalQuerySearchValue(source.q) ||
+        normalizeOptionalQuerySearchValue(source.query) ||
+        normalizeOptionalQuerySearchValue(source.search),
+      isArchived:
+        normalizeOptionalQueryBooleanValue(source.isArchived) ??
+        normalizeOptionalQueryBooleanValue(source.archived),
+    };
   },
 
   parseCreateTemplateBody(body: unknown) {
@@ -568,6 +692,22 @@ export const checklistsService = {
     );
   },
 
+  parseToggleChecklistInstanceItemBody(body: unknown) {
+    return parseWithSchema(
+      toggleChecklistInstanceItemBodySchema,
+      body,
+      'Invalid checklist instance item completion payload',
+    );
+  },
+
+  parseUpsertStageChecklistRulesBody(body: unknown) {
+    return parseWithSchema(
+      upsertStageChecklistRulesBodySchema,
+      body,
+      'Invalid stage checklist-rules payload',
+    );
+  },
+
   async requireTemplate(workspaceId: string, rawTemplateId: string) {
     const templateId = this.parseTemplateId(rawTemplateId);
     const template = await checklistsRepository.findTemplateById(workspaceId, templateId);
@@ -632,7 +772,7 @@ export const checklistsService = {
     const parsed = this.parseListTemplatesQuery(query);
     const templates = await checklistsRepository.listTemplates({
       workspaceId,
-      q: parsed.q?.trim(),
+      q: parsed.q,
       isArchived: parsed.isArchived,
     });
 
@@ -662,6 +802,7 @@ export const checklistsService = {
       const created = await checklistsRepository.createTemplateWithItems({
         workspaceId: input.workspaceId,
         name: payload.name,
+        appliesTo: payload.appliesTo,
         description: normalizeOptionalString(payload.description),
         items: items.map((item) => ({
           title: item.title,
@@ -713,12 +854,16 @@ export const checklistsService = {
     }
 
     const nextName = payload.name;
+    const nextAppliesTo = payload.appliesTo;
     const nextDescription = normalizePatchString(payload.description);
     const nextArchived = payload.isArchived;
 
     const fieldsChanged: string[] = [];
     if (nextName !== undefined && nextName !== current.name) {
       fieldsChanged.push('name');
+    }
+    if (nextAppliesTo !== undefined && nextAppliesTo !== current.appliesTo) {
+      fieldsChanged.push('appliesTo');
     }
     if (nextDescription !== undefined && nextDescription !== current.description) {
       fieldsChanged.push('description');
@@ -732,6 +877,7 @@ export const checklistsService = {
       try {
         const result = await checklistsRepository.updateTemplate(input.workspaceId, templateId, {
           ...(nextName !== undefined ? { name: nextName } : {}),
+          ...(nextAppliesTo !== undefined ? { appliesTo: nextAppliesTo } : {}),
           ...(nextDescription !== undefined ? { description: nextDescription } : {}),
           ...(nextArchived !== undefined ? { isArchived: nextArchived } : {}),
         });
@@ -1115,6 +1261,203 @@ export const checklistsService = {
     };
   },
 
+  async ensureChecklistInstancesForProjectStage(input: {
+    workspaceId: string;
+    projectId: string;
+    pipelineStageId: string;
+    actorUserId: string;
+    request?: FastifyRequest;
+  }) {
+    const projectId = this.parseProjectId(input.projectId);
+    const pipelineStageId = this.parsePipelineStageId(input.pipelineStageId);
+
+    await this.ensureProjectBelongsToWorkspace(input.workspaceId, projectId);
+
+    const stage = await checklistsRepository.findPipelineStageForRules(
+      input.workspaceId,
+      pipelineStageId,
+    );
+    if (!stage) {
+      throw notFound('Pipeline stage not found');
+    }
+
+    if (!stage.categoryId) {
+      return {
+        created: [],
+        existing: [],
+      };
+    }
+
+    const rules = await checklistsRepository.listStageChecklistRules(
+      input.workspaceId,
+      stage.categoryId,
+      pipelineStageId,
+    );
+
+    const created: string[] = [];
+    const existing: string[] = [];
+
+    for (const rule of rules) {
+      const ensured = await ensureChecklistInstance({
+        lookup: {
+          workspaceId: input.workspaceId,
+          projectId,
+          pipelineStageId,
+          checklistTemplateId: rule.checklistTemplateId,
+        },
+        autoCreateInstance: true,
+      });
+
+      if (ensured.created && ensured.instance) {
+        created.push(ensured.instance.id);
+      } else if (ensured.instance) {
+        existing.push(ensured.instance.id);
+      }
+    }
+
+    await audit.log({
+      event: 'checklists.instances.ensure',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      targetType: 'Project',
+      targetId: projectId,
+      metadata: {
+        projectId,
+        stageId: pipelineStageId,
+        rulesCount: rules.length,
+        createdInstanceIds: created,
+        existingInstanceIds: existing,
+      },
+      request: input.request,
+    });
+
+    return {
+      created,
+      existing,
+    };
+  },
+
+  async listStageChecklistRules(input: {
+    workspaceId: string;
+    categoryId: string;
+    stageId: string;
+  }) {
+    const categoryId = this.parseCategoryId(input.categoryId);
+    const stageId = this.parsePipelineStageId(input.stageId);
+
+    const [category, stage] = await Promise.all([
+      checklistsRepository.findProjectCategoryForRules(input.workspaceId, categoryId),
+      checklistsRepository.findPipelineStageForRules(input.workspaceId, stageId),
+    ]);
+
+    if (!category) {
+      throw notFound('Project category not found');
+    }
+
+    if (!stage) {
+      throw notFound('Pipeline stage not found');
+    }
+
+    if (stage.categoryId !== category.id) {
+      throw badRequest('Stage does not belong to category', {
+        categoryId,
+        stageId,
+      });
+    }
+
+    const rules = await checklistsRepository.listStageChecklistRules(
+      input.workspaceId,
+      category.id,
+      stage.id,
+    );
+
+    return {
+      items: rules.map((rule) => mapStageChecklistRule(rule)),
+    };
+  },
+
+  async replaceStageChecklistRules(input: {
+    workspaceId: string;
+    categoryId: string;
+    stageId: string;
+    actorUserId: string;
+    body: unknown;
+    request?: FastifyRequest;
+  }) {
+    const categoryId = this.parseCategoryId(input.categoryId);
+    const stageId = this.parsePipelineStageId(input.stageId);
+    const payload = this.parseUpsertStageChecklistRulesBody(input.body);
+
+    const [category, stage] = await Promise.all([
+      checklistsRepository.findProjectCategoryForRules(input.workspaceId, categoryId),
+      checklistsRepository.findPipelineStageForRules(input.workspaceId, stageId),
+    ]);
+
+    if (!category) {
+      throw notFound('Project category not found');
+    }
+
+    if (!stage) {
+      throw notFound('Pipeline stage not found');
+    }
+
+    if (stage.categoryId !== category.id) {
+      throw badRequest('Stage does not belong to category', {
+        categoryId,
+        stageId,
+      });
+    }
+
+    const uniqueTemplateIds = Array.from(new Set(payload.rules.map((rule) => rule.checklistTemplateId)));
+    const templates = uniqueTemplateIds.length > 0
+      ? await Promise.all(
+          uniqueTemplateIds.map((templateId) =>
+            checklistsRepository.findActiveTemplateById(input.workspaceId, templateId),
+          ),
+        )
+      : [];
+
+    if (templates.some((template) => !template)) {
+      throw badRequest('One or more checklist templates are invalid or archived');
+    }
+
+    if (templates.some((template) => template?.appliesTo !== 'PROJECT_STAGE')) {
+      throw badRequest('Only PROJECT_STAGE templates can be assigned to stage rules');
+    }
+
+    const rules = await checklistsRepository.replaceStageChecklistRules({
+      workspaceId: input.workspaceId,
+      projectCategoryId: category.id,
+      pipelineStageId: stage.id,
+      rules: payload.rules.map((rule) => ({
+        checklistTemplateId: rule.checklistTemplateId,
+        gateEnabled: rule.gateEnabled,
+      })),
+    });
+
+    await audit.log({
+      event: 'checklists.rules.update',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      targetType: 'PipelineStage',
+      targetId: stage.id,
+      metadata: {
+        categoryId: category.id,
+        stageId: stage.id,
+        rules: rules.map((rule) => ({
+          ruleId: rule.id,
+          checklistTemplateId: rule.checklistTemplateId,
+          gateEnabled: rule.gateEnabled,
+        })),
+      },
+      request: input.request,
+    });
+
+    return {
+      items: rules.map((rule) => mapStageChecklistRule(rule)),
+    };
+  },
+
   async listProjectChecklistInstances(
     workspaceId: string,
     rawProjectId: string,
@@ -1122,12 +1465,19 @@ export const checklistsService = {
   ) {
     const projectId = this.parseProjectId(rawProjectId);
     const parsedQuery = this.parseListProjectChecklistInstancesQuery(query);
+    const stageId = parsedQuery.stageId
+      ? this.parsePipelineStageId(parsedQuery.stageId)
+      : undefined;
     await this.ensureProjectBelongsToWorkspace(workspaceId, projectId);
+    if (stageId) {
+      await this.ensurePipelineStageBelongsToWorkspace(workspaceId, stageId);
+    }
 
     if (parsedQuery.includeItems) {
       const instancesWithItems = await checklistsRepository.listChecklistInstancesByProjectWithItems(
         workspaceId,
         projectId,
+        stageId,
       );
 
       return {
@@ -1138,6 +1488,7 @@ export const checklistsService = {
     const instances = await checklistsRepository.listChecklistInstancesByProject(
       workspaceId,
       projectId,
+      stageId,
     );
 
     return {
@@ -1327,6 +1678,68 @@ export const checklistsService = {
     return mapChecklistInstanceItem(resetItem);
   },
 
+  async toggleChecklistInstanceItemCompletion(input: {
+    workspaceId: string;
+    checklistInstanceId: string;
+    itemId: string;
+    actorUserId: string;
+    body: unknown;
+    request?: FastifyRequest;
+  }) {
+    const checklistInstanceId = this.parseChecklistInstanceItemId(input.checklistInstanceId);
+    const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
+    if (item.instanceId !== checklistInstanceId) {
+      throw notFound('Checklist instance item not found');
+    }
+
+    const payload = this.parseToggleChecklistInstanceItemBody(input.body);
+
+    if (payload.notApplicable) {
+      return this.markChecklistItemNotApplicable({
+        workspaceId: input.workspaceId,
+        itemId: item.id,
+        actorUserId: input.actorUserId,
+        body: {
+          reason: payload.notApplicableReason,
+        },
+        request: input.request,
+      });
+    }
+
+    if (payload.completed) {
+      return this.completeChecklistItem({
+        workspaceId: input.workspaceId,
+        itemId: item.id,
+        actorUserId: input.actorUserId,
+        body: {
+          evidenceNote: payload.notes,
+          evidenceUrl: payload.evidenceUrl,
+        },
+        request: input.request,
+      });
+    }
+
+    const reset = await this.resetChecklistItem({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+    });
+
+    await audit.log({
+      event: 'checklists.item.uncomplete',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      targetType: 'ChecklistInstanceItem',
+      targetId: item.id,
+      metadata: {
+        instanceId: item.instanceId,
+        itemId: item.id,
+      },
+      request: input.request,
+    });
+
+    return reset;
+  },
+
   async enforceGateForStageTransition(input: {
     workspaceId: string;
     projectId: string;
@@ -1336,12 +1749,37 @@ export const checklistsService = {
     actorUserId: string;
     request?: FastifyRequest;
     stageConfig: {
+      categoryId: string | null;
       isGated: boolean;
       gateChecklistTemplateId: string | null;
       autoCreateInstance: boolean;
     };
   }) {
-    if (!input.stageConfig.isGated) {
+    const stageRules = input.stageConfig.categoryId
+      ? await checklistsRepository.listEnabledStageChecklistRules(
+          input.workspaceId,
+          input.stageConfig.categoryId,
+          input.toStageId,
+        )
+      : [];
+
+    const gateRules = stageRules.length > 0
+      ? stageRules.map((rule) => ({
+          ruleId: rule.id,
+          templateId: rule.checklistTemplateId,
+          autoCreateInstance: true,
+        }))
+      : (
+          input.stageConfig.isGated && input.stageConfig.gateChecklistTemplateId
+            ? [{
+                ruleId: input.toStageId,
+                templateId: input.stageConfig.gateChecklistTemplateId,
+                autoCreateInstance: input.stageConfig.autoCreateInstance,
+              }]
+            : []
+        );
+
+    if (gateRules.length === 0) {
       return {
         enforced: false,
         overridden: false,
@@ -1351,103 +1789,119 @@ export const checklistsService = {
       };
     }
 
-    const templateId = input.stageConfig.gateChecklistTemplateId;
-    if (!templateId) {
-      throw badRequest('Gated pipeline stage is misconfigured', {
-        toStageId: input.toStageId,
-        reason: 'gateChecklistTemplateId is required when isGated=true',
-      });
-    }
+    const transactionalGateStates = await checklistsServiceRuntime.runTransaction(async (tx) => Promise.all(
+      gateRules.map(async (gateRule) => {
+        const template = await checklistsRepository.findActiveTemplateById(
+          input.workspaceId,
+          gateRule.templateId,
+          tx,
+        );
 
-    const transactionalGateState = await prisma.$transaction(async (tx) => {
-      const template = await checklistsRepository.findActiveTemplateById(
-        input.workspaceId,
-        templateId,
-        tx,
-      );
+        if (!template) {
+          throw badRequest('Gated pipeline stage template is invalid', {
+            toStageId: input.toStageId,
+            templateId: gateRule.templateId,
+            reason: 'Template not found in workspace or archived',
+          });
+        }
 
-      if (!template) {
-        throw badRequest('Gated pipeline stage template is invalid', {
-          toStageId: input.toStageId,
-          templateId,
-          reason: 'Template not found in workspace or archived',
+        if (template.appliesTo !== 'PROJECT_STAGE') {
+          throw badRequest('Gated pipeline stage template is invalid', {
+            toStageId: input.toStageId,
+            templateId: gateRule.templateId,
+            reason: 'Template appliesTo must be PROJECT_STAGE',
+          });
+        }
+
+        const lookup = {
+          workspaceId: input.workspaceId,
+          projectId: input.projectId,
+          pipelineStageId: input.toStageId,
+          checklistTemplateId: template.id,
+        };
+
+        const ensured = await ensureChecklistInstance({
+          lookup,
+          autoCreateInstance: gateRule.autoCreateInstance,
+          tx,
         });
-      }
 
-      const lookup = {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        pipelineStageId: input.toStageId,
-        checklistTemplateId: template.id,
-      };
+        const gateValidation = await validateGateForInstance({
+          workspaceId: input.workspaceId,
+          instanceId: ensured.instance?.id ?? null,
+          tx,
+        });
 
-      const ensured = await ensureChecklistInstance({
-        lookup,
-        autoCreateInstance: input.stageConfig.autoCreateInstance,
-        tx,
-      });
+        return {
+          ruleId: gateRule.ruleId,
+          templateId: template.id,
+          instanceId: ensured.instance?.id ?? null,
+          missingRequiredItemIds: gateValidation.missingRequiredItemIds,
+          gateOk: gateValidation.ok,
+        };
+      }),
+    ));
 
-      const gateValidation = await validateGateForInstance({
-        workspaceId: input.workspaceId,
-        instanceId: ensured.instance?.id ?? null,
-        tx,
-      });
+    const missingItems = transactionalGateStates
+      .filter((entry) => !entry.gateOk)
+      .map((entry) => ({
+        ruleId: entry.ruleId,
+        templateId: entry.templateId,
+        instanceId: entry.instanceId,
+        missingRequiredItemIds: entry.missingRequiredItemIds,
+      }));
 
-      return {
-        templateId: template.id,
-        instanceId: ensured.instance?.id ?? null,
-        missingRequiredItemIds: gateValidation.missingRequiredItemIds,
-        gateOk: gateValidation.ok,
-      };
-    });
-
-    if (!transactionalGateState.gateOk) {
+    if (missingItems.length > 0) {
       if (!input.overrideGate) {
         throw createGateBlockedError({
-          instanceId: transactionalGateState.instanceId,
-          templateId: transactionalGateState.templateId,
-          missingRequiredItemIds: transactionalGateState.missingRequiredItemIds,
+          missingItems,
         });
       }
 
       const normalizedReason = validateOverrideReason(input.overrideReason);
       await requirePermission(
-        input.actorUserId,
         input.workspaceId,
+        input.actorUserId,
         CHECKLISTS_OVERRIDE_GATE_PERMISSION,
       );
 
       await audit.log({
-        event: 'checklists.gate.override',
+        event: 'checklists.override_gate',
         actorUserId: input.actorUserId,
         workspaceId: input.workspaceId,
         entityType: 'Project',
         entityId: input.projectId,
         metadata: {
           projectId: input.projectId,
-          toStageId: input.toStageId,
-          instanceId: transactionalGateState.instanceId,
-          templateId: transactionalGateState.templateId,
-          missingRequiredItemIds: transactionalGateState.missingRequiredItemIds,
+          stageId: input.toStageId,
+          missingItems,
           overrideReason: truncateOverrideReasonForAudit(normalizedReason),
         },
         request: input.request,
       });
 
+      const flattenedMissingIds = Array.from(
+        new Set(
+          missingItems.flatMap((entry) => entry.missingRequiredItemIds),
+        ),
+      );
+
       return {
         enforced: true,
         overridden: true,
-        ruleId: input.toStageId,
-        checklistInstanceId: transactionalGateState.instanceId,
-        missingRequiredItemIds: transactionalGateState.missingRequiredItemIds,
+        ruleId: missingItems[0]?.ruleId ?? null,
+        checklistInstanceId: missingItems[0]?.instanceId ?? null,
+        missingRequiredItemIds: flattenedMissingIds,
       };
     }
+
+    const primaryState = transactionalGateStates[0] ?? null;
 
     return {
       enforced: true,
       overridden: false,
-      ruleId: input.toStageId,
-      checklistInstanceId: transactionalGateState.instanceId,
+      ruleId: primaryState?.ruleId ?? null,
+      checklistInstanceId: primaryState?.instanceId ?? null,
       missingRequiredItemIds: [] as string[],
     };
   },

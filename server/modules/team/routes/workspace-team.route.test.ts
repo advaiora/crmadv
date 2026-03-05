@@ -269,7 +269,7 @@ test('team route returns 404 for member id outside current workspace scope', asy
   }
 });
 
-test('team invite route writes audit event team.invite_sent', async () => {
+test('team invite route writes audit event team.invite', async () => {
   let app: FastifyInstance | null = null;
   const events: string[] = [];
 
@@ -289,7 +289,7 @@ test('team invite route writes audit event team.invite_sent', async () => {
     });
 
     assert.equal(response.statusCode, 201);
-    assert.ok(events.includes('team.invite_sent'));
+    assert.ok(events.includes('team.invite'));
   } finally {
     await closeApp(app);
   }
@@ -347,7 +347,7 @@ test('team invite accept route writes audit event team.invite_accepted', async (
   }
 });
 
-test('team deactivate route writes audit event team.member_deactivated', async () => {
+test('team deactivate route writes audit event team.deactivate', async () => {
   let app: FastifyInstance | null = null;
   const events: string[] = [];
 
@@ -367,13 +367,13 @@ test('team deactivate route writes audit event team.member_deactivated', async (
     });
 
     assert.equal(response.statusCode, 200);
-    assert.ok(events.includes('team.member_deactivated'));
+    assert.ok(events.includes('team.deactivate'));
   } finally {
     await closeApp(app);
   }
 });
 
-test('team roles route writes audit event team.roles_changed', async () => {
+test('team roles route writes audit event team.roles_assign', async () => {
   let app: FastifyInstance | null = null;
   const events: string[] = [];
 
@@ -393,7 +393,7 @@ test('team roles route writes audit event team.roles_changed', async () => {
     });
 
     assert.equal(response.statusCode, 200);
-    assert.ok(events.includes('team.roles_changed'));
+    assert.ok(events.includes('team.roles_assign'));
   } finally {
     await closeApp(app);
   }

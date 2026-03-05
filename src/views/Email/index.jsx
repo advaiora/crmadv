@@ -410,11 +410,11 @@ const InternalMessagingPage = () => {
                             className={`d-flex mb-2 ${message.isMine ? 'justify-content-end' : 'justify-content-start'}`}
                           >
                             <div
-                              className={`px-3 py-2 rounded ${message.isMine ? 'bg-primary text-white' : 'bg-light'}`}
+                              className={`px-3 py-2 rounded ${message.isMine ? 'bg-primary text-[var(--hk-text-on-dark-bg)]' : 'bg-light'}`}
                               style={{ maxWidth: '72%', whiteSpace: 'pre-wrap' }}
                             >
                               <div className="small">{message.body}</div>
-                              <div className={`small mt-1 ${message.isMine ? 'text-white-50' : 'text-muted'}`}>
+                              <div className={`small mt-1 ${message.isMine ? 'text-textMuted' : 'text-muted'}`}>
                                 {formatDateTime(message.createdAt)}
                               </div>
                             </div>

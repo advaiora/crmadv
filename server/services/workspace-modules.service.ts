@@ -74,6 +74,26 @@ export const workspaceModulesService = {
     return moduleRepository.listWorkspaceModules(workspaceId);
   },
 
+  async updateWorkspaceModuleByKey(
+    workspaceId: string,
+    moduleKey: string,
+    enabled: boolean,
+  ): Promise<WorkspaceModuleState> {
+    const updated = await moduleRepository.setWorkspaceModuleEnabled(
+      workspaceId,
+      moduleKey,
+      enabled,
+    );
+
+    if (!updated) {
+      throw badRequest('Unknown module key', {
+        moduleKey,
+      });
+    }
+
+    return updated;
+  },
+
   async updateWorkspaceModules(workspaceId: string, body: unknown) {
     const updates = this.parseUpdates(body) as ModulesUpdateBody['modules'];
     const previousState = await moduleRepository.listWorkspaceModules(workspaceId);

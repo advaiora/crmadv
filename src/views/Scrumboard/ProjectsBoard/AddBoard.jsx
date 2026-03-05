@@ -7,7 +7,7 @@ const AddBoard = ({ show, hide }) => {
         <Modal show={show} onHide={hide}>
             <Modal.Header className="header-wth-bg-inv">
                 <Modal.Title as="h5">Add Board</Modal.Title>
-                <Button bsPrefix="btn-close" className="text-white" onClick={hide} >
+                <Button bsPrefix="btn-close" className="text-[var(--hk-text-on-dark-bg)]" onClick={hide} >
                     <span aria-hidden="true">×</span>
                 </Button>
             </Modal.Header>

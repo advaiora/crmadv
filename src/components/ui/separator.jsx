@@ -8,7 +8,7 @@ const Separator = React.forwardRef(
       role={decorative ? 'none' : 'separator'}
       aria-orientation={orientation}
       className={cn(
-        'shrink-0 bg-[var(--border)]',
+        'shrink-0 bg-cardBorder',
         orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px',
         className,
       )}

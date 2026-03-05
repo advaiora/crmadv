@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { badRequest } from '../../../core/errors.js';
 import { ok } from '../../../core/response.js';
 import {
   CHECKLISTS_PERMISSIONS,
@@ -16,6 +17,12 @@ type ChecklistItemParams = {
 
 type ProjectChecklistQuery = {
   includeItems?: string;
+  stageId?: string;
+};
+
+type ChecklistInstanceItemParams = {
+  id: string;
+  itemInstanceId: string;
 };
 
 const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
@@ -24,7 +31,7 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { user, workspace } = await ensureChecklistsAccess(
         request,
-        CHECKLISTS_PERMISSIONS.create,
+        CHECKLISTS_PERMISSIONS.completeItem,
       );
 
       const instance = await checklistsService.createChecklistInstance({
@@ -54,6 +61,52 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
       );
 
       return ok(reply, result.items);
+    },
+  );
+
+  app.post<{ Params: ProjectParams; Body: unknown }>(
+    '/projects/:projectId/checklists/ensure',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.completeItem,
+      );
+
+      const body = request.body as { stageId?: unknown } | null | undefined;
+      if (typeof body?.stageId !== 'string' || body.stageId.trim().length === 0) {
+        throw badRequest('Body must include stageId');
+      }
+
+      const result = await checklistsService.ensureChecklistInstancesForProjectStage({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        pipelineStageId: body.stageId,
+        actorUserId: user.id,
+        request,
+      });
+
+      return ok(reply, result);
+    },
+  );
+
+  app.post<{ Params: ChecklistInstanceItemParams; Body: unknown }>(
+    '/checklists/instances/:id/items/:itemInstanceId/complete',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.completeItem,
+      );
+
+      const item = await checklistsService.toggleChecklistInstanceItemCompletion({
+        workspaceId: workspace.id,
+        checklistInstanceId: request.params.id,
+        itemId: request.params.itemInstanceId,
+        actorUserId: user.id,
+        body: request.body,
+        request,
+      });
+
+      return ok(reply, item);
     },
   );
 

@@ -36,7 +36,7 @@ const getDashboardErrorMessage = (error) => {
 };
 
 const SkeletonCard = ({ className }) => (
-  <Card className={className || 'rounded-2xl border border-[var(--border)] shadow-sm'}>
+  <Card className={className || 'rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover'}>
     <CardContent className="space-y-3 p-4 md:p-6">
       <Skeleton className="h-5 w-36" />
       <Skeleton className="h-9 w-28" />
@@ -55,13 +55,13 @@ const DashboardHomeSkeleton = () => (
     </div>
 
     <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
-      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-7" />
-      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-5" />
+      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-7" />
+      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-5" />
     </div>
 
     <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
-      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-7" />
-      <SkeletonCard className="rounded-2xl border border-[var(--border)] shadow-sm xl:col-span-5" />
+      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-7" />
+      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-5" />
     </div>
   </div>
 );
@@ -138,7 +138,7 @@ const DashboardWorkspacePage = ({ access, toggleCollapsedNav, reloadWorkspaceAcc
       isRefreshing={loading}
     >
       {error ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-[var(--destructive)] bg-[rgba(239,68,68,0.08)] px-4 py-4 text-sm text-[var(--destructive)]">
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-4 text-sm text-destructive">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p className="mb-0">{error}</p>
         </div>
@@ -149,13 +149,13 @@ const DashboardWorkspacePage = ({ access, toggleCollapsedNav, reloadWorkspaceAcc
       {!error && !loading && widgets.length > 0 ? <WidgetRenderer widgets={widgets} /> : null}
 
       {!error && !loading && widgets.length === 0 ? (
-        <Card className="rounded-2xl border border-[var(--border)] shadow-sm">
+        <Card className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover">
           <CardContent className="space-y-4 p-5 md:p-6">
-            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted)] px-4 py-8 text-center">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--muted)] text-[var(--hk-text-tertiary)]">
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cardBorder bg-bgSecondary px-4 py-8 text-center">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-bgSecondary text-primary">
                 <LayoutDashboard className="h-4 w-4" />
               </span>
-              <p className="mb-0 text-sm text-[var(--hk-text-tertiary)]">
+              <p className="mb-0 text-sm text-textMuted">
                 Nessun widget disponibile per il tuo profilo nel workspace attuale.
               </p>
             </div>

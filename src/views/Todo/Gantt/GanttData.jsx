@@ -36,7 +36,7 @@ const avatarFormater = (cell) => {
 const tagFormater = (cell) => (
     cell ? <Badge
         size="sm"
-        bg="white"
+        bg="light"
         className={classNames("badge-outline badge-wth-icon", { "badge-danger": cell === "High" || cell === "Urgent" }, { "badge-warning": cell === "Low" }, { "badge-orange": cell === "Medium" })}
     >
         <span>

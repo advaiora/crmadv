@@ -5,20 +5,8 @@ import { Badge } from "react-bootstrap";
 import ProjectCard from "./ProjectCard";
 
 const StageColumn = ({ stage, projects, canMove, moveDisabledReason, movingProjectIds }) => {
-  const stageColor = stage?.color || null;
-
   return (
-    <div
-      className="projects-stage-column"
-      style={
-        stageColor
-          ? {
-              "--stage-bg": stageColor,
-              "--stage-border": stageColor,
-            }
-          : undefined
-      }
-    >
+    <div className="projects-stage-column">
       <div className="projects-stage-header">
         <h6 className="mb-0">{stage?.name || "Stage"}</h6>
         <Badge bg="secondary">{projects.length}</Badge>
@@ -38,6 +26,8 @@ const StageColumn = ({ stage, projects, canMove, moveDisabledReason, movingProje
               <ProjectCard
                 key={project.id}
                 project={project}
+                stageColor={stage?.color}
+                stageName={stage?.name}
                 index={index}
                 canMove={canMove}
                 moveDisabledReason={moveDisabledReason}

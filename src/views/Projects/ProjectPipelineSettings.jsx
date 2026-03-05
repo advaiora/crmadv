@@ -5,7 +5,12 @@ import { Link } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
 import { useChecklistTemplates } from "../../modules/checklists/hooks/useChecklistsQueries";
-import { isApiError } from "../../modules/projects/api/projects.api";
+import {
+  isApiError as isChecklistApiError,
+  listStageChecklistRules,
+  replaceStageChecklistRules,
+} from "../../modules/checklists/api/checklists.api";
+import { isApiError as isProjectApiError } from "../../modules/projects/api/projects.api";
 import {
   useCreateCategory,
   useCreateStage,
@@ -21,6 +26,7 @@ import { useSelectedPipelineCategoryId } from "../../modules/projects/hooks/useS
 import EmptyState from "../../modules/projects/ui/states/EmptyState";
 import ErrorState from "../../modules/projects/ui/states/ErrorState";
 import LoadingState from "../../modules/projects/ui/states/LoadingState";
+import { hasPermission } from "../../utils/workspaceAccess";
 import "../../styles/css/project-pipeline-settings.css";
 import { readBrandingColor } from "../../lib/brandingColors";
 
@@ -59,18 +65,30 @@ const getErrorMessage = (error) => {
     return "";
   }
 
-  if (isApiError(error)) {
+  if (isProjectApiError(error) || isChecklistApiError(error)) {
     return `${error.message} (${error.code || error.status || "API_ERROR"})`;
   }
 
   return error?.message || "Errore inatteso";
 };
 
-const isInUseError = (error) => isApiError(error) && (error.code === "IN_USE" || error.status === 409);
+const isInUseError = (error) => isProjectApiError(error) && (error.code === "IN_USE" || error.status === 409);
 
-const isLastStageError = (error) => isApiError(error) && (error.code === "LAST_STAGE_REQUIRED" || error.status === 400);
+const isLastStageError = (error) => isProjectApiError(error) && (error.code === "LAST_STAGE_REQUIRED" || error.status === 400);
 
-const PipelineSettingsContent = () => {
+const normalizeStageRulesPayload = (payload) => {
+  if (Array.isArray(payload?.items)) {
+    return payload.items;
+  }
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  return [];
+};
+
+const PipelineSettingsContent = ({ access }) => {
   const defaultStageColor = readBrandingColor("--bs-primary", "#0d6efd");
   const categoriesQuery = usePipelineCategories();
   const categories = useMemo(() => sortCategories(categoriesQuery.data || []), [categoriesQuery.data]);
@@ -118,6 +136,181 @@ const PipelineSettingsContent = () => {
   );
 
   const selectedCategory = useMemo(() => categories.find((category) => category.id === categoryId) || null, [categories, categoryId]);
+  const canManageStageChecklistRules = hasPermission(access, "checklists.manage_templates");
+  const [stageRulesByStageId, setStageRulesByStageId] = useState({});
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!canManageStageChecklistRules) {
+      setStageRulesByStageId({});
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (!categoryId || localStages.length === 0) {
+      setStageRulesByStageId({});
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const stageIds = localStages.map((stage) => stage.id);
+
+    setStageRulesByStageId((current) => {
+      const next = {};
+      stageIds.forEach((stageId) => {
+        const existing = current[stageId];
+        next[stageId] = existing || {
+          loading: true,
+          saving: false,
+          error: "",
+          rules: [],
+        };
+      });
+      return next;
+    });
+
+    Promise.all(
+      stageIds.map(async (stageId) => {
+        try {
+          const payload = await listStageChecklistRules(categoryId, stageId);
+          const items = normalizeStageRulesPayload(payload);
+          if (!isMounted) {
+            return;
+          }
+
+          setStageRulesByStageId((current) => ({
+            ...current,
+            [stageId]: {
+              loading: false,
+              saving: false,
+              error: "",
+              rules: items.map((rule) => ({
+                checklistTemplateId: rule.checklistTemplateId,
+                gateEnabled: rule.gateEnabled !== false,
+              })),
+            },
+          }));
+        } catch (error) {
+          if (!isMounted) {
+            return;
+          }
+
+          setStageRulesByStageId((current) => ({
+            ...current,
+            [stageId]: {
+              loading: false,
+              saving: false,
+              error: getErrorMessage(error),
+              rules: [],
+            },
+          }));
+        }
+      }),
+    );
+
+    return () => {
+      isMounted = false;
+    };
+  }, [canManageStageChecklistRules, categoryId, localStages]);
+
+  const updateStageRulesDraft = (stageId, updater) => {
+    setStageRulesByStageId((current) => {
+      const existing = current[stageId] || {
+        loading: false,
+        saving: false,
+        error: "",
+        rules: [],
+      };
+
+      return {
+        ...current,
+        [stageId]: updater(existing),
+      };
+    });
+  };
+
+  const handleToggleStageRuleTemplate = (stageId, templateId, checked) => {
+    updateStageRulesDraft(stageId, (current) => {
+      const hasRule = current.rules.some((rule) => rule.checklistTemplateId === templateId);
+      if (checked && !hasRule) {
+        return {
+          ...current,
+          error: "",
+          rules: [
+            ...current.rules,
+            {
+              checklistTemplateId: templateId,
+              gateEnabled: true,
+            },
+          ],
+        };
+      }
+
+      if (!checked && hasRule) {
+        return {
+          ...current,
+          error: "",
+          rules: current.rules.filter((rule) => rule.checklistTemplateId !== templateId),
+        };
+      }
+
+      return current;
+    });
+  };
+
+  const handleToggleStageRuleGate = (stageId, templateId, gateEnabled) => {
+    updateStageRulesDraft(stageId, (current) => ({
+      ...current,
+      error: "",
+      rules: current.rules.map((rule) =>
+        rule.checklistTemplateId === templateId
+          ? { ...rule, gateEnabled }
+          : rule),
+    }));
+  };
+
+  const handleSaveStageRules = async (stageId) => {
+    if (!categoryId || !canManageStageChecklistRules) {
+      return;
+    }
+
+    const draft = stageRulesByStageId[stageId] || {
+      rules: [],
+    };
+
+    updateStageRulesDraft(stageId, (current) => ({
+      ...current,
+      saving: true,
+      error: "",
+    }));
+
+    try {
+      const payload = await replaceStageChecklistRules(categoryId, stageId, draft.rules);
+      const items = normalizeStageRulesPayload(payload);
+
+      updateStageRulesDraft(stageId, (current) => ({
+        ...current,
+        saving: false,
+        error: "",
+        rules: items.map((rule) => ({
+          checklistTemplateId: rule.checklistTemplateId,
+          gateEnabled: rule.gateEnabled !== false,
+        })),
+      }));
+
+      toast.success("Regole checklist salvate");
+    } catch (error) {
+      updateStageRulesDraft(stageId, (current) => ({
+        ...current,
+        saving: false,
+        error: getErrorMessage(error) || "Errore salvataggio regole checklist",
+      }));
+      toast.error(getErrorMessage(error) || "Errore salvataggio regole checklist");
+    }
+  };
 
   const handleCreateCategory = async (event) => {
     event.preventDefault();
@@ -614,73 +807,159 @@ const PipelineSettingsContent = () => {
 
                 {!stagesQuery.loading && !stagesQuery.error && localStages.length > 0 && (
                   <ListGroup variant="flush">
-                    {localStages.map((stage, index) => (
-                      <ListGroup.Item key={stage.id} className="d-flex justify-content-between align-items-center gap-2">
-                        <div className="d-flex align-items-center gap-2">
-                          {stage.color && (
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "50%",
-                                backgroundColor: stage.color,
-                                display: "inline-block",
-                              }}
-                            />
-                          )}
-                          <span className="fw-semibold">{stage.name}</span>
-                          {stage.isClosed && <Badge bg="secondary">Chiuso</Badge>}
-                          {stage.isGated && <Badge bg="warning" text="dark">Gated</Badge>}
-                          {stage.isGated && stage.gateChecklistTemplateId && (
-                            <Badge bg="light" text="dark">
-                              Template: {checklistTemplateNameById.get(stage.gateChecklistTemplateId) || stage.gateChecklistTemplateId}
-                            </Badge>
-                          )}
-                        </div>
+                    {localStages.map((stage, index) => {
+                      const stageRuleState = stageRulesByStageId[stage.id] || {
+                        loading: false,
+                        saving: false,
+                        error: "",
+                        rules: [],
+                      };
+                      const selectedRuleByTemplateId = new Map(
+                        stageRuleState.rules.map((rule) => [rule.checklistTemplateId, rule]),
+                      );
 
-                        <div className="d-flex align-items-center gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline-secondary"
-                            disabled={index === 0 || reorderStagesMutation.loading}
-                            onClick={() => void handleMoveStage(index, -1)}
-                          >
-                            <ChevronUp size={14} />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline-secondary"
-                            disabled={index === localStages.length - 1 || reorderStagesMutation.loading}
-                            onClick={() => void handleMoveStage(index, 1)}
-                          >
-                            <ChevronDown size={14} />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline-secondary"
-                            onClick={() =>
-                              setEditingStage({
-                                id: stage.id,
-                                name: stage.name,
-                                isClosed: Boolean(stage.isClosed),
-                                color: stage.color || defaultStageColor,
-                                isGated: Boolean(stage.isGated),
-                                gateChecklistTemplateId: stage.gateChecklistTemplateId || "",
-                                autoCreateInstance: stage.autoCreateInstance !== false,
-                              })
-                            }
-                          >
-                            <Pencil size={13} />
-                          </Button>
-                          <Button type="button" size="sm" variant="outline-danger" onClick={() => setDeletingStage(stage)}>
-                            <Trash2 size={13} />
-                          </Button>
-                        </div>
-                      </ListGroup.Item>
-                    ))}
+                      return (
+                        <ListGroup.Item key={stage.id} className="d-flex flex-column gap-2">
+                          <div className="d-flex justify-content-between align-items-center gap-2">
+                            <div className="d-flex align-items-center gap-2">
+                              {stage.color && (
+                                <span
+                                  style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: "50%",
+                                    backgroundColor: stage.color,
+                                    display: "inline-block",
+                                  }}
+                                />
+                              )}
+                              <span className="fw-semibold">{stage.name}</span>
+                              {stage.isClosed && <Badge bg="secondary">Chiuso</Badge>}
+                              {stage.isGated && <Badge bg="warning" text="dark">Gated</Badge>}
+                              {stage.isGated && stage.gateChecklistTemplateId && (
+                                <Badge bg="light" text="dark">
+                                  Template: {checklistTemplateNameById.get(stage.gateChecklistTemplateId) || stage.gateChecklistTemplateId}
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="d-flex align-items-center gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline-secondary"
+                                disabled={index === 0 || reorderStagesMutation.loading}
+                                onClick={() => void handleMoveStage(index, -1)}
+                              >
+                                <ChevronUp size={14} />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline-secondary"
+                                disabled={index === localStages.length - 1 || reorderStagesMutation.loading}
+                                onClick={() => void handleMoveStage(index, 1)}
+                              >
+                                <ChevronDown size={14} />
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline-secondary"
+                                onClick={() =>
+                                  setEditingStage({
+                                    id: stage.id,
+                                    name: stage.name,
+                                    isClosed: Boolean(stage.isClosed),
+                                    color: stage.color || defaultStageColor,
+                                    isGated: Boolean(stage.isGated),
+                                    gateChecklistTemplateId: stage.gateChecklistTemplateId || "",
+                                    autoCreateInstance: stage.autoCreateInstance !== false,
+                                  })
+                                }
+                              >
+                                <Pencil size={13} />
+                              </Button>
+                              <Button type="button" size="sm" variant="outline-danger" onClick={() => setDeletingStage(stage)}>
+                                <Trash2 size={13} />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="border-top pt-2">
+                            <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
+                              <span className="small text-muted">Checklist rules per stage</span>
+                              {stageRuleState.saving && <span className="small text-muted">Salvataggio...</span>}
+                            </div>
+
+                            {!canManageStageChecklistRules && (
+                              <div className="small text-muted">
+                                Servono permessi `checklists.manage_templates` per modificare le regole.
+                              </div>
+                            )}
+
+                            {canManageStageChecklistRules && stageRuleState.loading && (
+                              <div className="small text-muted">Caricamento regole...</div>
+                            )}
+
+                            {canManageStageChecklistRules && !stageRuleState.loading && activeChecklistTemplates.length === 0 && (
+                              <div className="small text-muted">Nessun template checklist attivo disponibile.</div>
+                            )}
+
+                            {canManageStageChecklistRules && !stageRuleState.loading && activeChecklistTemplates.length > 0 && (
+                              <div className="d-flex flex-column gap-2">
+                                {activeChecklistTemplates.map((template) => {
+                                  const selectedRule = selectedRuleByTemplateId.get(template.id);
+                                  const selected = Boolean(selectedRule);
+                                  const gateEnabled = selectedRule?.gateEnabled !== false;
+
+                                  return (
+                                    <div key={`${stage.id}-${template.id}`} className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                      <Form.Check
+                                        type="checkbox"
+                                        id={`stage-rule-template-${stage.id}-${template.id}`}
+                                        label={template.name}
+                                        checked={selected}
+                                        onChange={(event) =>
+                                          handleToggleStageRuleTemplate(stage.id, template.id, event.target.checked)}
+                                        disabled={stageRuleState.saving}
+                                      />
+                                      <Form.Check
+                                        type="switch"
+                                        id={`stage-rule-gate-${stage.id}-${template.id}`}
+                                        label="Gate"
+                                        checked={gateEnabled}
+                                        disabled={!selected || stageRuleState.saving}
+                                        onChange={(event) =>
+                                          handleToggleStageRuleGate(stage.id, template.id, event.target.checked)}
+                                      />
+                                    </div>
+                                  );
+                                })}
+
+                                {stageRuleState.error && (
+                                  <Alert variant="danger" className="py-2 mb-0">
+                                    {stageRuleState.error}
+                                  </Alert>
+                                )}
+
+                                <div className="d-flex justify-content-end">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline-primary"
+                                    disabled={stageRuleState.saving}
+                                    onClick={() => void handleSaveStageRules(stage.id)}
+                                  >
+                                    Salva regole
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </ListGroup.Item>
+                      );
+                    })}
                   </ListGroup>
                 )}
               </Card.Body>
@@ -689,7 +968,7 @@ const PipelineSettingsContent = () => {
         </Row>
       )}
 
-      <Modal show={Boolean(editingCategory)} onHide={() => setEditingCategory(null)} centered>
+      <Modal show={Boolean(editingCategory)} onHide={() => setEditingCategory(null)} centered className="pipeline-modal">
         <Modal.Header closeButton>
           <Modal.Title>Rinomina categoria</Modal.Title>
         </Modal.Header>
@@ -716,7 +995,7 @@ const PipelineSettingsContent = () => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={Boolean(deletingCategory)} onHide={() => setDeletingCategory(null)} centered>
+      <Modal show={Boolean(deletingCategory)} onHide={() => setDeletingCategory(null)} centered className="pipeline-modal">
         <Modal.Header closeButton>
           <Modal.Title>Eliminare categoria?</Modal.Title>
         </Modal.Header>
@@ -731,7 +1010,7 @@ const PipelineSettingsContent = () => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={Boolean(editingStage)} onHide={() => setEditingStage(null)} centered>
+      <Modal show={Boolean(editingStage)} onHide={() => setEditingStage(null)} centered className="pipeline-modal">
         <Modal.Header closeButton>
           <Modal.Title>Modifica stage</Modal.Title>
         </Modal.Header>
@@ -832,7 +1111,7 @@ const PipelineSettingsContent = () => {
         </Modal.Footer>
       </Modal>
 
-      <Modal show={Boolean(deletingStage)} onHide={() => setDeletingStage(null)} centered>
+      <Modal show={Boolean(deletingStage)} onHide={() => setDeletingStage(null)} centered className="pipeline-modal">
         <Modal.Header closeButton>
           <Modal.Title>Eliminare stage?</Modal.Title>
         </Modal.Header>
@@ -855,12 +1134,14 @@ const PipelineSettingsContent = () => {
 const ProjectPipelineSettings = () => {
   return (
     <ModulePermissionGate requiredModule="projects" requiredPermission={PIPELINE_SETTINGS_PERMISSION} moduleName="Progetti">
-      {/* ✅ scope per applicare i selettori del css notion */}
-      <div className="container-fluid py-4 pipeline-page">
-        <PipelineSettingsContent />
-      </div>
+      {({ access }) => (
+        <div className="container-fluid py-4 pipeline-page">
+          <PipelineSettingsContent access={access} />
+        </div>
+      )}
     </ModulePermissionGate>
   );
 };
 
 export default ProjectPipelineSettings;
+

@@ -50,9 +50,10 @@ const ChecklistTemplatesContent = ({ access }) => {
   const deleteItemMutation = useDeleteChecklistTemplateItem();
   const reorderItemsMutation = useReorderChecklistTemplateItems();
 
-  const canManageTemplates = hasPermission(access, 'checklists.edit');
-  const canCreateTemplate = hasPermission(access, 'checklists.create');
-  const canDeleteTemplate = hasPermission(access, 'checklists.delete');
+  const canManageTemplates = hasPermission(access, 'checklists.manage_templates')
+    || hasPermission(access, 'checklists.edit');
+  const canCreateTemplate = canManageTemplates || hasPermission(access, 'checklists.create');
+  const canDeleteTemplate = canManageTemplates || hasPermission(access, 'checklists.delete');
 
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateDescription, setNewTemplateDescription] = useState('');
@@ -343,7 +344,7 @@ const ChecklistTemplatesContent = ({ access }) => {
   return (
     <div className="container-fluid py-4 checklists-shell">
       <div className="mb-3">
-        <Link to="/projects" className="text-slate-600 hover:text-slate-900">
+        <Link to="/projects" className="text-textMuted hover:text-text">
           &larr; Torna a Progetti
         </Link>
       </div>
@@ -351,7 +352,7 @@ const ChecklistTemplatesContent = ({ access }) => {
       <div className="checklists-hero mb-4">
         <div className="checklists-hero-title">
           <h3 className="mb-1 flex items-center gap-2">
-            <Sparkles size={18} className="text-slate-600" />
+            <Sparkles size={18} className="text-textMuted" />
             Memo Operativi
           </h3>
           <p className="text-muted mb-0">
@@ -400,14 +401,14 @@ const ChecklistTemplatesContent = ({ access }) => {
             </div>
 
             {templatesQuery.loading && (
-              <div className="flex items-center gap-2 text-sm text-slate-600">
+              <div className="flex items-center gap-2 text-sm text-textMuted">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Caricamento memo...
               </div>
             )}
 
             {templatesQuery.error && (
-              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 {getErrorMessage(templatesQuery.error)}
               </div>
             )}
@@ -425,17 +426,17 @@ const ChecklistTemplatesContent = ({ access }) => {
                     className={`w-full rounded-md border px-3 py-2 text-left transition checklists-template-item ${
                       selectedTemplateId === template.id
                         ? 'is-active'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                        : 'border-cardBorder bg-card hover:bg-hover'
                     }`}
                     onClick={() => setSelectedTemplateId(template.id)}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="font-medium text-sm text-slate-800">{template.name}</span>
+                      <span className="font-medium text-sm text-text">{template.name}</span>
                       <Badge variant={template.isArchived ? 'secondary' : 'outline'}>
                         {template.itemsCount} step
                       </Badge>
                     </div>
-                    <p className="mb-0 text-xs text-slate-500">
+                    <p className="mb-0 text-xs text-textMuted">
                       {template.description || 'Nessuna descrizione'}
                     </p>
                   </button>
@@ -444,14 +445,14 @@ const ChecklistTemplatesContent = ({ access }) => {
             )}
 
             {!templatesQuery.loading && visibleTemplates.length === 0 && (
-              <div className="rounded-md border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500">
+              <div className="rounded-md border border-dashed border-cardBorder px-3 py-3 text-sm text-textMuted">
                 Nessun memo trovato con i filtri attuali.
               </div>
             )}
 
             {canCreateTemplate && (
-              <form className="space-y-2 rounded-md border border-dashed border-slate-300 p-3 bg-white/80" onSubmit={handleCreateTemplate}>
-                <p className="mb-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Nuovo memo</p>
+              <form className="space-y-2 rounded-md border border-dashed border-cardBorder p-3 bg-card/80" onSubmit={handleCreateTemplate}>
+                <p className="mb-0 text-xs font-semibold uppercase tracking-wide text-textMuted">Nuovo memo</p>
                 <Input
                   value={newTemplateName}
                   onChange={(event) => setNewTemplateName(event.target.value)}
@@ -482,13 +483,13 @@ const ChecklistTemplatesContent = ({ access }) => {
         <Card className="checklists-detail-card">
           {!selectedTemplateId && (
             <CardContent className="pt-6">
-              <p className="mb-0 text-sm text-slate-500">Seleziona un memo per visualizzare e modificare gli step.</p>
+              <p className="mb-0 text-sm text-textMuted">Seleziona un memo per visualizzare e modificare gli step.</p>
             </CardContent>
           )}
 
           {selectedTemplateId && selectedTemplateQuery.loading && (
             <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
+              <div className="flex items-center gap-2 text-sm text-textMuted">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Caricamento dettaglio memo...
               </div>
@@ -497,7 +498,7 @@ const ChecklistTemplatesContent = ({ access }) => {
 
           {selectedTemplateId && selectedTemplateQuery.error && (
             <CardContent className="pt-6">
-              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 {getErrorMessage(selectedTemplateQuery.error)}
               </div>
             </CardContent>
@@ -545,7 +546,7 @@ const ChecklistTemplatesContent = ({ access }) => {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div className="grid gap-2 rounded-md border border-slate-200 p-3 checklists-editor-box">
+                <div className="grid gap-2 rounded-md border border-cardBorder p-3 checklists-editor-box">
                   <Input
                     value={editingTemplateName}
                     onChange={(event) => setEditingTemplateName(event.target.value)}
@@ -574,11 +575,11 @@ const ChecklistTemplatesContent = ({ access }) => {
 
                 <div className="space-y-2">
                   <div className="checklists-list-caption">
-                    <h5 className="mb-0 text-sm font-semibold text-slate-800">Step Memo</h5>
+                    <h5 className="mb-0 text-sm font-semibold text-text">Step Memo</h5>
                     <span>{selectedTemplateQuery.data.items.length} elementi</span>
                   </div>
                   {selectedTemplateQuery.data.items.length === 0 && (
-                    <p className="rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
+                    <p className="rounded-md border border-dashed border-cardBorder px-3 py-2 text-sm text-textMuted">
                       Nessuno step presente in questo memo.
                     </p>
                   )}
@@ -586,7 +587,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                   {selectedTemplateQuery.data.items.map((item) => {
                     const isEditingItem = editingItem?.id === item.id;
                     return (
-                      <div key={item.id} className="rounded-md border border-slate-200 p-3 checklists-item-row">
+                      <div key={item.id} className="rounded-md border border-cardBorder p-3 checklists-item-row">
                         {isEditingItem ? (
                           <div className="space-y-2">
                             <Input
@@ -657,8 +658,8 @@ const ChecklistTemplatesContent = ({ access }) => {
                         ) : (
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
-                              <p className="mb-1 text-sm font-medium text-slate-800">{item.title}</p>
-                              {item.description && <p className="mb-1 text-xs text-slate-500">{item.description}</p>}
+                              <p className="mb-1 text-sm font-medium text-text">{item.title}</p>
+                              {item.description && <p className="mb-1 text-xs text-textMuted">{item.description}</p>}
                               <div className="flex flex-wrap gap-2">
                                 <Badge variant={item.isRequired ? 'warning' : 'outline'}>
                                   {item.isRequired ? 'Obbligatorio' : 'Facoltativo'}
@@ -674,7 +675,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 px-2 text-slate-700 hover:bg-slate-100"
+                                    className="h-8 px-2 text-text hover:bg-hover"
                                     title="Sposta su"
                                     aria-label="Sposta step su"
                                     onClick={() => void handleReorderItem(item.id, -1)}
@@ -687,7 +688,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 px-2 text-slate-700 hover:bg-slate-100"
+                                    className="h-8 px-2 text-text hover:bg-hover"
                                     title="Sposta giu"
                                     aria-label="Sposta step giu"
                                     onClick={() => void handleReorderItem(item.id, 1)}
@@ -703,7 +704,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="h-8 px-2 text-slate-700 hover:bg-slate-100"
+                                  className="h-8 px-2 text-text hover:bg-hover"
                                   title="Modifica step"
                                   aria-label="Modifica step"
                                   onClick={() =>
@@ -726,7 +727,7 @@ const ChecklistTemplatesContent = ({ access }) => {
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="h-8 px-2 text-red-600 hover:bg-red-50"
+                                  className="h-8 px-2 text-destructive hover:bg-destructive/10"
                                   title="Elimina step"
                                   aria-label="Elimina step"
                                   onClick={() => void handleDeleteItem(item.id)}
@@ -745,8 +746,8 @@ const ChecklistTemplatesContent = ({ access }) => {
                 </div>
 
                 {canManageTemplates && (
-                  <form className="space-y-2 rounded-md border border-dashed border-slate-300 p-3 checklists-editor-box" onSubmit={handleCreateItem}>
-                    <p className="mb-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Nuovo step</p>
+                  <form className="space-y-2 rounded-md border border-dashed border-cardBorder p-3 checklists-editor-box" onSubmit={handleCreateItem}>
+                    <p className="mb-0 text-xs font-semibold uppercase tracking-wide text-textMuted">Nuovo step</p>
                     <Input
                       value={newItemTitle}
                       onChange={(event) => setNewItemTitle(event.target.value)}

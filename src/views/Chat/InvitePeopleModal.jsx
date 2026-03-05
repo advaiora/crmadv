@@ -14,7 +14,7 @@ const InvitePeopleModal = ({ show, onClose }) => {
         <Modal show={show} onHide={onClose} centered dialogClassName="mw-400p" >
             <Modal.Header className="header-wth-bg-inv">
                 <Modal.Title as="h5">Invite People</Modal.Title>
-                <Button bsPrefix="btn-close" className="text-white" onClick={onClose} >
+                <Button bsPrefix="btn-close" className="text-[var(--hk-text-on-dark-bg)]" onClick={onClose} >
                     <span aria-hidden="true">×</span>
                 </Button>
             </Modal.Header>

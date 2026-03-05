@@ -90,30 +90,32 @@ const ClientEdit = () => {
                         )}
                     />
 
-                    <Card className="card-border">
-                        <Card.Body>
-                            {error && <Alert variant="danger">{error}</Alert>}
+                    <div className="clients-form-shell">
+                        {error && <Alert variant="danger">{error}</Alert>}
 
-                            {loadingClient ? (
-                                <Placeholder as="div" animation="glow">
-                                    <Placeholder xs={12} className="mb-2" />
-                                    <Placeholder xs={11} className="mb-2" />
-                                    <Placeholder xs={10} />
-                                </Placeholder>
-                            ) : (
-                                <ClientForm
-                                    initialValues={mapClientToFormValues(client)}
-                                    submitLabel="Salva"
-                                    onSubmit={handleSubmit}
-                                    onCancel={() => history.push({
-                                        pathname: `/apps/clients/${id}`,
-                                        state: { fromListSearch: listSearch },
-                                    })}
-                                    loading={saving}
-                                />
-                            )}
-                        </Card.Body>
-                    </Card>
+                        {loadingClient ? (
+                            <Card className="clients-form-loading card-border">
+                                <Card.Body>
+                                    <Placeholder as="div" animation="glow">
+                                        <Placeholder xs={12} className="mb-2" />
+                                        <Placeholder xs={11} className="mb-2" />
+                                        <Placeholder xs={10} />
+                                    </Placeholder>
+                                </Card.Body>
+                            </Card>
+                        ) : (
+                            <ClientForm
+                                initialValues={mapClientToFormValues(client)}
+                                submitLabel="Salva"
+                                onSubmit={handleSubmit}
+                                onCancel={() => history.push({
+                                    pathname: `/apps/clients/${id}`,
+                                    state: { fromListSearch: listSearch },
+                                })}
+                                loading={saving}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
         </ClientsModuleGate>

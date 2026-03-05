@@ -3,16 +3,16 @@ import type { FastifyRequest } from 'fastify';
 import { audit } from '../../audit/audit.js';
 
 export const TEAM_AUDIT_ACTION = {
-  inviteSent: 'team.invite_sent',
+  inviteSent: 'team.invite',
   inviteRevoked: 'team.invite_revoked',
   inviteDeleted: 'team.invite_deleted',
   inviteAccepted: 'team.invite_accepted',
   memberAdded: 'team.member_added',
   memberUpdated: 'team.member_updated',
-  memberDeactivated: 'team.member_deactivated',
+  memberDeactivated: 'team.deactivate',
   memberReactivated: 'team.member_reactivated',
   memberDeleted: 'team.member_deleted',
-  rolesChanged: 'team.roles_changed',
+  rolesChanged: 'team.roles_assign',
 } as const;
 
 type TeamAuditAction = (typeof TEAM_AUDIT_ACTION)[keyof typeof TEAM_AUDIT_ACTION];

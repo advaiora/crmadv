@@ -169,8 +169,8 @@ const ProjectsBoardContent = ({ access }) => {
       } catch (error) {
         setBoardProjects(previousProjects);
 
-        if (isApiError(error) && error.status === 409) {
-          if (error.code === "CHECKLIST_GATE_BLOCKED") {
+        if (isApiError(error) && error.status === 403) {
+          if (error.code === "GATE_BLOCKED") {
             if (canOverrideGate) {
               const reason = window.prompt("Gate checklist bloccato. Inserisci una motivazione (min 10 caratteri) per forzare il passaggio:");
               const normalizedReason = typeof reason === "string" ? reason.trim() : "";
@@ -191,8 +191,13 @@ const ProjectsBoardContent = ({ access }) => {
               }
             }
 
-            const missingCount = Array.isArray(error.details?.missingRequiredItemIds)
-              ? error.details.missingRequiredItemIds.length
+            const missingCount = Array.isArray(error.details?.missingItems)
+              ? error.details.missingItems.reduce((count, item) => {
+                const missing = Array.isArray(item?.missingRequiredItemIds)
+                  ? item.missingRequiredItemIds.length
+                  : 0;
+                return count + missing;
+              }, 0)
               : 0;
             toast.error(
               missingCount > 0
@@ -201,6 +206,9 @@ const ProjectsBoardContent = ({ access }) => {
             );
             return;
           }
+        }
+
+        if (isApiError(error) && error.status === 409) {
           showMoveConflictToast();
           return;
         }
@@ -443,7 +451,7 @@ const ProjectsBoard = () => {
   return (
     <ModulePermissionGate requiredModule="projects" requiredPermission="projects.view" moduleName="Progetti">
       {({ access }) => (
-        <div className="container-fluid py-4" style={{ background: "var(--bs-body-bg)" }}>
+        <div className="container-fluid py-4 projects-page">
           {/* Page header */}
           <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
             <div>

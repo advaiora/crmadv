@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { requirePermission } from '../../../auth/guards.js';
 import { isHttpError } from '../../../core/errors.js';
 import { ok } from '../../../core/response.js';
 import {
@@ -20,6 +21,11 @@ type StageParams = {
   id: string;
 };
 
+type OverrideGateParams = {
+  projectId: string;
+  stageId: string;
+};
+
 type ProjectsQuery = {
   categoryId?: string;
   stageId?: string;
@@ -33,6 +39,10 @@ type MoveStageRequestContext = {
   moveStageAccess?: Awaited<ReturnType<typeof ensureProjectsMoveStageAccess>>;
   moveStagePayload?: ReturnType<typeof projectsService.parseMoveStageBody>;
   moveStageContext?: Awaited<ReturnType<typeof projectsService.buildMoveStageContext>>;
+};
+
+type OverrideGateBody = {
+  reason?: string;
 };
 
 const ensureProjectsCreateAccess = async (
@@ -366,6 +376,32 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
         payload,
         request,
         prevalidatedContext: moveStageContext,
+      });
+
+      return ok(reply, result);
+    },
+  );
+
+  app.post<{ Params: OverrideGateParams; Body: OverrideGateBody }>(
+    '/projects/:projectId/stages/:stageId/override-gate',
+    async (request, reply) => {
+      const access = await ensureProjectsMoveStageAccess(request);
+      await requirePermission(
+        access.workspace.id,
+        access.user.id,
+        'checklists.override_gate',
+      );
+
+      const result = await projectsService.moveStage({
+        workspaceId: access.workspace.id,
+        actorUserId: access.user.id,
+        projectId: request.params.projectId,
+        payload: {
+          toStageId: request.params.stageId,
+          overrideGate: true,
+          overrideReason: request.body?.reason?.trim() || null,
+        },
+        request,
       });
 
       return ok(reply, result);

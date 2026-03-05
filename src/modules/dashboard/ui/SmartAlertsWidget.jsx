@@ -13,7 +13,7 @@ const severityVariant = {
 };
 
 const RowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <div className="flex items-center gap-2">
       <Skeleton className="h-5 w-16" />
       <Skeleton className="h-5 w-20" />
@@ -47,14 +47,14 @@ const SmartAlertsWidget = ({ title = 'Smart alerts', data, loading = false }) =>
       {!loading && alerts.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {alerts.map((alert, index) => (
-            <div key={`${alert.id || alert.href || 'alert'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]">
+            <div key={`${alert.id || alert.href || 'alert'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Badge variant={severityVariant[alert.severity] || 'secondary'}>{alert.severity}</Badge>
                 <Badge variant="outline">{alert.category}</Badge>
               </div>
 
               <p className="mb-1 text-sm font-medium">{alert.title}</p>
-              <p className="mb-2 text-sm text-[var(--hk-text-tertiary)]">{alert.why}</p>
+              <p className="mb-2 text-sm text-textMuted">{alert.why}</p>
 
               <Button size="sm" variant="ghost" onClick={() => window.location.assign(alert.href)}>
                 {alert.ctaLabel || 'Open'}

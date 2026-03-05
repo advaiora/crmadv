@@ -1,5 +1,121 @@
+.quotes-page-container {
+  padding-left: clamp(1rem, 1.5vw, 2rem) !important;
+  padding-right: clamp(1rem, 1.5vw, 2rem) !important;
+}
+
 .quotes-page-shell {
-  max-width: 1400px;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding-bottom: 2rem;
+  --quotes-surface-2: rgb(var(--surface-2) / 0.9);
+  --quotes-surface-3: rgb(var(--surface-3) / 0.84);
+  --quotes-border: rgb(var(--border-subtle) / 0.7);
+  --quotes-border-soft: rgb(var(--border-subtle) / 0.56);
+  --quotes-row-hover: rgb(var(--row-hover) / 0.74);
+  --quotes-shadow: 0 1px 2px rgb(var(--surface-1) / 0.22);
+}
+
+[data-bs-theme="dark"] .quotes-page-shell,
+.dark .quotes-page-shell {
+  --surface-2: 24 38 60;
+  --surface-3: 30 48 76;
+  --border-subtle: 94 118 152;
+  --row-hover: 50 74 112;
+  --quotes-surface-2: rgb(var(--surface-2) / 0.92);
+  --quotes-surface-3: rgb(var(--surface-3) / 0.86);
+  --quotes-border: rgb(var(--border-subtle) / 0.74);
+  --quotes-border-soft: rgb(var(--border-subtle) / 0.6);
+  --quotes-row-hover: rgb(var(--row-hover) / 0.8);
+}
+
+.quotes-page-shell .card,
+.quotes-page-shell .card-border,
+.quotes-page-shell .card-header,
+.quotes-page-shell .card-footer,
+.quotes-page-shell .form-control,
+.quotes-page-shell .form-select,
+.quotes-page-shell .input-group-text,
+.quotes-page-shell .table,
+.quotes-page-shell .table > :not(caption) > * > *,
+.quotes-page-shell .btn-outline-secondary,
+.quotes-page-shell .btn-outline-danger,
+.quotes-page-shell .btn-outline-primary,
+.quotes-page-shell .border,
+.quotes-page-shell hr {
+  border-color: var(--quotes-border) !important;
+}
+
+.quotes-page-shell .card-border {
+  background-color: var(--quotes-surface-3) !important;
+  box-shadow: var(--quotes-shadow);
+}
+
+.quotes-page-shell .form-label,
+.quotes-page-shell .small.text-muted,
+.quotes-page-shell .text-muted {
+  color: var(--muted-foreground) !important;
+}
+
+.quotes-page-shell .form-control,
+.quotes-page-shell .form-select,
+.quotes-page-shell textarea {
+  background-color: var(--quotes-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.quotes-page-shell .form-control::placeholder,
+.quotes-page-shell textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.quotes-page-shell .form-control:focus,
+.quotes-page-shell .form-select:focus,
+.quotes-page-shell textarea:focus {
+  border-color: var(--bs-primary) !important;
+  box-shadow: 0 0 0 0.125rem rgb(var(--row-hover) / 0.78) !important;
+}
+
+.quotes-page-shell .table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--foreground);
+  --bs-table-border-color: var(--quotes-border-soft);
+}
+
+.quotes-page-shell .table thead th {
+  background-color: rgb(var(--surface-2) / 0.62);
+  border-bottom: 1px solid var(--quotes-border) !important;
+  color: var(--foreground);
+}
+
+.quotes-page-shell .table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.quotes-page-shell .table tbody tr:hover > * {
+  background-color: var(--quotes-row-hover) !important;
+  color: var(--foreground) !important;
+}
+
+.quotes-page-shell .btn-outline-secondary,
+.quotes-page-shell .btn-outline-primary,
+.quotes-page-shell .btn-outline-danger {
+  background-color: var(--quotes-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.quotes-page-shell .btn-outline-secondary:hover,
+.quotes-page-shell .btn-outline-secondary:focus,
+.quotes-page-shell .btn-outline-secondary:active,
+.quotes-page-shell .btn-outline-primary:hover,
+.quotes-page-shell .btn-outline-primary:focus,
+.quotes-page-shell .btn-outline-primary:active,
+.quotes-page-shell .btn-outline-danger:hover,
+.quotes-page-shell .btn-outline-danger:focus,
+.quotes-page-shell .btn-outline-danger:active {
+  border-color: var(--bs-primary) !important;
+  background-color: var(--quotes-row-hover) !important;
+  color: var(--foreground) !important;
 }
 
 .quote-status-badge {
@@ -8,9 +124,9 @@
 }
 
 .quote-step-chip {
-  border: 1px solid var(--bs-border-color);
-  background: var(--bs-body-bg);
-  color: var(--bs-body-color);
+  border: 1px solid var(--quotes-border);
+  background: rgb(var(--surface-2) / 0.6);
+  color: var(--foreground);
   border-radius: 999px;
   padding: 0.35rem 0.75rem;
   font-size: 0.82rem;
@@ -26,8 +142,8 @@
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  background: var(--bs-gray-200);
-  color: var(--bs-body-color);
+  background: rgb(var(--surface-2) / 1);
+  color: var(--foreground);
   font-weight: 600;
   font-size: 0.72rem;
 }
@@ -39,7 +155,7 @@
 
 .quote-step-chip.is-active .quote-step-index {
   background: var(--bs-primary);
-  color: #fff;
+  color: var(--primary-foreground);
 }
 
 .quote-items-table td,
@@ -68,8 +184,93 @@
   cursor: pointer;
 }
 
-.quote-clickable-row:hover {
-  background: rgba(13, 110, 253, 0.05);
+.quote-clickable-row:hover > * {
+  background-color: var(--quotes-row-hover) !important;
+}
+
+.quotes-modal {
+  --quotes-modal-surface-2: rgb(var(--surface-2) / 0.92);
+  --quotes-modal-surface-3: rgb(var(--surface-3) / 0.95);
+  --quotes-modal-border: rgb(var(--border-subtle) / 0.78);
+  --quotes-modal-hover: rgb(var(--row-hover) / 0.8);
+}
+
+[data-bs-theme="dark"] .quotes-modal,
+.dark .quotes-modal {
+  --surface-2: 24 38 60;
+  --surface-3: 30 48 76;
+  --border-subtle: 94 118 152;
+  --row-hover: 50 74 112;
+  --quotes-modal-surface-2: rgb(var(--surface-2) / 0.94);
+  --quotes-modal-surface-3: rgb(var(--surface-3) / 0.96);
+  --quotes-modal-border: rgb(var(--border-subtle) / 0.8);
+  --quotes-modal-hover: rgb(var(--row-hover) / 0.84);
+}
+
+.quotes-modal .modal-content {
+  background-color: var(--quotes-modal-surface-3) !important;
+  border: 1px solid var(--quotes-modal-border) !important;
+  color: var(--foreground) !important;
+}
+
+.quotes-modal .modal-header,
+.quotes-modal .modal-footer {
+  border-color: var(--quotes-modal-border) !important;
+  background-color: rgb(var(--surface-2) / 0.58);
+}
+
+.quotes-modal .modal-title,
+.quotes-modal .modal-body,
+.quotes-modal .form-label {
+  color: var(--foreground) !important;
+}
+
+.quotes-modal .form-control,
+.quotes-modal .form-select,
+.quotes-modal textarea,
+.quotes-modal .input-group-text {
+  background-color: var(--quotes-modal-surface-2) !important;
+  border-color: var(--quotes-modal-border) !important;
+  color: var(--foreground) !important;
+}
+
+.quotes-modal .form-control::placeholder,
+.quotes-modal textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.quotes-modal .form-control:focus,
+.quotes-modal .form-select:focus,
+.quotes-modal textarea:focus {
+  border-color: var(--bs-primary) !important;
+  box-shadow: 0 0 0 0.125rem var(--quotes-modal-hover) !important;
+}
+
+.quotes-modal .text-muted,
+.quotes-modal .small.text-muted {
+  color: var(--muted-foreground) !important;
+}
+
+.quotes-modal .btn-outline-secondary,
+.quotes-modal .btn-outline-primary,
+.quotes-modal .btn-outline-danger {
+  border-color: var(--quotes-modal-border) !important;
+  background-color: var(--quotes-modal-surface-2) !important;
+  color: var(--foreground) !important;
+}
+
+.quotes-modal .btn-outline-secondary:hover,
+.quotes-modal .btn-outline-secondary:focus,
+.quotes-modal .btn-outline-secondary:active,
+.quotes-modal .btn-outline-primary:hover,
+.quotes-modal .btn-outline-primary:focus,
+.quotes-modal .btn-outline-primary:active,
+.quotes-modal .btn-outline-danger:hover,
+.quotes-modal .btn-outline-danger:focus,
+.quotes-modal .btn-outline-danger:active {
+  border-color: var(--bs-primary) !important;
+  background-color: var(--quotes-modal-hover) !important;
+  color: var(--foreground) !important;
 }
 
 @media (max-width: 991px) {

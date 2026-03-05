@@ -125,7 +125,7 @@ const statusBadgeVariant = (status) => {
     case 'PAUSED':
       return 'secondary';
     case 'ARCHIVED':
-      return 'dark';
+      return 'secondary';
     default:
       return 'secondary';
   }

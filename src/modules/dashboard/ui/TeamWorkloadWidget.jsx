@@ -5,7 +5,7 @@ import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 
 const RowSkeleton = () => (
-  <div className="flex items-center justify-between rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="flex items-center justify-between rounded-xl border border-cardBorder px-3 py-3">
     <Skeleton className="h-5 w-28" />
     <Skeleton className="h-5 w-10" />
   </div>
@@ -37,7 +37,7 @@ const TeamWorkloadWidget = ({ title = 'Team workload', data, loading = false }) 
           {rows.map((row, index) => (
             <div
               key={`${row.userId}-${index}`}
-              className="flex items-center justify-between gap-2 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]"
+              className="flex items-center justify-between gap-2 rounded-xl px-3 py-3 transition-colors hover:bg-hover"
             >
               <span className="text-sm font-medium">{row.name || 'Utente'}</span>
               <Badge variant="outline">{row.count}</Badge>

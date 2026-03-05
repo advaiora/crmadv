@@ -35,7 +35,7 @@ const ModulesStatusWidget = ({ title = 'Modules status', data, loading = false }
       {!loading ? (
         <div className="space-y-5">
           <div className="space-y-2">
-            <p className="mb-0 text-sm font-medium text-[var(--hk-text-tertiary)]">Enabled</p>
+            <p className="mb-0 text-sm font-medium text-textMuted">Enabled</p>
             {enabled.length === 0 ? (
               <WidgetEmptyState className="py-5" message="Nessun modulo abilitato." />
             ) : (
@@ -50,7 +50,7 @@ const ModulesStatusWidget = ({ title = 'Modules status', data, loading = false }
           </div>
 
           <div className="space-y-2">
-            <p className="mb-0 text-sm font-medium text-[var(--hk-text-tertiary)]">Disabled</p>
+            <p className="mb-0 text-sm font-medium text-textMuted">Disabled</p>
             {disabled.length === 0 ? (
               <WidgetEmptyState className="py-5" message="Nessun modulo disabilitato." />
             ) : (

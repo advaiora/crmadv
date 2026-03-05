@@ -1,3 +1,159 @@
+.projects-page {
+    padding-left: clamp(1rem, 1.5vw, 2rem) !important;
+    padding-right: clamp(1rem, 1.5vw, 2rem) !important;
+    --projects-surface-2: rgb(var(--surface-2) / 0.9);
+    --projects-surface-3: rgb(var(--surface-3) / 0.84);
+    --projects-border: rgb(var(--border-subtle) / 0.7);
+    --projects-border-soft: rgb(var(--border-subtle) / 0.56);
+    --projects-row-hover: rgb(var(--row-hover) / 0.74);
+    --projects-card-bg: rgb(var(--surface-2) / 0.98);
+    --projects-card-bg-hover: rgb(var(--surface-2) / 1);
+    --projects-card-border: rgb(var(--border-subtle) / 0.78);
+}
+
+[data-bs-theme="dark"] .projects-page,
+.dark .projects-page {
+    --surface-2: 24 38 60;
+    --surface-3: 30 48 76;
+    --border-subtle: 94 118 152;
+    --row-hover: 50 74 112;
+    --projects-surface-2: rgb(var(--surface-2) / 0.92);
+    --projects-surface-3: rgb(var(--surface-3) / 0.86);
+    --projects-border: rgb(var(--border-subtle) / 0.74);
+    --projects-border-soft: rgb(var(--border-subtle) / 0.6);
+    --projects-row-hover: rgb(var(--row-hover) / 0.8);
+    --projects-card-bg: rgb(var(--surface-2) / 0.72);
+    --projects-card-bg-hover: rgb(var(--surface-2) / 0.88);
+    --projects-card-border: rgb(var(--border-subtle) / 0.84);
+}
+
+.projects-page .card,
+.projects-page .card-border,
+.projects-page .card-header,
+.projects-page .card-footer,
+.projects-page .form-control,
+.projects-page .form-select,
+.projects-page .input-group-text,
+.projects-page .border,
+.projects-page hr {
+    border-color: var(--projects-border) !important;
+}
+
+.projects-page .card {
+    background-color: var(--projects-surface-2) !important;
+    color: var(--foreground) !important;
+}
+
+.projects-page .card-border {
+    background-color: var(--projects-surface-2) !important;
+}
+
+.projects-page .form-label,
+.projects-page .text-muted,
+.projects-page .small.text-muted {
+    color: var(--muted-foreground) !important;
+}
+
+.projects-page .form-control,
+.projects-page .form-select,
+.projects-page textarea {
+    background-color: var(--projects-surface-2) !important;
+    color: var(--foreground) !important;
+}
+
+.projects-page .form-control:focus,
+.projects-page .form-select:focus,
+.projects-page textarea:focus {
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 0.125rem var(--projects-row-hover) !important;
+}
+
+.projects-quick-create-modal {
+    --projects-modal-surface-2: rgb(var(--surface-2) / 0.92);
+    --projects-modal-surface-3: rgb(var(--surface-3) / 0.95);
+    --projects-modal-border: rgb(var(--border-subtle) / 0.74);
+    --projects-modal-hover: rgb(var(--row-hover) / 0.8);
+}
+
+[data-bs-theme="dark"] .projects-quick-create-modal,
+.dark .projects-quick-create-modal {
+    --surface-2: 24 38 60;
+    --surface-3: 30 48 76;
+    --border-subtle: 94 118 152;
+    --row-hover: 50 74 112;
+    --projects-modal-surface-2: rgb(var(--surface-2) / 0.94);
+    --projects-modal-surface-3: rgb(var(--surface-3) / 0.96);
+    --projects-modal-border: rgb(var(--border-subtle) / 0.8);
+    --projects-modal-hover: rgb(var(--row-hover) / 0.84);
+}
+
+.projects-quick-create-modal .modal-content {
+    background-color: var(--projects-modal-surface-3) !important;
+    border: 1px solid var(--projects-modal-border) !important;
+    color: var(--foreground) !important;
+}
+
+.projects-quick-create-modal .modal-header,
+.projects-quick-create-modal .modal-footer {
+    border-color: var(--projects-modal-border) !important;
+    background-color: rgb(var(--surface-2) / 0.58);
+}
+
+.projects-quick-create-modal .modal-title,
+.projects-quick-create-modal .modal-body,
+.projects-quick-create-modal .form-label {
+    color: var(--foreground) !important;
+}
+
+.projects-quick-create-modal .form-control,
+.projects-quick-create-modal .form-select,
+.projects-quick-create-modal textarea {
+    background-color: var(--projects-modal-surface-2) !important;
+    border-color: var(--projects-modal-border) !important;
+    color: var(--foreground) !important;
+}
+
+.projects-quick-create-modal .form-control::placeholder,
+.projects-quick-create-modal textarea::placeholder {
+    color: var(--muted-foreground) !important;
+}
+
+.projects-quick-create-modal .form-control:focus,
+.projects-quick-create-modal .form-select:focus,
+.projects-quick-create-modal textarea:focus {
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 0.125rem var(--projects-modal-hover) !important;
+}
+
+.projects-quick-create-modal .form-select[multiple] {
+    min-height: 9.5rem;
+}
+
+.projects-quick-create-modal .text-muted,
+.projects-quick-create-modal .small.text-muted {
+    color: var(--muted-foreground) !important;
+}
+
+.projects-quick-create-modal .alert-danger {
+    background-color: rgba(var(--bs-danger-rgb), 0.16) !important;
+    border-color: rgba(var(--bs-danger-rgb), 0.42) !important;
+    color: var(--foreground) !important;
+}
+
+.projects-quick-create-modal .btn-outline-secondary {
+    border-color: var(--projects-modal-border) !important;
+    color: var(--foreground) !important;
+    background-color: var(--projects-modal-surface-2) !important;
+}
+
+.projects-quick-create-modal .btn-outline-secondary:hover,
+.projects-quick-create-modal .btn-outline-secondary:focus,
+.projects-quick-create-modal .btn-outline-secondary:active {
+    border-color: var(--bs-primary) !important;
+    background-color: var(--projects-modal-hover) !important;
+    color: var(--foreground) !important;
+}
+
 .projects-board-shell {
     width: 100%;
 }
@@ -15,9 +171,9 @@
     max-width: 320px;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--projects-border);
     border-radius: 0.75rem;
-    background: var(--bs-light);
+    background: var(--projects-surface-3);
     padding: 0.75rem;
 }
 
@@ -39,30 +195,69 @@
 
 .projects-stage-dropzone.is-dragging-over {
     border-color: var(--bs-primary);
-    background: rgba(13, 110, 253, 0.08);
+    background: rgba(var(--bs-primary-rgb), 0.08);
 }
 
 .projects-board-card {
     cursor: pointer;
-    margin-bottom: 0.5rem;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    margin-bottom: 0;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    border-color: var(--projects-card-border) !important;
+    background-color: var(--projects-card-bg) !important;
 }
 
-.projects-board-card:last-child {
+.projects-board-card-wrap {
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
+.projects-board-card-wrap:last-child {
     margin-bottom: 0;
 }
 
-.projects-board-card.is-draggable:hover {
+.projects-board-card-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    border-radius: 0.75rem 0 0 0.75rem;
+    background-color: var(--project-stage-color);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.projects-board-card-wrap.is-draggable:hover .projects-board-card {
     transform: translateY(-1px);
-    box-shadow: 0 0.4rem 1rem rgba(15, 23, 42, 0.12);
+    box-shadow: 0 0.4rem 1rem rgba(var(--bs-emphasis-color-rgb), 0.12);
+    background-color: var(--projects-card-bg-hover) !important;
 }
 
-.projects-board-card.is-dragging {
-    box-shadow: 0 0.8rem 1.4rem rgba(15, 23, 42, 0.2);
+.projects-board-card-wrap.is-dragging .projects-board-card {
+    box-shadow: 0 0.8rem 1.4rem rgba(var(--bs-emphasis-color-rgb), 0.2);
+    background-color: var(--projects-card-bg-hover) !important;
 }
 
-.projects-board-card.is-moving {
+.projects-board-card-wrap.is-moving .projects-board-card {
     opacity: 0.75;
+}
+
+.projects-board-stage-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--project-stage-badge-border);
+    background-color: var(--project-stage-badge-bg-light);
+    color: var(--project-stage-text-color);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 0.3rem 0.55rem;
+}
+
+[data-bs-theme="dark"] .projects-board-stage-badge,
+.dark .projects-board-stage-badge {
+    background-color: var(--project-stage-badge-bg-dark);
 }
 
 .projects-board-card-title {

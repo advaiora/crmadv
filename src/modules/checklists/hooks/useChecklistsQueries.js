@@ -4,12 +4,16 @@ import {
   createChecklistTemplate,
   createChecklistTemplateItem,
   createProjectChecklistInstance,
+  ensureProjectStageChecklistInstances,
+  completeChecklistInstanceItem,
   deleteChecklistTemplatePermanently,
   deleteChecklistTemplateItem,
   getChecklistTemplate,
+  listStageChecklistRules,
   listChecklistTemplates,
   listProjectChecklistInstances,
   markChecklistItemNotApplicable,
+  replaceStageChecklistRules,
   reorderChecklistTemplateItems,
   resetChecklistItem,
   updateChecklistItemState,
@@ -242,8 +246,16 @@ export const useDeleteChecklistTemplateItem = () => useMutationAction((templateI
 export const useReorderChecklistTemplateItems = () =>
   useMutationAction((templateId, orderedItemIds) => reorderChecklistTemplateItems(templateId, orderedItemIds));
 export const useCreateProjectChecklistInstance = () => useMutationAction((projectId, input) => createProjectChecklistInstance(projectId, input));
+export const useEnsureProjectStageChecklistInstances = () =>
+  useMutationAction((projectId, stageId) => ensureProjectStageChecklistInstances(projectId, stageId));
+export const useCompleteChecklistInstanceItem = () =>
+  useMutationAction((instanceId, itemInstanceId, input) => completeChecklistInstanceItem(instanceId, itemInstanceId, input));
 export const useUpdateChecklistInstanceItemState = () => useMutationAction((itemId, input) => updateChecklistItemState(itemId, input));
 export const useMarkChecklistInstanceItemNotApplicable = () =>
   useMutationAction((itemId, input) => markChecklistItemNotApplicable(itemId, input));
 export const useResetChecklistInstanceItem = () =>
   useMutationAction((itemId) => resetChecklistItem(itemId));
+export const useListStageChecklistRules = () =>
+  useMutationAction((categoryId, stageId) => listStageChecklistRules(categoryId, stageId));
+export const useReplaceStageChecklistRules = () =>
+  useMutationAction((categoryId, stageId, rules) => replaceStageChecklistRules(categoryId, stageId, rules));

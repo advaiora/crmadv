@@ -143,7 +143,7 @@ const ContactList = ({ invitePeople, StartConversation, startChating, toggleTopN
                             <li>
                                 <div className="avatar avatar-sm avatar-primary position-relative avatar-rounded">
                                     <span className="initial-wrap">H</span>
-                                    <div className="badge-icon badge-circle badge-icon-xxs text-white position-bottom-end-overflow-1">
+                                    <div className="badge-icon badge-circle badge-icon-xxs text-[var(--hk-text-on-dark-bg)] position-bottom-end-overflow-1">
                                         <div className="badge-icon-wrap">
                                             <i className="ri-group-fill text-light" />
                                         </div>
@@ -159,7 +159,7 @@ const ContactList = ({ invitePeople, StartConversation, startChating, toggleTopN
                             <li>
                                 <div className="avatar avatar-sm avatar-primary position-relative avatar-rounded">
                                     <img src={avatar1} alt="user" className="avatar-img" />
-                                    <div className="badge-icon badge-circle badge-icon-xxs text-white position-bottom-end-overflow-1">
+                                    <div className="badge-icon badge-circle badge-icon-xxs text-[var(--hk-text-on-dark-bg)] position-bottom-end-overflow-1">
                                         <div className="badge-icon-wrap">
                                             <i className="ri-group-fill text-light" />
                                         </div>

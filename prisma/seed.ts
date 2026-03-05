@@ -10,6 +10,18 @@ import {
 
 const prisma = new PrismaClient();
 
+const resolveWorkspaceDefaultModuleEnabled = (moduleKey: string, isCore: boolean) => {
+  if (isCore) {
+    return true;
+  }
+
+  if (moduleKey === 'seo') {
+    return false;
+  }
+
+  return true;
+};
+
 const resolvePermissionKeys = (
   permissionSelection: PermissionSelection,
   allPermissionKeys: string[],
@@ -124,7 +136,7 @@ async function main() {
     },
   });
 
-  const modulesByKey = new Map<string, { id: string; key: string }>();
+  const modulesByKey = new Map<string, { id: string; key: string; isCore: boolean }>();
   for (const moduleData of SYSTEM_MODULE_CATALOG) {
     const moduleRecord = await prisma.module.upsert({
       where: { key: moduleData.key },
@@ -139,7 +151,7 @@ async function main() {
         description: moduleData.description,
         isCore: moduleData.isCore,
       },
-      select: { id: true, key: true },
+      select: { id: true, key: true, isCore: true },
     });
 
     modulesByKey.set(moduleData.key, moduleRecord);
@@ -153,11 +165,11 @@ async function main() {
           moduleId: moduleRecord.id,
         },
       },
-      update: { enabled: true },
+      update: { enabled: resolveWorkspaceDefaultModuleEnabled(moduleRecord.key, moduleRecord.isCore) },
       create: {
         workspaceId: workspace.id,
         moduleId: moduleRecord.id,
-        enabled: true,
+        enabled: resolveWorkspaceDefaultModuleEnabled(moduleRecord.key, moduleRecord.isCore),
       },
     });
   }

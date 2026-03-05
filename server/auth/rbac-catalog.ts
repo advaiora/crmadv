@@ -31,6 +31,7 @@ export type WorkspaceSystemRoleName =
 
 export const TEAM_MODULE_KEY = 'team';
 export const DASHBOARD_MODULE_KEY = 'dashboard';
+export const MESSAGES_MODULE_KEY = 'messages';
 
 export const TEAM_PERMISSIONS = {
   view: 'team.view',
@@ -76,6 +77,7 @@ export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   { key: 'web', name: 'Web', isCore: false, description: 'Web module' },
   { key: 'vault', name: 'Vault', isCore: false, description: 'Vault module' },
   { key: 'seo', name: 'SEO', isCore: false, description: 'SEO module' },
+  { key: MESSAGES_MODULE_KEY, name: 'Messages', isCore: false, description: 'Internal messaging module' },
 ] as const;
 
 export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
@@ -105,6 +107,8 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'projects.delete', moduleKey: 'projects', description: 'Delete projects' },
   { key: 'projects.move_stage', moduleKey: 'projects', description: 'Move projects between stages' },
   { key: 'checklists.view', moduleKey: 'checklists', description: 'View checklists' },
+  { key: 'checklists.manage_templates', moduleKey: 'checklists', description: 'Manage checklist templates' },
+  // Legacy granular permissions still accepted by existing APIs.
   { key: 'checklists.create', moduleKey: 'checklists', description: 'Create checklist templates' },
   { key: 'checklists.edit', moduleKey: 'checklists', description: 'Edit checklist templates and items' },
   { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archive checklist templates and delete items' },
@@ -126,6 +130,9 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'web.edit', moduleKey: 'web', description: 'Edit web assets' },
   { key: 'web.delete', moduleKey: 'web', description: 'Delete web assets' },
   { key: 'web.publish', moduleKey: 'web', description: 'Publish or unpublish web assets' },
+  { key: 'web.unpublish', moduleKey: 'web', description: 'Unpublish web assets' },
+  { key: 'web.version.create', moduleKey: 'web', description: 'Create web asset versions' },
+  { key: 'web.version.rollback', moduleKey: 'web', description: 'Rollback web asset versions' },
   { key: 'vault.view_list', moduleKey: 'vault', description: 'View vault item list' },
   { key: 'vault.create', moduleKey: 'vault', description: 'Create vault items' },
   { key: 'vault.edit', moduleKey: 'vault', description: 'Edit vault items' },
@@ -136,6 +143,8 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'seo.run_scan', moduleKey: 'seo', description: 'Run SEO scans' },
   { key: 'seo.export', moduleKey: 'seo', description: 'Export SEO reports' },
   { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Manage SEO settings' },
+  { key: 'messages.view', moduleKey: MESSAGES_MODULE_KEY, description: 'View internal messages' },
+  { key: 'messages.send', moduleKey: MESSAGES_MODULE_KEY, description: 'Send internal messages' },
 ] as const;
 
 export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
@@ -183,9 +192,9 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'projects.edit',
       'projects.move_stage',
       'checklists.view',
-      'checklists.create',
-      'checklists.edit',
+      'checklists.manage_templates',
       'checklists.complete_item',
+      'checklists.override_gate',
       'calendar.view',
       'calendar.create',
       'calendar.edit',
@@ -199,6 +208,11 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'web.edit',
       'web.delete',
       'web.publish',
+      'web.unpublish',
+      'web.version.create',
+      'web.version.rollback',
+      'messages.view',
+      'messages.send',
     ],
   },
   {
@@ -219,6 +233,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'calendar.edit',
       'quotes.view',
       'web.view',
+      'messages.view',
+      'messages.send',
     ],
   },
   {
@@ -236,6 +252,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'quotes.view',
       'web.view',
       'audit.view',
+      'messages.view',
     ],
   },
 ] as const;

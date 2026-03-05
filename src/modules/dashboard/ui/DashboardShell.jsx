@@ -13,14 +13,14 @@ const DashboardShell = ({
   quickActions = [],
   children,
 }) => (
-  <div className="min-h-full bg-[var(--background)]">
-    <div className="bg-gradient-to-b from-[var(--muted)] to-[var(--background)]">
+  <div className="min-h-full bg-bg">
+    <div className="bg-gradient-to-b from-bgSecondary to-bg">
       <div className="mx-auto w-full max-w-7xl px-4 pb-4 pt-6 md:px-6 md:pb-6 md:pt-8">
-        <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 shadow-sm backdrop-blur md:flex-row md:items-start md:justify-between md:p-6">
+        <div className="flex flex-col gap-4 rounded-2xl border border-cardBorder bg-card p-4 shadow-sm backdrop-blur transition hover:bg-hover md:flex-row md:items-start md:justify-between md:p-6">
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>
-            {subtitle ? <p className="text-sm text-[var(--muted-foreground)]">{subtitle}</p> : null}
-            <p className="text-sm text-[var(--muted-foreground)]">Aggiornato {lastUpdatedLabel}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-text md:text-3xl">{title}</h1>
+            {subtitle ? <p className="text-sm text-textMuted">{subtitle}</p> : null}
+            <p className="text-sm text-textMuted">Aggiornato {lastUpdatedLabel}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

@@ -3,12 +3,15 @@ import type { Prisma } from '@prisma/client';
 import { auditRepository } from '../repositories/audit.repository.js';
 
 type AuditEventInput = {
-  event: string;
+  event?: string;
+  action?: string;
   actorUserId?: string;
   workspaceId: string;
   metadata?: Prisma.InputJsonValue;
   entityType?: string;
   entityId?: string;
+  targetType?: string;
+  targetId?: string;
   request?: FastifyRequest;
 };
 
@@ -22,16 +25,21 @@ const readHeader = (value: string | string[] | undefined): string | undefined =>
 
 export const audit = {
   log(input: AuditEventInput) {
+    const action = input.action ?? input.event;
+    if (!action) {
+      throw new Error('audit.log requires action/event');
+    }
+
     const ipAddress = input.request?.ip;
     const userAgent = readHeader(input.request?.headers['user-agent']);
 
     return auditRepository.create({
-      action: input.event,
+      action,
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       metadata: input.metadata,
-      entityType: input.entityType,
-      entityId: input.entityId,
+      entityType: input.targetType ?? input.entityType,
+      entityId: input.targetId ?? input.entityId,
       ipAddress,
       userAgent,
     });

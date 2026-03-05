@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Button, Card } from 'react-bootstrap';
+import { Alert, Button } from 'react-bootstrap';
 import { ArrowLeft, Users } from 'lucide-react';
 import { Link, useHistory } from 'react-router-dom';
 import ClientForm from '../../modules/clients/ui/ClientForm';
@@ -53,17 +53,15 @@ const ClientNew = () => {
                         )}
                     />
 
-                    <Card className="card-border">
-                        <Card.Body>
-                            {error && <Alert variant="danger">{error}</Alert>}
-                            <ClientForm
-                                submitLabel="Salva"
-                                onSubmit={handleSubmit}
-                                onCancel={() => history.push('/apps/clients')}
-                                loading={loading}
-                            />
-                        </Card.Body>
-                    </Card>
+                    <div className="clients-form-shell">
+                        {error && <Alert variant="danger">{error}</Alert>}
+                        <ClientForm
+                            submitLabel="Salva"
+                            onSubmit={handleSubmit}
+                            onCancel={() => history.push('/apps/clients')}
+                            loading={loading}
+                        />
+                    </div>
                 </div>
             </div>
         </ClientsModuleGate>

@@ -429,7 +429,7 @@ const QuoteWizardForm = ({ mode = 'create', quoteId }) => {
           <h3 className="mb-1">
             {isEditMode ? 'Modifica preventivo' : 'Nuovo preventivo'}
             {quoteId && (
-              <Badge bg="light" text="dark" className="ms-2">#{shortQuoteId(quoteId)}</Badge>
+              <Badge bg="light" className="ms-2">#{shortQuoteId(quoteId)}</Badge>
             )}
           </h3>
           <p className="text-muted mb-0">

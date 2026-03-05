@@ -9,7 +9,7 @@
   padding-right: clamp(0.65rem, 2vw, 1.2rem);
   background:
     radial-gradient(1200px 400px at 10% -10%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 60%),
-    radial-gradient(900px 360px at 95% -20%, color-mix(in srgb, #06b6d4 10%, transparent), transparent 60%);
+    radial-gradient(900px 360px at 95% -20%, color-mix(in srgb, var(--info) 10%, transparent), transparent 60%);
 }
 
 .dashboard-kpi-title {
@@ -20,15 +20,15 @@
 }
 
 .dashboard-empty-state {
-  border: 1px dashed color-mix(in srgb, var(--border) 75%, #94a3b8 25%);
+  border: 1px dashed color-mix(in srgb, var(--border) 75%, var(--muted-foreground) 25%);
   border-radius: 0.9rem;
   padding: 1rem 1.1rem;
   font-size: 0.82rem;
   color: var(--hk-text-secondary);
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--card) 95%, #ffffff 5%),
-    color-mix(in srgb, var(--card) 98%, #f8fafc 2%)
+    color-mix(in srgb, var(--card) 95%, var(--card) 5%),
+    color-mix(in srgb, var(--card) 98%, var(--background) 2%)
   );
 }
 
@@ -57,15 +57,15 @@
   align-items: flex-start;
   justify-content: space-between;
   padding: 1rem 1.25rem 1.1rem;
-  border: 1px solid color-mix(in srgb, var(--border) 80%, #ffffff 20%);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--card) 20%);
   border-radius: 1rem;
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--card) 96%, #ffffff 4%),
-      color-mix(in srgb, var(--card) 94%, #f8fafc 6%)
+      color-mix(in srgb, var(--card) 96%, var(--card) 4%),
+      color-mix(in srgb, var(--card) 94%, var(--background) 6%)
     );
-  box-shadow: 0 10px 26px color-mix(in srgb, #0f172a 8%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--foreground) 8%, transparent);
   overflow: hidden;
 }
 
@@ -76,7 +76,7 @@
   pointer-events: none;
   background:
     radial-gradient(circle at 92% 18%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 40%),
-    radial-gradient(circle at 6% 0%, color-mix(in srgb, #06b6d4 10%, transparent), transparent 32%);
+    radial-gradient(circle at 6% 0%, color-mix(in srgb, var(--info) 10%, transparent), transparent 32%);
 }
 
 .dashboard-title {
@@ -108,8 +108,8 @@
 }
 
 .dashboard-nav-chip {
-  border: 1px solid color-mix(in srgb, var(--border) 75%, #ffffff 25%);
-  background: color-mix(in srgb, var(--card) 90%, #ffffff 10%);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, var(--card) 25%);
+  background: color-mix(in srgb, var(--card) 90%, var(--card) 10%);
   color: var(--hk-text-secondary);
   font-size: 0.73rem;
   letter-spacing: 0.02em;
@@ -146,13 +146,13 @@
 }
 
 .dashboard-kpi-icon {
-  color: color-mix(in srgb, var(--foreground) 75%, #64748b 25%);
+  color: color-mix(in srgb, var(--foreground) 75%, var(--muted-foreground) 25%);
 }
 
 .dashboard-kpi-delta {
   margin-top: 0.35rem;
   font-size: 0.72rem;
-  color: #0f766e;
+  color: var(--success);
   font-weight: 600;
 }
 
@@ -242,8 +242,8 @@
   display: flex;
   flex-direction: column;
   border-radius: 0.9rem;
-  border: 1px solid color-mix(in srgb, var(--border) 86%, #ffffff 14%);
-  box-shadow: 0 8px 24px color-mix(in srgb, #0f172a 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 86%, var(--card) 14%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 5%, transparent);
   transition: transform 180ms ease, box-shadow 220ms ease, border-color 220ms ease;
 }
 
@@ -254,24 +254,24 @@
 
 .dashboard-widget > .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 32px color-mix(in srgb, #0f172a 9%, transparent);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--foreground) 9%, transparent);
   border-color: color-mix(in srgb, var(--primary) 25%, var(--border) 75%);
 }
 
 .dashboard-widget[data-dashboard-section="overview"] > .card {
-  border-top: 3px solid color-mix(in srgb, var(--primary) 55%, #60a5fa 45%);
+  border-top: 3px solid color-mix(in srgb, var(--primary) 55%, var(--info) 45%);
 }
 
 .dashboard-widget[data-dashboard-section="operations"] > .card {
-  border-top: 3px solid color-mix(in srgb, #f59e0b 55%, #fb7185 45%);
+  border-top: 3px solid color-mix(in srgb, var(--warning) 55%, var(--destructive) 45%);
 }
 
 .dashboard-widget[data-dashboard-section="security"] > .card {
-  border-top: 3px solid color-mix(in srgb, #14b8a6 55%, #22d3ee 45%);
+  border-top: 3px solid color-mix(in srgb, var(--success) 55%, var(--info) 45%);
 }
 
 .dashboard-widget[data-dashboard-section="activity"] > .card {
-  border-top: 3px solid color-mix(in srgb, #8b5cf6 55%, #6366f1 45%);
+  border-top: 3px solid color-mix(in srgb, var(--secondary) 55%, var(--primary) 45%);
 }
 
 .dashboard-widget--span-12,
@@ -324,7 +324,7 @@
 }
 
 .dashboard-scroll-stack::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--border) 72%, #64748b 28%);
+  background: color-mix(in srgb, var(--border) 72%, var(--muted-foreground) 28%);
   border-radius: 999px;
 }
 
@@ -344,7 +344,7 @@
 .dashboard-security-tile {
   border: 1px solid var(--border);
   border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--card) 93%, #ffffff 7%);
+  background: color-mix(in srgb, var(--card) 93%, var(--card) 7%);
   padding: 0.85rem;
 }
 
@@ -362,7 +362,7 @@
   border: 1px solid var(--border);
   border-radius: 0.7rem;
   padding: 0.75rem;
-  background: color-mix(in srgb, var(--card) 93%, #ffffff 7%);
+  background: color-mix(in srgb, var(--card) 93%, var(--card) 7%);
 }
 
 .dashboard-security-plus-stat .dashboard-kpi-value {
@@ -373,7 +373,7 @@
   border: 1px dashed var(--border);
   border-radius: 0.65rem;
   padding: 0.65rem 0.75rem;
-  background: color-mix(in srgb, var(--card) 96%, #f8fafc 4%);
+  background: color-mix(in srgb, var(--card) 96%, var(--background) 4%);
 }
 
 .dashboard-ai-summary summary {
@@ -417,8 +417,8 @@
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 75%, #ffffff 25%);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, #ffffff 85%);
+  background: color-mix(in srgb, var(--primary) 75%, var(--card) 25%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, var(--card) 85%);
 }
 
 .dashboard-activity-timeline::-webkit-scrollbar {
@@ -426,7 +426,7 @@
 }
 
 .dashboard-activity-timeline::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--border) 72%, #64748b 28%);
+  background: color-mix(in srgb, var(--border) 72%, var(--muted-foreground) 28%);
   border-radius: 999px;
 }
 

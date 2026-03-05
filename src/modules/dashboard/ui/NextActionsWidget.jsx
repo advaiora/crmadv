@@ -6,7 +6,7 @@ import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 
 const RowSkeleton = () => (
-  <div className="space-y-2 rounded-xl border border-[var(--border)] px-3 py-3">
+  <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
     <div className="flex items-center justify-between gap-2">
       <Skeleton className="h-5 w-1/2" />
       <Skeleton className="h-5 w-12" />
@@ -40,13 +40,13 @@ const NextActionsWidget = ({ title = 'Next best actions', data, loading = false 
       {!loading && actions.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {actions.map((action, index) => (
-            <div key={`${action.id || action.href || 'action'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-[var(--muted)]">
+            <div key={`${action.id || action.href || 'action'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="mb-0 text-sm font-medium">{action.title}</p>
                 <Badge variant="outline">P{action.priority}</Badge>
               </div>
 
-              <p className="mb-2 text-sm text-[var(--hk-text-tertiary)]">{action.description}</p>
+              <p className="mb-2 text-sm text-textMuted">{action.description}</p>
 
               <Button size="sm" variant="ghost" onClick={() => window.location.assign(action.href)}>
                 {action.ctaLabel || 'Open'}

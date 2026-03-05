@@ -142,3 +142,20 @@ Business (MVP 1):
 - Accept endpoint usa il workspace dal record invito (no workspace param), quindi il token determina sempre il tenant corretto.
 - Se modulo `team` e disabilitato per il workspace dell'invito, `accept` risponde `403`.
 - In assenza di SMTP, l'invito viene comunque creato; in dev viene restituito `inviteLink` in response per test manuale.
+
+## 15) Checklist MVP decisions (2026-03-05)
+- `StageChecklistRule` is the primary gate model (`workspaceId + projectCategoryId + pipelineStageId + checklistTemplateId` unique).
+- Gate evaluation on `projects.move_stage` resolves all `gateEnabled=true` rules for target `(categoryId, stageId)`.
+- For every required rule, missing checklist instances are auto-created when allowed and then validated.
+- Blocking response for missing required items is `403` with code `GATE_BLOCKED` and `missingItems` details.
+- Legacy stage-level gate fields (`PipelineStage.isGated + gateChecklistTemplateId`) are kept as fallback when no stage rules are configured.
+- Override endpoint `POST /projects/:projectId/stages/:stageId/override-gate` requires `checklists.override_gate` and logs a dedicated audit action.
+
+## 16) Audit naming conventions (2026-03-05)
+- Use action strings in dot notation: `<domain>.<action>` (examples: `modules.manage`, `branding.manage`, `checklists.override_gate`).
+- Team critical actions are normalized to:
+  - `team.invite`
+  - `team.deactivate`
+  - `team.roles_assign`
+- Web asset audit actions remain explicit (`web.asset.*`, `web.version.*`) and must not include secret values in metadata.
+- `metadata` must contain only operational fields (IDs, status transitions, reasons), never secrets or decrypted vault data.

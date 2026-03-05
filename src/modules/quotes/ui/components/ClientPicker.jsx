@@ -112,7 +112,7 @@ const ClientPicker = ({
         </Button>
       )}
 
-      <Modal show={open} onHide={() => setOpen(false)} size="lg" centered>
+      <Modal className="quotes-modal" show={open} onHide={() => setOpen(false)} size="lg" centered>
         <Modal.Header closeButton>
           <Modal.Title>Seleziona cliente</Modal.Title>
         </Modal.Header>

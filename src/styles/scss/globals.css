@@ -1,7 +1,40 @@
 :root,
-[data-bs-theme="light"] {
+[data-bs-theme="light"],
+.light {
+  --branding-primary: 250 204 21;
+  --branding-secondary: 226 232 240;
+
+  --color-bg: 248 250 252;
+  --color-bg-secondary: 238 242 247;
+  --color-card: 255 255 255;
+  --color-card-border: 203 213 225;
+  --color-text: 15 23 42;
+  --color-text-muted: 71 85 105;
+  --color-primary: var(--branding-primary);
+  --color-secondary: var(--branding-secondary);
+  --color-hover: 232 238 251;
+  --surface-1: var(--color-bg);
+  --surface-2: var(--color-card);
+  --surface-3: 241 245 252;
+  --border-subtle: var(--color-card-border);
+  --row-hover: var(--color-hover);
+
+  --color-success: 22 163 74;
+  --color-info: 37 99 235;
+  --color-warning: 217 119 6;
+  --color-danger: 220 38 38;
+  --color-success-soft: 220 252 231;
+  --color-info-soft: 219 234 254;
+  --color-warning-soft: 254 243 199;
+  --color-danger-soft: 254 226 226;
+  --color-success-text: 20 83 45;
+  --color-info-text: 30 58 138;
+  --color-warning-text: 120 53 15;
+  --color-danger-text: 127 29 29;
+  --color-on-dark: 255 255 255;
+
   /* Brand */
-  --brand-yellow: #facc15;
+  --brand-yellow: rgb(var(--color-primary) / 1);
   --brand-yellow-hover: #eab308;
   --brand-yellow-active: #ca8a04;
   --brand-yellow-soft: #fef9c3;
@@ -10,51 +43,52 @@
   --brand-yellow-soft-foreground: #111827;
 
   /* Core palette */
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --muted: #eef2f7;
-  --muted-foreground: #475569;
-  --border: #cbd5e1;
-  --input: #cbd5e1;
-  --ring: #2563eb;
-  --primary: #facc15;
+  --background: rgb(var(--surface-1) / 1);
+  --foreground: rgb(var(--color-text) / 1);
+  --card: rgb(var(--surface-2) / 1);
+  --card-foreground: rgb(var(--color-text) / 1);
+  --popover: rgb(var(--surface-2) / 1);
+  --popover-foreground: rgb(var(--color-text) / 1);
+  --muted: rgb(var(--surface-3) / 1);
+  --muted-foreground: rgb(var(--color-text-muted) / 1);
+  --border: rgb(var(--border-subtle) / 1);
+  --input: rgb(var(--border-subtle) / 1);
+  --ring: rgb(var(--color-primary) / 1);
+  --primary: rgb(var(--color-primary) / 1);
   --primary-foreground: #111827;
-  --secondary: #e2e8f0;
+  --secondary: rgb(var(--color-secondary) / 1);
   --secondary-foreground: #0f172a;
-  --accent: #e8eefb;
+  --accent: rgb(var(--row-hover) / 1);
   --accent-foreground: #0f172a;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
+  --destructive: rgb(var(--color-danger) / 1);
+  --destructive-foreground: rgb(var(--color-on-dark) / 1);
 
   /* Status */
-  --success: #16a34a;
-  --success-soft: #dcfce7;
-  --success-soft-dark: rgba(22, 163, 74, 0.2);
-  --info: #2563eb;
-  --info-soft: #dbeafe;
-  --info-soft-dark: rgba(37, 99, 235, 0.2);
-  --warning: #d97706;
-  --warning-soft: #fef3c7;
-  --warning-soft-dark: rgba(217, 119, 6, 0.2);
-  --danger: #dc2626;
-  --danger-soft: #fee2e2;
-  --danger-soft-dark: rgba(220, 38, 38, 0.2);
+  --success: rgb(var(--color-success) / 1);
+  --success-soft: rgb(var(--color-success-soft) / 1);
+  --success-soft-dark: color-mix(in srgb, var(--success) 20%, transparent);
+  --info: rgb(var(--color-info) / 1);
+  --info-soft: rgb(var(--color-info-soft) / 1);
+  --info-soft-dark: color-mix(in srgb, var(--info) 20%, transparent);
+  --warning: rgb(var(--color-warning) / 1);
+  --warning-soft: rgb(var(--color-warning-soft) / 1);
+  --warning-soft-dark: color-mix(in srgb, var(--warning) 20%, transparent);
+  --danger: rgb(var(--color-danger) / 1);
+  --danger-soft: rgb(var(--color-danger-soft) / 1);
+  --danger-soft-dark: color-mix(in srgb, var(--danger) 20%, transparent);
 
   /* Focus */
-  --focus-ring-offset: #ffffff;
-  --focus-ring-shadow: rgba(37, 99, 235, 0.42);
+  --focus-ring-offset: rgb(var(--color-card) / 1);
+  --focus-ring-shadow: color-mix(in srgb, var(--ring) 42%, transparent);
 
   /* Bootstrap mapping */
   --bs-body-bg: var(--background);
   --bs-body-color: var(--foreground);
+  --bs-secondary-color: var(--muted-foreground);
   --bs-border-color: var(--border);
-  --bs-border-color-translucent: rgba(15, 23, 42, 0.18);
-  --bs-link-color: #1d4ed8;
-  --bs-link-hover-color: #1e40af;
+  --bs-border-color-translucent: color-mix(in srgb, var(--foreground) 18%, transparent);
+  --bs-link-color: color-mix(in srgb, var(--primary) 76%, var(--foreground) 24%);
+  --bs-link-hover-color: color-mix(in srgb, var(--primary) 66%, var(--foreground) 34%);
   --bs-link-decoration: underline;
 
   --bs-primary: var(--primary);
@@ -79,13 +113,13 @@
   --bs-light-rgb: 238, 242, 247;
 
   --bs-soft-primary: var(--accent);
-  --bs-soft-secondary: #eef2f7;
+  --bs-soft-secondary: var(--muted);
   --bs-soft-success: var(--success-soft);
   --bs-soft-info: var(--info-soft);
   --bs-soft-warning: var(--warning-soft);
   --bs-soft-danger: var(--danger-soft);
-  --bs-soft-light: #f8fafc;
-  --bs-soft-dark: #d2dbe8;
+  --bs-soft-light: var(--background);
+  --bs-soft-dark: color-mix(in srgb, var(--muted) 76%, var(--foreground) 24%);
 
   --bs-primary-bg-subtle: var(--accent);
   --bs-success-bg-subtle: var(--success-soft);
@@ -100,22 +134,22 @@
   --hk-bg-primary-rgb: 255, 255, 255;
   --hk-bg-secondary: var(--background);
   --hk-bg-tertiary: var(--muted);
-  --hk-bg-hover: #e2e8f0;
+  --hk-bg-hover: rgb(var(--color-hover) / 1);
   --hk-select-primary: var(--accent);
 
   --hk-text-primary: var(--foreground);
-  --hk-text-secondary: #1e293b;
-  --hk-text-tertiary: #475569;
-  --hk-text-disabled: #64748b;
-  --hk-text-on-dark-bg: #ffffff;
+  --hk-text-secondary: color-mix(in srgb, var(--foreground) 88%, var(--muted-foreground) 12%);
+  --hk-text-tertiary: var(--muted-foreground);
+  --hk-text-disabled: color-mix(in srgb, var(--muted-foreground) 86%, transparent);
+  --hk-text-on-dark-bg: rgb(var(--color-on-dark) / 1);
   --hk-text-primary-rgb: 15, 23, 42;
   --hk-text-secondary-rgb: 30, 41, 59;
   --hk-text-tertiary-rgb: 71, 85, 105;
 
   --hk-border-primary: var(--border);
-  --hk-border-secondary: #b8c3d3;
-  --hk-border-tertiary: #dbe3ef;
-  --hk-scrim-bg: #000000;
+  --hk-border-secondary: color-mix(in srgb, var(--border) 84%, var(--foreground) 16%);
+  --hk-border-tertiary: color-mix(in srgb, var(--border) 80%, var(--background) 20%);
+  --hk-scrim-bg: rgb(0 0 0 / 1);
   --hk-shadow-rgb: 15, 23, 42;
 
   --hk-menu-bg: #111827;
@@ -133,49 +167,83 @@
   --workspace-logo-expanded-width: clamp(128px, 9.5vw, 172px);
 }
 
-[data-bs-theme="dark"] {
-  --background: #0f172a;
-  --foreground: #e5e7eb;
-  --card: #111827;
-  --card-foreground: #e5e7eb;
-  --popover: #111827;
-  --popover-foreground: #e5e7eb;
-  --muted: #1f2937;
-  --muted-foreground: #cbd5e1;
-  --border: #334155;
-  --input: #334155;
-  --ring: #60a5fa;
-  --primary: #facc15;
+[data-bs-theme="dark"],
+.dark {
+  --branding-primary: 250 204 21;
+  --branding-secondary: 30 41 59;
+
+  --color-bg: 15 23 42;
+  --color-bg-secondary: 30 41 59;
+  --color-card: 17 24 39;
+  --color-card-border: 51 65 85;
+  --color-text: 229 231 235;
+  --color-text-muted: 148 163 184;
+  --color-primary: var(--branding-primary);
+  --color-secondary: var(--branding-secondary);
+  --color-hover: 51 65 85;
+  --surface-1: 15 23 42;
+  --surface-2: 22 32 52;
+  --surface-3: 30 41 59;
+  --border-subtle: 71 85 105;
+  --row-hover: 51 65 85;
+
+  --color-success: 34 197 94;
+  --color-info: 96 165 250;
+  --color-warning: 245 158 11;
+  --color-danger: 248 113 113;
+  --color-success-soft: 34 197 94;
+  --color-info-soft: 96 165 250;
+  --color-warning-soft: 245 158 11;
+  --color-danger-soft: 248 113 113;
+  --color-success-text: 187 247 208;
+  --color-info-text: 191 219 254;
+  --color-warning-text: 252 211 77;
+  --color-danger-text: 252 165 165;
+  --color-on-dark: 229 231 235;
+
+  --background: rgb(var(--surface-1) / 1);
+  --foreground: rgb(var(--color-text) / 1);
+  --card: rgb(var(--surface-2) / 1);
+  --card-foreground: rgb(var(--color-text) / 1);
+  --popover: rgb(var(--surface-2) / 1);
+  --popover-foreground: rgb(var(--color-text) / 1);
+  --muted: rgb(var(--surface-3) / 1);
+  --muted-foreground: rgb(var(--color-text-muted) / 1);
+  --border: rgb(var(--border-subtle) / 1);
+  --input: rgb(var(--border-subtle) / 1);
+  --ring: rgb(var(--color-info) / 1);
+  --primary: rgb(var(--color-primary) / 1);
   --primary-foreground: #111827;
-  --secondary: #1e293b;
+  --secondary: rgb(var(--color-secondary) / 1);
   --secondary-foreground: #e5e7eb;
-  --accent: #1e293b;
+  --accent: rgb(var(--row-hover) / 1);
   --accent-foreground: #e5e7eb;
-  --destructive: #f87171;
+  --destructive: rgb(var(--color-danger) / 1);
   --destructive-foreground: #111827;
 
-  --success: #22c55e;
-  --success-soft: #dcfce7;
-  --success-soft-dark: rgba(34, 197, 94, 0.2);
-  --info: #60a5fa;
-  --info-soft: #dbeafe;
-  --info-soft-dark: rgba(96, 165, 250, 0.2);
-  --warning: #f59e0b;
-  --warning-soft: #fef3c7;
-  --warning-soft-dark: rgba(245, 158, 11, 0.2);
-  --danger: #f87171;
-  --danger-soft: #fee2e2;
-  --danger-soft-dark: rgba(248, 113, 113, 0.2);
+  --success: rgb(var(--color-success) / 1);
+  --success-soft: rgb(var(--color-success-soft) / 1);
+  --success-soft-dark: color-mix(in srgb, var(--success) 22%, transparent);
+  --info: rgb(var(--color-info) / 1);
+  --info-soft: rgb(var(--color-info-soft) / 1);
+  --info-soft-dark: color-mix(in srgb, var(--info) 22%, transparent);
+  --warning: rgb(var(--color-warning) / 1);
+  --warning-soft: rgb(var(--color-warning-soft) / 1);
+  --warning-soft-dark: color-mix(in srgb, var(--warning) 22%, transparent);
+  --danger: rgb(var(--color-danger) / 1);
+  --danger-soft: rgb(var(--color-danger-soft) / 1);
+  --danger-soft-dark: color-mix(in srgb, var(--danger) 22%, transparent);
 
-  --focus-ring-offset: #0f172a;
-  --focus-ring-shadow: rgba(96, 165, 250, 0.45);
+  --focus-ring-offset: var(--background);
+  --focus-ring-shadow: color-mix(in srgb, var(--ring) 45%, transparent);
 
   --bs-body-bg: var(--background);
   --bs-body-color: var(--foreground);
+  --bs-secondary-color: var(--muted-foreground);
   --bs-border-color: var(--border);
-  --bs-border-color-translucent: rgba(229, 231, 235, 0.16);
-  --bs-link-color: #93c5fd;
-  --bs-link-hover-color: #bfdbfe;
+  --bs-border-color-translucent: color-mix(in srgb, var(--foreground) 16%, transparent);
+  --bs-link-color: color-mix(in srgb, var(--primary) 62%, var(--foreground) 38%);
+  --bs-link-hover-color: color-mix(in srgb, var(--primary) 52%, var(--foreground) 48%);
   --bs-link-decoration: underline;
 
   --bs-primary: var(--primary);
@@ -199,14 +267,14 @@
   --bs-light: #1f2937;
   --bs-light-rgb: 31, 41, 55;
 
-  --bs-soft-primary: rgba(250, 204, 21, 0.18);
-  --bs-soft-secondary: #1f2937;
+  --bs-soft-primary: color-mix(in srgb, var(--primary) 18%, transparent);
+  --bs-soft-secondary: var(--muted);
   --bs-soft-success: var(--success-soft-dark);
   --bs-soft-info: var(--info-soft-dark);
   --bs-soft-warning: var(--warning-soft-dark);
   --bs-soft-danger: var(--danger-soft-dark);
-  --bs-soft-light: #1f2937;
-  --bs-soft-dark: #0b1220;
+  --bs-soft-light: var(--muted);
+  --bs-soft-dark: color-mix(in srgb, var(--background) 88%, #000000 12%);
 
   --bs-primary-bg-subtle: var(--bs-soft-primary);
   --bs-success-bg-subtle: var(--success-soft-dark);
@@ -220,22 +288,22 @@
   --hk-bg-primary-rgb: 17, 24, 39;
   --hk-bg-secondary: var(--background);
   --hk-bg-tertiary: var(--muted);
-  --hk-bg-hover: #243244;
-  --hk-select-primary: rgba(96, 165, 250, 0.18);
+  --hk-bg-hover: rgb(var(--color-hover) / 1);
+  --hk-select-primary: color-mix(in srgb, var(--info) 18%, transparent);
 
   --hk-text-primary: var(--foreground);
-  --hk-text-secondary: #d1d5db;
-  --hk-text-tertiary: #cbd5e1;
-  --hk-text-disabled: #94a3b8;
-  --hk-text-on-dark-bg: #e5e7eb;
+  --hk-text-secondary: color-mix(in srgb, var(--foreground) 92%, var(--muted-foreground) 8%);
+  --hk-text-tertiary: var(--muted-foreground);
+  --hk-text-disabled: var(--muted-foreground);
+  --hk-text-on-dark-bg: var(--foreground);
   --hk-text-primary-rgb: 229, 231, 235;
   --hk-text-secondary-rgb: 209, 213, 219;
   --hk-text-tertiary-rgb: 203, 213, 225;
 
   --hk-border-primary: var(--border);
-  --hk-border-secondary: #3f526d;
-  --hk-border-tertiary: #334155;
-  --hk-scrim-bg: #000000;
+  --hk-border-secondary: color-mix(in srgb, var(--border) 82%, var(--foreground) 18%);
+  --hk-border-tertiary: var(--border);
+  --hk-scrim-bg: rgb(0 0 0 / 1);
   --hk-shadow-rgb: 2, 6, 23;
 
   --hk-menu-bg: #0b1220;
@@ -984,20 +1052,65 @@ small.text-muted,
 .table {
   --bs-table-bg: transparent;
   --bs-table-color: var(--foreground);
-  --bs-table-border-color: color-mix(in srgb, var(--border) 72%, transparent);
+  --bs-table-border-color: rgb(var(--border-subtle) / 0.6);
 }
 
 .table > :not(caption) > * > * {
-  border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent) !important;
+  border-bottom-color: rgb(var(--border-subtle) / 0.6) !important;
 }
 
 .table-hover > tbody > tr:hover > * {
-  background-color: color-mix(in srgb, var(--muted) 72%, transparent) !important;
+  background-color: rgb(var(--row-hover) / 0.7) !important;
   color: var(--foreground) !important;
 }
 
 .table thead th {
   color: var(--foreground);
+}
+
+.table-dark {
+  --bs-table-bg: rgb(var(--surface-3) / 1);
+  --bs-table-striped-bg: rgb(var(--row-hover) / 0.55);
+  --bs-table-hover-bg: rgb(var(--row-hover) / 0.75);
+  --bs-table-color: var(--foreground);
+  color: var(--foreground);
+  border-color: rgb(var(--border-subtle) / 0.6);
+}
+
+.data-table-shell {
+  background-color: rgb(var(--surface-3) / 0.82);
+  border: 1px solid rgb(var(--border-subtle) / 0.62);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px color-mix(in srgb, #0f172a 8%, transparent);
+  overflow: visible;
+}
+
+.data-table-shell > .table-responsive,
+.data-table-shell.table-responsive {
+  border-radius: inherit;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.data-table-shell .table {
+  margin-bottom: 0;
+}
+
+.data-table-shell .table > :not(caption) > * > * {
+  border-bottom-color: rgb(var(--border-subtle) / 0.58) !important;
+}
+
+.data-table-shell .table thead th {
+  background-color: rgb(var(--surface-2) / 0.62);
+  border-bottom: 1px solid rgb(var(--border-subtle) / 0.75);
+}
+
+.data-table-shell .table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.data-table-shell .table tbody tr:hover > * {
+  background-color: rgb(var(--row-hover) / 0.72) !important;
 }
 
 .form-control,

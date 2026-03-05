@@ -13,6 +13,9 @@ const MODULE_ROUTES = {
   checklists: '/checklists/templates',
   calendar: '/apps/calendar',
   branding: '/pages/workspace-branding',
+  messages: '/apps/email',
+  modules: '/settings/modules',
+  audit: '/audit',
 };
 
 const MODULE_LABELS = {
@@ -23,6 +26,9 @@ const MODULE_LABELS = {
   checklists: 'Memo Operativi',
   calendar: 'Calendario',
   branding: 'Branding',
+  messages: 'Messaggi',
+  modules: 'Moduli',
+  audit: 'Audit',
 };
 
 const CORE_PERMISSIONS = [
@@ -39,7 +45,11 @@ const CORE_PERMISSIONS = [
   'calendar.create',
   'calendar.edit',
   'checklists.view',
+  'checklists.manage_templates',
   'branding.manage',
+  'modules.manage',
+  'audit.view',
+  'messages.view',
 ];
 
 const formatDateTime = (value) => {

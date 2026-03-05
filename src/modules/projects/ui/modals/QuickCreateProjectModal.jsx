@@ -135,7 +135,13 @@ const QuickCreateProjectModal = ({
     };
 
     return (
-        <Modal show={show} onHide={onHide} centered backdrop={submitting ? 'static' : true}>
+        <Modal
+            show={show}
+            onHide={onHide}
+            centered
+            backdrop={submitting ? 'static' : true}
+            className="projects-quick-create-modal"
+        >
             <Form onSubmit={onFormSubmit}>
                 <Modal.Header closeButton={!submitting}>
                     <Modal.Title>Nuovo progetto rapido</Modal.Title>

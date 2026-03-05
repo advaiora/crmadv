@@ -5,7 +5,7 @@ import WidgetCard from './WidgetCard';
 import { formatNumber } from './formatters';
 
 const Tile = ({ label, value, loading = false }) => (
-  <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-4">
+  <div className="rounded-xl border border-cardBorder bg-bgSecondary p-4">
     {loading ? (
       <div className="space-y-2">
         <Skeleton className="h-8 w-16" />
@@ -14,7 +14,7 @@ const Tile = ({ label, value, loading = false }) => (
     ) : (
       <>
         <p className="mb-1 text-2xl font-semibold tracking-tight">{formatNumber(value)}</p>
-        <p className="mb-0 text-sm text-[var(--hk-text-tertiary)]">{label}</p>
+        <p className="mb-0 text-sm text-textMuted">{label}</p>
       </>
     )}
   </div>

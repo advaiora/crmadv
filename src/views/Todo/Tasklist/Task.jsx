@@ -51,7 +51,7 @@ const Task = (props) => {
                                 {
                                     props.task.priority && <Badge
                                         size="sm"
-                                        bg="white"
+                                        bg="light"
                                         className={classNames("badge-sm badge-outline badge-wth-indicator badge-wth-icon ms-3 d-lg-inline-block d-none", { "badge-danger": props.task.priority === "High" || props.task.priority === "Urgent" }, { "badge-warning": props.task.priority === "Low" }, { "badge-orange": props.task.priority === "Medium" })}
                                     >
                                         <span>

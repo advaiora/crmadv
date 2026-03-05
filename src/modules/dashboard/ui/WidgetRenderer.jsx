@@ -222,7 +222,7 @@ const WidgetRenderer = ({ widgets = [] }) => {
     <div className="space-y-6">
       {kpiWidgets.length > 0 ? (
         <section id="dashboard-section-overview" className="space-y-3">
-          <p className="text-sm font-medium text-[var(--hk-text-tertiary)]">Panoramica</p>
+          <p className="text-sm font-medium text-textMuted">Panoramica</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6">
             {kpiWidgets.map((widget) => renderCell(widget, 'col-span-12', 'dashboard-kpi'))}
           </div>
@@ -231,7 +231,7 @@ const WidgetRenderer = ({ widgets = [] }) => {
 
       {urgentWidget || pipelineWidget ? (
         <section id="dashboard-section-main" className="space-y-3">
-          <p className="text-sm font-medium text-[var(--hk-text-tertiary)]">Priorita operative</p>
+          <p className="text-sm font-medium text-textMuted">Priorita operative</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {urgentWidget
               ? renderCell(urgentWidget, pipelineWidget ? 'xl:col-span-7' : 'xl:col-span-12', 'dashboard-main')
@@ -245,7 +245,7 @@ const WidgetRenderer = ({ widgets = [] }) => {
 
       {secondaryFocusWidget || activityWidget ? (
         <section id="dashboard-section-insights" className="space-y-3">
-          <p className="text-sm font-medium text-[var(--hk-text-tertiary)]">Operativita e attivita</p>
+          <p className="text-sm font-medium text-textMuted">Operativita e attivita</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {secondaryFocusWidget
               ? renderCell(
@@ -263,7 +263,7 @@ const WidgetRenderer = ({ widgets = [] }) => {
 
       {remainingWidgets.length > 0 ? (
         <section id="dashboard-section-more" className="space-y-3">
-          <p className="text-sm font-medium text-[var(--hk-text-tertiary)]">Approfondimenti</p>
+          <p className="text-sm font-medium text-textMuted">Approfondimenti</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {remainingWidgets.map((widget) => renderCell(
               widget,

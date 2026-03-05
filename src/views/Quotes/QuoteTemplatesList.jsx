@@ -172,7 +172,7 @@ const QuoteTemplatesList = () => {
         </div>
       </div>
 
-      <Modal show={Boolean(deletingTemplate)} onHide={() => setDeletingTemplate(null)} centered>
+      <Modal className="quotes-modal" show={Boolean(deletingTemplate)} onHide={() => setDeletingTemplate(null)} centered>
         <Modal.Header closeButton={!deleting}>
           <Modal.Title>Elimina template</Modal.Title>
         </Modal.Header>

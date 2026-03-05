@@ -61,15 +61,15 @@ const getErrorMessage = (error) => {
 
 const ItemStateIcon = ({ state }) => {
   if (state === 'completed') {
-    return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+    return <CheckCircle2 className="h-4 w-4 text-success" />;
   }
   if (state === 'not_applicable') {
-    return <Ban className="h-4 w-4 text-violet-500" />;
+    return <Ban className="h-4 w-4 text-secondary" />;
   }
   if (state === 'in_progress') {
-    return <PlayCircle className="h-4 w-4 text-amber-500" />;
+    return <PlayCircle className="h-4 w-4 text-warning" />;
   }
-  return <CircleDashed className="h-4 w-4 text-slate-400" />;
+  return <CircleDashed className="h-4 w-4 text-textMuted" />;
 };
 
 const ChecklistInstanceCard = ({
@@ -97,7 +97,7 @@ const ChecklistInstanceCard = ({
     : instance.items;
 
   return (
-    <Card className="border-slate-200 bg-slate-50/40 checklist-instance-card">
+    <Card className="border-cardBorder bg-bgSecondary/40 checklist-instance-card">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -134,13 +134,13 @@ const ChecklistInstanceCard = ({
 
       <CardContent className="space-y-2">
         {instance.items.length === 0 && (
-          <p className="rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
+          <p className="rounded-md border border-dashed border-cardBorder px-3 py-2 text-sm text-textMuted">
             Nessuno step disponibile.
           </p>
         )}
 
         {instance.items.length > 0 && visibleItems.length === 0 && showOnlyOpenItems && (
-          <p className="rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
+          <p className="rounded-md border border-dashed border-cardBorder px-3 py-2 text-sm text-textMuted">
             Nessuno step aperto in questo memo.
           </p>
         )}
@@ -154,14 +154,14 @@ const ChecklistInstanceCard = ({
           return (
             <div
               key={item.id}
-              className={`flex flex-col gap-2 rounded-md border border-slate-200 bg-white px-3 py-3 md:flex-row md:items-center md:justify-between checklist-project-item ${
+              className={`flex flex-col gap-2 rounded-md border border-cardBorder bg-card px-3 py-3 md:flex-row md:items-center md:justify-between checklist-project-item ${
                 item.isRequired ? 'is-required' : ''
               } ${normalizedState === 'not_applicable' ? 'is-not-applicable' : ''}`}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <ItemStateIcon state={normalizedState} />
-                  <p className={`mb-0 text-sm font-medium text-slate-900 ${isDone ? 'line-through opacity-70' : ''}`}>
+                  <p className={`mb-0 text-sm font-medium text-text ${isDone ? 'line-through opacity-70' : ''}`}>
                     {item.title}
                   </p>
                   {item.isRequired ? <Badge variant="warning">Obbligatorio</Badge> : <Badge variant="outline">Facoltativo</Badge>}
@@ -169,24 +169,24 @@ const ChecklistInstanceCard = ({
                     {stateLabel}
                   </Badge>
                 </div>
-                {item.description && <p className="mt-1 mb-0 text-xs text-slate-600">{item.description}</p>}
+                {item.description && <p className="mt-1 mb-0 text-xs text-textMuted">{item.description}</p>}
                 {item.requiresEvidenceSnapshot && (
-                  <p className="mt-1 mb-0 text-xs text-slate-500">
+                  <p className="mt-1 mb-0 text-xs text-textMuted">
                     Richiede evidenza (nota o URL) per il completamento.
                   </p>
                 )}
                 {item.notApplicableReason && (
-                  <p className="mt-1 mb-0 text-xs text-violet-500">
+                  <p className="mt-1 mb-0 text-xs text-secondary">
                     Non applicabile: {item.notApplicableReason}
                   </p>
                 )}
                 {item.evidenceNote && (
-                  <p className="mt-1 mb-0 text-xs text-slate-500">
+                  <p className="mt-1 mb-0 text-xs text-textMuted">
                     Evidenza nota: {item.evidenceNote}
                   </p>
                 )}
                 {item.evidenceUrl && (
-                  <p className="mt-1 mb-0 text-xs text-slate-500">
+                  <p className="mt-1 mb-0 text-xs text-textMuted">
                     Evidenza URL: {item.evidenceUrl}
                   </p>
                 )}
@@ -195,7 +195,7 @@ const ChecklistInstanceCard = ({
               <div className="w-full md:w-[240px]">
                 {canCompleteItem ? (
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2">
+                    <div className="flex items-center justify-between rounded-md border border-cardBorder bg-card px-3 py-2">
                       <label className="inline-flex items-center gap-2 text-sm checklists-checkbox-label">
                         <input
                           type="checkbox"
@@ -207,7 +207,7 @@ const ChecklistInstanceCard = ({
                         />
                         <span className="font-medium">{isDone ? 'Fatto' : 'Da fare'}</span>
                       </label>
-                      {updatingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin text-slate-500" />}
+                      {updatingItemId === item.id && <Loader2 className="h-4 w-4 animate-spin text-textMuted" />}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -248,7 +248,9 @@ const ChecklistInstanceCard = ({
 const ProjectChecklistPanel = ({ project, access }) => {
   const checklistModuleEnabled = hasModuleEnabled(access, 'checklists');
   const canViewChecklists = hasPermission(access, 'checklists.view');
-  const canCreateInstances = hasPermission(access, 'checklists.create');
+  const canCreateInstances = hasPermission(access, 'checklists.complete_item')
+    || hasPermission(access, 'checklists.manage_templates')
+    || hasPermission(access, 'checklists.create');
   const canCompleteItems = hasPermission(access, 'checklists.complete_item');
 
   const currentStageId = project?.stageId || project?.pipelineStageId || '';
@@ -289,6 +291,23 @@ const ProjectChecklistPanel = ({ project, access }) => {
       ),
     [checklistInstances, currentStageId],
   );
+
+  const currentStageGateStatus = useMemo(() => {
+    const stageInstances = checklistInstances.filter((instance) => instance.pipelineStageId === currentStageId);
+    const missingRequiredItems = stageInstances.reduce((count, instance) => {
+      const missingForInstance = (instance.items || []).reduce((instanceCount, item) => {
+        const state = normalizeItemState(item.state);
+        const isDone = state === 'completed' || state === 'not_applicable';
+        return item.isRequired && !isDone ? instanceCount + 1 : instanceCount;
+      }, 0);
+      return count + missingForInstance;
+    }, 0);
+
+    return {
+      stageInstancesCount: stageInstances.length,
+      missingRequiredItems,
+    };
+  }, [checklistInstances, currentStageId]);
 
   const selectedTemplateAlreadyLinked = Boolean(
     selectedTemplateId && currentStageId && currentStageTemplateIds.has(selectedTemplateId),
@@ -468,7 +487,7 @@ const ProjectChecklistPanel = ({ project, access }) => {
   };
 
   return (
-    <Card className="mt-4 border-slate-200 checklist-project-panel checklists-shell">
+    <Card className="mt-4 border-cardBorder checklist-project-panel checklists-shell">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -514,7 +533,7 @@ const ProjectChecklistPanel = ({ project, access }) => {
 
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="mb-0 text-xs text-slate-500">
+          <p className="mb-0 text-xs text-textMuted">
             Usa la spunta per segnare gli step completati.
           </p>
           <Button
@@ -528,14 +547,20 @@ const ProjectChecklistPanel = ({ project, access }) => {
         </div>
 
         {selectedTemplateAlreadyLinked && (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
             Il memo selezionato e gia collegato allo stage corrente.
+          </div>
+        )}
+
+        {currentStageId && currentStageGateStatus.stageInstancesCount > 0 && currentStageGateStatus.missingRequiredItems > 0 && (
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
+            Gate attivo: {currentStageGateStatus.missingRequiredItems} item obbligatori mancanti nello stage corrente.
           </div>
         )}
 
         {transitionState && (
           <div className="space-y-2 rounded-md border p-3 checklists-transition-box">
-            <p className="mb-0 text-sm font-semibold text-slate-800">
+            <p className="mb-0 text-sm font-semibold text-text">
               {transitionState.nextState === 'not_applicable'
                 ? `Segna "${transitionState.item.title}" come non applicabile`
                 : `Completa "${transitionState.item.title}"`}
@@ -573,7 +598,7 @@ const ProjectChecklistPanel = ({ project, access }) => {
             )}
 
             {transitionState.error && (
-              <div className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
                 {transitionState.error}
               </div>
             )}
@@ -602,27 +627,27 @@ const ProjectChecklistPanel = ({ project, access }) => {
         )}
 
         {currentStageId ? null : (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
             Questo progetto non ha uno stage associato. Imposta uno stage prima di collegare un memo.
           </div>
         )}
 
         {checklistsQuery.loading && (
-          <div className="flex items-center gap-2 text-sm text-slate-600">
+          <div className="flex items-center gap-2 text-sm text-textMuted">
             <Loader2 className="h-4 w-4 animate-spin" />
             Caricamento memo...
           </div>
         )}
 
         {checklistsQuery.error && (
-          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {getErrorMessage(checklistsQuery.error)}
           </div>
         )}
 
         {!checklistsQuery.loading && !checklistsQuery.error && checklistInstances.length === 0 && (
-          <div className="rounded-md border border-dashed border-slate-300 bg-white p-4">
-            <div className="flex items-center gap-2 text-slate-700">
+          <div className="rounded-md border border-dashed border-cardBorder bg-card p-4">
+            <div className="flex items-center gap-2 text-text">
               <AlertTriangle className="h-4 w-4" />
               <span className="text-sm">Nessun memo collegato a questo progetto/stage.</span>
             </div>
@@ -648,7 +673,7 @@ const ProjectChecklistPanel = ({ project, access }) => {
         )}
 
         {!canCompleteItems && (
-          <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          <div className="flex items-center gap-2 rounded-md border border-cardBorder bg-bgSecondary p-3 text-xs text-textMuted">
             <CheckCircle2 className="h-4 w-4" />
             Hai accesso in sola lettura ai memo di progetto.
           </div>
