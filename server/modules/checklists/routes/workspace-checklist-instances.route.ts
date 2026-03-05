@@ -25,7 +25,22 @@ type ChecklistInstanceItemParams = {
   itemInstanceId: string;
 };
 
+type ChecklistInstanceAssigneeParams = {
+  instanceId: string;
+  itemInstanceId: string;
+};
+
 const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
+  app.get('/checklists/assignable-users', async (request, reply) => {
+    const { workspace } = await ensureChecklistsAccess(
+      request,
+      CHECKLISTS_PERMISSIONS.assign,
+    );
+
+    const users = await checklistsService.listAssignableUsers(workspace.id);
+    return ok(reply, users.items);
+  });
+
   app.post<{ Params: ProjectParams; Body: unknown }>(
     '/projects/:projectId/checklists',
     async (request, reply) => {
@@ -181,6 +196,47 @@ const workspaceChecklistInstancesRoute: FastifyPluginAsync = async (app) => {
       const item = await checklistsService.resetChecklistItem({
         workspaceId: workspace.id,
         itemId: request.params.itemId,
+      });
+
+      return ok(reply, item);
+    },
+  );
+
+  app.patch<{ Params: ChecklistItemParams; Body: unknown }>(
+    '/checklists/items/:itemId/assignee',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.assign,
+      );
+
+      const item = await checklistsService.assignChecklistItem({
+        workspaceId: workspace.id,
+        itemId: request.params.itemId,
+        actorUserId: user.id,
+        body: request.body,
+        request,
+      });
+
+      return ok(reply, item);
+    },
+  );
+
+  app.patch<{ Params: ChecklistInstanceAssigneeParams; Body: unknown }>(
+    '/checklists/instances/:instanceId/items/:itemInstanceId/assignee',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChecklistsAccess(
+        request,
+        CHECKLISTS_PERMISSIONS.assign,
+      );
+
+      const item = await checklistsService.assignChecklistItem({
+        workspaceId: workspace.id,
+        checklistInstanceId: request.params.instanceId,
+        itemInstanceId: request.params.itemInstanceId,
+        actorUserId: user.id,
+        body: request.body,
+        request,
       });
 
       return ok(reply, item);

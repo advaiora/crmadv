@@ -32,6 +32,14 @@ const templateItemSelect = Prisma.validator<Prisma.ChecklistTemplateItemSelect>(
   isRequired: true,
   requiresEvidenceSnapshot: true,
   isCriticalSnapshot: true,
+  defaultAssignedToUserId: true,
+  defaultAssignedToUser: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
   createdAt: true,
   updatedAt: true,
 });
@@ -78,6 +86,23 @@ const checklistInstanceItemSelect = Prisma.validator<Prisma.ChecklistInstanceIte
   notApplicableReason: true,
   completedAt: true,
   completedByUserId: true,
+  assignedToUserId: true,
+  assignedByUserId: true,
+  assignedAt: true,
+  assignedToUser: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  assignedByUser: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
   createdAt: true,
   updatedAt: true,
 });
@@ -174,6 +199,7 @@ type CreateTemplateItemInput = {
   isRequired: boolean;
   requiresEvidenceSnapshot: boolean;
   isCriticalSnapshot: boolean;
+  defaultAssignedToUserId: string | null;
 };
 
 type UpdateTemplateInput = {
@@ -212,6 +238,7 @@ type UpdateTemplateItemInput = {
   isRequired?: boolean;
   requiresEvidenceSnapshot?: boolean;
   isCriticalSnapshot?: boolean;
+  defaultAssignedToUserId?: string | null;
 };
 
 const templateWhereByWorkspaceAndId = (workspaceId: string, templateId: string) => ({
@@ -241,6 +268,8 @@ const tableExists = async (tableName: string) => {
 
   return rows[0]?.exists === true;
 };
+
+const withClient = (tx?: Prisma.TransactionClient) => tx ?? prisma;
 
 const tableHasColumn = async (tableName: string, columnName: string) => {
   const rows = await prisma.$queryRaw<Array<{ exists: boolean }>>(Prisma.sql`
@@ -344,10 +373,12 @@ const createChecklistInstanceWithItemsInTx = async (
       isRequired: true,
       requiresEvidenceSnapshot: true,
       isCriticalSnapshot: true,
+      defaultAssignedToUserId: true,
     },
   });
 
   if (templateItems.length > 0) {
+    const now = new Date();
     await tx.checklistInstanceItem.createMany({
       data: templateItems.map((templateItem) => ({
         workspaceId: input.workspaceId,
@@ -359,6 +390,8 @@ const createChecklistInstanceWithItemsInTx = async (
         isCriticalSnapshot: templateItem.isCriticalSnapshot,
         sortOrderSnapshot: templateItem.sortOrder,
         state: 'pending',
+        assignedToUserId: templateItem.defaultAssignedToUserId,
+        assignedAt: templateItem.defaultAssignedToUserId ? now : null,
       })),
     });
   }
@@ -437,6 +470,7 @@ export const checklistsRepository = {
                   isRequired: item.isRequired,
                   requiresEvidenceSnapshot: item.requiresEvidenceSnapshot,
                   isCriticalSnapshot: item.isCriticalSnapshot,
+                  defaultAssignedToUserId: item.defaultAssignedToUserId,
                 })),
               },
             }),
@@ -517,6 +551,7 @@ export const checklistsRepository = {
     isRequired: boolean;
     requiresEvidenceSnapshot: boolean;
     isCriticalSnapshot: boolean;
+    defaultAssignedToUserId: string | null;
   }) {
     return prisma.$transaction(async (tx) => {
       const template = await tx.checklistTemplate.findFirst({
@@ -550,6 +585,7 @@ export const checklistsRepository = {
           isRequired: input.isRequired,
           requiresEvidenceSnapshot: input.requiresEvidenceSnapshot,
           isCriticalSnapshot: input.isCriticalSnapshot,
+          defaultAssignedToUserId: input.defaultAssignedToUserId,
         },
         select: templateItemSelect,
       });
@@ -974,6 +1010,114 @@ export const checklistsRepository = {
         id: itemId,
       },
       select: checklistInstanceItemWithInstanceSelect,
+    });
+  },
+
+  findActiveWorkspaceMemberByUserId(
+    workspaceId: string,
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    return withClient(tx).membership.findFirst({
+      where: {
+        workspaceId,
+        userId,
+        status: 'ACTIVE',
+      },
+      select: {
+        userId: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+  },
+
+  listActiveWorkspaceMembers(workspaceId: string, tx?: Prisma.TransactionClient) {
+    return withClient(tx).membership.findMany({
+      where: {
+        workspaceId,
+        status: 'ACTIVE',
+      },
+      select: {
+        userId: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: [
+        {
+          createdAt: 'asc',
+        },
+        {
+          id: 'asc',
+        },
+      ],
+    });
+  },
+
+  async updateChecklistItemAssignee(input: {
+    workspaceId: string;
+    itemId: string;
+    assignedToUserId: string | null;
+    assignedByUserId: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const current = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!current) {
+        return {
+          updated: false as const,
+          current: null,
+        };
+      }
+
+      await tx.checklistInstanceItem.updateMany({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        data: {
+          assignedToUserId: input.assignedToUserId,
+          assignedByUserId: input.assignedToUserId ? input.assignedByUserId : null,
+          assignedAt: input.assignedToUserId ? new Date() : null,
+        },
+      });
+
+      const item = await tx.checklistInstanceItem.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          id: input.itemId,
+        },
+        select: checklistInstanceItemWithInstanceSelect,
+      });
+
+      if (!item) {
+        return {
+          updated: false as const,
+          current,
+        };
+      }
+
+      return {
+        updated: true as const,
+        item,
+        previousAssignedToUserId: current.assignedToUserId,
+      };
     });
   },
 

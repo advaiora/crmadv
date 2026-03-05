@@ -11,6 +11,7 @@ export const CHECKLISTS_PERMISSIONS = {
   edit: 'checklists.edit',
   delete: 'checklists.delete',
   completeItem: 'checklists.complete_item',
+  assign: 'checklists.assign',
   overrideGate: 'checklists.override_gate',
 } as const;
 

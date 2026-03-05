@@ -93,6 +93,7 @@ const createTemplateItemSchema = z
     isRequired: z.boolean().optional(),
     requiresEvidenceSnapshot: z.boolean().optional(),
     isCriticalSnapshot: z.boolean().optional(),
+    defaultAssignedToUserId: z.union([idSchema, z.null()]).optional(),
   })
   .strict();
 
@@ -134,6 +135,7 @@ const updateTemplateItemBodySchema = z
     isRequired: z.boolean().optional(),
     requiresEvidenceSnapshot: z.boolean().optional(),
     isCriticalSnapshot: z.boolean().optional(),
+    defaultAssignedToUserId: z.union([idSchema, z.null()]).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -142,7 +144,8 @@ const updateTemplateItemBodySchema = z
       value.description === undefined &&
       value.isRequired === undefined &&
       value.requiresEvidenceSnapshot === undefined &&
-      value.isCriticalSnapshot === undefined
+      value.isCriticalSnapshot === undefined &&
+      value.defaultAssignedToUserId === undefined
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -215,6 +218,12 @@ const markChecklistItemNotApplicableBodySchema = z
       .trim()
       .min(MIN_NOT_APPLICABLE_REASON_LENGTH)
       .max(MAX_DESCRIPTION_LENGTH),
+  })
+  .strict();
+
+const assignChecklistItemBodySchema = z
+  .object({
+    assignedToUserId: z.union([idSchema, z.null()]).optional(),
   })
   .strict();
 
@@ -352,6 +361,9 @@ const mapTemplateItem = (record: ChecklistTemplateItemRecord) => ({
   isRequired: record.isRequired,
   requiresEvidenceSnapshot: record.requiresEvidenceSnapshot,
   isCriticalSnapshot: record.isCriticalSnapshot,
+  defaultAssignedToUserId: record.defaultAssignedToUserId,
+  defaultAssignedToUserName:
+    record.defaultAssignedToUser?.name ?? record.defaultAssignedToUser?.email ?? null,
 });
 
 const mapTemplateWithItems = (record: ChecklistTemplateWithItemsRecord) => ({
@@ -365,6 +377,9 @@ const mapTemplateWithItems = (record: ChecklistTemplateWithItemsRecord) => ({
 
 const mapChecklistInstanceItem = (
   record: ChecklistInstanceItemRecord | ChecklistInstanceItemWithInstanceRecord,
+  options?: {
+    activeUserIds?: Set<string>;
+  },
 ) => ({
   id: record.id,
   templateItemId: record.templateItemId,
@@ -379,16 +394,30 @@ const mapChecklistInstanceItem = (
   notApplicableReason: record.notApplicableReason,
   completedAt: record.completedAt,
   completedByUserId: record.completedByUserId,
+  assignedToUserId: record.assignedToUserId,
+  assignedByUserId: record.assignedByUserId,
+  assignedAt: record.assignedAt,
+  assignedToUserName: record.assignedToUser?.name ?? record.assignedToUser?.email ?? null,
+  assignedByUserName: record.assignedByUser?.name ?? record.assignedByUser?.email ?? null,
+  assignedToUserInactive:
+    record.assignedToUserId && options?.activeUserIds
+      ? !options.activeUserIds.has(record.assignedToUserId)
+      : false,
 });
 
-const mapChecklistInstance = (record: ChecklistInstanceWithItemsRecord) => ({
+const mapChecklistInstance = (
+  record: ChecklistInstanceWithItemsRecord,
+  options?: {
+    activeUserIds?: Set<string>;
+  },
+) => ({
   id: record.id,
   checklistTemplateId: record.checklistTemplateId,
   checklistTemplateName: record.template?.name ?? null,
   pipelineStageId: record.pipelineStageId,
   status: record.status,
   createdAt: record.createdAt,
-  items: record.items.map((item) => mapChecklistInstanceItem(item)),
+  items: record.items.map((item) => mapChecklistInstanceItem(item, options)),
 });
 
 const mapChecklistInstanceSummary = (record: ChecklistInstanceSummaryRecord) => ({
@@ -591,6 +620,10 @@ export const checklistsService = {
     return parseWithSchema(idSchema, rawItemId, 'Checklist item id is invalid');
   },
 
+  parseChecklistInstanceId(rawInstanceId: string) {
+    return parseWithSchema(idSchema, rawInstanceId, 'Checklist instance id is invalid');
+  },
+
   parsePipelineStageId(rawPipelineStageId: string) {
     return parseWithSchema(idSchema, rawPipelineStageId, 'Pipeline stage id is invalid');
   },
@@ -700,6 +733,14 @@ export const checklistsService = {
     );
   },
 
+  parseAssignChecklistItemBody(body: unknown) {
+    return parseWithSchema(
+      assignChecklistItemBodySchema,
+      body,
+      'Invalid checklist item assignee payload',
+    );
+  },
+
   parseUpsertStageChecklistRulesBody(body: unknown) {
     return parseWithSchema(
       upsertStageChecklistRulesBodySchema,
@@ -737,6 +778,19 @@ export const checklistsService = {
     }
 
     return item;
+  },
+
+  async requireActiveWorkspaceMember(workspaceId: string, userId: string) {
+    const member = await checklistsRepository.findActiveWorkspaceMemberByUserId(
+      workspaceId,
+      userId,
+    );
+
+    if (!member) {
+      throw badRequest('Assigned user must be an active workspace member');
+    }
+
+    return member;
   },
 
   async ensureProjectBelongsToWorkspace(workspaceId: string, projectId: string) {
@@ -797,6 +851,23 @@ export const checklistsService = {
   }) {
     const payload = this.parseCreateTemplateBody(input.body);
     const items = payload.items ?? [];
+    const normalizedItems = await Promise.all(
+      items.map(async (item) => {
+        const defaultAssignedToUserId = item.defaultAssignedToUserId ?? null;
+        if (defaultAssignedToUserId) {
+          await this.requireActiveWorkspaceMember(input.workspaceId, defaultAssignedToUserId);
+        }
+
+        return {
+          title: item.title,
+          description: normalizeOptionalString(item.description),
+          isRequired: item.isRequired ?? true,
+          requiresEvidenceSnapshot: item.requiresEvidenceSnapshot ?? false,
+          isCriticalSnapshot: item.isCriticalSnapshot ?? false,
+          defaultAssignedToUserId,
+        };
+      }),
+    );
 
     try {
       const created = await checklistsRepository.createTemplateWithItems({
@@ -804,13 +875,7 @@ export const checklistsService = {
         name: payload.name,
         appliesTo: payload.appliesTo,
         description: normalizeOptionalString(payload.description),
-        items: items.map((item) => ({
-          title: item.title,
-          description: normalizeOptionalString(item.description),
-          isRequired: item.isRequired ?? true,
-          requiresEvidenceSnapshot: item.requiresEvidenceSnapshot ?? false,
-          isCriticalSnapshot: item.isCriticalSnapshot ?? false,
-        })),
+        items: normalizedItems,
       });
 
       await audit.log({
@@ -1003,8 +1068,12 @@ export const checklistsService = {
   }) {
     const templateId = this.parseTemplateId(input.templateId);
     const payload = this.parseCreateTemplateItemBody(input.body);
+    const defaultAssignedToUserId = payload.defaultAssignedToUserId ?? null;
 
     await this.requireTemplate(input.workspaceId, templateId);
+    if (defaultAssignedToUserId) {
+      await this.requireActiveWorkspaceMember(input.workspaceId, defaultAssignedToUserId);
+    }
 
     const createdItem = await checklistsRepository.createTemplateItem({
       workspaceId: input.workspaceId,
@@ -1014,6 +1083,7 @@ export const checklistsService = {
       isRequired: payload.isRequired ?? true,
       requiresEvidenceSnapshot: payload.requiresEvidenceSnapshot ?? false,
       isCriticalSnapshot: payload.isCriticalSnapshot ?? false,
+      defaultAssignedToUserId,
     });
 
     if (!createdItem) {
@@ -1055,6 +1125,11 @@ export const checklistsService = {
     const nextRequired = payload.isRequired;
     const nextRequiresEvidence = payload.requiresEvidenceSnapshot;
     const nextCritical = payload.isCriticalSnapshot;
+    const nextDefaultAssignedToUserId = payload.defaultAssignedToUserId;
+
+    if (nextDefaultAssignedToUserId) {
+      await this.requireActiveWorkspaceMember(input.workspaceId, nextDefaultAssignedToUserId);
+    }
 
     const fieldsChanged: string[] = [];
     if (nextTitle !== undefined && nextTitle !== currentItem.title) {
@@ -1075,6 +1150,12 @@ export const checklistsService = {
     if (nextCritical !== undefined && nextCritical !== currentItem.isCriticalSnapshot) {
       fieldsChanged.push('isCriticalSnapshot');
     }
+    if (
+      nextDefaultAssignedToUserId !== undefined &&
+      nextDefaultAssignedToUserId !== currentItem.defaultAssignedToUserId
+    ) {
+      fieldsChanged.push('defaultAssignedToUserId');
+    }
 
     let updatedItem = currentItem;
     if (fieldsChanged.length > 0) {
@@ -1090,6 +1171,9 @@ export const checklistsService = {
             ? { requiresEvidenceSnapshot: nextRequiresEvidence }
             : {}),
           ...(nextCritical !== undefined ? { isCriticalSnapshot: nextCritical } : {}),
+          ...(nextDefaultAssignedToUserId !== undefined
+            ? { defaultAssignedToUserId: nextDefaultAssignedToUserId }
+            : {}),
         },
       );
 
@@ -1474,14 +1558,19 @@ export const checklistsService = {
     }
 
     if (parsedQuery.includeItems) {
-      const instancesWithItems = await checklistsRepository.listChecklistInstancesByProjectWithItems(
-        workspaceId,
-        projectId,
-        stageId,
-      );
+      const [instancesWithItems, activeMembers] = await Promise.all([
+        checklistsRepository.listChecklistInstancesByProjectWithItems(
+          workspaceId,
+          projectId,
+          stageId,
+        ),
+        checklistsRepository.listActiveWorkspaceMembers(workspaceId),
+      ]);
+      const activeUserIds = new Set(activeMembers.map((member) => member.userId));
 
       return {
-        items: instancesWithItems.map((instance) => mapChecklistInstance(instance)),
+        items: instancesWithItems.map((instance) =>
+          mapChecklistInstance(instance, { activeUserIds })),
       };
     }
 
@@ -1493,6 +1582,17 @@ export const checklistsService = {
 
     return {
       items: instances.map((instance) => mapChecklistInstanceSummary(instance)),
+    };
+  },
+
+  async listAssignableUsers(workspaceId: string) {
+    const members = await checklistsRepository.listActiveWorkspaceMembers(workspaceId);
+    return {
+      items: members.map((member) => ({
+        userId: member.userId,
+        name: member.user.name ?? member.user.email,
+        email: member.user.email,
+      })),
     };
   },
 
@@ -1678,6 +1778,66 @@ export const checklistsService = {
     return mapChecklistInstanceItem(resetItem);
   },
 
+  async assignChecklistItem(input: {
+    workspaceId: string;
+    itemId?: string;
+    itemInstanceId?: string;
+    checklistInstanceId?: string;
+    actorUserId: string;
+    body: unknown;
+    request?: FastifyRequest;
+  }) {
+    const rawItemId = input.itemInstanceId ?? input.itemId;
+    if (!rawItemId) {
+      throw badRequest('Checklist item id is required');
+    }
+
+    const item = await this.requireChecklistInstanceItem(input.workspaceId, rawItemId);
+    const checklistInstanceId = input.checklistInstanceId
+      ? this.parseChecklistInstanceId(input.checklistInstanceId)
+      : null;
+    if (checklistInstanceId && item.instanceId !== checklistInstanceId) {
+      throw notFound('Checklist instance item not found');
+    }
+
+    const payload = this.parseAssignChecklistItemBody(input.body);
+    const assignedToUserId = payload.assignedToUserId ?? null;
+
+    if (assignedToUserId) {
+      await this.requireActiveWorkspaceMember(input.workspaceId, assignedToUserId);
+    }
+
+    const updated = await checklistsRepository.updateChecklistItemAssignee({
+      workspaceId: input.workspaceId,
+      itemId: item.id,
+      assignedToUserId,
+      assignedByUserId: input.actorUserId,
+    });
+
+    if (!updated.updated) {
+      throw notFound('Checklist item not found');
+    }
+
+    await audit.log({
+      event: assignedToUserId ? 'checklists.item.assign' : 'checklists.item.unassign',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      entityType: 'ChecklistInstanceItem',
+      entityId: updated.item.id,
+      metadata: {
+        instanceId: updated.item.instanceId,
+        itemInstanceId: updated.item.id,
+        projectId: updated.item.instance.projectId,
+        stageId: updated.item.instance.pipelineStageId,
+        fromUserId: updated.previousAssignedToUserId,
+        toUserId: assignedToUserId,
+      },
+      request: input.request,
+    });
+
+    return mapChecklistInstanceItem(updated.item);
+  },
+
   async toggleChecklistInstanceItemCompletion(input: {
     workspaceId: string;
     checklistInstanceId: string;
@@ -1686,7 +1846,7 @@ export const checklistsService = {
     body: unknown;
     request?: FastifyRequest;
   }) {
-    const checklistInstanceId = this.parseChecklistInstanceItemId(input.checklistInstanceId);
+    const checklistInstanceId = this.parseChecklistInstanceId(input.checklistInstanceId);
     const item = await this.requireChecklistInstanceItem(input.workspaceId, input.itemId);
     if (item.instanceId !== checklistInstanceId) {
       throw notFound('Checklist instance item not found');
