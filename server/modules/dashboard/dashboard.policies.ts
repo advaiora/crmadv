@@ -119,6 +119,7 @@ export const resolveRoleTierFromPermissions = (
       'quotes.send',
       'quotes.accept',
       'checklists.edit',
+      'checklists.assign',
     ])
   ) {
     return DASHBOARD_ROLE_TIER.manager;

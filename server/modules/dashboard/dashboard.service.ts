@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { badRequest } from '../../core/errors.js';
 import { moduleRepository } from '../../repositories/module.repository.js';
 import { rbacRepository } from '../../repositories/rbac.repository.js';
 import { dashboardRepository, type DashboardUrgentRecord } from './dashboard.repository.js';
@@ -209,6 +210,59 @@ const widget = (
   data,
 });
 
+const parseTeamWorkloadQuery = (query: unknown) => {
+  const source =
+    query && typeof query === 'object'
+      ? (query as Record<string, unknown>)
+      : {};
+
+  const normalizedRange = String(source.range ?? '7').trim().toLowerCase();
+  const includeAllUsersRaw = String(source.includeAllUsers ?? 'true').trim().toLowerCase();
+  const includeAllUsers = includeAllUsersRaw !== 'false';
+  const now = new Date();
+
+  if (normalizedRange === '30') {
+    return {
+      from: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      to: now,
+      includeAllUsers,
+    };
+  }
+
+  if (normalizedRange === 'custom') {
+    const fromRaw = source.from;
+    const toRaw = source.to;
+    if (typeof fromRaw !== 'string' || typeof toRaw !== 'string') {
+      throw badRequest('Custom range requires from and to query parameters');
+    }
+
+    const from = new Date(fromRaw);
+    const to = new Date(toRaw);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw badRequest('Invalid custom range dates');
+    }
+    if (from >= to) {
+      throw badRequest('from must be earlier than to');
+    }
+
+    return {
+      from,
+      to,
+      includeAllUsers,
+    };
+  }
+
+  if (normalizedRange !== '7') {
+    throw badRequest('range must be one of 7, 30, custom');
+  }
+
+  return {
+    from: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+    to: now,
+    includeAllUsers,
+  };
+};
+
 export const buildDashboardService = (
   dependencies: DashboardServiceDependencies = defaultDependencies,
 ) => {
@@ -271,6 +325,7 @@ export const buildDashboardService = (
       const canViewQuotes = hasPermissionKey(permissionKeys, 'quotes.view');
       const canViewClients = hasPermissionKey(permissionKeys, 'clients.view');
       const canViewChecklists = hasPermissionKey(permissionKeys, 'checklists.view');
+      const canAssignChecklistItems = hasPermissionKey(permissionKeys, 'checklists.assign');
       const canViewTeam = hasPermissionKey(permissionKeys, 'team.view');
       const canViewModules = hasAnyPermissionKey(permissionKeys, ['modules.manage', 'modules.view']);
       const canViewAudit = hasPermissionKey(permissionKeys, 'audit.view');
@@ -362,7 +417,12 @@ export const buildDashboardService = (
 
       const loadTeamWorkload = () => {
         if (!teamWorkloadPromise) {
-          teamWorkloadPromise = dashboardRepositoryApi.getTeamWorkload(context.workspaceId);
+          teamWorkloadPromise = dashboardRepositoryApi.getTeamWorkload(context.workspaceId, {
+            includeAssignmentData: canAssignChecklistItems,
+            includeAllUsers: true,
+            from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            to: new Date(),
+          });
         }
 
         return teamWorkloadPromise;
@@ -502,7 +562,10 @@ export const buildDashboardService = (
             'team_workload',
             'Team Workload',
             order,
-            await loadTeamWorkload(),
+            {
+              ...(await loadTeamWorkload()),
+              canAssignChecklistItems,
+            },
           ));
           order += 1;
         }
@@ -600,7 +663,10 @@ export const buildDashboardService = (
             'team_workload',
             'Team Workload',
             order,
-            await loadTeamWorkload(),
+            {
+              ...(await loadTeamWorkload()),
+              canAssignChecklistItems,
+            },
           ));
           order += 1;
         }
@@ -751,7 +817,18 @@ export const buildDashboardService = (
           loadUrgent(),
           loadKpis(),
           canViewProjects ? loadPipelineSnapshot() : Promise.resolve([]),
-          canViewTeam ? loadTeamWorkload() : Promise.resolve({ openChecklistByUser: [] }),
+          canViewTeam
+            ? loadTeamWorkload()
+            : Promise.resolve({
+              openChecklistByUser: [],
+              byUser: [],
+              range: {
+                from: new Date().toISOString(),
+                to: new Date().toISOString(),
+              },
+              assignableUsers: [],
+              unassignedItems: [],
+            }),
           canViewChecklists ? loadMyTasks() : Promise.resolve({ items: [] }),
           canViewProjects ? loadProjectFreshness() : Promise.resolve(null),
           canViewChecklists ? loadChecklistCompletionStats() : Promise.resolve(null),
@@ -856,6 +933,24 @@ export const buildDashboardService = (
         role,
         widgets: sortedWidgets,
       });
+    },
+
+    async getTeamWorkload(input: {
+      workspaceId: string;
+      query: unknown;
+    }) {
+      const parsed = parseTeamWorkloadQuery(input.query);
+      const workload = await dashboardRepositoryApi.getTeamWorkload(input.workspaceId, {
+        includeAssignmentData: false,
+        includeAllUsers: parsed.includeAllUsers,
+        from: parsed.from,
+        to: parsed.to,
+      });
+
+      return {
+        range: workload.range,
+        items: workload.byUser,
+      };
     },
   };
 };

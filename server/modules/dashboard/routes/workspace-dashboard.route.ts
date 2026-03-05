@@ -6,18 +6,28 @@ import {
   type DashboardPermissionKey,
 } from '../dashboard.policies.js';
 import { dashboardService } from '../dashboard.service.js';
+import { requirePermission } from '../../../guards/requirePermission.js';
 
 type DashboardRouteDependencies = {
   ensureDashboardAccessFn: (
     request: Parameters<typeof ensureDashboardAccess>[0],
     permissionKey: DashboardPermissionKey,
   ) => ReturnType<typeof ensureDashboardAccess>;
+  requirePermissionFn: typeof requirePermission;
   dashboardServiceApi: typeof dashboardService;
 };
 
 const defaultDependencies: DashboardRouteDependencies = {
   ensureDashboardAccessFn: ensureDashboardAccess,
+  requirePermissionFn: requirePermission,
   dashboardServiceApi: dashboardService,
+};
+
+type TeamWorkloadQuery = {
+  range?: string;
+  from?: string;
+  to?: string;
+  includeAllUsers?: string;
 };
 
 export const buildWorkspaceDashboardRoute = (
@@ -25,6 +35,7 @@ export const buildWorkspaceDashboardRoute = (
 ): FastifyPluginAsync => async (app) => {
   const {
     ensureDashboardAccessFn,
+    requirePermissionFn,
     dashboardServiceApi,
   } = {
     ...defaultDependencies,
@@ -48,6 +59,19 @@ export const buildWorkspaceDashboardRoute = (
     reply.header('Cache-Control', 'private, max-age=30');
 
     return ok(reply, home);
+  });
+
+  app.get<{ Querystring: TeamWorkloadQuery }>('/api/dashboard/team-workload', async (request, reply) => {
+    const { user, workspace } = await ensureDashboardAccessFn(request, DASHBOARD_PERMISSIONS.view);
+    await requirePermissionFn(user.id, workspace.id, 'team.view');
+    await requirePermissionFn(user.id, workspace.id, 'checklists.view');
+
+    const workload = await dashboardServiceApi.getTeamWorkload({
+      workspaceId: workspace.id,
+      query: request.query,
+    });
+
+    return ok(reply, workload);
   });
 };
 

@@ -34,10 +34,38 @@ type ActivityRecord = {
 };
 
 type TeamWorkloadRecord = {
+  range: {
+    from: string;
+    to: string;
+  };
+  byUser: Array<{
+    userId: string;
+    name: string;
+    email: string | null;
+    avatarUrl: string | null;
+    membershipStatus: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'UNKNOWN';
+    assignedOpen: number;
+    completedInRange: number;
+    overdue: number;
+  }>;
   openChecklistByUser: Array<{
     userId: string;
     name: string;
     count: number;
+  }>;
+  assignableUsers: Array<{
+    userId: string;
+    name: string;
+    email: string;
+  }>;
+  unassignedItems: Array<{
+    itemId: string;
+    instanceId: string;
+    title: string;
+    projectId: string | null;
+    projectName: string | null;
+    pipelineStageId: string | null;
+    updatedAt: string;
   }>;
 };
 
@@ -213,29 +241,25 @@ const toStartOfDay = (value: Date) => {
   return date;
 };
 
-const toStartOfWeek = (value: Date) => {
-  const date = toStartOfDay(value);
-  const weekday = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - weekday);
-  return date;
-};
-
-const buildWeeklyBuckets = (weeks: number) => {
-  const currentWeekStart = toStartOfWeek(now());
+const buildRollingWeeklyBuckets = (weeks: number) => {
+  const todayStart = toStartOfDay(now());
+  const endExclusive = new Date(todayStart);
+  endExclusive.setDate(endExclusive.getDate() + 1);
   const buckets: Array<{ label: string; start: Date; end: Date }> = [];
 
   for (let offset = weeks - 1; offset >= 0; offset -= 1) {
-    const start = new Date(currentWeekStart);
-    start.setDate(start.getDate() - offset * 7);
+    const start = new Date(endExclusive);
+    start.setDate(start.getDate() - (offset + 1) * 7);
 
-    const end = new Date(start);
-    end.setDate(end.getDate() + 7);
+    const end = new Date(endExclusive);
+    end.setDate(end.getDate() - offset * 7);
+    const labelDate = new Date(end.getTime() - 1);
 
     buckets.push({
       label: new Intl.DateTimeFormat('it-IT', {
         day: '2-digit',
         month: 'short',
-      }).format(start),
+      }).format(labelDate),
       start,
       end,
     });
@@ -611,25 +635,310 @@ export const dashboardRepository = {
     }));
   },
 
-  async getTeamWorkload(workspaceId: string): Promise<TeamWorkloadRecord> {
-    // TODO: current schema has no explicit checklist assignee user.
-    // We expose a safe aggregate fallback without leaking unrelated data.
-    const openChecklistItemsCount = await prisma.checklistInstanceItem.count({
-      where: listIncompleteRequiredChecklistItemsWhere(workspaceId),
-    });
+  async getTeamWorkload(
+    workspaceId: string,
+    options?: {
+      includeAssignmentData?: boolean;
+      includeAllUsers?: boolean;
+      from?: Date;
+      to?: Date;
+      overdueSlaDays?: number;
+    },
+  ): Promise<TeamWorkloadRecord> {
+    const includeAssignmentData = Boolean(options?.includeAssignmentData);
+    const includeAllUsers = options?.includeAllUsers ?? true;
+    const to = options?.to ?? now();
+    const from = options?.from ?? new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const overdueSlaDays = options?.overdueSlaDays ?? 7;
+    const overdueThreshold = new Date(now().getTime() - overdueSlaDays * 24 * 60 * 60 * 1000);
 
-    if (openChecklistItemsCount <= 0) {
-      return { openChecklistByUser: [] };
+    const [
+      openByAssignee,
+      completedByAssignee,
+      overdueByAssignee,
+      unassignedOpenCount,
+      activeMembers,
+    ] = await Promise.all([
+      prisma.checklistInstanceItem.groupBy({
+        by: ['assignedToUserId'],
+        where: {
+          ...listIncompleteRequiredChecklistItemsWhere(workspaceId),
+          assignedToUserId: {
+            not: null,
+          },
+        },
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.checklistInstanceItem.groupBy({
+        by: ['assignedToUserId'],
+        where: {
+          workspaceId,
+          assignedToUserId: {
+            not: null,
+          },
+          state: 'completed',
+          completedAt: {
+            gte: from,
+            lt: to,
+          },
+        },
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.checklistInstanceItem.groupBy({
+        by: ['assignedToUserId'],
+        where: {
+          workspaceId,
+          assignedToUserId: {
+            not: null,
+          },
+          isRequiredSnapshot: true,
+          createdAt: {
+            lt: overdueThreshold,
+          },
+          state: {
+            in: CHECKLIST_INCOMPLETE_STATES,
+          },
+        },
+        _count: {
+          _all: true,
+        },
+      }),
+      prisma.checklistInstanceItem.count({
+        where: {
+          ...listIncompleteRequiredChecklistItemsWhere(workspaceId),
+          assignedToUserId: null,
+        },
+      }),
+      (includeAllUsers || includeAssignmentData)
+        ? prisma.membership.findMany({
+            where: {
+              workspaceId,
+              status: 'ACTIVE',
+            },
+            select: {
+              userId: true,
+              status: true,
+              user: {
+                select: {
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: [
+              {
+                createdAt: 'asc',
+              },
+              {
+                id: 'asc',
+              },
+            ],
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const trackedUserIds = new Set<string>();
+    for (const group of openByAssignee) {
+      if (group.assignedToUserId) {
+        trackedUserIds.add(group.assignedToUserId);
+      }
+    }
+    for (const group of completedByAssignee) {
+      if (group.assignedToUserId) {
+        trackedUserIds.add(group.assignedToUserId);
+      }
+    }
+    for (const group of overdueByAssignee) {
+      if (group.assignedToUserId) {
+        trackedUserIds.add(group.assignedToUserId);
+      }
+    }
+    if (includeAllUsers) {
+      for (const member of activeMembers) {
+        trackedUserIds.add(member.userId);
+      }
     }
 
-    return {
-      openChecklistByUser: [
+    const trackedUserIdList = Array.from(trackedUserIds);
+    const memberships = trackedUserIdList.length > 0
+      ? await prisma.membership.findMany({
+          where: {
+            workspaceId,
+            userId: {
+              in: trackedUserIdList,
+            },
+          },
+          select: {
+            userId: true,
+            status: true,
+            user: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
+          },
+        })
+      : [];
+    const membershipByUserId = new Map(
+      memberships.map((entry) => [entry.userId, entry]),
+    );
+    const activeMemberByUserId = new Map(
+      activeMembers.map((entry) => [entry.userId, entry]),
+    );
+
+    const openCountByUserId = new Map(
+      openByAssignee
+        .filter((entry) => typeof entry.assignedToUserId === 'string' && entry.assignedToUserId.length > 0)
+        .map((entry) => [entry.assignedToUserId as string, entry._count._all]),
+    );
+    const completedCountByUserId = new Map(
+      completedByAssignee
+        .filter((entry) => typeof entry.assignedToUserId === 'string' && entry.assignedToUserId.length > 0)
+        .map((entry) => [entry.assignedToUserId as string, entry._count._all]),
+    );
+    const overdueCountByUserId = new Map(
+      overdueByAssignee
+        .filter((entry) => typeof entry.assignedToUserId === 'string' && entry.assignedToUserId.length > 0)
+        .map((entry) => [entry.assignedToUserId as string, entry._count._all]),
+    );
+
+    const byUser = trackedUserIdList
+      .map((userId) => {
+        const membership = membershipByUserId.get(userId) ?? null;
+        const activeMembership = activeMemberByUserId.get(userId) ?? null;
+        const userName = membership?.user.name
+          ?? membership?.user.email
+          ?? activeMembership?.user.name
+          ?? activeMembership?.user.email
+          ?? 'Utente non disponibile';
+        const membershipStatus = membership?.status ?? 'UNKNOWN';
+
+        return {
+          userId,
+          name: membershipStatus === 'INACTIVE' ? `${userName} (disattivato)` : userName,
+          email: membership?.user.email ?? activeMembership?.user.email ?? null,
+          avatarUrl: null,
+          membershipStatus,
+          assignedOpen: openCountByUserId.get(userId) ?? 0,
+          completedInRange: completedCountByUserId.get(userId) ?? 0,
+          overdue: overdueCountByUserId.get(userId) ?? 0,
+        };
+      })
+      .sort((left, right) => {
+        if (left.assignedOpen !== right.assignedOpen) {
+          return right.assignedOpen - left.assignedOpen;
+        }
+        if (left.completedInRange !== right.completedInRange) {
+          return right.completedInRange - left.completedInRange;
+        }
+        return left.name.localeCompare(right.name, 'it');
+      });
+
+    const openChecklistByUser = byUser
+      .filter((entry) => entry.assignedOpen > 0)
+      .map((entry) => ({
+        userId: entry.userId,
+        name: entry.name,
+        count: entry.assignedOpen,
+      }));
+    if (unassignedOpenCount > 0) {
+      openChecklistByUser.push({
+        userId: 'unassigned',
+        name: 'Non assegnato',
+        count: unassignedOpenCount,
+      });
+    }
+
+    if (!includeAssignmentData) {
+      return {
+        range: {
+          from: toIso(from),
+          to: toIso(to),
+        },
+        byUser,
+        openChecklistByUser,
+        assignableUsers: [],
+        unassignedItems: [],
+      };
+    }
+
+    const unassignedItemsRaw = await prisma.checklistInstanceItem.findMany({
+      where: {
+        ...listIncompleteRequiredChecklistItemsWhere(workspaceId),
+        assignedToUserId: null,
+      },
+      select: {
+        id: true,
+        instanceId: true,
+        titleSnapshot: true,
+        updatedAt: true,
+        instance: {
+          select: {
+            projectId: true,
+            pipelineStageId: true,
+          },
+        },
+      },
+      orderBy: [
         {
-          userId: 'unassigned',
-          name: 'Non assegnato',
-          count: openChecklistItemsCount,
+          updatedAt: 'desc',
+        },
+        {
+          createdAt: 'desc',
         },
       ],
+      take: 12,
+    });
+
+    const projectIds = Array.from(
+      new Set(
+        unassignedItemsRaw
+          .map((item) => item.instance.projectId)
+          .filter((value): value is string => typeof value === 'string' && value.length > 0),
+      ),
+    );
+    const projects = projectIds.length > 0
+      ? await prisma.project.findMany({
+          where: {
+            workspaceId,
+            id: {
+              in: projectIds,
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+      : [];
+    const projectById = new Map(projects.map((project) => [project.id, project.name]));
+
+    return {
+      range: {
+        from: toIso(from),
+        to: toIso(to),
+      },
+      byUser,
+      openChecklistByUser,
+      assignableUsers: activeMembers.map((entry) => ({
+        userId: entry.userId,
+        name: entry.user.name ?? entry.user.email,
+        email: entry.user.email,
+      })),
+      unassignedItems: unassignedItemsRaw.map((item) => ({
+        itemId: item.id,
+        instanceId: item.instanceId,
+        title: item.titleSnapshot,
+        projectId: item.instance.projectId,
+        projectName: item.instance.projectId ? (projectById.get(item.instance.projectId) ?? null) : null,
+        pipelineStageId: item.instance.pipelineStageId,
+        updatedAt: toIso(item.updatedAt),
+      })),
     };
   },
 
@@ -814,8 +1123,9 @@ export const dashboardRepository = {
   },
 
   async getClientsTrend(workspaceId: string): Promise<ClientsTrendRecord> {
-    const buckets = buildWeeklyBuckets(8);
+    const buckets = buildRollingWeeklyBuckets(8);
     const firstBucketStart = buckets[0]?.start;
+    const lastBucketEnd = buckets[buckets.length - 1]?.end;
     if (!firstBucketStart) {
       return { points: [] };
     }
@@ -825,6 +1135,11 @@ export const dashboardRepository = {
         workspaceId,
         createdAt: {
           gte: firstBucketStart,
+          ...(lastBucketEnd
+            ? {
+                lt: lastBucketEnd,
+              }
+            : {}),
         },
       },
       select: {
