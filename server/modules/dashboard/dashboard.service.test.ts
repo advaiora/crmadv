@@ -178,3 +178,41 @@ test('dashboard home resolves tier from permissions when role name is lower', as
   const widgetTypes = new Set(result.widgets.map((widget) => widget.type));
   assert.equal(widgetTypes.has('modules_status'), true);
 });
+
+test('dashboard team workload forwards workspace scope to repository', async () => {
+  let capturedWorkspaceId: string | null = null;
+
+  const repository = buildMockDashboardRepository();
+  repository.getTeamWorkload = async (workspaceId) => {
+    capturedWorkspaceId = workspaceId;
+    return {
+      range: {
+        from: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+        to: new Date('2026-01-08T00:00:00.000Z').toISOString(),
+      },
+      byUser: [],
+      openChecklistByUser: [],
+      assignableUsers: [],
+      unassignedItems: [],
+    };
+  };
+
+  const service = buildDashboardService({
+    dashboardRepositoryApi: repository as never,
+    rbacRepositoryApi: {
+      listUserPermissions: async () => ([]),
+      listUserRoles: async () => ([]),
+    } as never,
+    moduleRepositoryApi: {
+      listEnabledModules: async () => ([]),
+    } as never,
+  });
+
+  const result = await service.getTeamWorkload({
+    workspaceId: 'workspace-scope-1',
+    query: { range: '7' },
+  });
+
+  assert.equal(capturedWorkspaceId, 'workspace-scope-1');
+  assert.equal(Array.isArray(result.items), true);
+});

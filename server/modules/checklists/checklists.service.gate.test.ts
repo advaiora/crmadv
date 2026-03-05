@@ -66,3 +66,56 @@ test('projects.move_stage gate returns GATE_BLOCKED with missing items when requ
     },
   );
 });
+
+test('assignChecklistItem rejects assignee outside workspace', async (t) => {
+  t.mock.method(checklistsRepository, 'findChecklistInstanceItemById', async () => ({
+    id: 'item-1',
+    instanceId: 'instance-1',
+    workspaceId: 'workspace-1',
+    templateItemId: 'template-item-1',
+    titleSnapshot: 'Task',
+    isRequiredSnapshot: true,
+    requiresEvidenceSnapshot: false,
+    isCriticalSnapshot: false,
+    sortOrderSnapshot: 0,
+    state: 'pending',
+    evidenceNote: null,
+    evidenceUrl: null,
+    notApplicableReason: null,
+    completedAt: null,
+    completedByUserId: null,
+    assignedToUserId: null,
+    assignedByUserId: null,
+    assignedAt: null,
+    assignedToUser: null,
+    assignedByUser: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    instance: {
+      id: 'instance-1',
+      workspaceId: 'workspace-1',
+      projectId: 'project-1',
+      pipelineStageId: 'stage-1',
+      checklistTemplateId: 'template-1',
+      status: 'active',
+    },
+  } as never));
+
+  t.mock.method(checklistsRepository, 'findActiveWorkspaceMemberByUserId', async () => null);
+
+  await assert.rejects(
+    async () => checklistsService.assignChecklistItem({
+      workspaceId: 'workspace-1',
+      itemId: 'item-1',
+      actorUserId: 'actor-1',
+      body: {
+        assignedToUserId: 'user-outside-workspace',
+      },
+    }),
+    (error) => {
+      assert.equal(isHttpError(error), true);
+      assert.equal(error.statusCode, 400);
+      return true;
+    },
+  );
+});

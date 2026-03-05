@@ -6,6 +6,7 @@ import { buildWorkspaceDashboardRoute } from './workspace-dashboard.route.js';
 
 const createTestApp = async (input?: {
   ensureDashboardAccessFn?: Parameters<typeof buildWorkspaceDashboardRoute>[0]['ensureDashboardAccessFn'];
+  requirePermissionFn?: Parameters<typeof buildWorkspaceDashboardRoute>[0]['requirePermissionFn'];
 }) => {
   const app = Fastify({ logger: false });
 
@@ -16,6 +17,7 @@ const createTestApp = async (input?: {
           user: { id: 'user-1' },
           workspace: { id: 'workspace-1' },
         })),
+      requirePermissionFn: input?.requirePermissionFn ?? (async () => undefined),
       dashboardServiceApi: {
         getOverview: async () => ({
           kpis: {
@@ -31,6 +33,13 @@ const createTestApp = async (input?: {
         getHome: async () => ({
           role: 'viewer',
           widgets: [],
+        }),
+        getTeamWorkload: async () => ({
+          range: {
+            from: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+            to: new Date('2026-01-08T00:00:00.000Z').toISOString(),
+          },
+          items: [],
         }),
       },
     }),
@@ -121,6 +130,27 @@ test('dashboard home route sets private cache header', async () => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.headers['cache-control'], 'private, max-age=30');
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('dashboard team workload route returns 403 when permission is missing', async () => {
+  let app: FastifyInstance | null = null;
+
+  try {
+    app = await createTestApp({
+      requirePermissionFn: async () => {
+        throw forbidden('Permission denied');
+      },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/team-workload',
+    });
+
+    assert.equal(response.statusCode, 403);
   } finally {
     await closeApp(app);
   }
