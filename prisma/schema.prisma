@@ -150,39 +150,42 @@ model Workspace {
 }
 
 model User {
-  id                                String                      @id @default(cuid())
-  email                             String                      @unique
-  googleSub                         String?                     @unique
-  name                              String?
-  passwordHash                      String?
-  vaultPasswordHash                 String?
-  role                              String                      @default("member")
-  createdAt                         DateTime                    @default(now())
-  updatedAt                         DateTime                    @updatedAt
-  memberships                       Membership[]
-  teamInvitesSent                   TeamInvite[]                @relation("TeamInviteInvitedByUser")
-  teamInvitesAccepted               TeamInvite[]                @relation("TeamInviteAcceptedByUser")
-  userRoles                         UserRole[]
-  createdQuotes                     Quote[]                     @relation("QuoteCreatedByUser")
-  createdCalendarEvents             CalendarEvent[]             @relation("CalendarEventCreatedByUser")
-  updatedCalendarEvents             CalendarEvent[]             @relation("CalendarEventUpdatedByUser")
-  ownedWebsiteAssets                WebsiteAsset[]              @relation("WebsiteAssetOwner")
-  ownedWebAppAssets                 WebAppAsset[]               @relation("WebAppAssetOwner")
-  ownedEcommerceAssets              EcommerceAsset[]            @relation("EcommerceAssetOwner")
-  createdWebAssetVersions           WebAssetVersion[]           @relation("WebAssetVersionCreatedByUser")
-  createdWebAssetHealthChecks       WebAssetHealthCheck[]       @relation("WebAssetHealthCheckCreatedByUser")
-  createdWebAssetSeoReports         WebAssetSeoReport[]         @relation("WebAssetSeoReportCreatedByUser")
-  createdWebAssetAnalyticsSnapshots WebAssetAnalyticsSnapshot[] @relation("WebAssetAnalyticsSnapshotCreatedByUser")
-  createdWebAssetAnalyticsEvents    WebAssetAnalyticsEvent[]    @relation("WebAssetAnalyticsEventCreatedByUser")
-  createdWebAssetMaintenanceWindows WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowCreatedByUser")
-  updatedWebAssetMaintenanceWindows WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowUpdatedByUser")
-  createdWebAssetAlerts             WebAssetAlert[]             @relation("WebAssetAlertCreatedByUser")
-  sentWorkspaceMessages             WorkspaceMessage[]          @relation("WorkspaceMessageSender")
-  receivedWorkspaceMessages         WorkspaceMessage[]          @relation("WorkspaceMessageRecipient")
-  createdVaultItems                 VaultItem[]                 @relation("VaultItemCreatedByUser")
-  updatedVaultItems                 VaultItem[]                 @relation("VaultItemUpdatedByUser")
-  auditLogs                         AuditLog[]                  @relation("AuditActor")
-  completedChecklistItems           ChecklistInstanceItem[]
+  id                                    String                      @id @default(cuid())
+  email                                 String                      @unique
+  googleSub                             String?                     @unique
+  name                                  String?
+  passwordHash                          String?
+  vaultPasswordHash                     String?
+  role                                  String                      @default("member")
+  createdAt                             DateTime                    @default(now())
+  updatedAt                             DateTime                    @updatedAt
+  memberships                           Membership[]
+  teamInvitesSent                       TeamInvite[]                @relation("TeamInviteInvitedByUser")
+  teamInvitesAccepted                   TeamInvite[]                @relation("TeamInviteAcceptedByUser")
+  userRoles                             UserRole[]
+  createdQuotes                         Quote[]                     @relation("QuoteCreatedByUser")
+  createdCalendarEvents                 CalendarEvent[]             @relation("CalendarEventCreatedByUser")
+  updatedCalendarEvents                 CalendarEvent[]             @relation("CalendarEventUpdatedByUser")
+  ownedWebsiteAssets                    WebsiteAsset[]              @relation("WebsiteAssetOwner")
+  ownedWebAppAssets                     WebAppAsset[]               @relation("WebAppAssetOwner")
+  ownedEcommerceAssets                  EcommerceAsset[]            @relation("EcommerceAssetOwner")
+  createdWebAssetVersions               WebAssetVersion[]           @relation("WebAssetVersionCreatedByUser")
+  createdWebAssetHealthChecks           WebAssetHealthCheck[]       @relation("WebAssetHealthCheckCreatedByUser")
+  createdWebAssetSeoReports             WebAssetSeoReport[]         @relation("WebAssetSeoReportCreatedByUser")
+  createdWebAssetAnalyticsSnapshots     WebAssetAnalyticsSnapshot[] @relation("WebAssetAnalyticsSnapshotCreatedByUser")
+  createdWebAssetAnalyticsEvents        WebAssetAnalyticsEvent[]    @relation("WebAssetAnalyticsEventCreatedByUser")
+  createdWebAssetMaintenanceWindows     WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowCreatedByUser")
+  updatedWebAssetMaintenanceWindows     WebAssetMaintenanceWindow[] @relation("WebAssetMaintenanceWindowUpdatedByUser")
+  createdWebAssetAlerts                 WebAssetAlert[]             @relation("WebAssetAlertCreatedByUser")
+  sentWorkspaceMessages                 WorkspaceMessage[]          @relation("WorkspaceMessageSender")
+  receivedWorkspaceMessages             WorkspaceMessage[]          @relation("WorkspaceMessageRecipient")
+  createdVaultItems                     VaultItem[]                 @relation("VaultItemCreatedByUser")
+  updatedVaultItems                     VaultItem[]                 @relation("VaultItemUpdatedByUser")
+  auditLogs                             AuditLog[]                  @relation("AuditActor")
+  completedChecklistItems               ChecklistInstanceItem[]     @relation("ChecklistItemCompletedByUser")
+  assignedChecklistItems                ChecklistInstanceItem[]     @relation("ChecklistItemAssignedToUser")
+  assignedChecklistItemsBy              ChecklistInstanceItem[]     @relation("ChecklistItemAssignedByUser")
+  defaultAssignedChecklistTemplateItems ChecklistTemplateItem[]     @relation("ChecklistTemplateItemDefaultAssignedToUser")
 }
 
 model TeamInvite {
@@ -296,14 +299,14 @@ model ProjectClient {
 }
 
 model ProjectCategory {
-  id          String          @id @default(cuid())
-  workspaceId String
-  name        String
-  sortOrder   Int             @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  stages      PipelineStage[]
+  id                  String               @id @default(cuid())
+  workspaceId         String
+  name                String
+  sortOrder           Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stages              PipelineStage[]
   stageChecklistRules StageChecklistRule[]
 
   @@unique([workspaceId, name])
@@ -311,21 +314,21 @@ model ProjectCategory {
 }
 
 model PipelineStage {
-  id                      String             @id @default(cuid())
+  id                      String               @id @default(cuid())
   workspaceId             String
   categoryId              String?
   name                    String
-  sortOrder               Int                @default(0)
-  isClosed                Boolean            @default(false)
-  color                   String?            @db.VarChar(20)
-  isGated                 Boolean            @default(false)
+  sortOrder               Int                  @default(0)
+  isClosed                Boolean              @default(false)
+  color                   String?              @db.VarChar(20)
+  isGated                 Boolean              @default(false)
   gateChecklistTemplateId String?
-  autoCreateInstance      Boolean            @default(true)
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
-  workspace               Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  category                ProjectCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  gateChecklistTemplate   ChecklistTemplate? @relation("PipelineStageGateTemplate", fields: [gateChecklistTemplateId], references: [id], onDelete: Restrict)
+  autoCreateInstance      Boolean              @default(true)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  workspace               Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  category                ProjectCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  gateChecklistTemplate   ChecklistTemplate?   @relation("PipelineStageGateTemplate", fields: [gateChecklistTemplateId], references: [id], onDelete: Restrict)
   stageChecklistRules     StageChecklistRule[]
   projects                Project[]
 
@@ -336,18 +339,18 @@ model PipelineStage {
 }
 
 model ChecklistTemplate {
-  id                  String                  @id @default(cuid())
+  id                  String                     @id @default(cuid())
   workspaceId         String
-  name                String                  @db.VarChar(80)
+  name                String                     @db.VarChar(80)
   appliesTo           ChecklistTemplateAppliesTo @default(PROJECT_STAGE)
-  description         String?                 @db.VarChar(500)
-  isArchived          Boolean                 @default(false)
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  workspace           Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  description         String?                    @db.VarChar(500)
+  isArchived          Boolean                    @default(false)
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  workspace           Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   items               ChecklistTemplateItem[]
   instances           ChecklistInstance[]
-  gatedPipelineStages PipelineStage[]         @relation("PipelineStageGateTemplate")
+  gatedPipelineStages PipelineStage[]            @relation("PipelineStageGateTemplate")
   stageChecklistRules StageChecklistRule[]
 
   @@unique([workspaceId, name])
@@ -364,14 +367,17 @@ model ChecklistTemplateItem {
   isRequired               Boolean                 @default(true)
   requiresEvidenceSnapshot Boolean                 @default(false)
   isCriticalSnapshot       Boolean                 @default(false)
+  defaultAssignedToUserId  String?
   createdAt                DateTime                @default(now())
   updatedAt                DateTime                @updatedAt
   workspace                Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   template                 ChecklistTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  defaultAssignedToUser    User?                   @relation("ChecklistTemplateItemDefaultAssignedToUser", fields: [defaultAssignedToUserId], references: [id], onDelete: SetNull)
   instanceItems            ChecklistInstanceItem[]
 
   @@unique([workspaceId, templateId, sortOrder])
   @@index([workspaceId, templateId])
+  @@index([workspaceId, defaultAssignedToUserId])
 }
 
 model ChecklistInstance {
@@ -429,16 +435,23 @@ model ChecklistInstanceItem {
   notApplicableReason      String?               @db.VarChar(500)
   completedAt              DateTime?
   completedByUserId        String?
+  assignedToUserId         String?
+  assignedByUserId         String?
+  assignedAt               DateTime?
   createdAt                DateTime              @default(now())
   updatedAt                DateTime              @updatedAt
   workspace                Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   instance                 ChecklistInstance     @relation(fields: [instanceId], references: [id], onDelete: Cascade)
   templateItem             ChecklistTemplateItem @relation(fields: [templateItemId], references: [id], onDelete: Restrict)
-  completedByUser          User?                 @relation(fields: [completedByUserId], references: [id], onDelete: SetNull)
+  completedByUser          User?                 @relation("ChecklistItemCompletedByUser", fields: [completedByUserId], references: [id], onDelete: SetNull)
+  assignedToUser           User?                 @relation("ChecklistItemAssignedToUser", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  assignedByUser           User?                 @relation("ChecklistItemAssignedByUser", fields: [assignedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, instanceId, templateItemId])
   @@index([workspaceId, instanceId])
   @@index([workspaceId, instanceId, sortOrderSnapshot])
+  @@index([workspaceId, assignedToUserId])
+  @@index([workspaceId, state])
 }
 
 model WebsiteAsset {
