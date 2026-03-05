@@ -424,7 +424,6 @@ const ProjectsBoardContent = ({ access }) => {
                   projects={boardProjects}
                   onMove={handleMove}
                   canMove={canMove}
-                  onQuickCreate={openQuickCreate}
                   movingProjectIds={movingProjectIds}
                 />
               </div>
@@ -451,12 +450,12 @@ const ProjectsBoard = () => {
   return (
     <ModulePermissionGate requiredModule="projects" requiredPermission="projects.view" moduleName="Progetti">
       {({ access }) => (
-        <div className="container-fluid py-4 projects-page">
+        <div className="container-fluid py-3 py-lg-4 projects-page">
           {/* Page header */}
           <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
             <div>
-              <h3 className="mb-1 fw-semibold">Progetti</h3>
-              <p className="text-muted mb-0">Board operativa per categoria</p>
+              <h3 className="mb-1 fw-semibold fs-4">Progetti</h3>
+              <p className="text-muted mb-0 small">Board operativa per categoria</p>
             </div>
           </div>
 

@@ -111,6 +111,27 @@ const buildInitials = (value) => {
     return `${words[0][0]}${words[1][0]}`.toUpperCase();
 };
 
+const resolveMobilePageTitle = (pathname) => {
+    if (!pathname || pathname === '/') {
+        return 'Dashboard';
+    }
+
+    if (pathname.startsWith('/dashboard')) return 'Dashboard';
+    if (pathname.startsWith('/apps/clients')) return 'Clienti';
+    if (pathname.startsWith('/projects')) return 'Progetti';
+    if (pathname.startsWith('/apps/quotes')) return 'Preventivi';
+    if (pathname.startsWith('/apps/team')) return 'Team';
+    if (pathname.startsWith('/apps/email')) return 'Messaggi';
+    if (pathname.startsWith('/apps/calendar')) return 'Calendario';
+    if (pathname.startsWith('/apps/vault')) return 'Vault';
+    if (pathname.startsWith('/apps/web-assets')) return 'Web Assets';
+    if (pathname.startsWith('/audit')) return 'Audit';
+    if (pathname.startsWith('/pages/profile')) return 'Profilo';
+    if (pathname.startsWith('/settings')) return 'Impostazioni';
+
+    return 'Agency OS';
+};
+
 const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const history = useHistory();
     const location = useLocation();
@@ -189,6 +210,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const workspaceName = branding?.companyName || session?.workspaceBranding?.companyName || workspace?.name || 'Workspace';
     const userInitials = useMemo(() => buildInitials(userDisplayName), [userDisplayName]);
     const avatarUserId = user?.id || session?.userId || '';
+    const mobilePageTitle = useMemo(() => resolveMobilePageTitle(location.pathname), [location.pathname]);
 
     const pollMessagingUnread = useCallback(async () => {
         if (!session?.accessToken || !canViewMessaging || messagingPollingBlocked) {
@@ -341,11 +363,16 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                         variant="flush-dark"
                         onClick={() => toggleCollapsedNav(!navCollapsed)}
                         className="btn-icon btn-rounded flush-soft-hover navbar-toggle d-xl-none topnav-action-btn"
+                        aria-label="Apri navigazione"
                     >
                         <span className="icon">
                             <span className="feather-icon"><AlignLeft /></span>
                         </span>
                     </Button>
+
+                    <div className="app-topnav-mobile-title d-sm-none" title={mobilePageTitle}>
+                        {mobilePageTitle}
+                    </div>
 
                     <div className="app-topnav-workspace d-none d-sm-flex">
                         <span className="app-topnav-workspace-label">Workspace</span>
@@ -357,18 +384,19 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
 
                 <div className="nav-end-wrap">
                     <Nav className="navbar-nav flex-row">
-                        <Nav.Item className="ms-2">
+                        <Nav.Item className="ms-2 app-topnav-theme-item">
                             <ThemeSwitcher />
                         </Nav.Item>
 
                         {canManageBranding && (
-                            <Nav.Item>
+                            <Nav.Item className="app-topnav-settings-item">
                                 <Button
                                     as={Link}
                                     to="/pages/workspace-branding"
                                     variant="flush-dark"
                                     className="btn-icon btn-rounded flush-soft-hover topnav-action-btn"
                                     title="Branding workspace"
+                                    aria-label="Apri branding workspace"
                                 >
                                     <span className="icon">
                                         <span className="feather-icon"><Settings /></span>
@@ -389,6 +417,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                 <Dropdown.Toggle
                                     variant="flush-dark"
                                     className="btn-icon btn-rounded flush-soft-hover no-caret topnav-action-btn"
+                                    aria-label="Apri notifiche"
                                 >
                                     <span className="icon">
                                         <span className="position-relative">
@@ -493,6 +522,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                 <Dropdown.Toggle
                                     variant="flush-dark"
                                     className="no-caret btn-icon btn-rounded flush-soft-hover app-topnav-avatar-trigger"
+                                    aria-label="Apri menu utente"
                                 >
                                     {userAvatarUrl ? (
                                         <span className="app-topnav-avatar p-0 overflow-hidden">

@@ -413,7 +413,7 @@ const ClientsList = () => {
                       variant="outline-secondary"
                       disabled={!canCreate || importing}
                       onClick={triggerImport}
-                      className="d-inline-flex align-items-center gap-2 clients-import-export-btn"
+                      className="d-none d-sm-inline-flex align-items-center gap-2 clients-import-export-btn"
                     >
                       <Upload size={15} />
                       {importing ? "Importazione..." : "Importa CSV"}
@@ -422,7 +422,7 @@ const ClientsList = () => {
                       variant="outline-secondary"
                       disabled={exporting}
                       onClick={() => void onExportClients()}
-                      className="d-inline-flex align-items-center gap-2 clients-import-export-btn"
+                      className="d-none d-sm-inline-flex align-items-center gap-2 clients-import-export-btn"
                     >
                       <Download size={15} />
                       {exporting ? "Esportazione..." : "Esporta CSV"}
@@ -713,14 +713,23 @@ const ClientsList = () => {
                     <Button
                       variant="outline-secondary"
                       size="sm"
+                      onClick={() => goToPage(activePage + 1)}
+                      disabled={!clientsData.pageInfo.hasNextPage || loading}
+                      className="clients-pagination-more-btn d-md-none"
+                    >
+                      Mostra altri
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
                       onClick={() => goToPage(activePage - 1)}
                       disabled={!clientsData.pageInfo.hasPrevPage || loading}
-                      className="clients-pagination-btn"
+                      className="clients-pagination-btn d-none d-md-inline-flex"
                       aria-label="Pagina precedente"
                     >
                       <ChevronLeft size={15} />
                     </Button>
-                    <span className="small clients-pagination-status">
+                    <span className="small clients-pagination-status d-none d-md-inline">
                       Pagina {clientsData.pageInfo.page} di {paginationTotalPages}
                     </span>
                     <Button
@@ -728,7 +737,7 @@ const ClientsList = () => {
                       size="sm"
                       onClick={() => goToPage(activePage + 1)}
                       disabled={!clientsData.pageInfo.hasNextPage || loading}
-                      className="clients-pagination-btn"
+                      className="clients-pagination-btn d-none d-md-inline-flex"
                       aria-label="Pagina successiva"
                     >
                       <ChevronRight size={15} />

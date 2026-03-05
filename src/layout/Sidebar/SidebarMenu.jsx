@@ -244,6 +244,11 @@ export const SidebarMenu = [
             path: "/settings/theme-preview",
             grp_name: "apps",
           },
+          {
+            name: "Responsive QA",
+            path: "/settings/responsive-qa",
+            grp_name: "apps",
+          },
         ],
       },
     ],

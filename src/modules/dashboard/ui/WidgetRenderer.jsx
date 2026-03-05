@@ -106,7 +106,7 @@ const UnknownWidget = ({ title, type }) => (
   </WidgetCard>
 );
 
-const renderWidgetContent = (widget) => {
+const renderWidgetContent = (widget, onRefreshRequested) => {
   const loading = widget?.data == null;
 
   if (widget.type === 'kpis') {
@@ -142,7 +142,14 @@ const renderWidgetContent = (widget) => {
   }
 
   if (widget.type === 'team_workload') {
-    return <TeamWorkloadWidget title={widget.title} data={widget.data} loading={loading} />;
+    return (
+      <TeamWorkloadWidget
+        title={widget.title}
+        data={widget.data}
+        loading={loading}
+        onRefreshRequested={onRefreshRequested}
+      />
+    );
   }
 
   if (widget.type === 'modules_status') {
@@ -204,7 +211,17 @@ const renderCell = (widget, className, idPrefix = 'dashboard-widget') => (
   </div>
 );
 
-const WidgetRenderer = ({ widgets = [] }) => {
+const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
+  const renderCellWithWidget = (widget, className, idPrefix = 'dashboard-widget') => (
+    <div
+      key={widget.id}
+      id={`${idPrefix}-${widget.id}`}
+      className={cn('col-span-12 min-w-0', className)}
+    >
+      {renderWidgetContent(widget, onRefreshRequested)}
+    </div>
+  );
+
   const sortedWidgets = [...widgets].sort(sortWidgets);
   const usedIds = new Set();
 
@@ -234,10 +251,10 @@ const WidgetRenderer = ({ widgets = [] }) => {
           <p className="text-sm font-medium text-textMuted">Priorita operative</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {urgentWidget
-              ? renderCell(urgentWidget, pipelineWidget ? 'xl:col-span-7' : 'xl:col-span-12', 'dashboard-main')
+              ? renderCellWithWidget(urgentWidget, pipelineWidget ? 'xl:col-span-7' : 'xl:col-span-12', 'dashboard-main')
               : null}
             {pipelineWidget
-              ? renderCell(pipelineWidget, urgentWidget ? 'xl:col-span-5' : 'xl:col-span-12', 'dashboard-main')
+              ? renderCellWithWidget(pipelineWidget, urgentWidget ? 'xl:col-span-5' : 'xl:col-span-12', 'dashboard-main')
               : null}
           </div>
         </section>
@@ -248,14 +265,14 @@ const WidgetRenderer = ({ widgets = [] }) => {
           <p className="text-sm font-medium text-textMuted">Operativita e attivita</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {secondaryFocusWidget
-              ? renderCell(
+              ? renderCellWithWidget(
                 secondaryFocusWidget,
                 activityWidget ? 'xl:col-span-7' : 'xl:col-span-12',
                 'dashboard-insight',
               )
               : null}
             {activityWidget
-              ? renderCell(activityWidget, secondaryFocusWidget ? 'xl:col-span-5' : 'xl:col-span-12', 'dashboard-insight')
+              ? renderCellWithWidget(activityWidget, secondaryFocusWidget ? 'xl:col-span-5' : 'xl:col-span-12', 'dashboard-insight')
               : null}
           </div>
         </section>
@@ -265,7 +282,7 @@ const WidgetRenderer = ({ widgets = [] }) => {
         <section id="dashboard-section-more" className="space-y-3">
           <p className="text-sm font-medium text-textMuted">Approfondimenti</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
-            {remainingWidgets.map((widget) => renderCell(
+            {remainingWidgets.map((widget) => renderCellWithWidget(
               widget,
               REMAINING_SPAN_CLASS_BY_TYPE[widget.type] || 'xl:col-span-6',
               'dashboard-extra',

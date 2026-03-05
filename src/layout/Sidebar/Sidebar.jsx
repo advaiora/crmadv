@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Nav } from 'react-bootstrap';
 import SimpleBar from 'simplebar-react';
 import { connect } from 'react-redux';
@@ -111,6 +111,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
 
     const [activeMenu, setActiveMenu] = useState();
     const [activeSubMenu, setActiveSubMenu] = useState();
+    const menuPanelRef = useRef(null);
 
     const windowWidth = useWindowWidth();
     const location = useLocation();
@@ -133,6 +134,63 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
         setActiveSubMenu(subMenuName);
     }, [location.pathname, menuGroups]);
 
+    useEffect(() => {
+        if (windowWidth > 1199 || !navCollapsed) {
+            return undefined;
+        }
+
+        const closeOnEscape = (event) => {
+            if (event.key === 'Escape') {
+                toggleCollapsedNav(false);
+            }
+        };
+
+        window.addEventListener('keydown', closeOnEscape);
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [navCollapsed, toggleCollapsedNav, windowWidth]);
+
+    useEffect(() => {
+        const panel = menuPanelRef.current;
+        if (!panel || windowWidth > 1199 || !navCollapsed) {
+            return undefined;
+        }
+
+        let startX = 0;
+        let startY = 0;
+
+        const onTouchStart = (event) => {
+            const touch = event.touches?.[0];
+            if (!touch) {
+                return;
+            }
+
+            startX = touch.clientX;
+            startY = touch.clientY;
+        };
+
+        const onTouchEnd = (event) => {
+            const touch = event.changedTouches?.[0];
+            if (!touch) {
+                return;
+            }
+
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+
+            if (deltaX < -64 && Math.abs(deltaY) < 48) {
+                toggleCollapsedNav(false);
+            }
+        };
+
+        panel.addEventListener('touchstart', onTouchStart, { passive: true });
+        panel.addEventListener('touchend', onTouchEnd, { passive: true });
+
+        return () => {
+            panel.removeEventListener('touchstart', onTouchStart);
+            panel.removeEventListener('touchend', onTouchEnd);
+        };
+    }, [navCollapsed, toggleCollapsedNav, windowWidth]);
+
     const handleLeafClick = () => {
         if (windowWidth <= 1199) {
             toggleCollapsedNav(false);
@@ -153,7 +211,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
 
     return (
         <>
-            <div className="hk-menu">
+            <div className="hk-menu" ref={menuPanelRef}>
                 {/* Brand */}
                 <SidebarHeader />
                 {/* Main Menu */}

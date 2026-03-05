@@ -46,6 +46,7 @@ import Account from "../views/Profiles/Account";
 import WorkspaceBranding from "../views/WorkspaceBranding";
 import ModulesSettingsPage from "../views/Settings/Modules";
 import ThemePreviewPage from "../views/Settings/ThemePreview";
+import ResponsiveQAPage from "../views/Settings/ResponsiveQA";
 import AuditPage from "../views/Audit";
 //Auth
 import Login from "../views/Authentication/LogIn/Login/Login";
@@ -113,6 +114,7 @@ export const routes = [
     { path: 'pages/workspace-branding', exact: true, component: WorkspaceBranding },
     { path: 'settings/modules', exact: true, component: ModulesSettingsPage },
     { path: 'settings/theme-preview', exact: true, component: ThemePreviewPage },
+    { path: 'settings/responsive-qa', exact: true, component: ResponsiveQAPage },
     { path: 'audit', exact: true, component: AuditPage },
     //Error
     { path: 'error-404', exact: true, component: Error404 },

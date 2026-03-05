@@ -146,7 +146,17 @@ const DashboardWorkspacePage = ({ access, toggleCollapsedNav, reloadWorkspaceAcc
 
       {!error && loading ? <DashboardHomeSkeleton /> : null}
 
-      {!error && !loading && widgets.length > 0 ? <WidgetRenderer widgets={widgets} /> : null}
+      {!error && !loading && widgets.length > 0 ? (
+        <WidgetRenderer
+          widgets={widgets}
+          onRefreshRequested={async () => {
+            await loadHome();
+            if (typeof reloadWorkspaceAccess === 'function') {
+              await reloadWorkspaceAccess();
+            }
+          }}
+        />
+      ) : null}
 
       {!error && !loading && widgets.length === 0 ? (
         <Card className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover">

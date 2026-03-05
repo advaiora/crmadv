@@ -10,7 +10,8 @@ import {
   Row,
   Spinner,
 } from 'react-bootstrap';
-import { MessageSquare, RefreshCw, SendHorizontal } from 'lucide-react';
+import { ArrowLeft, MessageSquare, RefreshCw, SendHorizontal } from 'lucide-react';
+import { useWindowWidth } from '@react-hook/window-size';
 import MessagingModuleGate from '../../modules/messaging/ui/MessagingModuleGate';
 import {
   MESSAGING_PERMISSIONS,
@@ -22,6 +23,7 @@ import {
   sendMessagingMessage,
 } from '../../modules/messaging/api/messagingApi';
 import { hasPermission } from '../../utils/workspaceAccess';
+import '../../modules/messaging/ui/messaging-ui.css';
 
 const CONTACTS_POLL_INTERVAL_MS = 2500;
 const CONVERSATION_POLL_INTERVAL_MS = 1500;
@@ -55,6 +57,8 @@ const getErrorMessage = (error, fallback) => {
 };
 
 const InternalMessagingPage = () => {
+  const windowWidth = useWindowWidth();
+  const isMobile = windowWidth < 992;
   const [contacts, setContacts] = useState([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [contactsError, setContactsError] = useState('');
@@ -68,6 +72,7 @@ const InternalMessagingPage = () => {
   const [composerText, setComposerText] = useState('');
   const [sending, setSending] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [mobileView, setMobileView] = useState('list');
 
   const selectedPeer = useMemo(
     () => contacts.find((item) => item.userId === selectedPeerId) || null,
@@ -89,14 +94,14 @@ const InternalMessagingPage = () => {
       setContacts(nextItems);
       setSelectedPeerId((current) => {
         if (!current && nextItems.length > 0) {
-          return nextItems[0].userId;
+          return isMobile ? '' : nextItems[0].userId;
         }
 
         if (current && nextItems.some((item) => item.userId === current)) {
           return current;
         }
 
-        return nextItems[0]?.userId || '';
+        return isMobile ? '' : (nextItems[0]?.userId || '');
       });
     } catch (error) {
       if (!silent) {
@@ -109,7 +114,7 @@ const InternalMessagingPage = () => {
         setContactsLoading(false);
       }
     }
-  }, [searchQuery]);
+  }, [isMobile, searchQuery]);
 
   const loadConversation = useCallback(async (peerUserId, { silent = false } = {}) => {
     if (!peerUserId) {
@@ -158,6 +163,15 @@ const InternalMessagingPage = () => {
 
     void loadConversation(selectedPeerId);
   }, [loadConversation, selectedPeerId]);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileView('chat');
+      return;
+    }
+
+    setMobileView(selectedPeerId ? 'chat' : 'list');
+  }, [isMobile, selectedPeerId]);
 
   useEffect(() => {
     let timeoutId;
@@ -264,15 +278,19 @@ const InternalMessagingPage = () => {
     void handleSendMessage();
   };
 
+  const showContactsColumn = !isMobile || mobileView === 'list';
+  const showConversationColumn = !isMobile || mobileView === 'chat';
+
   return (
     <MessagingModuleGate requiredPermission={MESSAGING_PERMISSIONS.view}>
       {({ access }) => {
         const canSend = hasPermission(access, MESSAGING_PERMISSIONS.send);
 
         return (
-          <div className="hk-pg-body py-0">
-            <div className="container-fluid px-0">
+          <div className="hk-pg-body messaging-page py-0">
+            <div className="container-fluid">
               <Row className="g-3">
+                {showContactsColumn && (
                 <Col lg={4} xl={3}>
                   <Card className="card-border h-100">
                     <Card.Body>
@@ -329,7 +347,12 @@ const InternalMessagingPage = () => {
                             action
                             key={contact.userId}
                             active={selectedPeerId === contact.userId}
-                            onClick={() => setSelectedPeerId(contact.userId)}
+                            onClick={() => {
+                              setSelectedPeerId(contact.userId);
+                              if (isMobile) {
+                                setMobileView('chat');
+                              }
+                            }}
                             className="py-2"
                           >
                             <div className="d-flex justify-content-between align-items-start gap-2">
@@ -361,11 +384,26 @@ const InternalMessagingPage = () => {
                     </Card.Body>
                   </Card>
                 </Col>
+                )}
 
+                {showConversationColumn && (
                 <Col lg={8} xl={9}>
-                  <Card className="card-border h-100">
+                  <Card className="card-border h-100 messaging-conversation-card">
                     <Card.Header className="bg-transparent d-flex align-items-center justify-content-between">
-                      <div>
+                      <div className="d-flex align-items-start gap-2">
+                        {isMobile && (
+                          <Button
+                            type="button"
+                            variant="outline-secondary"
+                            size="sm"
+                            className="messaging-back-btn"
+                            onClick={() => setMobileView('list')}
+                            aria-label="Torna alla lista conversazioni"
+                          >
+                            <ArrowLeft size={15} />
+                          </Button>
+                        )}
+                        <div>
                         <h5 className="mb-0 d-flex align-items-center gap-2">
                           <MessageSquare size={16} />
                           Conversazione
@@ -374,6 +412,7 @@ const InternalMessagingPage = () => {
                           {selectedPeer
                             ? `${selectedPeer.name || selectedPeer.email} (${selectedPeer.email})`
                             : 'Seleziona un utente a sinistra'}
+                        </div>
                         </div>
                       </div>
                     </Card.Header>
@@ -385,7 +424,7 @@ const InternalMessagingPage = () => {
                       )}
 
                       <div
-                        className="flex-grow-1 border rounded p-3 mb-3"
+                        className="flex-grow-1 border rounded p-3 mb-3 messaging-scroll-area"
                         style={{ minHeight: 320, maxHeight: 520, overflowY: 'auto' }}
                       >
                         {!selectedPeerId && (
@@ -410,7 +449,7 @@ const InternalMessagingPage = () => {
                             className={`d-flex mb-2 ${message.isMine ? 'justify-content-end' : 'justify-content-start'}`}
                           >
                             <div
-                              className={`px-3 py-2 rounded ${message.isMine ? 'bg-primary text-[var(--hk-text-on-dark-bg)]' : 'bg-light'}`}
+                              className={`px-3 py-2 rounded messaging-bubble ${message.isMine ? 'bg-primary text-[var(--hk-text-on-dark-bg)] messaging-bubble-mine' : 'bg-light'}`}
                               style={{ maxWidth: '72%', whiteSpace: 'pre-wrap' }}
                             >
                               <div className="small">{message.body}</div>
@@ -422,7 +461,7 @@ const InternalMessagingPage = () => {
                         ))}
                       </div>
 
-                      <div className="d-flex gap-2 align-items-end">
+                      <div className="d-flex gap-2 align-items-end messaging-composer">
                         <Form.Control
                           as="textarea"
                           rows={2}
@@ -450,6 +489,7 @@ const InternalMessagingPage = () => {
                     </Card.Body>
                   </Card>
                 </Col>
+                )}
               </Row>
             </div>
           </div>

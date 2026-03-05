@@ -5,6 +5,7 @@ import { useRouteMatch } from 'react-router-dom';
 import { toggleCollapsedNav } from '../../../redux/action/Theme';
 import PageFooter from '../../Footer/PageFooter';
 import TopNav from '../../Header/TopNav';
+import MobileBottomNav from '../../Mobile/MobileBottomNav';
 import Sidebar from '../../Sidebar/Sidebar';
 import { useWindowWidth } from '@react-hook/window-size';
 
@@ -22,6 +23,13 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [windowWidth, appRoutes])
+
+    useEffect(() => {
+        if (windowWidth < 1200) {
+            toggleCollapsedNav(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [windowWidth]);
 
     useEffect(() => {
         setTimeout(() => {
@@ -44,10 +52,11 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
             <TopNav />
             {/* Vertical Nav */}
             <Sidebar />
-            <div className={classNames("hk-pg-wrapper", { "pb-0": appRoutes })}>
+            <div className={classNames("hk-pg-wrapper app-shell-content", { "app-shell-no-footer-gap": appRoutes })}>
                 {children}
                 {!appRoutes && <PageFooter />}
             </div>
+            <MobileBottomNav />
         </div>
     )
 }

@@ -139,6 +139,7 @@ const QuickCreateProjectModal = ({
             show={show}
             onHide={onHide}
             centered
+            fullscreen="sm-down"
             backdrop={submitting ? 'static' : true}
             className="projects-quick-create-modal"
         >

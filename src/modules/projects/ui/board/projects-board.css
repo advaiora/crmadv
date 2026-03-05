@@ -1,6 +1,6 @@
 .projects-page {
-    padding-left: clamp(1rem, 1.5vw, 2rem) !important;
-    padding-right: clamp(1rem, 1.5vw, 2rem) !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
     --projects-surface-2: rgb(var(--surface-2) / 0.9);
     --projects-surface-3: rgb(var(--surface-3) / 0.84);
     --projects-border: rgb(var(--border-subtle) / 0.7);
@@ -9,6 +9,13 @@
     --projects-card-bg: rgb(var(--surface-2) / 0.98);
     --projects-card-bg-hover: rgb(var(--surface-2) / 1);
     --projects-card-border: rgb(var(--border-subtle) / 0.78);
+}
+
+@media (min-width: 992px) {
+    .projects-page {
+        padding-left: clamp(1rem, 1.5vw, 2rem) !important;
+        padding-right: clamp(1rem, 1.5vw, 2rem) !important;
+    }
 }
 
 [data-bs-theme="dark"] .projects-page,
@@ -273,6 +280,93 @@
 
 .projects-board-meta-value {
     font-size: 0.84rem;
+}
+
+.projects-mobile-stage-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+}
+
+.projects-mobile-stage-group {
+    border: 1px solid var(--projects-border);
+    border-radius: 0.8rem;
+    background: var(--projects-surface-3);
+    overflow: hidden;
+}
+
+.projects-mobile-stage-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.72rem 0.85rem;
+    border-bottom: 1px solid var(--projects-border-soft);
+}
+
+.projects-mobile-stage-body {
+    padding: 0.65rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+}
+
+.projects-mobile-card {
+    border: 1px solid var(--projects-card-border);
+    border-radius: 0.7rem;
+    background: var(--projects-card-bg);
+    padding: 0.7rem;
+}
+
+.projects-mobile-card-link {
+    border: 0;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    color: var(--foreground);
+    padding: 0;
+}
+
+.projects-mobile-card-title {
+    font-size: 0.96rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.projects-mobile-card-meta {
+    font-size: 0.81rem;
+    color: var(--muted-foreground);
+    margin-top: 0.28rem;
+    line-height: 1.3;
+}
+
+.projects-mobile-card-move {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.65rem;
+}
+
+.projects-mobile-move-btn.btn {
+    min-height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.34rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 991.98px) {
+    .projects-board-columns {
+        overflow: visible;
+    }
+
+    .projects-stage-column {
+        flex: 1 1 100%;
+        min-width: 0;
+        max-width: none;
+    }
 }
 
 
