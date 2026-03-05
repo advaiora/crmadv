@@ -21,14 +21,16 @@
     --surface-1: var(--color-bg);
     --surface-2: var(--color-card);
     --surface-3: 241 245 252;
+    --surface-elevated: var(--surface-3);
     --border-subtle: var(--color-card-border);
     --row-hover: var(--color-hover);
+    --shadow-color: 15 23 42;
 
     --background: rgb(var(--surface-1) / 1);
     --foreground: rgb(var(--color-text) / 1);
     --card: rgb(var(--surface-2) / 1);
     --card-foreground: rgb(var(--color-text) / 1);
-    --popover: rgb(var(--surface-2) / 1);
+    --popover: rgb(var(--surface-elevated) / 1);
     --popover-foreground: rgb(var(--color-text) / 1);
     --muted: rgb(var(--surface-3) / 1);
     --muted-foreground: rgb(var(--color-text-muted) / 1);
@@ -52,28 +54,30 @@
   [data-bs-theme='dark'],
   .dark {
     --branding-primary: 250 204 21;
-    --branding-secondary: 30 41 59;
+    --branding-secondary: 39 39 42;
 
-    --color-bg: 15 23 42;
-    --color-bg-secondary: 30 41 59;
-    --color-card: 17 24 39;
-    --color-card-border: 51 65 85;
-    --color-text: 229 231 235;
-    --color-text-muted: 148 163 184;
+    --color-bg: 10 10 11;
+    --color-bg-secondary: 17 17 19;
+    --color-card: 17 17 19;
+    --color-card-border: 63 63 70;
+    --color-text: 244 244 245;
+    --color-text-muted: 161 161 170;
     --color-primary: var(--branding-primary);
     --color-secondary: var(--branding-secondary);
-    --color-hover: 51 65 85;
-    --surface-1: 15 23 42;
-    --surface-2: 22 32 52;
-    --surface-3: 30 41 59;
-    --border-subtle: 71 85 105;
-    --row-hover: 51 65 85;
+    --color-hover: 39 39 42;
+    --surface-1: 10 10 11;
+    --surface-2: 17 17 19;
+    --surface-3: 32 32 36;
+    --surface-elevated: var(--surface-3);
+    --border-subtle: 63 63 70;
+    --row-hover: 39 39 42;
+    --shadow-color: 0 0 0;
 
     --background: rgb(var(--surface-1) / 1);
     --foreground: rgb(var(--color-text) / 1);
     --card: rgb(var(--surface-2) / 1);
     --card-foreground: rgb(var(--color-text) / 1);
-    --popover: rgb(var(--surface-2) / 1);
+    --popover: rgb(var(--surface-elevated) / 1);
     --popover-foreground: rgb(var(--color-text) / 1);
     --muted: rgb(var(--surface-3) / 1);
     --muted-foreground: rgb(var(--color-text-muted) / 1);

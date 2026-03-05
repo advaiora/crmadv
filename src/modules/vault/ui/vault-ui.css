@@ -19,10 +19,10 @@
 
 [data-bs-theme="dark"] .vault-page-shell,
 .dark .vault-page-shell {
-  --surface-2: 24 38 60;
-  --surface-3: 30 48 76;
-  --border-subtle: 94 118 152;
-  --row-hover: 50 74 112;
+  --surface-2: 17 17 19;
+  --surface-3: 32 32 36;
+  --border-subtle: 63 63 70;
+  --row-hover: 39 39 42;
   --vault-surface-2: rgb(var(--surface-2) / 0.92);
   --vault-surface-3: rgb(var(--surface-3) / 0.86);
   --vault-border: rgb(var(--border-subtle) / 0.74);
@@ -172,10 +172,10 @@
 
 [data-bs-theme="dark"] .vault-modal,
 .dark .vault-modal {
-  --surface-2: 24 38 60;
-  --surface-3: 30 48 76;
-  --border-subtle: 94 118 152;
-  --row-hover: 50 74 112;
+  --surface-2: 17 17 19;
+  --surface-3: 32 32 36;
+  --border-subtle: 63 63 70;
+  --row-hover: 39 39 42;
   --vault-modal-surface-2: rgb(var(--surface-2) / 0.94);
   --vault-modal-surface-3: rgb(var(--surface-3) / 0.96);
   --vault-modal-border: rgb(var(--border-subtle) / 0.8);
@@ -277,3 +277,4 @@
   background-color: rgb(var(--row-hover) / 0.58) !important;
   color: var(--foreground) !important;
 }
+

@@ -16,8 +16,10 @@
   --surface-1: var(--color-bg);
   --surface-2: var(--color-card);
   --surface-3: 241 245 252;
+  --surface-elevated: var(--surface-3);
   --border-subtle: var(--color-card-border);
   --row-hover: var(--color-hover);
+  --shadow-color: 15 23 42;
 
   --color-success: 22 163 74;
   --color-info: 37 99 235;
@@ -47,7 +49,7 @@
   --foreground: rgb(var(--color-text) / 1);
   --card: rgb(var(--surface-2) / 1);
   --card-foreground: rgb(var(--color-text) / 1);
-  --popover: rgb(var(--surface-2) / 1);
+  --popover: rgb(var(--surface-elevated) / 1);
   --popover-foreground: rgb(var(--color-text) / 1);
   --muted: rgb(var(--surface-3) / 1);
   --muted-foreground: rgb(var(--color-text-muted) / 1);
@@ -151,6 +153,7 @@
   --hk-border-tertiary: color-mix(in srgb, var(--border) 80%, var(--background) 20%);
   --hk-scrim-bg: rgb(0 0 0 / 1);
   --hk-shadow-rgb: 15, 23, 42;
+  --bs-shadow-color: 15, 23, 42;
 
   --hk-menu-bg: #111827;
   --hk-menu-text: #f8fafc;
@@ -169,23 +172,27 @@
 
 [data-bs-theme="dark"],
 .dark {
+  /* Dark Neutral Palette (charcoal): background 10 10 11, surface-2 17 17 19, elevated 32 32 36 */
+  /* Text: fg 244 244 245, muted 161 161 170, border 63 63 70, row-hover 39 39 42, shadow 0 0 0 */
   --branding-primary: 250 204 21;
-  --branding-secondary: 30 41 59;
+  --branding-secondary: 39 39 42;
 
-  --color-bg: 15 23 42;
-  --color-bg-secondary: 30 41 59;
-  --color-card: 17 24 39;
-  --color-card-border: 51 65 85;
-  --color-text: 229 231 235;
-  --color-text-muted: 148 163 184;
+  --color-bg: 10 10 11;
+  --color-bg-secondary: 17 17 19;
+  --color-card: 17 17 19;
+  --color-card-border: 63 63 70;
+  --color-text: 244 244 245;
+  --color-text-muted: 161 161 170;
   --color-primary: var(--branding-primary);
   --color-secondary: var(--branding-secondary);
-  --color-hover: 51 65 85;
-  --surface-1: 15 23 42;
-  --surface-2: 22 32 52;
-  --surface-3: 30 41 59;
-  --border-subtle: 71 85 105;
-  --row-hover: 51 65 85;
+  --color-hover: 39 39 42;
+  --surface-1: 10 10 11;
+  --surface-2: 17 17 19;
+  --surface-3: 32 32 36;
+  --surface-elevated: var(--surface-3);
+  --border-subtle: 63 63 70;
+  --row-hover: 39 39 42;
+  --shadow-color: 0 0 0;
 
   --color-success: 34 197 94;
   --color-info: 96 165 250;
@@ -199,19 +206,19 @@
   --color-info-text: 191 219 254;
   --color-warning-text: 252 211 77;
   --color-danger-text: 252 165 165;
-  --color-on-dark: 229 231 235;
+  --color-on-dark: 244 244 245;
 
   --background: rgb(var(--surface-1) / 1);
   --foreground: rgb(var(--color-text) / 1);
   --card: rgb(var(--surface-2) / 1);
   --card-foreground: rgb(var(--color-text) / 1);
-  --popover: rgb(var(--surface-2) / 1);
+  --popover: rgb(var(--surface-elevated) / 1);
   --popover-foreground: rgb(var(--color-text) / 1);
   --muted: rgb(var(--surface-3) / 1);
   --muted-foreground: rgb(var(--color-text-muted) / 1);
   --border: rgb(var(--border-subtle) / 1);
   --input: rgb(var(--border-subtle) / 1);
-  --ring: rgb(var(--color-info) / 1);
+  --ring: rgb(var(--color-primary) / 1);
   --primary: rgb(var(--color-primary) / 1);
   --primary-foreground: #111827;
   --secondary: rgb(var(--color-secondary) / 1);
@@ -249,7 +256,7 @@
   --bs-primary: var(--primary);
   --bs-primary-rgb: 250, 204, 21;
   --bs-secondary: var(--secondary);
-  --bs-secondary-rgb: 30, 41, 59;
+  --bs-secondary-rgb: 39, 39, 42;
   --bs-success: var(--success);
   --bs-success-rgb: 34, 197, 94;
   --bs-info: var(--info);
@@ -262,10 +269,10 @@
   --bs-white-rgb: 255, 255, 255;
   --bs-black: #000000;
   --bs-black-rgb: 0, 0, 0;
-  --bs-dark: #0f172a;
-  --bs-dark-rgb: 15, 23, 42;
-  --bs-light: #1f2937;
-  --bs-light-rgb: 31, 41, 55;
+  --bs-dark: #111113;
+  --bs-dark-rgb: 17, 17, 19;
+  --bs-light: #202024;
+  --bs-light-rgb: 32, 32, 36;
 
   --bs-soft-primary: color-mix(in srgb, var(--primary) 18%, transparent);
   --bs-soft-secondary: var(--muted);
@@ -285,36 +292,37 @@
   --bs-focus-ring-width: 0.125rem;
 
   --hk-bg-primary: var(--card);
-  --hk-bg-primary-rgb: 17, 24, 39;
+  --hk-bg-primary-rgb: 17, 17, 19;
   --hk-bg-secondary: var(--background);
   --hk-bg-tertiary: var(--muted);
   --hk-bg-hover: rgb(var(--color-hover) / 1);
-  --hk-select-primary: color-mix(in srgb, var(--info) 18%, transparent);
+  --hk-select-primary: color-mix(in srgb, var(--primary) 18%, transparent);
 
   --hk-text-primary: var(--foreground);
   --hk-text-secondary: color-mix(in srgb, var(--foreground) 92%, var(--muted-foreground) 8%);
   --hk-text-tertiary: var(--muted-foreground);
   --hk-text-disabled: var(--muted-foreground);
   --hk-text-on-dark-bg: var(--foreground);
-  --hk-text-primary-rgb: 229, 231, 235;
-  --hk-text-secondary-rgb: 209, 213, 219;
-  --hk-text-tertiary-rgb: 203, 213, 225;
+  --hk-text-primary-rgb: 244, 244, 245;
+  --hk-text-secondary-rgb: 212, 212, 216;
+  --hk-text-tertiary-rgb: 161, 161, 170;
 
   --hk-border-primary: var(--border);
   --hk-border-secondary: color-mix(in srgb, var(--border) 82%, var(--foreground) 18%);
   --hk-border-tertiary: var(--border);
   --hk-scrim-bg: rgb(0 0 0 / 1);
-  --hk-shadow-rgb: 2, 6, 23;
+  --hk-shadow-rgb: 0, 0, 0;
+  --bs-shadow-color: 0, 0, 0;
 
-  --hk-menu-bg: #0b1220;
-  --hk-menu-text: #e5e7eb;
-  --hk-menu-border: #1e293b;
+  --hk-menu-bg: #121214;
+  --hk-menu-text: #f4f4f5;
+  --hk-menu-border: #2a2a2e;
   --hk-menu-item-active-bg: var(--primary);
   --hk-menu-item-active-text: var(--primary-foreground);
-  --hk-menu-hover-bg: rgba(var(--bs-primary-rgb), 0.14);
-  --hk-menu-icon-color: #e5e7eb;
-  --hk-menu-arrow-color: rgba(229, 231, 235, 0.78);
-  --hk-menu-header-text: #cbd5e1;
+  --hk-menu-hover-bg: rgb(var(--row-hover) / 0.72);
+  --hk-menu-icon-color: #f4f4f5;
+  --hk-menu-arrow-color: rgb(212 212 216 / 0.78);
+  --hk-menu-header-text: #a1a1aa;
 }
 
 /* Utility colors */
@@ -1191,7 +1199,7 @@ option {
 [data-bs-theme="dark"] .card {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.03),
-    0 14px 30px rgba(2, 6, 23, 0.34);
+    0 14px 30px rgb(var(--shadow-color) / 0.34);
 }
 
 [data-bs-theme="dark"] .bg-white,

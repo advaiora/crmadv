@@ -239,6 +239,11 @@ export const SidebarMenu = [
             requiredPermission: "modules.manage",
             grp_name: "apps",
           },
+          {
+            name: "Theme Preview",
+            path: "/settings/theme-preview",
+            grp_name: "apps",
+          },
         ],
       },
     ],
