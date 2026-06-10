@@ -1,19 +1,10 @@
 <div align="center">
-    <img src="https://github.com/frappe/design/blob/master/logos/logo-2019/frappe-gantt-logo.png" height="128">
     <h2>Frappe Gantt</h2>
     <p align="center">
         <p>A simple, interactive, modern gantt chart library for the web</p>
-        <a href="https://frappe.github.io/gantt">
-            <b>View the demo »</b>
-        </a>
     </p>
 </div>
 
-<p align="center">
-    <a href="https://frappe.github.io/gantt">
-        <img src="https://cloud.githubusercontent.com/assets/9355208/21537921/4a38b194-cdbd-11e6-8110-e0da19678a6d.png">
-    </a>
-</p>
 
 ### Install
 ```
@@ -98,4 +89,4 @@ Assuming the last commit (or a couple of commits) were enhancements or fixes,
 License: MIT
 
 ------------------
-Project maintained by [frappe](https://github.com/frappe)
+Project maintained by frappe

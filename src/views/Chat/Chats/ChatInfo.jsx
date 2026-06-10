@@ -4,7 +4,7 @@ import SimpleBar from 'simplebar-react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Briefcase, Mail, MapPin, MoreVertical, Phone } from 'react-feather';
-import { faDropbox, faFacebook, faGithub, faGoogle, faGoogleDrive } from '@fortawesome/free-brands-svg-icons';
+import { faDropbox, faFacebook, faGoogle, faGoogleDrive } from '@fortawesome/free-brands-svg-icons';
 //Redux
 import { connect } from 'react-redux';
 
@@ -112,11 +112,6 @@ const ChatInfo = ({ infoToggle, avatar, userName }) => {
                                                 <li>
                                                     <Button variant="info" className="btn-icon btn-rounded"><span className="icon">
                                                         <FontAwesomeIcon icon={faDropbox} />
-                                                    </span></Button>
-                                                </li>
-                                                <li>
-                                                    <Button variant="dark" className="btn-icon btn-rounded"><span className="icon">
-                                                        <FontAwesomeIcon icon={faGithub} />
                                                     </span></Button>
                                                 </li>
                                                 <li>

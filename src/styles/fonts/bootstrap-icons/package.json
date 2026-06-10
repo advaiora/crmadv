@@ -5,13 +5,6 @@
   "author": "mdo",
   "license": "MIT",
   "homepage": "https://icons.getbootstrap.com/",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/twbs/icons.git"
-  },
-  "bugs": {
-    "url": "https://github.com/twbs/icons/issues"
-  },
   "keywords": [
     "bootstrap",
     "icons"

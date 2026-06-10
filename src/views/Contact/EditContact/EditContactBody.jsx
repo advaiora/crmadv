@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { Rating } from 'react-simple-star-rating';
 import SimpleBar from 'simplebar-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBehance, faDropbox, faGithub, faGoogleDrive } from '@fortawesome/free-brands-svg-icons';
+import { faBehance, faDropbox, faGoogleDrive } from '@fortawesome/free-brands-svg-icons';
 import { Activity, CheckSquare, Clock, Edit2, Edit3, Heart, Mail, Phone, Plus, Shield, Trash, Upload, Video, Zap } from 'react-feather';
 //Internal Components
 import ProfileInfo from './ProfileInfo';
@@ -199,13 +199,6 @@ const EditContactBody = () => {
                                             <Button variant="info" className="btn-icon btn-rounded">
                                                 <span className="icon">
                                                     <FontAwesomeIcon icon={faDropbox} />
-                                                </span>
-                                            </Button>
-                                        </li>
-                                        <li>
-                                            <Button variant="dark" className="btn-icon btn-rounded">
-                                                <span className="icon">
-                                                    <FontAwesomeIcon icon={faGithub} />
                                                 </span>
                                             </Button>
                                         </li>

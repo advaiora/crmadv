@@ -16,7 +16,6 @@ import symbolAvatar12 from '../../../assets/img/symbol-avatar-12.png';
 import symbolAvatar13 from '../../../assets/img/symbol-avatar-13.png';
 import symbolAvatar14 from '../../../assets/img/symbol-avatar-14.png';
 import symbolAvatar15 from '../../../assets/img/symbol-avatar-15.png';
-import symbolAvatar16 from '../../../assets/img/symbol-avatar-1.png';
 import logoAvatar1 from '../../../assets/img/logo-avatar-1.png';
 import logoAvatar2 from '../../../assets/img/logo-avatar-2.png';
 import logoAvatar3 from '../../../assets/img/logo-avatar-3.png';
@@ -171,25 +170,6 @@ const Body = () => {
                                 <div className="card-footer justify-content-between border-0">
                                     <span className="d-flex align-items-center fs-8">
                                         <i className="ri-download-cloud-2-line fs-7 me-2" />1,245 Downloads</span>
-                                    <Button variant="outline-secondary" size="sm">Connect</Button>
-                                </div>
-                            </Card>
-                        </Col>
-                        <Col xxl={3} xl={4} md={6}>
-                            <Card className="card-border card-int mb-4">
-                                <Card.Body>
-                                    <div className="avatar avatar-sm avatar-logo mb-3">
-                                        <span className="initial-wrap">
-                                            <img src={symbolAvatar16} alt="logo" />
-                                        </span>
-                                    </div>
-                                    <div className="app-name">Github</div>
-                                    <div className="app-cat">Developer Geek</div>
-                                    <p className="p-sm multine-ellipsis">Tellus in hac habitasse platea dictumst vestibulum rhoncus est pellentesque. Elit at imperdiet dui accumsan sit. Condimentum lacinia.</p>
-                                </Card.Body>
-                                <div className="card-footer justify-content-between border-0">
-                                    <span className="d-flex align-items-center fs-8">
-                                        <i className="ri-download-cloud-2-line fs-7 me-2" />24.8M Downloads</span>
                                     <Button variant="outline-secondary" size="sm">Connect</Button>
                                 </div>
                             </Card>

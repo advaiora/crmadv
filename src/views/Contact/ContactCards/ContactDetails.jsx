@@ -5,7 +5,7 @@ import { Activity, Archive, CheckSquare, ChevronLeft, ChevronRight, Clock, Edit2
 import { Link } from 'react-router-dom';
 import SimpleBar from 'simplebar-react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBehance, faDropbox, faGithub, faGoogleDrive } from '@fortawesome/free-brands-svg-icons';
+import { faBehance, faDropbox, faGoogleDrive } from '@fortawesome/free-brands-svg-icons';
 import HkAvatarUploader from '../../../components/@hk-avatar-uploader/@hk-avatar-uploader';
 
 //Image
@@ -250,13 +250,6 @@ const ContactDetails = ({ show, onHide }) => {
                                                 <Button variant="info" className="btn-icon btn-rounded">
                                                     <span className="icon">
                                                         <FontAwesomeIcon icon={faDropbox} />
-                                                    </span>
-                                                </Button>
-                                            </li>
-                                            <li>
-                                                <Button variant="dark" className="btn-icon btn-rounded">
-                                                    <span className="icon">
-                                                        <FontAwesomeIcon icon={faGithub} />
                                                     </span>
                                                 </Button>
                                             </li>

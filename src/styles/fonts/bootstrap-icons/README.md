@@ -20,8 +20,6 @@
   <br>
 </p>
 
-[![Bootstrap Icons preview](https://github.com/twbs/icons/blob/main/.github/preview.png)](https://icons.getbootstrap.com)
-
 ## Install
 
 Bootstrap Icons are packaged up and published to npm. We only include the processed SVGs in this package—it's up to you and your team to implement. [Read our docs](https://icons.getbootstrap.com/) for usage instructions.
@@ -51,12 +49,9 @@ Depending on your setup, you can include Bootstrap Icons in a handful of ways.
 
 ## Development
 
-[![Build Status](https://github.com/twbs/icons/workflows/Tests/badge.svg)](https://github.com/twbs/icons/actions?workflow=Tests)
-
-Clone the repo, install dependencies, and start the Hugo server locally.
+Install dependencies and start the Hugo server locally.
 
 ```shell
-git clone https://github.com/twbs/icons/
 cd icons
 npm i
 npm start
@@ -86,7 +81,7 @@ Use `npm run icons` to run the script, run `npm run pages` to build permalink pa
 
 ## Publishing
 
-Documentation is published automatically when a new Git tag is published. See our [GitHub Actions](https://github.com/twbs/icons/tree/main/.github/workflows) and [`package.json`](https://github.com/twbs/icons/blob/main/package.json) for more information.
+Documentation is published automatically when a new Git tag is published. See `package.json` for more information.
 
 ## License
 
@@ -94,4 +89,4 @@ MIT
 
 ## Author
 
-[@mdo](https://github.com/mdo)
+@mdo

@@ -15,7 +15,6 @@ import symbolAvatar4 from '../../../assets/img/symbol-avatar-4.png';
 import symbolAvatar12 from '../../../assets/img/symbol-avatar-12.png';
 import symbolAvatar14 from '../../../assets/img/symbol-avatar-14.png';
 import symbolAvatar15 from '../../../assets/img/symbol-avatar-15.png';
-import symbolAvatar16 from '../../../assets/img/symbol-avatar-16.png';
 import logoAvatar2 from '../../../assets/img/logo-avatar-2.png';
 import logoAvatar10 from '../../../assets/img/logo-avatar-10.png';
 import avatar2 from '../../../assets/img/avatar2.jpg';
@@ -610,23 +609,6 @@ const Body = () => {
                                         <div className="app-cat">Dating App</div>
                                         <div className="d-flex align-items-center justify-content-center">
                                             <Rating initialValue={4} readonly size="20" className="d-flex align-items-center me-2" />
-                                            <span className="fs-8">3,672</span>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                            <Col xl={3} md={6}>
-                                <Card className="card-border text-center">
-                                    <Card.Body>
-                                        <div className="avatar avatar-sm avatar-logo mb-3">
-                                            <span className="initial-wrap">
-                                                <img src={symbolAvatar16} alt="logo" />
-                                            </span>
-                                        </div>
-                                        <div className="app-name">Github</div>
-                                        <div className="app-cat">Developer Geek</div>
-                                        <div className="d-flex align-items-center justify-content-center">
-                                            <Rating initialValue={3.5} allowFraction readonly size="20" className="d-flex align-items-center me-2" />
                                             <span className="fs-8">3,672</span>
                                         </div>
                                     </Card.Body>

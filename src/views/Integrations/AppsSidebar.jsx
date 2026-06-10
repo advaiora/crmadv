@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Form, Nav } from 'react-bootstrap';
-import { Archive, Book, Box, Briefcase, CheckSquare, Code, GitBranch, GitHub, Grid, Heart, PenTool, RefreshCw, Settings, Tool, Zap } from 'react-feather';
+import { Archive, Book, Box, Briefcase, CheckSquare, Code, GitBranch, Grid, Heart, PenTool, RefreshCw, Settings, Tool, Zap } from 'react-feather';
 import { NavLink, useRouteMatch } from 'react-router-dom';
 import SimpleBar from 'simplebar-react';
 import HkTooltip from '../../components/@hk-tooltip/HkTooltip';
@@ -118,7 +118,7 @@ const AppsSidebar = () => {
                                 <Nav.Link>
                                     <span className="nav-icon-wrap">
                                         <span className="feather-icon">
-                                            <GitHub />
+                                            <Briefcase />
                                         </span>
                                     </span>
                                     <span className="nav-link-text">Marketing</span>
