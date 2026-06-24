@@ -1,0 +1,687 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { badRequest, forbidden } from '../../../core/errors.js';
+import { ok } from '../../../core/response.js';
+import { getUserWorkspaceSystemRoleName, SYSTEM_ROLE_NAME } from '../../../auth/workspace-bootstrap.js';
+import { prisma } from '../../../prisma.js';
+import { PROJECTS_PERMISSIONS, ensureProjectsAccess } from '../../projects/projects.policies.js';
+import { agencyService } from '../agency.service.js';
+
+type AgencyProjectParams = {
+  projectId: string;
+};
+
+type AgencyProjectFileParams = AgencyProjectParams & {
+  fileId: string;
+};
+
+type AgencyWebProjectParams = AgencyProjectParams & {
+  webProjectId: string;
+};
+
+type AgencySourceFileQuery = {
+  download?: string;
+};
+
+const isAgencySuperadmin = async (workspaceId: string, userId: string) => {
+  const roleName = await getUserWorkspaceSystemRoleName({
+    tx: prisma,
+    workspaceId,
+    userId,
+  });
+
+  return roleName === SYSTEM_ROLE_NAME.superadmin;
+};
+
+const ensureAgencySuperadminAccess = async (request: Parameters<typeof ensureProjectsAccess>[0]) => {
+  const access = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+  const canManage = await isAgencySuperadmin(access.workspace.id, access.user.id);
+  if (!canManage) {
+    throw forbidden('Solo un Superadmin puo gestire le impostazioni runtime Agency.');
+  }
+
+  return access;
+};
+
+const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
+  app.get('/agency/projects', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const projects = await agencyService.listWorkspaceProjects(workspace.id);
+
+    return ok(reply, {
+      projects,
+    });
+  });
+
+  app.post<{ Body: unknown }>('/agency/projects', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+    const project = await agencyService.createProject({
+      workspaceId: workspace.id,
+      body: request.body,
+    });
+
+    return ok(reply, {
+      project,
+    });
+  });
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const project = await agencyService.getProject(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        project,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/overview',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const overview = await agencyService.getProjectOverview(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        overview,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/brain',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const brain = await agencyService.getProjectBrain(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        brain,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/working-context',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const workingContext = await agencyService.buildProjectWorkingContext(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        workingContext,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/discovery',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const discovery = await agencyService.getProjectDiscovery(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        discovery,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/discovery/regenerate-from-sources',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const discovery = await agencyService.regenerateProjectDiscoveryFromSources(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        discovery,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/discovery/generate-from-sources',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const discovery = await agencyService.generateProjectDiscoveryFromSourcesWithAi(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        discovery,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/discovery/regenerate-section',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const discovery = await agencyService.regenerateProjectDiscoverySectionFromSources({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        discovery,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/discovery/generate-section',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const discovery = await agencyService.generateProjectDiscoverySectionWithAi({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        discovery,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/sources',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const sources = await agencyService.getProjectSources(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        sources,
+      });
+    },
+  );
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/sources',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const sources = await agencyService.saveProjectSources({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        sources,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/sources/files',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const file = await request.file();
+      if (!file) {
+        throw badRequest('Missing multipart file field.');
+      }
+
+      const buffer = await file.toBuffer();
+      const uploadedFile = await agencyService.uploadProjectSourceFile({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        originalName: file.filename || 'source-file',
+        mimeType: file.mimetype || '',
+        buffer,
+      });
+
+      return ok(reply, {
+        file: uploadedFile,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectFileParams; Querystring: AgencySourceFileQuery }>(
+    '/agency/projects/:projectId/sources/files/:fileId',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const sourceFile = await agencyService.getProjectSourceFile({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        fileId: request.params.fileId,
+      });
+      const download = request.query.download === '1' || request.query.download === 'true';
+
+      reply
+        .header('Content-Type', sourceFile.contentType)
+        .header('Content-Length', sourceFile.buffer.byteLength)
+        .header('Content-Disposition', sourceFile.disposition(download));
+
+      return reply.send(sourceFile.buffer);
+    },
+  );
+
+  app.delete<{ Params: AgencyProjectFileParams }>(
+    '/agency/projects/:projectId/sources/files/:fileId',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const sources = await agencyService.deleteProjectSourceFile({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        fileId: request.params.fileId,
+      });
+
+      return ok(reply, {
+        sources,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/sources/competitors/search',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const body = typeof request.body === 'object' && request.body !== null
+        ? request.body as { dryRun?: unknown }
+        : {};
+      const competitorSearch = await agencyService.searchProjectCompetitors({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        dryRun: body.dryRun === true,
+      });
+
+      return ok(reply, {
+        competitorSearch,
+      });
+    },
+  );
+
+  app.get('/agency/settings/provider-status', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const competitorSearch = await agencyService.getCompetitorSearchSettings(workspace.id);
+
+    return ok(reply, {
+      competitorSearch,
+    });
+  });
+
+  app.get('/agency/ai/status', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const ai = await agencyService.getAgencyAiStatus(workspace.id);
+
+    return ok(reply, {
+      ai,
+    });
+  });
+
+  app.get('/agency/settings/runtime', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const canManage = await isAgencySuperadmin(workspace.id, user.id);
+    const runtimeSettings = await agencyService.getAgencyRuntimeSettings({
+      workspaceId: workspace.id,
+      canManage,
+    });
+
+    return ok(reply, {
+      runtimeSettings,
+    });
+  });
+
+  app.put<{ Body: unknown }>('/agency/settings/runtime', async (request, reply) => {
+    const { user, workspace } = await ensureAgencySuperadminAccess(request);
+    const runtimeSettings = await agencyService.saveAgencyRuntimeSettings({
+      workspaceId: workspace.id,
+      actorUserId: user.id,
+      body: request.body,
+    });
+
+    return ok(reply, {
+      runtimeSettings,
+    });
+  });
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/web',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const web = await agencyService.getProjectWeb(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        web,
+      });
+    },
+  );
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/web',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const web = await agencyService.saveProjectWeb({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        web,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyWebProjectParams }>(
+    '/agency/projects/:projectId/web-projects/:webProjectId/generate-ai',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const web = await agencyService.generateProjectWebProjectWithAi({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        webProjectId: request.params.webProjectId,
+      });
+
+      return ok(reply, {
+        web,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyWebProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/web-projects/:webProjectId/generate-block-ai',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const web = await agencyService.generateProjectWebBlockWithAi({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        webProjectId: request.params.webProjectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        web,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/ads',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const ads = await agencyService.getProjectAds(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        ads,
+      });
+    },
+  );
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/ads',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const ads = await agencyService.saveProjectAds({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        ads,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/ads/generate-asset-ai',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const ads = await agencyService.generateProjectAdsAssetWithAi({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        ads,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/reports/input',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const input = await agencyService.buildProjectReportInput(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        input,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/reports/client/input',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const input = await agencyService.buildProjectClientReportInput(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        input,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/reports/client',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const clientReport = await agencyService.getProjectClientReport(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        clientReport,
+      });
+    },
+  );
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/reports/client',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const clientReport = await agencyService.saveProjectClientReport({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        clientReport,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/diagnosis/input',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const input = await agencyService.buildProjectDiagnosisInput(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        input,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/diagnosis',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const diagnosis = await agencyService.getProjectDiagnosis(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        diagnosis,
+      });
+    },
+  );
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/diagnosis',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const diagnosis = await agencyService.saveProjectDiagnosis({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        diagnosis,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/reports',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const report = await agencyService.getProjectReport(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        report,
+      });
+    },
+  );
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/reports',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const report = await agencyService.saveProjectReport({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        report,
+      });
+    },
+  );
+
+  app.get('/agency/reports', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const reports = await agencyService.getWorkspaceReports(workspace.id);
+
+    return ok(reply, {
+      reports,
+    });
+  });
+
+  app.put<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/discovery',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const discovery = await agencyService.saveProjectDiscovery({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        body: request.body,
+      });
+
+      return ok(reply, {
+        discovery,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/alerts',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const alerts = await agencyService.getProjectAlerts(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        alerts,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/alerts/sync',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const alerts = await agencyService.syncProjectAlerts(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        alerts,
+      });
+    },
+  );
+
+  app.get('/agency/alerts', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const alerts = await agencyService.getWorkspaceAlerts(workspace.id);
+
+    return ok(reply, {
+      alerts,
+    });
+  });
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/opportunities/input',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const input = await agencyService.buildProjectOpportunityInput(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        input,
+      });
+    },
+  );
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/opportunities',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const opportunities = await agencyService.getProjectOpportunities(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        opportunities,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/opportunities/sync',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const opportunities = await agencyService.syncProjectOpportunities(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        opportunities,
+      });
+    },
+  );
+
+  app.get('/agency/opportunities', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const opportunities = await agencyService.getWorkspaceOpportunities(workspace.id);
+
+    return ok(reply, {
+      opportunities,
+    });
+  });
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/tasks',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const tasks = await agencyService.getProjectTasks(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        tasks,
+      });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/tasks/sync',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const tasks = await agencyService.syncProjectTasks(workspace.id, request.params.projectId);
+
+      return ok(reply, {
+        tasks,
+      });
+    },
+  );
+};
+
+export default workspaceAgencyRoute;

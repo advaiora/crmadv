@@ -104,6 +104,44 @@ enum ChecklistTemplateAppliesTo {
   WEB_ASSET_STATUS
 }
 
+enum AgencyProjectStatus {
+  DISCOVERY
+  PLANNING
+  PRODUCTION
+  REVIEW
+  LIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum AgencyPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProjectAlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ProjectAlertStatus {
+  OPEN
+  MONITORING
+  RESOLVED
+  SUGGESTED
+}
+
+enum ProjectOpportunityStatus {
+  OPEN
+  PROPOSED
+  WON
+  LOST
+  SUGGESTED
+}
+
 model Workspace {
   id                         String                      @id @default(cuid())
   name                       String
@@ -147,6 +185,13 @@ model Workspace {
   checklistInstances         ChecklistInstance[]
   checklistInstanceItems     ChecklistInstanceItem[]
   stageChecklistRules        StageChecklistRule[]
+  projectTypes               ProjectType[]
+  projectActiveModules       ProjectActiveModule[]
+  projectMemories            ProjectMemory[]
+  projectAlerts              ProjectAlert[]
+  projectOpportunities       ProjectOpportunity[]
+  projectTasks               ProjectTask[]
+  agencyRuntimeSettings      AgencyRuntimeSetting[]
 }
 
 model User {
@@ -260,29 +305,185 @@ model Client {
 }
 
 model Project {
-  id              String           @id @default(cuid())
-  workspaceId     String
-  clientId        String?
-  name            String
-  description     String?
-  value           Float?
-  dueDate         DateTime?
-  pipelineStageId String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client          Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  clientLinks     ProjectClient[]
-  pipelineStage   PipelineStage?   @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
-  quotes          Quote[]
-  websiteAssets   WebsiteAsset[]   @relation("WebsiteAssetProject")
-  webAppAssets    WebAppAsset[]    @relation("WebAppAssetProject")
-  ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetProject")
+  id                   String                @id @default(cuid())
+  workspaceId          String
+  clientId             String?
+  name                 String
+  description          String?
+  value                Float?
+  dueDate              DateTime?
+  pipelineStageId      String?
+  projectTypeId        String?
+  goal                 String?
+  scopePurchased       Json?
+  statusAgency         AgencyProjectStatus   @default(DISCOVERY)
+  priorityAgency       AgencyPriority        @default(MEDIUM)
+  ownerUserId          String?
+  startDate            DateTime?
+  endDate              DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  workspace            Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client               Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  clientLinks          ProjectClient[]
+  pipelineStage        PipelineStage?        @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  projectType          ProjectType?          @relation(fields: [projectTypeId], references: [id], onDelete: SetNull)
+  quotes               Quote[]
+  websiteAssets        WebsiteAsset[]        @relation("WebsiteAssetProject")
+  webAppAssets         WebAppAsset[]         @relation("WebAppAssetProject")
+  ecommerceAssets      EcommerceAsset[]      @relation("EcommerceAssetProject")
+  activeModules        ProjectActiveModule[]
+  projectMemory        ProjectMemory?
+  projectAlerts        ProjectAlert[]
+  projectOpportunities ProjectOpportunity[]
+  projectTasks         ProjectTask[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, clientId])
   @@index([workspaceId, pipelineStageId])
+  @@index([workspaceId, projectTypeId])
   @@index([workspaceId, updatedAt])
+}
+
+model ProjectType {
+  id          String    @id @default(cuid())
+  workspaceId String
+  key         String
+  label       String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects    Project[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId, label])
+}
+
+model ProjectActiveModule {
+  id          String    @id @default(cuid())
+  workspaceId String
+  projectId   String
+  moduleKey   String
+  moduleLabel String?
+  included    Boolean   @default(false)
+  suggested   Boolean   @default(false)
+  active      Boolean   @default(false)
+  source      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, moduleKey])
+  @@index([workspaceId, projectId])
+}
+
+model ProjectMemory {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  projectId      String    @unique
+  briefJson      Json?
+  sourcesJson    Json?
+  webJson        Json?
+  adsJson        Json?
+  diagnosisJson  Json?
+  reportsJson    Json?
+  contextSummary String?
+  memorySummary  Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, projectId])
+}
+
+model ProjectAlert {
+  id          String               @id @default(cuid())
+  workspaceId String
+  projectId   String
+  title       String
+  description String?
+  reason      String?
+  severity    ProjectAlertSeverity @default(MEDIUM)
+  priority    AgencyPriority       @default(MEDIUM)
+  status      ProjectAlertStatus   @default(OPEN)
+  source      String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, projectId, status])
+}
+
+model ProjectOpportunity {
+  id             String                   @id @default(cuid())
+  workspaceId    String
+  projectId      String
+  title          String
+  stage          String?
+  estimatedValue Decimal?                 @db.Decimal(12, 2)
+  status         ProjectOpportunityStatus @default(OPEN)
+  category       String?
+  type           String?
+  rationale      String?
+  priority       AgencyPriority?
+  score          Int?
+  impactLevel    AgencyPriority?
+  sourceModule   String?
+  sourceSignalKey String?
+  dedupKey       String?
+  suggestedService String?
+  lastEvaluatedAt DateTime?
+  source         String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  workspace      Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project        Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, projectId, status])
+}
+
+model ProjectTask {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  projectId       String
+  title           String
+  description     String?
+  teamRole        String
+  priority        AgencyPriority @default(MEDIUM)
+  status          String         @default("todo")
+  sourceType      String         @default("manual")
+  dependsOnTaskId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dependsOnTask   ProjectTask?   @relation("ProjectTaskDependency", fields: [dependsOnTaskId], references: [id], onDelete: SetNull)
+  blockedByTasks  ProjectTask[]  @relation("ProjectTaskDependency")
+
+  @@index([workspaceId, projectId, status])
+  @@index([workspaceId, teamRole, status])
+}
+
+model AgencyRuntimeSetting {
+  id          String    @id @default(cuid())
+  workspaceId String
+  key         String    @db.VarChar(120)
+  valueJson   Json?
+  ciphertext  String?   @db.Text
+  iv          String?   @db.VarChar(255)
+  authTag     String?   @db.VarChar(255)
+  keyVersion  Int?
+  isSecret    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
 }
 
 model ProjectClient {

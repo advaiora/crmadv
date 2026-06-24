@@ -1,0 +1,215 @@
+import React from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { getAgencyProject, getAgencyProjectWorkingContext } from "../../../modules/agency-os/data/agencyDataAdapter";
+import AgencyPageShell from "../AgencyPageShell";
+import AgencyDataSourceBadge from "../AgencyDataSourceBadge";
+import AgencySourceReadinessPanel from "./AgencySourceReadinessPanel";
+
+const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: projectOverride, children }) => {
+  const { projectId } = useParams();
+  const location = useLocation();
+  const [project, setProject] = React.useState(projectOverride || null);
+  const [workingContext, setWorkingContext] = React.useState(null);
+  const normalizedProjectId = typeof projectId === "string" && projectId.trim()
+    ? projectId.trim()
+    : "-";
+  const projectRootPath = normalizedProjectId === "-"
+    ? "/agency/projects"
+    : `/agency/projects/${encodeURIComponent(normalizedProjectId)}`;
+  const projectOverviewPath = normalizedProjectId === "-"
+    ? "/agency/projects"
+    : `${projectRootPath}/overview`;
+  const workspaceSections = [
+    { key: "overview", label: "Overview", path: projectOverviewPath, group: "primary" },
+    { key: "assets", label: "Fonti", path: `${projectRootPath}/assets`, group: "primary" },
+    { key: "discovery", label: "Discovery", path: `${projectRootPath}/discovery`, group: "primary" },
+    { key: "web", label: "Web", path: `${projectRootPath}/web`, group: "primary" },
+    { key: "ads", label: "Ads", path: `${projectRootPath}/ads`, group: "primary" },
+    { key: "reports-client", label: "Report", path: `${projectRootPath}/reports/client`, group: "primary" },
+    { key: "tasks", label: "Task", path: `${projectRootPath}/tasks`, group: "primary" },
+    { key: "opportunities", label: "Opportunita", path: `${projectRootPath}/opportunities`, group: "secondary" },
+    { key: "alerts", label: "Alert", path: `${projectRootPath}/alerts`, group: "secondary" },
+    { key: "diagnosis", label: "Diagnosis", path: `${projectRootPath}/diagnosis`, group: "secondary" },
+    { key: "reports", label: "Reports tecnici", path: `${projectRootPath}/reports`, group: "secondary" },
+    { key: "brain", label: "Brain", path: `${projectRootPath}/brain`, group: "secondary" },
+    { key: "memory", label: "Memory", path: `${projectRootPath}/memory`, group: "secondary" },
+  ];
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (projectOverride) {
+      setProject(projectOverride);
+      if (normalizedProjectId !== "-") {
+        getAgencyProjectWorkingContext(normalizedProjectId)
+          .then((nextWorkingContext) => {
+            if (!cancelled) {
+              setWorkingContext(nextWorkingContext);
+            }
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setWorkingContext(null);
+            }
+          });
+      }
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (normalizedProjectId === "-") {
+      setProject(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    Promise.all([
+      getAgencyProject(normalizedProjectId),
+      getAgencyProjectWorkingContext(normalizedProjectId).catch(() => null),
+    ])
+      .then(([nextProject, nextWorkingContext]) => {
+        if (!cancelled) {
+          setProject(nextProject);
+          setWorkingContext(nextWorkingContext);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProject(null);
+          setWorkingContext(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedProjectId, projectOverride]);
+
+  const projectDisplayName = project?.name?.trim() || `Progetto ${normalizedProjectId}`;
+  const projectClientLabel = project?.clientName?.trim() || workingContext?.client?.name?.trim() || "";
+  const sourceStatus = project?.sourceReadiness?.status || "missing";
+  const sourceLabel = sourceStatus === "ready"
+    ? "Fonti pronte"
+    : sourceStatus === "partial"
+      ? "Fonti parziali"
+      : "Fonti da completare";
+  const sourceBadgeClass = sourceStatus === "ready"
+    ? "text-bg-success"
+    : sourceStatus === "partial"
+      ? "text-bg-warning"
+      : "text-bg-danger";
+  const visibleWorkspaceSections = workspaceSections.filter((entry) => {
+    if (entry.group !== "secondary") {
+      return true;
+    }
+    if (entry.key === "opportunities" || entry.key === "alerts") {
+      return true;
+    }
+    return import.meta.env.DEV;
+  });
+  const activeSection = visibleWorkspaceSections.find((entry) => {
+    const isOverviewAliasActive = entry.key === "overview"
+      && (location.pathname === projectOverviewPath || location.pathname === projectRootPath);
+    return location.pathname === entry.path || isOverviewAliasActive;
+  });
+  const primaryAction = sourceStatus !== "ready"
+    ? { label: "Completa fonti", path: `${projectRootPath}/assets` }
+    : activeSection?.key === "discovery"
+      ? { label: "Rigenera brief", path: `${projectRootPath}/discovery` }
+      : activeSection?.key === "ads"
+        ? { label: "Crea campagna", path: `${projectRootPath}/ads` }
+        : activeSection?.key === "reports-client"
+          ? { label: "Genera report", path: `${projectRootPath}/reports/client` }
+      : { label: "Crea landing", path: `${projectRootPath}/web` };
+  const confidenceLabel = workingContext?.confidence?.sourceQuality
+    ? `Confidence: ${workingContext.confidence.sourceQuality}`
+    : sourceStatus === "ready"
+      ? "Confidence: buona"
+      : sourceStatus === "partial"
+        ? "Confidence: media"
+        : "Confidence: bassa";
+  const renderNavigationLink = (entry) => {
+    const isOverviewAliasActive = entry.key === "overview"
+      && (location.pathname === projectOverviewPath || location.pathname === projectRootPath);
+    const isActive = location.pathname === entry.path || isOverviewAliasActive;
+    return (
+      <Link
+        key={entry.key}
+        to={entry.path}
+        className={`btn btn-sm ${isActive ? "btn-primary" : "btn-outline-secondary"}`}
+      >
+        {entry.label}
+      </Link>
+    );
+  };
+
+  return (
+    <AgencyPageShell
+      title={title}
+      subtitle={subtitle}
+      dataMeta={dataMeta}
+      breadcrumbs={[
+        { label: "Dashboard", to: "/dashboard" },
+        { label: "Agency", to: "/agency/projects" },
+        ...(projectClientLabel ? [{ label: projectClientLabel, to: "/apps/clients" }] : []),
+        { label: projectDisplayName, to: projectOverviewPath },
+        { label: title },
+      ]}
+    >
+      <div className="agency-project-header p-3 mb-3">
+        <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <h5 className="mb-0">{projectDisplayName}</h5>
+              <span className={`badge ${sourceBadgeClass}`}>{sourceLabel}</span>
+              {project?.statusAgency && (
+                <span className="badge text-bg-light border">Stato: {project.statusAgency}</span>
+              )}
+              <span className="badge text-bg-light border">{confidenceLabel}</span>
+            </div>
+            <div className="small text-muted">
+              {projectClientLabel ? `Cliente: ${projectClientLabel}` : "Cliente non assegnato"}
+              {activeSection?.label ? ` | Sezione: ${activeSection.label}` : ""}
+              <AgencyDataSourceBadge meta={dataMeta} />
+            </div>
+          </div>
+          <Link to={primaryAction.path} className="btn btn-sm btn-primary">
+            {primaryAction.label}
+          </Link>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <div className="d-flex flex-wrap gap-2 mb-2">
+          {workspaceSections.filter((entry) => entry.group === "primary").map(renderNavigationLink)}
+          {visibleWorkspaceSections
+            .filter((entry) => entry.group === "secondary" && (entry.key === "opportunities" || entry.key === "alerts"))
+            .map(renderNavigationLink)}
+        </div>
+        {visibleWorkspaceSections.some((entry) => entry.group === "secondary" && entry.key !== "opportunities" && entry.key !== "alerts") && (
+          <details className="small">
+            <summary className="text-muted" style={{ cursor: "pointer" }}>Diagnosi e strumenti tecnici</summary>
+            <div className="d-flex flex-wrap gap-2 mt-2">
+              {visibleWorkspaceSections
+                .filter((entry) => entry.group === "secondary" && entry.key !== "opportunities" && entry.key !== "alerts")
+                .map(renderNavigationLink)}
+            </div>
+          </details>
+        )}
+      </div>
+
+      {project?.sourceReadiness && location.pathname !== `${projectRootPath}/assets` && (
+        <AgencySourceReadinessPanel readiness={project.sourceReadiness} compact />
+      )}
+      {children || (
+        <p className="mb-0 text-muted">
+          Sezione non ancora configurata.
+        </p>
+      )}
+    </AgencyPageShell>
+  );
+};
+
+export default AgencyProjectPageTemplate;

@@ -1,0 +1,295 @@
+.agency-page-shell {
+  --agency-border: #d8e0ea;
+  --agency-border-soft: #e8edf4;
+  --agency-muted: #526174;
+  --agency-surface: #ffffff;
+  --agency-soft: #f7f9fc;
+  --agency-soft-blue: #eef5ff;
+  --agency-ink: #111827;
+  --agency-primary: #2563eb;
+  --agency-success: #138a55;
+  --agency-warning: #a86600;
+  --agency-danger: #b42318;
+}
+
+.agency-page-shell .card,
+.agency-page-shell .card-border,
+.agency-page-shell .border {
+  border-color: var(--agency-border) !important;
+}
+
+.agency-page-shell .card,
+.agency-page-shell .card-border {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.agency-page-shell .card .card-body,
+.agency-page-shell .card-border .card-body {
+  padding: 16px !important;
+}
+
+.agency-page-shell .text-muted,
+.agency-page-shell .small.text-muted {
+  color: var(--agency-muted) !important;
+}
+
+.agency-page-shell .form-control,
+.agency-page-shell .form-select,
+.agency-page-shell textarea {
+  background-color: #ffffff !important;
+  color: var(--agency-ink) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.agency-page-shell .form-control:focus,
+.agency-page-shell .form-select:focus,
+.agency-page-shell textarea:focus,
+.agency-page-shell .btn:focus-visible,
+.agency-page-shell a:focus-visible,
+.agency-page-shell summary:focus-visible {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.18) !important;
+  outline: 2px solid transparent;
+}
+
+.agency-page-shell .accordion .accordion-button,
+.agency-page-shell .accordion .accordion-button:not(.collapsed) {
+  background: var(--agency-soft) !important;
+  color: var(--agency-ink) !important;
+}
+
+.agency-page-shell .accordion .accordion-body,
+.agency-page-shell .accordion .accordion-item {
+  background: #ffffff !important;
+  color: var(--agency-ink) !important;
+}
+
+.agency-project-header,
+.agency-panel,
+.agency-output-panel {
+  background: var(--agency-surface);
+  border: 1px solid var(--agency-border);
+  border-radius: 8px;
+}
+
+.agency-panel {
+  padding: 16px;
+}
+
+.agency-panel-title {
+  color: var(--agency-ink);
+  font-size: 0.98rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.agency-panel-subtitle {
+  color: var(--agency-muted);
+  font-size: 0.82rem;
+  margin: 4px 0 0;
+}
+
+.agency-action-strip {
+  align-items: center;
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.agency-action-strip strong {
+  color: #0f172a;
+}
+
+.agency-workflow-steps {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.agency-workflow-step {
+  background: var(--agency-surface);
+  border: 1px solid var(--agency-border-soft);
+  border-radius: 8px;
+  min-height: 68px;
+  padding: 10px 12px;
+}
+
+.agency-workflow-step-number {
+  align-items: center;
+  background: var(--agency-soft-blue);
+  border-radius: 999px;
+  color: var(--agency-primary);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  height: 22px;
+  justify-content: center;
+  margin-right: 6px;
+  width: 22px;
+}
+
+.agency-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agency-record-row {
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid var(--agency-border-soft);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.agency-record-row:hover {
+  border-color: #bfd0e8;
+}
+
+.agency-output-panel {
+  height: 100%;
+  padding: 16px;
+}
+
+.agency-output-panel h6,
+.agency-panel h6 {
+  color: var(--agency-ink);
+}
+
+.agency-output-feature {
+  background: #f8fafc;
+  border: 1px solid var(--agency-border-soft);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.agency-output-feature-title {
+  color: var(--agency-ink);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.agency-output-feature-body {
+  color: #334155;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.agency-mini-metric {
+  background: #ffffff;
+  border: 1px solid var(--agency-border-soft);
+  border-radius: 8px;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+.agency-mini-metric strong {
+  display: block;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+}
+
+.agency-empty-state {
+  background: #ffffff;
+  border: 1px dashed #b9c6d8;
+  border-radius: 8px;
+  color: var(--agency-muted);
+  padding: 14px;
+}
+
+.agency-debug-only {
+  display: none;
+}
+
+.agency-page-shell .btn {
+  border-radius: 6px;
+}
+
+.agency-section-card {
+  background: var(--agency-surface);
+  border: 1px solid var(--agency-border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.agency-section-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.agency-section-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.agency-field-question {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #334155;
+  padding: 8px 10px;
+}
+
+.agency-table-wrap {
+  overflow-x: auto;
+}
+
+@media (max-width: 767.98px) {
+  .agency-workflow-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .agency-action-strip {
+    align-items: stretch;
+  }
+
+  .agency-action-strip .btn,
+  .agency-record-row .btn,
+  .agency-record-row .form-select {
+    width: 100%;
+  }
+
+  .agency-page-shell .table-responsive table,
+  .agency-page-shell .table-responsive thead,
+  .agency-page-shell .table-responsive tbody,
+  .agency-page-shell .table-responsive th,
+  .agency-page-shell .table-responsive td,
+  .agency-page-shell .table-responsive tr {
+    display: block;
+  }
+
+  .agency-page-shell .table-responsive thead {
+    display: none;
+  }
+
+  .agency-page-shell .table-responsive tr {
+    border: 1px solid var(--agency-border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #ffffff;
+  }
+
+  .agency-page-shell .table-responsive td {
+    border: 0 !important;
+    padding: 4px 0 !important;
+  }
+}
