@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
+import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import { Prisma } from "@prisma/client";
 import { audit } from "./audit/audit.js";
@@ -26,6 +27,7 @@ import workspaceDashboardRoute from "./modules/dashboard/routes/workspace-dashbo
 import workspaceAuditRoute from "./modules/audit/routes/workspace-audit.route.js";
 import workspaceTeamRoute from "./modules/team/routes/workspace-team.route.js";
 import workspaceVaultRoute from "./modules/vault/routes/workspace-vault.route.js";
+import workspaceAgencyRoute from "./modules/agency-os/routes/workspace-agency.route.js";
 import workspaceWebAssetsRoute from "./routes/workspace-web-assets.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
@@ -322,6 +324,12 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
     max: 200,
     timeWindow: "1 minute",
   });
+  void app.register(multipart, {
+    limits: {
+      files: 1,
+      fileSize: 20 * 1024 * 1024,
+    },
+  });
 
   void app.register(authRoute);
   void app.register(workspaceBrandingRoute);
@@ -334,6 +342,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceAuditRoute);
   void app.register(workspaceTeamRoute);
   void app.register(workspaceVaultRoute);
+  void app.register(workspaceAgencyRoute);
   void app.register(workspaceWebAssetsRoute);
   void app.register(workspaceRolesRoute);
   void app.register(clientsRoute);

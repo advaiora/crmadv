@@ -11,6 +11,46 @@ export const SidebarMenu = [
         requiredModule: "dashboard",
         requiredPermission: "dashboard.view",
       },
+      {
+        id: "main_agency",
+        name: "Agency",
+        icon: <Icons.Briefcase />,
+        path: "/agency/projects",
+        requiredModule: "projects",
+        requiredPermission: "projects.view",
+        childrens: [
+          {
+            name: "Progetti Agency",
+            path: "/agency/projects",
+            requiredPermission: "projects.view",
+            grp_name: "apps",
+          },
+          {
+            name: "Alert",
+            path: "/agency/alerts",
+            requiredPermission: "dashboard.view",
+            grp_name: "apps",
+          },
+          {
+            name: "Opportunita",
+            path: "/agency/opportunities",
+            requiredPermission: "projects.view",
+            grp_name: "apps",
+          },
+          {
+            name: "Report",
+            path: "/agency/reports",
+            requiredPermission: "dashboard.view",
+            grp_name: "apps",
+          },
+          {
+            name: "Impostazioni Agency",
+            path: "/agency/settings",
+            requiredPermission: "modules.manage",
+            grp_name: "apps",
+          },
+        ],
+      },
     ],
   },
   {

@@ -1,6 +1,27 @@
+import React from "react";
+import { Redirect } from "react-router-dom";
 import AddNewPost from "../views/Blog/AddNewPost";
 import PostDetail from "../views/Blog/PostDetails";
 import Posts from "../views/Blog/Posts";
+import AgencyAlertsPage from "../views/Agency/AgencyAlertsPage";
+import AgencyOpportunitiesPage from "../views/Agency/AgencyOpportunitiesPage";
+import AgencyProjectNewPage from "../views/Agency/AgencyProjectNewPage";
+import AgencyProjectsListPage from "../views/Agency/AgencyProjectsListPage";
+import AgencyReportsPage from "../views/Agency/AgencyReportsPage";
+import AgencySettingsPage from "../views/Agency/AgencySettingsPage";
+import AgencyProjectAdsPage from "../views/Agency/project/AgencyProjectAdsPage";
+import AgencyProjectAlertsPage from "../views/Agency/project/AgencyProjectAlertsPage";
+import AgencyProjectAssetsPage from "../views/Agency/project/AgencyProjectAssetsPage";
+import AgencyProjectBrainPage from "../views/Agency/project/AgencyProjectBrainPage";
+import AgencyProjectClientReportPage from "../views/Agency/project/AgencyProjectClientReportPage";
+import AgencyProjectDiscoveryPage from "../views/Agency/project/AgencyProjectDiscoveryPage";
+import AgencyProjectDiagnosisPage from "../views/Agency/project/AgencyProjectDiagnosisPage";
+import AgencyProjectMemoryPage from "../views/Agency/project/AgencyProjectMemoryPage";
+import AgencyProjectOpportunitiesPage from "../views/Agency/project/AgencyProjectOpportunitiesPage";
+import AgencyProjectOverviewPage from "../views/Agency/project/AgencyProjectOverviewPage";
+import AgencyProjectReportsPage from "../views/Agency/project/AgencyProjectReportsPage";
+import AgencyProjectTasksPage from "../views/Agency/project/AgencyProjectTasksPage";
+import AgencyProjectWebPage from "../views/Agency/project/AgencyProjectWebPage";
 import Calendar from "../views/Calendar";
 import ChecklistsTemplates from "../views/Checklists";
 import ContactCards from "../views/Contact/ContactCards";
@@ -60,6 +81,9 @@ import ResetPassword from "../views/Authentication/ResetPassword";
 import Error404 from "../views/Authentication/Error404/Error404";
 import Error503 from "../views/Authentication/Error503/Error503";
 
+const AgencyProjectOverviewRedirect = ({ match }) => (
+    <Redirect to={`${match.url}/overview`} />
+);
 
 export const routes = [
 
@@ -91,6 +115,26 @@ export const routes = [
     { path: 'projects', exact: true, component: ProjectsHome },
     { path: 'projects/settings/pipeline', exact: true, component: ProjectPipelineSettings },
     { path: 'projects/:id', exact: true, component: ProjectDetail },
+    { path: 'agency/projects', exact: true, component: AgencyProjectsListPage },
+    { path: 'agency/projects/new', exact: true, component: AgencyProjectNewPage },
+    { path: 'agency/projects/:projectId', exact: true, component: AgencyProjectOverviewRedirect },
+    { path: 'agency/projects/:projectId/overview', exact: true, component: AgencyProjectOverviewPage },
+    { path: 'agency/projects/:projectId/discovery', exact: true, component: AgencyProjectDiscoveryPage },
+    { path: 'agency/projects/:projectId/diagnosis', exact: true, component: AgencyProjectDiagnosisPage },
+    { path: 'agency/projects/:projectId/brain', exact: true, component: AgencyProjectBrainPage },
+    { path: 'agency/projects/:projectId/web', exact: true, component: AgencyProjectWebPage },
+    { path: 'agency/projects/:projectId/ads', exact: true, component: AgencyProjectAdsPage },
+    { path: 'agency/projects/:projectId/alerts', exact: true, component: AgencyProjectAlertsPage },
+    { path: 'agency/projects/:projectId/reports', exact: true, component: AgencyProjectReportsPage },
+    { path: 'agency/projects/:projectId/reports/client', exact: true, component: AgencyProjectClientReportPage },
+    { path: 'agency/projects/:projectId/opportunities', exact: true, component: AgencyProjectOpportunitiesPage },
+    { path: 'agency/projects/:projectId/memory', exact: true, component: AgencyProjectMemoryPage },
+    { path: 'agency/projects/:projectId/assets', exact: true, component: AgencyProjectAssetsPage },
+    { path: 'agency/projects/:projectId/tasks', exact: true, component: AgencyProjectTasksPage },
+    { path: 'agency/alerts', exact: true, component: AgencyAlertsPage },
+    { path: 'agency/opportunities', exact: true, component: AgencyOpportunitiesPage },
+    { path: 'agency/reports', exact: true, component: AgencyReportsPage },
+    { path: 'agency/settings', exact: true, component: AgencySettingsPage },
     { path: 'checklists/templates', exact: true, component: ChecklistsTemplates },
     { path: 'apps/file-manager/list-view', exact: true, component: ListView },
     { path: 'apps/file-manager/grid-view', exact: true, component: GridView },
