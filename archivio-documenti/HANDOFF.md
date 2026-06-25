@@ -7,7 +7,7 @@
 
 È stata completata la fase di **analisi e pianificazione strategica** del CRM. In particolare:
 
-1. ✅ Analizzato lo stato attuale del codice → `01-brief-stato-attuale.md`.
+1. ✅ Analizzato lo stato attuale del codice → `01-brief-stato-attuale-pre-revisione-apple-style.md`.
 2. ✅ Acquisita la visione target ("bibbia") fornita dal team → `02-brief-operativo-definitivo-bibbia.md`.
 3. ✅ Prodotto il confronto + roadmap versionata V1→V10 → `03-roadmap-confronto-e-build.md`.
 4. ✅ Creato questo archivio (`archivio-documenti/`) e committato/pushato su `main`.
@@ -39,7 +39,7 @@ Erano state proposte tre opzioni. La prossima sessione dovrà sceglierne una:
 
 ## Riferimenti rapidi
 
-- Stato attuale: `archivio-documenti/01-brief-stato-attuale.md`
+- Stato attuale (pre-revisione Apple-style): `archivio-documenti/01-brief-stato-attuale-pre-revisione-apple-style.md`
 - Visione target (bibbia): `archivio-documenti/02-brief-operativo-definitivo-bibbia.md`
 - Roadmap: `archivio-documenti/03-roadmap-confronto-e-build.md`
 - Setup locale: `installazione-e-avvio.md` (root del progetto)

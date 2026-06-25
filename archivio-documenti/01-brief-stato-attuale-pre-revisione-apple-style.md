@@ -1,5 +1,7 @@
-# Brief integrale — Stato del progetto CRM Advaiora (Agency OS)
+# Brief integrale — Stato del progetto CRM Advaiora (Agency OS) — *pre-revisione Apple-style*
 
+> ⚠️ **Nota storica:** questo documento fotografa lo stato del progetto **prima** della revisione orientata al Brief Operativo Definitivo ("bibbia") e all'approccio Apple-style. Descrive quindi la base di partenza, non l'architettura target.
+>
 > Documento di sintesi dello stato attuale del progetto.
 > Data brief: **25 giugno 2026** · Branch: `main` · Ultima release taggata nei commit: **v2.0**
 > Periodo di sviluppo: 9 febbraio 2026 → 24 giugno 2026 (42 commit, 39 migrazioni DB)
