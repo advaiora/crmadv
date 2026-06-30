@@ -1,8 +1,5 @@
 import React from "react";
 import { Redirect } from "react-router-dom";
-import AddNewPost from "../views/Blog/AddNewPost";
-import PostDetail from "../views/Blog/PostDetails";
-import Posts from "../views/Blog/Posts";
 import AgencyAlertsPage from "../views/Agency/AgencyAlertsPage";
 import AgencyOpportunitiesPage from "../views/Agency/AgencyOpportunitiesPage";
 import AgencyProjectNewPage from "../views/Agency/AgencyProjectNewPage";
@@ -24,9 +21,6 @@ import AgencyProjectTasksPage from "../views/Agency/project/AgencyProjectTasksPa
 import AgencyProjectWebPage from "../views/Agency/project/AgencyProjectWebPage";
 import Calendar from "../views/Calendar";
 import ChecklistsTemplates from "../views/Checklists";
-import ContactCards from "../views/Contact/ContactCards";
-import ContactList from "../views/Contact/ContactList";
-import EditContact from "../views/Contact/EditContact";
 import ClientDetail from "../views/Clients/ClientDetail";
 import ClientEdit from "../views/Clients/ClientEdit";
 import ClientsList from "../views/Clients/ClientsList";
@@ -34,16 +28,6 @@ import ClientNew from "../views/Clients/ClientNew";
 import Dashboard from "../views/Dashboard";
 import Team from "../views/Team";
 import Email from "../views/Email";
-import GridView from "../views/FileManager/GridView";
-import ListView from "../views/FileManager/ListView";
-import Gallery from "../views/Gallery";
-import AllApps from "../views/Integrations/All Apps";
-import IntegrationsDetail from "../views/Integrations/App Details";
-import Integration from "../views/Integrations/Integration";
-import CreateInvoice from "../views/Invoices/CreateInvoice";
-import InvoiceList from "../views/Invoices/InvoiceList";
-import InvoiceTemplates from "../views/Invoices/InvoiceTemplates";
-import PreviewInvoice from "../views/Invoices/PreviewInvoice";
 import QuoteDetail from "../views/Quotes/QuoteDetail";
 import QuoteFormPage from "../views/Quotes/QuoteFormPage";
 import QuoteNotificationsSettings from "../views/Quotes/QuoteNotificationsSettings";
@@ -55,11 +39,6 @@ import ProjectPipelineSettings from "../views/Projects/ProjectPipelineSettings";
 import ProjectsHome from "../views/Projects/ProjectsBoard";
 import Vault from "../views/Vault";
 import WebAssets from "../views/WebAssets";
-import KanbanBoard from "../views/Scrumboard/KanbanBoard/Index";
-import Pipeline from "../views/Scrumboard/Pipeline";
-import ProjectsBoard from "../views/Scrumboard/ProjectsBoard";
-import Gantt from "../views/Todo/Gantt";
-import TaskList from "../views/Todo/Tasklist";
 //Pages
 import Profile from "../views/Profiles/Profile";
 import EditProfile from "../views/Profiles/EditProfile";
@@ -91,12 +70,6 @@ export const routes = [
     //Apps
     { path: 'apps/calendar', exact: true, component: Calendar },
     { path: 'apps/email', exact: true, component: Email },
-    { path: 'apps/taskboard/projects-board', exact: true, component: ProjectsBoard },
-    { path: 'apps/taskboard/kanban-board', exact: true, component: KanbanBoard },
-    { path: 'apps/taskboard/pipeline', exact: true, component: Pipeline },
-    { path: 'apps/contacts/contact-list', exact: true, component: ContactList },
-    { path: 'apps/contacts/contact-cards', exact: true, component: ContactCards },
-    { path: 'apps/contacts/edit-contact', exact: true, component: EditContact },
     { path: 'apps/clients', exact: true, component: ClientsList },
     { path: 'apps/clients/new', exact: true, component: ClientNew },
     { path: 'apps/clients/:id/edit', exact: true, component: ClientEdit },
@@ -136,21 +109,6 @@ export const routes = [
     { path: 'agency/reports', exact: true, component: AgencyReportsPage },
     { path: 'agency/settings', exact: true, component: AgencySettingsPage },
     { path: 'checklists/templates', exact: true, component: ChecklistsTemplates },
-    { path: 'apps/file-manager/list-view', exact: true, component: ListView },
-    { path: 'apps/file-manager/grid-view', exact: true, component: GridView },
-    { path: 'apps/gallery', exact: true, component: Gallery },
-    { path: 'apps/todo/task-list', exact: true, component: TaskList },
-    { path: 'apps/todo/gantt', exact: true, component: Gantt },
-    { path: 'apps/blog/posts', exact: true, component: Posts },
-    { path: 'apps/blog/add-new-post', exact: true, component: AddNewPost },
-    { path: 'apps/blog/post-detail', exact: true, component: PostDetail },
-    { path: 'apps/invoices/invoice-list', exact: true, component: InvoiceList },
-    { path: 'apps/invoices/invoice-templates', exact: true, component: InvoiceTemplates },
-    { path: 'apps/invoices/create-invoice', exact: true, component: CreateInvoice },
-    { path: 'apps/invoices/invoice-preview', exact: true, component: PreviewInvoice },
-    { path: 'apps/integrations/all-apps', exact: true, component: AllApps },
-    { path: 'apps/integrations/integrations-detail', exact: true, component: IntegrationsDetail },
-    { path: 'apps/integrations/integration', exact: true, component: Integration },
     //Pages
     { path: 'pages/profile', exact: true, component: Profile },
     { path: 'pages/edit-profile', exact: true, component: EditProfile },
