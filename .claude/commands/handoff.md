@@ -19,6 +19,11 @@ Sei a fine sessione di lavoro su questo progetto. Devi scrivere il **documento d
 2. **Niente sigle, codici o nomi "interni"** che il collega potrebbe non conoscere. Se devi citare un file, una funzione o uno strumento, scrivi anche, in parole semplici, **cosa è e a cosa serve**.
 3. **Breve ma completo.** Tre sezioni essenziali, nessun muro di testo.
 4. Scrivi **in italiano**.
+5. **NESSUN REPORT DIDATTICO. Mai.** L'handoff è un passaggio di consegne operativo tra colleghi, non un diario di apprendimento. Durante la sessione una delle due persone (Jacopo) potrebbe chiedere spiegazioni su meccaniche base di programmazione: quelle spiegazioni servono sul momento, **non vanno nell'handoff**. NON includere MAI frasi del tipo:
+   - "appreso che usando il codice X si ottiene il risultato Y";
+   - "compresa la funzione del file X";
+   - "imparato come funziona Z".
+   Il collega che riprende è esperto: gli interessa **cosa è stato fatto, dove ci si è fermati e come ripartire** — non cosa qualcuno ha imparato strada facendo. Riporta i **fatti e i prossimi passi**, mai i progressi formativi di chi ha scritto.
 
 ## Cosa fare, passo per passo
 
@@ -42,7 +47,7 @@ Crea il file in `archivio-documenti/handoff/handoff-<data-ora>.md` usando **esat
 **Per chi riprende:** <l'altra persona>
 
 ## Cosa ho fatto
-<Elenco chiaro e sintetico di ciò che è stato fatto in questa sessione. Frasi semplici. Per ogni cosa, spiega in una riga il "perché" se non è ovvio. Se hai toccato dei file, dì quali e cosa fanno in parole povere.>
+<Elenco chiaro e sintetico di ciò che è stato fatto in questa sessione. Frasi semplici. Per ogni cosa, spiega in una riga il "perché" se non è ovvio. Se hai toccato dei file, dì quali e cosa fanno in parole povere. NON inserire qui spiegazioni didattiche o "cose imparate" su come funziona la programmazione: solo lavoro svolto e modifiche concrete.>
 
 ## Dove mi sono fermato
 <Punto esatto in cui ti sei interrotto. Cosa è completo, cosa è a metà, eventuali cose lasciate in sospeso o che non funzionano ancora. Se c'è qualcosa di delicato da sapere prima di toccare il codice, scrivilo qui.>
