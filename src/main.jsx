@@ -5,6 +5,7 @@ import App from './App.jsx'
 import './styles/tailwind.css';
 import './styles/scss/style.scss';
 import './styles/scss/globals.css';
+import './styles/design-tokens.css';
 import { Provider } from 'react-redux';
 import store from './redux/store';
 import { ThemeProvider } from './utils/theme-provider/theme-provider.jsx';

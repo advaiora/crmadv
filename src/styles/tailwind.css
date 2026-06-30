@@ -6,7 +6,7 @@
   :root,
   [data-bs-theme='light'],
   .light {
-    --branding-primary: 250 204 21;
+    --branding-primary: 13 110 253;
     --branding-secondary: 226 232 240;
 
     --color-bg: 248 250 252;
@@ -38,7 +38,7 @@
     --input: rgb(var(--border-subtle) / 1);
     --ring: rgb(var(--color-primary) / 1);
     --primary: rgb(var(--color-primary) / 1);
-    --primary-foreground: #111827;
+    --primary-foreground: #ffffff;
     --secondary: rgb(var(--color-secondary) / 1);
     --secondary-foreground: #0f172a;
     --accent: rgb(var(--row-hover) / 1);
@@ -53,7 +53,7 @@
 
   [data-bs-theme='dark'],
   .dark {
-    --branding-primary: 250 204 21;
+    --branding-primary: 96 165 250;
     --branding-secondary: 39 39 42;
 
     --color-bg: 10 10 11;

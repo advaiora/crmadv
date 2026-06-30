@@ -1,0 +1,105 @@
+/* =====================================================================
+   Design System Apple-style — token unici del progetto (V1)
+   ---------------------------------------------------------------------
+   Questo file è la fonte unica per tipografia, spaziature, raggi,
+   ombre e animazioni. I COLORI di base/superfici stanno in
+   `tailwind.css`; il colore d'ACCENTO è personalizzabile per workspace
+   e viene impostato a runtime da `src/lib/workspaceBranding.ts`
+   (default neutro + blu). Importato per ULTIMO in `main.jsx` così i
+   suoi valori prevalgono.
+   ===================================================================== */
+
+:root {
+  /* --- Tipografia: stack di sistema (San Francisco su Apple, Segoe UI
+     su Windows). Filosofia Apple: usare il font nativo della piattaforma. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Scala tipografica (disponibile per i componenti) */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.8125rem;   /* 13px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-md: 1rem;        /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.375rem;    /* 22px */
+  --text-2xl: 1.75rem;    /* 28px */
+  --text-3xl: 2.25rem;    /* 36px */
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Tracking (Apple: leggermente più stretto sui titoli) */
+  --tracking-body: -0.01em;
+  --tracking-heading: -0.021em;
+
+  /* --- Spaziature (passo 4px) --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+
+  /* --- Raggi (Apple-style, morbidi). --radius resta la base esistente. */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-pill: 9999px;
+
+  /* --- Ombre (Apple: morbide, ampie, bassa opacità) --- */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 14px 36px rgba(15, 23, 42, 0.12);
+  --shadow-focus: 0 0 0 3px var(--focus-ring-shadow, rgba(13, 110, 253, 0.35));
+
+  /* --- Animazioni --- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+
+  /* Allinea il font del corpo Bootstrap allo stack di sistema */
+  --bs-body-font-family: var(--font-sans);
+
+  /* Ombre Bootstrap → versione Apple-style morbida */
+  --bs-box-shadow: var(--shadow-md);
+  --bs-box-shadow-sm: var(--shadow-sm);
+  --bs-box-shadow-lg: var(--shadow-lg);
+}
+
+[data-bs-theme='dark'] {
+  --bs-body-font-family: var(--font-sans);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.65);
+}
+
+/* --- Base: tipografia nitida in stile Apple --- */
+body {
+  font-family: var(--font-sans);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--font-heading);
+  letter-spacing: var(--tracking-heading);
+}
