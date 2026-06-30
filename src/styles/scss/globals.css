@@ -1,7 +1,7 @@
 :root,
 [data-bs-theme="light"],
 .light {
-  --branding-primary: 250 204 21;
+  --branding-primary: 13 110 253;
   --branding-secondary: 226 232 240;
 
   --color-bg: 248 250 252;
@@ -35,14 +35,15 @@
   --color-danger-text: 127 29 29;
   --color-on-dark: 255 255 255;
 
-  /* Brand */
+  /* Brand (accento; nome legacy "yellow", valori ora blu neutro.
+     A runtime vengono sovrascritti dal branding del workspace.) */
   --brand-yellow: rgb(var(--color-primary) / 1);
-  --brand-yellow-hover: #eab308;
-  --brand-yellow-active: #ca8a04;
-  --brand-yellow-soft: #fef9c3;
-  --brand-yellow-hover-foreground: #111827;
-  --brand-yellow-active-foreground: #111827;
-  --brand-yellow-soft-foreground: #111827;
+  --brand-yellow-hover: #0b5ed7;
+  --brand-yellow-active: #0a58ca;
+  --brand-yellow-soft: #e7f1ff;
+  --brand-yellow-hover-foreground: #ffffff;
+  --brand-yellow-active-foreground: #ffffff;
+  --brand-yellow-soft-foreground: #084298;
 
   /* Core palette */
   --background: rgb(var(--surface-1) / 1);
@@ -57,7 +58,7 @@
   --input: rgb(var(--border-subtle) / 1);
   --ring: rgb(var(--color-primary) / 1);
   --primary: rgb(var(--color-primary) / 1);
-  --primary-foreground: #111827;
+  --primary-foreground: #ffffff;
   --secondary: rgb(var(--color-secondary) / 1);
   --secondary-foreground: #0f172a;
   --accent: rgb(var(--row-hover) / 1);
@@ -94,7 +95,7 @@
   --bs-link-decoration: underline;
 
   --bs-primary: var(--primary);
-  --bs-primary-rgb: 250, 204, 21;
+  --bs-primary-rgb: 13, 110, 253;
   --bs-secondary: var(--secondary);
   --bs-secondary-rgb: 226, 232, 240;
   --bs-success: var(--success);
@@ -174,7 +175,7 @@
 .dark {
   /* Dark Neutral Palette (charcoal): background 10 10 11, surface-2 17 17 19, elevated 32 32 36 */
   /* Text: fg 244 244 245, muted 161 161 170, border 63 63 70, row-hover 39 39 42, shadow 0 0 0 */
-  --branding-primary: 250 204 21;
+  --branding-primary: 96 165 250;
   --branding-secondary: 39 39 42;
 
   --color-bg: 10 10 11;
@@ -254,7 +255,7 @@
   --bs-link-decoration: underline;
 
   --bs-primary: var(--primary);
-  --bs-primary-rgb: 250, 204, 21;
+  --bs-primary-rgb: 96, 165, 250;
   --bs-secondary: var(--secondary);
   --bs-secondary-rgb: 39, 39, 42;
   --bs-success: var(--success);

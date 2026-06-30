@@ -19,15 +19,12 @@ export function useTheme() {
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState("light"); // Default to light
 
-  // On mount, check localStorage and system preference
+  // On mount, apply the user's saved choice. Without a saved choice the
+  // default is light (scelta di progetto: "entrambe, default chiaro").
   useEffect(() => {
     const storedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    if (storedTheme) {
+    if (storedTheme === "dark" || storedTheme === "light") {
       setTheme(storedTheme);
-    } else {
-      setTheme(prefersDark ? "dark" : "light");
     }
   }, []);
 
