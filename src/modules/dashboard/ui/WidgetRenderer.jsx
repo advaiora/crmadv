@@ -239,7 +239,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
     <div className="space-y-6">
       {kpiWidgets.length > 0 ? (
         <section id="dashboard-section-overview" className="space-y-3">
-          <p className="text-sm font-medium text-textMuted">Panoramica</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Panoramica</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6">
             {kpiWidgets.map((widget) => renderCell(widget, 'col-span-12', 'dashboard-kpi'))}
           </div>
@@ -248,7 +248,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
 
       {urgentWidget || pipelineWidget ? (
         <section id="dashboard-section-main" className="space-y-3">
-          <p className="text-sm font-medium text-textMuted">Priorita operative</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Priorita operative</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {urgentWidget
               ? renderCellWithWidget(urgentWidget, pipelineWidget ? 'xl:col-span-7' : 'xl:col-span-12', 'dashboard-main')
@@ -262,7 +262,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
 
       {secondaryFocusWidget || activityWidget ? (
         <section id="dashboard-section-insights" className="space-y-3">
-          <p className="text-sm font-medium text-textMuted">Operativita e attivita</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Operativita e attivita</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {secondaryFocusWidget
               ? renderCellWithWidget(
@@ -280,7 +280,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
 
       {remainingWidgets.length > 0 ? (
         <section id="dashboard-section-more" className="space-y-3">
-          <p className="text-sm font-medium text-textMuted">Approfondimenti</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Approfondimenti</p>
           <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {remainingWidgets.map((widget) => renderCellWithWidget(
               widget,
