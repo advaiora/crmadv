@@ -245,6 +245,14 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 ---
 
+## Debito tecnico / tooling (trasversale)
+
+Voci non legate a una singola versione: si pianificano quando conviene, non fanno parte del "done" di nessuna tappa.
+
+- **Migrazione ESLint a "flat config".** Il lint JavaScript del progetto (`npm run lint`) al momento **non parte**: ESLint 9 richiede il nuovo formato `eslint.config.js`, mentre il progetto usa ancora `.eslintrc.cjs` con flag legacy. Va migrato, aggiornando lo script in `package.json`. **Attenzione:** a lint funzionante emergeranno molti errori pre-esistenti `react-hooks/set-state-in-effect` (e alcuni `no-useless-escape`) da valutare caso per caso — correggere il codice o declassare consapevolmente la regola; concordare l'approccio prima di modifiche di massa ai moduli. Non tocca il guard colori dedicato (`npm run lint:colors`), che è autonomo e già funzionante. **Quando:** idealmente presto (durante o subito dopo la V1), così i moduli successivi si sviluppano con il lint attivo.
+
+---
+
 ## Sintesi visiva della progressione
 
 | Build | Tema | Blocco aggiunto |
