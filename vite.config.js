@@ -32,6 +32,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      // Onora la porta assegnata dall'ambiente (es. anteprima) se presente;
+      // altrimenti Vite usa il suo default (5173). Non cambia `npm run dev`.
+      port: process.env.PORT ? Number(process.env.PORT) : undefined,
       proxy: {
         '/api': {
           target: `http://${apiHost}:${apiPort}`,
