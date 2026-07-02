@@ -15,31 +15,52 @@ export function useTheme() {
   return context;
 }
 
+// Legge la preferenza del sistema operativo (chiaro/scuro).
+const getSystemTheme = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia &&
+  window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+
 // The main provider component
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState("light"); // Default to light
+  // Default: segue il tema di sistema. Se l'utente ha scelto esplicitamente
+  // un tema (salvato in localStorage), quella scelta ha la precedenza.
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+    const storedTheme = localStorage.getItem("theme");
+    return storedTheme === "dark" || storedTheme === "light" ? storedTheme : getSystemTheme();
+  });
 
-  // On mount, apply the user's saved choice. Without a saved choice the
-  // default is light (scelta di progetto: "entrambe, default chiaro").
+  // Applica il tema al tag <html>.
   useEffect(() => {
+    document.documentElement.setAttribute("data-bs-theme", theme === "dark" ? "dark" : "light");
+  }, [theme]);
+
+  // Finché l'utente non ha una preferenza salvata, segue i cambi di tema del sistema.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return undefined;
+    }
     const storedTheme = localStorage.getItem("theme");
     if (storedTheme === "dark" || storedTheme === "light") {
-      setTheme(storedTheme);
+      return undefined; // scelta esplicita: non seguire più il sistema
     }
-  }, []);
-
-  // Whenever the theme changes, update localStorage and the <html> tag
-  useEffect(() => {
-    if (theme === "dark") {
-      document.documentElement.setAttribute("data-bs-theme", "dark");
-    } else {
-      document.documentElement.setAttribute("data-bs-theme", "light");
-    }
-    localStorage.setItem("theme", theme);
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemChange = (event) => setTheme(event.matches ? "dark" : "light");
+    mediaQuery.addEventListener("change", handleSystemChange);
+    return () => mediaQuery.removeEventListener("change", handleSystemChange);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
+    setTheme((prevTheme) => {
+      const nextTheme = prevTheme === "light" ? "dark" : "light";
+      localStorage.setItem("theme", nextTheme); // scelta esplicita dell'utente: la salviamo
+      return nextTheme;
+    });
   };
 
   return (

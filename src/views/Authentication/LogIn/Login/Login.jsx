@@ -75,10 +75,10 @@ const Login = ({ history }) => {
     onboardingRequired ? "/pages/workspace-branding?onboarding=1" : "/dashboard"
   );
 
-  const leftPanelBackground = "var(--secondary, #0f172a)";
-  const leftPanelTextColor = "var(--secondary-foreground, #ffffff)";
-  const leftPanelMutedTextColor = "var(--hk-menu-header-text, rgba(255,255,255,0.82))";
-  const rightPanelBackground = "var(--primary, #facc15)";
+  const leftPanelBackground = "var(--background, #f8fafc)";
+  const leftPanelTextColor = "var(--foreground, #0f172a)";
+  const leftPanelMutedTextColor = "var(--muted-foreground, #475569)";
+  const rightPanelBackground = "var(--primary, #0d6efd)";
   const rightPanelTextColor = "var(--primary-foreground, #111111)";
 
   const clearFieldError = (fieldName) => {
@@ -228,7 +228,7 @@ const Login = ({ history }) => {
   };
 
   return (
-    <div className="hk-pg-wrapper py-0" data-bs-theme="dark">
+    <div className="hk-pg-wrapper py-0">
       <div className="hk-pg-body py-0">
         <Container fluid className="min-vh-100 px-0">
           <Row className="g-0 min-vh-100">
@@ -273,7 +273,7 @@ const Login = ({ history }) => {
                     )}
 
                     <Form onSubmit={handleSubmit}>
-                      <Button type="button" variant="outline-light" className="w-100 mb-3" onClick={handleGoogleLogin} disabled={isBusy}>
+                      <Button type="button" variant="outline-primary" className="w-100 mb-3" onClick={handleGoogleLogin} disabled={isBusy}>
                         {googleLoading ? (
                           <span className="d-inline-flex align-items-center">
                             <Spinner animation="border" size="sm" className="me-2" />

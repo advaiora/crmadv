@@ -117,7 +117,7 @@ const AcceptInvite = () => {
   }, [inviteToken]);
 
   return (
-    <div className="hk-pg-wrapper py-0" data-bs-theme="dark">
+    <div className="hk-pg-wrapper py-0">
       <div className="hk-pg-body py-0 d-flex align-items-center min-vh-100">
         <Container style={{ maxWidth: 560 }}>
           <Card className="border-0 shadow-sm">

@@ -9,6 +9,7 @@ import { useSession } from "../../../../hooks/useSession";
 import { authenticateWithGoogle, GoogleAuthError } from "../../../../utils/googleAuthClient";
 import { requestGoogleIdToken } from "../../../../utils/googleIdentity";
 import { getClientRuntimeConfig } from "../../../../utils/runtimeConfig";
+import { useTheme } from "../../../../utils/theme-provider/theme-provider";
 
 // Images
 import AdvaioraLogoWhite from "../../../../assets/img/AdvaioraLogo-White.png";
@@ -89,6 +90,7 @@ const resolveGoogleWorkspaceSlug = ({ workspaceName, name, email }) => {
 };
 
 const Signup = () => {
+  const { theme } = useTheme();
   const history = useHistory();
   const location = useLocation();
   const { login } = useSession();
@@ -510,15 +512,17 @@ const Signup = () => {
     }
   };
 
-  const leftPanelBackground = "var(--primary, #facc15)";
+  const leftPanelBackground = "var(--primary, #0d6efd)";
   const leftPanelTextColor = "var(--primary-foreground, #111111)";
+  // Logo che sta sul pannello del form (sfondo del tema): nero su chiaro, bianco su scuro.
+  const formHeadingLogo = theme === "dark" ? AdvaioraLogoWhite : AdvaioraLogoBlack;
 
   return (
-    <div className="hk-pg-wrapper py-0" data-bs-theme="dark">
+    <div className="hk-pg-wrapper py-0">
       <div className="hk-pg-body py-0">
         <Container fluid>
           <Row className="auth-split">
-            {/* PANNELLO SINISTRO (GIALLO ADVAIORA) */}
+            {/* PANNELLO SINISTRO (ACCENTO BRAND ADVAIORA) */}
             <Col
               xl={5}
               lg={6}
@@ -530,7 +534,7 @@ const Signup = () => {
                 color: leftPanelTextColor,
               }}
             >
-              {/* Immagine tenue sopra il giallo (senza blend mode, così il testo resta nero) */}
+              {/* Immagine tenue sopra l'accento (senza blend mode, così il testo resta leggibile) */}
               <img
                 className="bg-img"
                 src={signupBg}
@@ -581,7 +585,7 @@ const Signup = () => {
                       <h4 className="text-center mb-4 d-flex align-items-center justify-content-center gap-2">
                         Registrati su
                         <img
-                          src={AdvaioraLogoWhite}
+                          src={formHeadingLogo}
                           alt="Advaiora"
                           style={{
                             height: "26px",
@@ -592,7 +596,7 @@ const Signup = () => {
 
                       {!isGoogleWorkspaceStep ? (
                         <>
-                          <Button variant="outline-dark" className="btn-rounded btn-block mb-3" type="button" onClick={handleGoogleSignup} disabled={isGoogleSignupDisabled}>
+                          <Button variant="outline-primary" className="btn-rounded btn-block mb-3" type="button" onClick={handleGoogleSignup} disabled={isGoogleSignupDisabled}>
                             <span>
                               <span className="icon">
                                 <FontAwesomeIcon icon={faGoogle} />
@@ -670,8 +674,8 @@ const Signup = () => {
                                     <div
                                       className="rounded-2 px-3 py-2"
                                       style={{
-                                        background: "rgba(15, 23, 42, 0.44)",
-                                        border: "1px solid rgba(148, 163, 184, 0.24)",
+                                        background: "rgb(var(--surface-3) / 0.6)",
+                                        border: "1px solid rgb(var(--border-subtle) / 0.5)",
                                       }}
                                     >
                                       <p
@@ -697,8 +701,8 @@ const Signup = () => {
                                     <div
                                       className="rounded-2 px-3 py-2"
                                       style={{
-                                        background: "rgba(15, 23, 42, 0.44)",
-                                        border: "1px solid rgba(148, 163, 184, 0.24)",
+                                        background: "rgb(var(--surface-3) / 0.6)",
+                                        border: "1px solid rgb(var(--border-subtle) / 0.5)",
                                       }}
                                     >
                                       <p
