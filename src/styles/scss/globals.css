@@ -156,15 +156,15 @@
   --hk-shadow-rgb: 15, 23, 42;
   --bs-shadow-color: 15, 23, 42;
 
-  --hk-menu-bg: #111827;
-  --hk-menu-text: #f8fafc;
-  --hk-menu-border: #1f2937;
+  --hk-menu-bg: var(--card);
+  --hk-menu-text: var(--foreground);
+  --hk-menu-border: var(--border);
   --hk-menu-item-active-bg: var(--primary);
   --hk-menu-item-active-text: var(--primary-foreground);
-  --hk-menu-hover-bg: rgba(var(--bs-primary-rgb), 0.16);
-  --hk-menu-icon-color: #f8fafc;
-  --hk-menu-arrow-color: rgba(248, 250, 252, 0.8);
-  --hk-menu-header-text: #cbd5e1;
+  --hk-menu-hover-bg: var(--accent);
+  --hk-menu-icon-color: var(--muted-foreground);
+  --hk-menu-arrow-color: var(--muted-foreground);
+  --hk-menu-header-text: var(--muted-foreground);
   --workspace-logo-max-width: 220px;
   --workspace-logo-slot-height: 34px;
   --workspace-logo-mark-size: 34px;
@@ -315,15 +315,15 @@
   --hk-shadow-rgb: 0, 0, 0;
   --bs-shadow-color: 0, 0, 0;
 
-  --hk-menu-bg: #121214;
-  --hk-menu-text: #f4f4f5;
-  --hk-menu-border: #2a2a2e;
+  --hk-menu-bg: var(--card);
+  --hk-menu-text: var(--foreground);
+  --hk-menu-border: var(--border);
   --hk-menu-item-active-bg: var(--primary);
   --hk-menu-item-active-text: var(--primary-foreground);
-  --hk-menu-hover-bg: rgb(var(--row-hover) / 0.72);
-  --hk-menu-icon-color: #f4f4f5;
-  --hk-menu-arrow-color: rgb(212 212 216 / 0.78);
-  --hk-menu-header-text: #a1a1aa;
+  --hk-menu-hover-bg: var(--accent);
+  --hk-menu-icon-color: var(--muted-foreground);
+  --hk-menu-arrow-color: var(--muted-foreground);
+  --hk-menu-header-text: var(--muted-foreground);
 }
 
 /* Utility colors */

@@ -139,8 +139,6 @@ export const applyWorkspaceBranding = (workspaceBranding?: WorkspaceBrandingStat
   const primaryActiveForeground = getReadableTextColor(primaryActive);
   const primarySoftForeground = getReadableTextColor(primarySoft);
   const secondaryForeground = getReadableTextColor(secondaryColor);
-  const menuBorder = mixHexColors(secondaryColor, '#000000', 0.22);
-  const menuArrowColor = toRgba(secondaryForeground, 0.72);
 
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty('--branding-primary', toRgbSpace(primaryColor));
@@ -164,11 +162,8 @@ export const applyWorkspaceBranding = (workspaceBranding?: WorkspaceBrandingStat
   rootStyle.setProperty('--bs-primary-rgb', toRgbCsv(primaryColor));
   rootStyle.setProperty('--bs-secondary', secondaryColor);
   rootStyle.setProperty('--bs-secondary-rgb', toRgbCsv(secondaryColor));
-  rootStyle.setProperty('--hk-menu-bg', secondaryColor);
-  rootStyle.setProperty('--hk-menu-text', secondaryForeground);
-  rootStyle.setProperty('--hk-menu-icon-color', secondaryForeground);
-  rootStyle.setProperty('--hk-menu-arrow-color', menuArrowColor);
-  rootStyle.setProperty('--hk-menu-border', menuBorder);
+  // La sidebar segue il tema (token in globals.css), non il colore secondario:
+  // qui impostiamo solo lo stato attivo/hover sull'accento.
   rootStyle.setProperty('--hk-menu-item-active-bg', primaryColor);
   rootStyle.setProperty('--hk-menu-item-active-text', primaryForeground);
   rootStyle.setProperty('--hk-menu-hover-bg', toRgba(primaryColor, 0.12));
