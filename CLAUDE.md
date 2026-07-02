@@ -27,6 +27,13 @@ Quando si individua un **sospetto conflitto di questo tipo**, NON procedere subi
 
 Vale per tutto il progetto, in ogni sessione. Nel dubbio, segnalare: meglio una domanda in più che disfare il lavoro dell'altro.
 
+## Auto-miglioramento dell'AI (note operative)
+
+Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativi già individuati e il modo corretto di procedere (es. come fare le verifiche in anteprima senza sprechi di tempo).
+
+- **Leggilo a inizio sessione** ed evita gli errori già annotati.
+- Quando ti accorgi di aver eseguito un'operazione in modo inefficiente o sbagliato, **aggiorna quel file in autonomia** (senza che l'utente lo chieda), aggiungendo una voce breve nel formato *Contesto → Errore → Modo corretto*.
+
 ## Regole di scrittura degli handoff
 
 - Linguaggio **chiaro e semplice**, niente sigle o nomi "in codice" non spiegati.
