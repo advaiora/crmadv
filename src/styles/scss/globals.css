@@ -388,7 +388,7 @@ body,
   max-width: 320px;
   padding: 0.35rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm);
   background-color: var(--hk-bg-tertiary);
 }
 
@@ -428,7 +428,7 @@ body,
 .hk-wrapper .hk-navbar.app-topnav .app-topnav-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -516,7 +516,7 @@ body,
   gap: 0.35rem;
   padding: 0.32rem 0.55rem;
   border: 1px solid var(--border);
-  border-radius: 0.45rem;
+  border-radius: var(--radius-sm);
   font-size: 0.76rem;
   color: var(--hk-text-primary) !important;
   background-color: transparent;
@@ -570,7 +570,7 @@ body,
 .hk-wrapper .hk-menu .menu-group .navbar-nav > .nav-item > .nav-link:hover {
   background-color: var(--hk-menu-hover-bg);
   color: var(--hk-menu-text);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm);
 }
 
 .hk-wrapper .hk-menu .menu-group .navbar-nav > .nav-item.active > .nav-link,
