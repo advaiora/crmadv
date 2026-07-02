@@ -132,7 +132,7 @@
 }
 
 .clients-toolbar-card .card-body {
-  background: linear-gradient(120deg, rgba(255, 214, 0, 0.1), rgba(255, 214, 0, 0) 35%), var(--hk-bg-primary);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--bs-primary) 10%, transparent), transparent 35%), var(--hk-bg-primary);
   border-radius: var(--clients-toolbar-radius) !important;
 }
 
@@ -161,7 +161,7 @@
 .clients-toolbar-card .form-control:focus,
 .clients-toolbar-card .form-select:focus {
   border-color: var(--bs-primary);
-  box-shadow: 0 0 0 0.125rem rgba(255, 214, 0, 0.35);
+  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--bs-primary) 35%, transparent);
 }
 
 .clients-toolbar-card .btn-outline-primary {
@@ -173,9 +173,9 @@
 .clients-toolbar-card .btn-outline-primary:hover,
 .clients-toolbar-card .btn-outline-primary:focus,
 .clients-toolbar-card .btn-outline-primary:active {
-  border-color: var(--brand-yellow-hover, #e6c200);
-  color: var(--brand-yellow-hover-foreground);
-  background-color: var(--brand-yellow-hover, #e6c200);
+  border-color: var(--brand-accent-hover, #e6c200);
+  color: var(--brand-accent-hover-foreground);
+  background-color: var(--brand-accent-hover, #e6c200);
 }
 
 .clients-toolbar-card .btn-outline-secondary {
@@ -208,8 +208,8 @@
 
 .clients-toolbar-card .badge.bg-light {
   background-color: var(--bs-soft-primary) !important;
-  color: var(--brand-yellow-soft-foreground) !important;
-  border: 1px solid rgba(255, 214, 0, 0.45);
+  color: var(--brand-accent-soft-foreground) !important;
+  border: 1px solid color-mix(in srgb, var(--bs-primary) 45%, transparent);
 }
 
 .clients-form-shell {
@@ -307,7 +307,7 @@
 }
 
 [data-bs-theme="dark"] .clients-toolbar-card .input-group-text {
-  background-color: rgba(255, 214, 0, 0.16);
+  background-color: color-mix(in srgb, var(--bs-primary) 16%, transparent);
   color: var(--foreground);
 }
 
@@ -716,7 +716,7 @@
 .clients-type-toggle-btn.btn-primary:hover,
 .clients-type-toggle-btn.btn-primary:focus,
 .clients-type-toggle-btn.btn-primary:active {
-  color: var(--brand-yellow-hover-foreground) !important;
+  color: var(--brand-accent-hover-foreground) !important;
 }
 
 .clients-type-toggle-btn.btn-outline-secondary:hover,
@@ -756,7 +756,7 @@
 [data-bs-theme="dark"] .clients-type-toggle-btn.btn-primary:hover,
 [data-bs-theme="dark"] .clients-type-toggle-btn.btn-primary:focus,
 [data-bs-theme="dark"] .clients-type-toggle-btn.btn-primary:active {
-  color: var(--brand-yellow-hover-foreground) !important;
+  color: var(--brand-accent-hover-foreground) !important;
 }
 
 [data-bs-theme="dark"] .clients-type-toggle-btn.btn-outline-secondary:hover,
