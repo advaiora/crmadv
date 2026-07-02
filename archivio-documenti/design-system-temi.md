@@ -59,4 +59,8 @@ Gialli/colori decorativi non tematici (es. la palette `$yellow` del template, le
 
 ## Controllo automatico
 
-C'è uno stylelint che segnala i colori scritti a mano nei file CSS di modulo: `npm run lint:css`. Attenzione: **non** vede gli stili inline in JSX — lì la disciplina è manuale (vale la regola d'oro).
+Due comandi segnalano i colori scritti a mano nei moduli (`src/modules/**`):
+- `npm run lint:css` — file `.css` di modulo (stylelint).
+- `npm run lint:colors` — stili **inline in JSX** nei componenti `.jsx`/`.tsx` (regola ESLint dedicata).
+
+Entrambi sono "avvisi" (segnalano, non bloccano la build) e coprono solo `src/modules/**`. Restano fuori: i colori-dato legittimi nei file util `.js` (palette dei tag, colori delle fasi kanban…) e i colori decorativi non di tema.

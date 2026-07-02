@@ -9,6 +9,7 @@
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "lint:css": "stylelint \"src/modules/**/*.css\"",
+    "lint:colors": "eslint -c eslint.colors.config.mjs src/modules",
     "preview": "vite preview",
     "dev:api": "tsx watch server/index.ts",
     "start:api": "tsx server/index.ts",
