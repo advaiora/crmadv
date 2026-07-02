@@ -27,7 +27,7 @@ const WidgetCard = ({
   return (
     <Card
       className={cn(
-        'h-full rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover',
+        'glass-edge h-full rounded-2xl border-0 bg-card transition-colors hover:bg-card',
         className,
       )}
     >
@@ -35,8 +35,8 @@ const WidgetCard = ({
         <CardHeader className={cn('flex flex-row items-start justify-between gap-4 p-4 pb-0 md:p-6 md:pb-0', headerClassName)}>
           <div className="flex min-w-0 items-start gap-3">
             {Icon ? (
-              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bgSecondary text-primary">
-                <Icon className="h-4 w-4" aria-hidden="true" />
+              <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
               </span>
             ) : null}
             <div className="min-w-0 space-y-1">
@@ -74,12 +74,12 @@ export const WidgetEmptyState = ({
 }) => (
   <div
     className={cn(
-      'flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cardBorder bg-bgSecondary px-4 py-8 text-center',
+      'flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cardBorder/60 bg-bgSecondary px-4 py-8 text-center',
       className,
     )}
   >
-    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-bgSecondary text-primary">
-      <Icon className="h-4 w-4" aria-hidden="true" />
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
     </span>
     <p className="mb-0 text-sm text-textMuted">{message}</p>
     {action ? <div>{action}</div> : null}

@@ -172,7 +172,7 @@ Successo/info/avviso/errore hanno token dedicati (`--success/--info/--warning/--
 3. **Ombra tenue** (fa da bordo, più delicata);
 4. **Bordo hairline** solo se serve davvero.
 
-- **Fai:** bordi **hairline** a bassa opacità (Apple usa 1px `rgba(0,0,0,0.08)`; noi: `color-mix(... var(--border) …)` o `--border-subtle` con alpha).
+- **Fai:** bordi **hairline** a bassa opacità (Apple usa 1px `rgba(0,0,0,0.08)`; noi: `color-mix(... var(--border) …)` o `--border-subtle` con alpha). **Sui blocchi/superfici (card, KPI, widget, pannelli) lo stile della casa è il "bordo vetro" `.glass-edge`** (vedi §6.5), non un bordo pieno.
 - **Non fare:** bordi pieni e scuri ovunque → "sporcano" e affaticano.
 
 ### 6.2 Ombre
@@ -192,6 +192,15 @@ Apple usa angoli morbidi e coerenti. Nostri token: `--radius-sm` 8 · `--radius-
 🍏 Apple ama il **vetro smerigliato** (sfondo translucido + blur); dal 2025 c'è "Liquid Glass" (glassmorphism a livello OS). Sul web si ottiene con `backdrop-filter: saturate(180%) blur(...)`.
 - **Fai:** usalo **con parsimonia** e solo su **superfici che stanno sopra il contenuto e restano fisse** mentre si scrolla: **topnav** (già fatto), bottom-nav mobile (già fatto), eventualmente sidebar/menu overlay.
 - **Non fare:** blur su superfici di contenuto statiche (è finto e costa in performance); esagerare con la trasparenza (il testo deve restare leggibile → tieni opacità alta, ~0.8+).
+
+### 6.5 Bordo "vetro" `.glass-edge` — stile della casa per i blocchi
+Scelta di design adottata per il prodotto (luglio 2026): i **blocchi/superfici** (card, tessere KPI, widget, pannelli) non usano un bordo pieno che chiude il perimetro, ma un **bordo vetro discontinuo** — la classe globale `.glass-edge` in `globals.css`.
+
+Come funziona (concettualmente): un **anello a gradiente** (pseudo-elemento `::before` mascherato) che resta visibile **agli angoli** e **sfuma fino a sparire lungo i lati** → il contorno **non chiude mai** il perimetro; più un **tenue riflesso di luce** sul bordo superiore (inset highlight). Costruito su `--foreground` con `color-mix`, quindi **adattivo al tema** (in chiaro = hairline morbido che si apre; in scuro = effetto vetro/rifrazione più percepibile) e a norma di token.
+
+- **Fai:** usa `.glass-edge` sui blocchi di contenuto; aggiungi `.glass-edge-interactive` sui blocchi "a colpo d'occhio" (KPI) per un lieve ravvivarsi al passaggio. Tienilo **sobrio**: opacità basse, effetto percepibile solo da vicino.
+- **Non fare:** alzarne l'intensità fino a farlo sembrare un neon/vetro appariscente (§9 anti-pattern: nulla di eccessivo); applicarlo a **controlli piccoli** (bottoni, input, badge) — è pensato per **superfici/blocchi**, non per i micro-controlli.
+- **Nota di coerenza:** è un **effetto di bordo** (sheen sul contorno), *non* glassmorphism con blur sul contenuto — resta quindi compatibile con la regola §6.4 ("niente blur su superfici di contenuto statiche").
 
 ---
 
@@ -273,7 +282,8 @@ Apple usa angoli morbidi e coerenti. Nostri token: `--radius-sm` 8 · `--radius-
 
 **Superfici**
 - [ ] Separazione con spazio/sfondo prima che con bordi?
-- [ ] Bordi hairline tenui, ombre morbide da token (`--shadow-*`)?
+- [ ] Blocchi/card col bordo vetro `.glass-edge` (§6.5), non un bordo pieno? Effetto sobrio?
+- [ ] Ombre morbide da token (`--shadow-*`)?
 - [ ] Raggi da token (`--radius-*`) proporzionati all'elemento?
 
 **Chiaro/scuro**

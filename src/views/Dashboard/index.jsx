@@ -36,8 +36,8 @@ const getDashboardErrorMessage = (error) => {
 };
 
 const SkeletonCard = ({ className }) => (
-  <Card className={className || 'rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover'}>
-    <CardContent className="space-y-3 p-4 md:p-6">
+  <Card className={className || 'rounded-2xl border-cardBorder/60 bg-card shadow-sm'}>
+    <CardContent className="space-y-3 p-5 md:p-6">
       <Skeleton className="h-5 w-36" />
       <Skeleton className="h-9 w-28" />
       <Skeleton className="h-4 w-3/4" />
@@ -55,13 +55,13 @@ const DashboardHomeSkeleton = () => (
     </div>
 
     <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
-      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-7" />
-      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-5" />
+      <SkeletonCard className="rounded-2xl border-cardBorder/60 bg-card shadow-sm xl:col-span-7" />
+      <SkeletonCard className="rounded-2xl border-cardBorder/60 bg-card shadow-sm xl:col-span-5" />
     </div>
 
     <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
-      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-7" />
-      <SkeletonCard className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover xl:col-span-5" />
+      <SkeletonCard className="rounded-2xl border-cardBorder/60 bg-card shadow-sm xl:col-span-7" />
+      <SkeletonCard className="rounded-2xl border-cardBorder/60 bg-card shadow-sm xl:col-span-5" />
     </div>
   </div>
 );
@@ -159,11 +159,11 @@ const DashboardWorkspacePage = ({ access, toggleCollapsedNav, reloadWorkspaceAcc
       ) : null}
 
       {!error && !loading && widgets.length === 0 ? (
-        <Card className="rounded-2xl border border-cardBorder bg-card shadow-sm transition hover:bg-hover">
+        <Card className="rounded-2xl border-cardBorder/60 bg-card shadow-sm">
           <CardContent className="space-y-4 p-5 md:p-6">
-            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cardBorder bg-bgSecondary px-4 py-8 text-center">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-bgSecondary text-primary">
-                <LayoutDashboard className="h-4 w-4" />
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-cardBorder/60 bg-bgSecondary px-4 py-8 text-center">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <LayoutDashboard className="h-[18px] w-[18px]" />
               </span>
               <p className="mb-0 text-sm text-textMuted">
                 Nessun widget disponibile per il tuo profilo nel workspace attuale.

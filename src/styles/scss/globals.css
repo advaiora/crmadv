@@ -1074,6 +1074,57 @@ small.text-muted,
   box-shadow: var(--shadow-lg);
 }
 
+/* Bordo "vetro" discontinuo (prototipo Apple-style):
+   anello a gradiente mascherato che resta visibile agli angoli e sfuma fino a
+   sparire lungo i lati — quindi NON chiude mai il perimetro del blocco — con un
+   tenue riflesso di luce sul bordo superiore. Neutro e adattivo al tema
+   (usa --foreground: scuro in chiaro = hairline morbido; chiaro in scuro =
+   effetto vetro/rifrazione). Tenuto volutamente discreto. */
+.glass-edge {
+  position: relative;
+  border-color: transparent !important;
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent) !important;
+}
+
+.glass-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--foreground) 26%, transparent) 0%,
+    color-mix(in srgb, var(--foreground) 6%, transparent) 22%,
+    transparent 44%,
+    transparent 58%,
+    color-mix(in srgb, var(--foreground) 10%, transparent) 80%,
+    color-mix(in srgb, var(--foreground) 24%, transparent) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Variante per blocchi "a colpo d'occhio" (KPI): l'anello si ravviva appena
+   al passaggio, come luce che scorre sul vetro. */
+.glass-edge-interactive:hover::before {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--foreground) 34%, transparent) 0%,
+    color-mix(in srgb, var(--foreground) 8%, transparent) 22%,
+    transparent 42%,
+    transparent 56%,
+    color-mix(in srgb, var(--foreground) 14%, transparent) 78%,
+    color-mix(in srgb, var(--foreground) 30%, transparent) 100%
+  );
+}
+
 .dropdown-item,
 .list-group-item {
   color: var(--foreground);
