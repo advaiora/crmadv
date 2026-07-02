@@ -173,9 +173,9 @@
 .clients-toolbar-card .btn-outline-primary:hover,
 .clients-toolbar-card .btn-outline-primary:focus,
 .clients-toolbar-card .btn-outline-primary:active {
-  border-color: var(--brand-accent-hover, #e6c200);
+  border-color: var(--brand-accent-hover);
   color: var(--brand-accent-hover-foreground);
-  background-color: var(--brand-accent-hover, #e6c200);
+  background-color: var(--brand-accent-hover);
 }
 
 .clients-toolbar-card .btn-outline-secondary {
@@ -455,7 +455,7 @@
 
 .clients-row-meta {
   margin-top: 0.2rem;
-  color: var(--hk-text-secondary, #6c757d);
+  color: var(--hk-text-secondary);
   font-size: 0.82rem;
 }
 

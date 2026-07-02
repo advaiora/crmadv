@@ -1,0 +1,21 @@
+{
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      {
+        "color": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "/color$/": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "/^background/": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "/^border/": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "/^outline/": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "box-shadow": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "fill": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"],
+        "stroke": ["/#[0-9a-fA-F]{3,8}/", "/(rgb|hsl)a?\\(\\s*[0-9.]/"]
+      },
+      {
+        "severity": "warning",
+        "message": "Colore fisso: usa un token del tema var(--...) — vedi archivio-documenti/design-system-temi.md"
+      }
+    ]
+  },
+  "ignoreFiles": ["**/node_modules/**"]
+}

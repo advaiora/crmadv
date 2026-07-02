@@ -45,3 +45,7 @@ Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativ
 - **Backend:** Node + Fastify 5 (TypeScript via `tsx`), Zod.
 - **Database:** PostgreSQL via Prisma 6.
 - Avvio e comandi: vedi `installazione-e-avvio.md`.
+
+## Colori e temi (chiaro/scuro) — regola d'oro
+
+Il tema è un sistema globale a token (variabili CSS) in `src/styles/scss/globals.css`. Sviluppando qualsiasi pagina/componente: **usa sempre i token `var(--…)` o i componenti Bootstrap standard, mai colori scritti a mano** (`#hex`/`rgb`/`rgba`), nemmeno negli stili inline in JSX. Così chiaro e scuro funzionano da soli, senza ritocchi pagina per pagina. Riferimento completo dei token: `archivio-documenti/design-system-temi.md`. Controllo automatico sui CSS di modulo: `npm run lint:css`.
