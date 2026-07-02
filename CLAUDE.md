@@ -49,3 +49,7 @@ Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativ
 ## Colori e temi (chiaro/scuro) — regola d'oro
 
 Il tema è un sistema globale a token (variabili CSS) in `src/styles/scss/globals.css`. Sviluppando qualsiasi pagina/componente: **usa sempre i token `var(--…)` o i componenti Bootstrap standard, mai colori scritti a mano** (`#hex`/`rgb`/`rgba`), nemmeno negli stili inline in JSX. Così chiaro e scuro funzionano da soli, senza ritocchi pagina per pagina. Riferimento completo dei token: `archivio-documenti/design-system-temi.md`. Controlli automatici sui moduli: `npm run lint:css` (file CSS) e `npm run lint:colors` (stili inline in JSX).
+
+## Design "Apple-style" — la bussola
+
+La direzione visiva del prodotto è **Apple-style a sottrazione** (app minimale, non un sito marketing né un'app nativa). Il documento fondativo — principi, regole "fai/non fare", valori concreti agganciati ai token, checklist per pagina — è `archivio-documenti/design-linguaggio-apple-web.md`. **Leggilo prima di lavorare sull'aspetto** di qualsiasi pagina/componente: è pensato per guidare il design anche nelle sessioni future senza memoria di questa. In sintesi: gerarchia tipografica netta, un solo accento per vista, spazio dove aiuta la lettura ma densità dentro tabelle/liste, meno bordi e ombre morbide, token per tutto.

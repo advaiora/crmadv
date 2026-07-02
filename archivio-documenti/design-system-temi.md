@@ -1,6 +1,8 @@
 # Design system — colori e temi (chiaro/scuro)
 
 > Come colorare qualsiasi pagina/componente in modo che chiaro e scuro funzionino **da soli**, senza doverci tornare sopra dopo.
+>
+> **Questo file** copre i **token colore** e la regola d'oro chiaro/scuro. Per la **direzione di design complessiva** (principi Apple-style, tipografia, spaziatura, controlli, motion, anti-pattern, checklist) vedi il documento fondativo `design-linguaggio-apple-web.md`.
 
 ## Regola d'oro
 
