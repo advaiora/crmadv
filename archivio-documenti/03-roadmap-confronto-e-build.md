@@ -162,6 +162,7 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - Pulizia pagine demo non pertinenti e file di servizio in root.
 - **Advanced Find / Command-K** (ricerca globale: progetti, clienti, comandi).
 - **Shortcuts** personalizzabili + personalizzazione utente (tema, colori, foto profilo) cablata.
+- **Brandizzazione colori — schemi + equilibrio tema (da definire):** oggi il workspace ha due color-picker liberi (primario/accento + secondario), senza preset né vincoli. Va progettato: quali schemi/preset offrire e le **regole/guardrail che garantiscano leggibilità ed equilibrio visivo in chiaro *e* scuro** nonostante il colore scelto dall'utente (le neutre restano dai token; si valida/aggiusta solo l'accento). Rifinitura del design system: farla verso fine V1, al più tardi a inizio V2 (prima di aprire la brandizzazione a workspace reali).
 - Navigazione "a sottrazione": menu contestuale per modulo/ruolo.
 **Si appoggia su:** multi-tenant + RBAC + moduli già esistenti.
 **Done quando:** l'app gira nel nuovo look, Command-K naviga ovunque, zero pagine demo.
