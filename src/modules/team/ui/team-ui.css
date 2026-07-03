@@ -231,3 +231,11 @@
   color: var(--foreground) !important;
 }
 
+/* Approccio misto "senza scatole" (pagina dentro `.page-flat`, vedi
+   apple-foundation.css): l'intestazione perde la scatola, quindi va spento
+   anche il suo pannello decorativo a gradiente. Le tabelle (`.flat-keep`)
+   restano scatole e non sono toccate. */
+.page-flat .team-page-shell .team-page-header .card-body {
+  background: transparent;
+}
+

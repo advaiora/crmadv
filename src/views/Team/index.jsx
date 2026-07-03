@@ -349,7 +349,7 @@ const TeamWorkspacePage = ({ access }) => {
   };
 
   return (
-    <div className="container-fluid pt-3 team-page-container">
+    <div className="container-fluid pt-3 team-page-container page-flat">
       <div className="team-page-shell">
         <Card className="card-border mb-3 team-page-header">
           <Card.Body className="d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -394,7 +394,7 @@ const TeamWorkspacePage = ({ access }) => {
               </Card.Body>
             </Card>
           {membersError && <Alert variant="danger">{membersError}</Alert>}
-          <Card className="card-border team-data-table-shell">
+          <Card className="card-border flat-keep team-data-table-shell">
             <Card.Body>
               <div className="table-responsive">
                 <Table hover className="mb-0 align-middle team-table">
@@ -458,7 +458,7 @@ const TeamWorkspacePage = ({ access }) => {
             </Card.Body>
           </Card>
           {invitesError && <Alert variant="danger">{invitesError}</Alert>}
-          <Card className="card-border team-data-table-shell">
+          <Card className="card-border flat-keep team-data-table-shell">
             <Card.Body>
               <div className="table-responsive">
                 <Table hover className="mb-0 align-middle team-table">

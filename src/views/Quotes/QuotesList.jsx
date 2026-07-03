@@ -211,7 +211,7 @@ const QuotesList = () => {
         const totalPages = Math.max(1, Number(quotesData?.pageInfo?.totalPages) || 0);
 
         return (
-          <div className="container-fluid quotes-page-container">
+          <div className="container-fluid quotes-page-container page-flat">
             <div className="quotes-page-shell pt-3">
               <div className="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
                 <div>
@@ -318,7 +318,7 @@ const QuotesList = () => {
                 </Alert>
               )}
 
-              <Card className="card-border mb-3">
+              <Card className="card-border flat-keep mb-3">
                 <Card.Body className="py-2">
                   <div className="table-responsive">
                     <Table hover className="mb-0 align-middle">
