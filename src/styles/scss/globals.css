@@ -592,6 +592,23 @@ body,
   color: var(--accent-foreground) !important;
 }
 
+/* Leggibilità dello stato ATTIVO: la regola generale sul `.nav-link-text`
+   (più sopra, con !important) vincerebbe sul colore dello stato attivo,
+   lasciando il testo del colore "a riposo" del menu: nero su fondo accento in
+   tema chiaro (sezione), bianco su fondo tinta-soft in tema scuro (sottovoce).
+   Qui si ribadisce sul testo lo stesso colore del contenitore attivo — i token
+   `*-foreground` sono già calcolati leggibili sul rispettivo fondo, anche con
+   il branding per-workspace che li sovrascrive a runtime. */
+.hk-wrapper .hk-menu .menu-group .navbar-nav > .nav-item.active > .nav-link .nav-link-text,
+.hk-wrapper .hk-menu .menu-group .navbar-nav > .nav-item > .nav-link.active .nav-link-text {
+  color: var(--primary-foreground) !important;
+}
+
+.hk-wrapper .hk-menu .menu-group .nav-children .nav-item.active > .nav-link .nav-link-text,
+.hk-wrapper .hk-menu .menu-group .nav-children .nav-link.active .nav-link-text {
+  color: var(--accent-foreground) !important;
+}
+
 .hk-wrapper .hk-menu .menu-header .navbar-toggle,
 .hk-wrapper .hk-menu .menu-header .navbar-toggle:hover,
 .hk-wrapper .hk-menu .menu-header .navbar-toggle:focus,
