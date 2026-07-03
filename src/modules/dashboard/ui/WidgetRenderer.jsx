@@ -205,7 +205,7 @@ const renderCell = (widget, className, idPrefix = 'dashboard-widget') => (
   <div
     key={widget.id}
     id={`${idPrefix}-${widget.id}`}
-    className={cn('col-span-12 min-w-0', className)}
+    className={cn('glass-sep col-span-12 min-w-0', className)}
   >
     {renderWidgetContent(widget)}
   </div>
@@ -216,7 +216,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
     <div
       key={widget.id}
       id={`${idPrefix}-${widget.id}`}
-      className={cn('col-span-12 min-w-0', className)}
+      className={cn('glass-sep col-span-12 min-w-0', className)}
     >
       {renderWidgetContent(widget, onRefreshRequested)}
     </div>
@@ -224,6 +224,10 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
 
   const sortedWidgets = [...widgets].sort(sortWidgets);
   const usedIds = new Set();
+  // `page-flat`: layout "separatori sottili al posto delle scatole"
+  // (stile iOS Impostazioni/Mail). Tutta la logica visiva è in apple-foundation.css:
+  // `page-flat` sul contenitore, `flat-cols` sulle griglie a riga singola
+  // (linee verticali a desktop). Per tornare alle scatole: rimuovere `page-flat`.
 
   const kpiWidgets = sortedWidgets.filter((widget) => widget.type === 'kpis');
   kpiWidgets.forEach((widget) => usedIds.add(widget.id));
@@ -236,11 +240,11 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
   const remainingWidgets = sortedWidgets.filter((widget) => !usedIds.has(widget.id));
 
   return (
-    <div className="space-y-6">
+    <div className="page-flat space-y-6">
       {kpiWidgets.length > 0 ? (
         <section id="dashboard-section-overview" className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Panoramica</p>
-          <div className="grid grid-cols-1 gap-4 md:gap-6">
+          <div className="flat-rows grid grid-cols-1 gap-4 md:gap-6">
             {kpiWidgets.map((widget) => renderCell(widget, 'col-span-12', 'dashboard-kpi'))}
           </div>
         </section>
@@ -249,7 +253,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
       {urgentWidget || pipelineWidget ? (
         <section id="dashboard-section-main" className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Priorita operative</p>
-          <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
+          <div className="flat-cols grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {urgentWidget
               ? renderCellWithWidget(urgentWidget, pipelineWidget ? 'xl:col-span-7' : 'xl:col-span-12', 'dashboard-main')
               : null}
@@ -263,7 +267,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
       {secondaryFocusWidget || activityWidget ? (
         <section id="dashboard-section-insights" className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Operativita e attivita</p>
-          <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
+          <div className="flat-cols grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {secondaryFocusWidget
               ? renderCellWithWidget(
                 secondaryFocusWidget,
@@ -281,7 +285,7 @@ const WidgetRenderer = ({ widgets = [], onRefreshRequested }) => {
       {remainingWidgets.length > 0 ? (
         <section id="dashboard-section-more" className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-textMuted">Approfondimenti</p>
-          <div className="grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
+          <div className="flat-rows grid grid-cols-1 gap-4 md:gap-6 xl:grid-cols-12">
             {remainingWidgets.map((widget) => renderCellWithWidget(
               widget,
               REMAINING_SPAN_CLASS_BY_TYPE[widget.type] || 'xl:col-span-6',

@@ -1,0 +1,371 @@
+/* =============================================================================
+   apple-foundation.css — Fase 1: layer di fondazione "Apple-style" (solo CSS).
+
+   COS'È. Un unico file che, da un punto solo, dà a TUTTA l'app l'aspetto
+   Apple-style deciso nel documento `archivio-documenti/design-linguaggio-apple-web.md`
+   (bussola di design). È app-wide, reversibile (basta rimuovere l'import in
+   `main.jsx`) e NON tocca nessun file JSX/TSX: la "struttura" dei blocchi si
+   sostituirà progressivamente in una fase successiva (Fase 2), non qui.
+
+   ORDINE DI IMPORT (importante). In `src/main.jsx` questo file va importato
+   DOPO `globals.css` (di cui riusa la classe `.glass-edge` e il gradiente del
+   bordo vetro) e PRIMA di `design-tokens.css` (solo `:root`/token, non
+   confligge). Vive quindi "sopra" al tema Jampack/Bootstrap che sta più in
+   basso nella cascata.
+
+   SPECIFICITÀ. Si usa il prefisso reale dell'app `.hk-wrapper` + `:where()`
+   per battere il template in modo pulito, senza spam di `!important`
+   (solo dove serve neutralizzare shorthand del template).
+
+   REGOLA COLORI. Solo token `var(--…)` / `color-mix`. Gli unici `#000`/#fff
+   presenti sono le "stencil" della maschera del bordo vetro (non sono colori
+   di tema), identiche a quelle già usate in `globals.css`.
+   ========================================================================== */
+
+/* -----------------------------------------------------------------------------
+   1) Collisione `.card.card-border` (doppio bordo) — risolta UNA volta sola.
+   Il tema Jampack applica una shorthand `border` su `.card-border`; sommata
+   all'anello vetro darebbe un doppio contorno. Qui azzeriamo quella shorthand
+   così resta solo l'anello vetro `.glass-edge`.
+   -------------------------------------------------------------------------- */
+.hk-wrapper .card.card-border {
+  border: 0 !important;
+}
+
+/* -----------------------------------------------------------------------------
+   2) Bordo "vetro" come DEFAULT di tutte le superfici `.card` dell'app.
+   Porta ai blocchi legacy Bootstrap/Jampack lo stesso aspetto che le card
+   React (`components/ui/card.jsx`) hanno già via la classe `.glass-edge`,
+   senza toccare il markup. Le card che hanno già `.glass-edge` condividono
+   lo stesso pseudo-elemento `::before`: nessun doppio bordo.
+
+   Opt-out: `.no-glass` (nessun anello) e `.card-flat` (hairline semplice,
+   per liste/griglie dense — vedi punto 3).
+   -------------------------------------------------------------------------- */
+.hk-wrapper :where(.card):not(.no-glass):not(.card-flat) {
+  position: relative;
+  border-color: transparent !important;
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 color-mix(in srgb, var(--foreground) 8%, transparent) !important;
+}
+
+.hk-wrapper :where(.card):not(.no-glass):not(.card-flat)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  /* Riflesso che segue il mouse (radiale) + anello vetro di base (lineare),
+     identici a .glass-edge in globals.css così l'effetto è uniforme. */
+  background:
+    radial-gradient(
+      circle at var(--gx, 50%) var(--gy, 50%),
+      rgb(var(--color-text) / calc(0.5 * var(--glass-glow, 0))) 0%,
+      rgb(var(--color-text) / calc(0.16 * var(--glass-glow, 0))) 26%,
+      transparent 58%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--foreground) 26%, transparent) 0%,
+      color-mix(in srgb, var(--foreground) 6%, transparent) 22%,
+      transparent 44%,
+      transparent 58%,
+      color-mix(in srgb, var(--foreground) 10%, transparent) 80%,
+      color-mix(in srgb, var(--foreground) 24%, transparent) 100%
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   3) Variante piatta `.card-flat` — hairline sobrio, niente anello vetro.
+   Per liste/griglie dense dove l'anello sarebbe troppo "materico".
+   -------------------------------------------------------------------------- */
+.hk-wrapper .card.card-flat {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent) !important;
+  box-shadow: none !important;
+}
+
+.hk-wrapper .card.card-flat::before {
+  content: none !important;
+}
+
+/* -----------------------------------------------------------------------------
+   4) Piccoli buchi del template lasciati fuori dai token — colmati qui.
+   -------------------------------------------------------------------------- */
+
+/* Addon dei gruppi input (icone/prefissi accanto ai campi). */
+.hk-wrapper :where(.input-group-text) {
+  border-color: color-mix(in srgb, var(--input) 90%, transparent);
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+
+/* Accento discreto sulla riga di accordion aperta. */
+.hk-wrapper :where(.accordion-button):not(.collapsed) {
+  color: var(--primary);
+  background-color: var(--accent);
+}
+
+.hk-wrapper :where(.accordion-button):focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.125rem var(--focus-ring-shadow);
+}
+
+/* Pannelli off-canvas: angoli morbidi sul lato "interno" (quello verso il
+   contenuto), coerenti con i raggi del design system. */
+.hk-wrapper :where(.offcanvas) {
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.hk-wrapper :where(.offcanvas.offcanvas-end) {
+  border-top-left-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.hk-wrapper :where(.offcanvas.offcanvas-start) {
+  border-top-right-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.hk-wrapper :where(.offcanvas.offcanvas-top) {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.hk-wrapper :where(.offcanvas.offcanvas-bottom) {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+/* =============================================================================
+   5) Layout "senza scatole" — sistema flat riutilizzabile (stile iOS
+   Impostazioni/Mail). Nato come test sulla Dashboard, ora è un set di classi
+   generiche esteso alle pagine "pulite" (Checklist, Impostazioni→Moduli),
+   come da ordine concordato nell'handoff del 3 luglio.
+
+   Come si usa (tre classi contenitore + il mattone `.glass-sep`):
+   - `.page-flat`        sul contenitore di pagina: i blocchi `.glass-edge`
+                         (primitive React) e `.card` (legacy Bootstrap) al suo
+                         interno perdono la scatola (sfondo/ombra/anello vetro).
+   - `.flat-cols`        su una griglia di blocchi AFFIANCATI su una riga:
+                         linee-vetro verticali tra le colonne a desktop
+                         (≥1280px), orizzontali quando i blocchi si impilano.
+   - `.flat-cols-tight`  variante compatta (es. striscia tessere KPI): passo
+                         più stretto; tra 768 e 1279px (griglia 2×2) niente
+                         linee, resta lo spazio.
+   - `.flat-list`        su una pila VERTICALE di righe (es. elenco
+                         impostazioni): linee orizzontali tra le righe,
+                         centrate nel gap del contenitore (passo regolabile
+                         con `--flat-list-gap`).
+   I singoli blocchi/righe da separare portano la classe `.glass-sep`.
+   Tutto reversibile: togliendo `.page-flat` tornano le scatole.
+
+   La specificità è tenuta a pari/maggiore del default vetro del punto 2
+   (prefisso `.hk-wrapper` + `.page-flat`), e questo blocco viene DOPO,
+   così vince sull'aspetto a scatola.
+   ========================================================================== */
+
+/* I blocchi non sono più scatole: si appoggiano allo sfondo pagina.
+   Copre sia le primitive React (`div.glass-edge`) sia le card legacy
+   Bootstrap (`.card`), così il sistema vale anche sulle pagine non ancora
+   migrate. (Il bordo è già trasparente di suo — globals.css per .glass-edge,
+   punto 2 qui sopra per .card — quindi basta togliere sfondo, ombra e anello.) */
+.hk-wrapper .page-flat .glass-edge,
+.hk-wrapper .page-flat :where(.card):not(.no-glass):not(.card-flat) {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.hk-wrapper .page-flat .glass-edge::before,
+.hk-wrapper .page-flat :where(.card):not(.no-glass):not(.card-flat)::before {
+  content: none !important;
+}
+
+/* --- Separatori-vetro ------------------------------------------------------
+   I separatori usano lo STESSO materiale del bordo delle scatole: una linea a
+   gradiente (che sfuma alle estremità) + un riflesso radiale che segue il mouse
+   (posizione via --gx/--gy, intensità via --glass-glow, impostate da
+   GlassPointer.jsx sugli elementi con classe `.glass-sep`).
+   Nota: la linea di base (statica) sta in una variabile; il riflesso che segue
+   il mouse va invece INLINE in ogni ::after, perché contiene var(--glass-glow)
+   / --gx / --gy che devono risolversi sull'elemento del separatore, non
+   sull'antenato dove verrebbero "congelati" (le custom property sostituiscono
+   i var() nel contesto dell'elemento in cui sono dichiarate). */
+.hk-wrapper .page-flat {
+  --glass-line-v: linear-gradient(
+    to bottom,
+    transparent 0%,
+    color-mix(in srgb, var(--foreground) 22%, transparent) 16%,
+    color-mix(in srgb, var(--foreground) 22%, transparent) 84%,
+    transparent 100%
+  );
+  --glass-line-h: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--foreground) 22%, transparent) 16%,
+    color-mix(in srgb, var(--foreground) 22%, transparent) 84%,
+    transparent 100%
+  );
+}
+
+.hk-wrapper .page-flat .glass-sep {
+  position: relative;
+}
+
+/* Divisore tra sezioni: linea-vetro orizzontale a tutta larghezza (statica:
+   raggruppa i blocchi come i gruppi di iOS Impostazioni). */
+.hk-wrapper .page-flat section + section {
+  position: relative;
+  padding-top: var(--space-6);
+}
+
+.hk-wrapper .page-flat section + section::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-6) / 2);
+  left: 0;
+  right: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    color-mix(in srgb, var(--foreground) 20%, transparent) 8%,
+    color-mix(in srgb, var(--foreground) 20%, transparent) 92%,
+    transparent 100%
+  );
+}
+
+/* Desktop (≥ xl): separatori VERTICALI tra blocchi affiancati.
+   `.flat-cols` va usato solo dove i blocchi sono davvero su una riga singola;
+   per griglie multi-riga (es. "Approfondimenti") NON usarlo (la linea seguirebbe
+   l'ordine DOM, non le colonne visive) → lì resta lo spazio. */
+@media (min-width: 1280px) {
+  .hk-wrapper .page-flat .flat-cols > .glass-sep + .glass-sep {
+    padding-left: var(--space-6);
+  }
+
+  .hk-wrapper .page-flat .flat-cols > .glass-sep + .glass-sep::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--space-6) / 2 * -1);
+    width: 1px;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        2px 130px at 50% var(--gy, 50%),
+        rgb(var(--color-text) / calc(0.6 * var(--glass-glow, 0))) 0%,
+        transparent 72%
+      ),
+      var(--glass-line-v);
+  }
+
+  /* Striscia compatta (es. tessere KPI): stesso disegno, passo più stretto. */
+  .hk-wrapper .page-flat .flat-cols-tight > .glass-sep + .glass-sep {
+    padding-left: var(--space-5);
+  }
+
+  .hk-wrapper .page-flat .flat-cols-tight > .glass-sep + .glass-sep::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--space-5) / 2 * -1);
+    width: 1px;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        2px 130px at 50% var(--gy, 50%),
+        rgb(var(--color-text) / calc(0.6 * var(--glass-glow, 0))) 0%,
+        transparent 72%
+      ),
+      var(--glass-line-v);
+  }
+}
+
+/* Sotto xl: blocchi impilati → separatori ORIZZONTALI (ordine DOM = ordine
+   visivo, quindi sicuri anche su più elementi). `.flat-rows` è la variante per
+   le griglie multi-riga a desktop (es. "Approfondimenti"): lì a ≥1280px NON
+   vanno linee (seguirebbero l'ordine DOM, non le colonne visive) ma quando i
+   blocchi si impilano i separatori orizzontali servono comunque. */
+@media (max-width: 1279.98px) {
+  .hk-wrapper .page-flat .flat-cols > .glass-sep + .glass-sep,
+  .hk-wrapper .page-flat .flat-rows > .glass-sep + .glass-sep {
+    padding-top: var(--space-5);
+  }
+
+  .hk-wrapper .page-flat .flat-cols > .glass-sep + .glass-sep::after,
+  .hk-wrapper .page-flat .flat-rows > .glass-sep + .glass-sep::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--space-5) / 2 * -1);
+    height: 1px;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        130px 2px at var(--gx, 50%) 50%,
+        rgb(var(--color-text) / calc(0.6 * var(--glass-glow, 0))) 0%,
+        transparent 72%
+      ),
+      var(--glass-line-h);
+  }
+}
+
+/* Striscia compatta impilata (mobile): linee-vetro orizzontali tra le tessere.
+   Tra 768 e 1279px la striscia è una griglia 2×2 → niente linee, solo spazio. */
+@media (max-width: 767.98px) {
+  .hk-wrapper .page-flat .flat-cols-tight > .glass-sep + .glass-sep {
+    padding-top: var(--space-4);
+  }
+
+  .hk-wrapper .page-flat .flat-cols-tight > .glass-sep + .glass-sep::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--space-4) / 2 * -1);
+    height: 1px;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        130px 2px at var(--gx, 50%) 50%,
+        rgb(var(--color-text) / calc(0.6 * var(--glass-glow, 0))) 0%,
+        transparent 72%
+      ),
+      var(--glass-line-h);
+  }
+}
+
+/* Pila verticale di righe (es. elenco Impostazioni→Moduli): linea-vetro
+   orizzontale tra le righe, centrata nel gap del contenitore. Se il
+   contenitore usa un gap diverso da 16px, ridefinire `--flat-list-gap`. */
+.hk-wrapper .page-flat .flat-list {
+  --flat-list-gap: var(--space-4);
+}
+
+.hk-wrapper .page-flat .flat-list > .glass-sep + .glass-sep::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--flat-list-gap) / 2 * -1);
+  height: 1px;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      130px 2px at var(--gx, 50%) 50%,
+      rgb(var(--color-text) / calc(0.6 * var(--glass-glow, 0))) 0%,
+      transparent 72%
+    ),
+    var(--glass-line-h);
+}

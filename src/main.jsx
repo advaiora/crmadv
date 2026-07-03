@@ -5,6 +5,9 @@ import App from './App.jsx'
 import './styles/tailwind.css';
 import './styles/scss/style.scss';
 import './styles/scss/globals.css';
+// Fase 1 — layer di fondazione Apple-style. DEVE stare dopo globals.css
+// (riusa .glass-edge e il gradiente del bordo vetro) e prima di design-tokens.css.
+import './styles/scss/apple-foundation.css';
 import './styles/design-tokens.css';
 import { Provider } from 'react-redux';
 import store from './redux/store';

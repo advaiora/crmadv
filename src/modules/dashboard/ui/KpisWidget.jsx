@@ -11,7 +11,7 @@ const KpisWidget = ({ data, loading = false }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
+    <div className="flat-cols-tight grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-4">
       <KpiCard
         title="Clienti attivi"
         value={kpis.clientsActive}

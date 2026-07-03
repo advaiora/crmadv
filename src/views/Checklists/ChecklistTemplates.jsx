@@ -352,7 +352,7 @@ const ChecklistTemplatesContent = ({ access }) => {
   };
 
   return (
-    <div className="container-fluid py-4 checklists-shell">
+    <div className="container-fluid py-4 checklists-shell page-flat">
       <div className="mb-3">
         <Link to="/projects" className="text-textMuted hover:text-text">
           &larr; Torna a Progetti
@@ -382,8 +382,8 @@ const ChecklistTemplatesContent = ({ access }) => {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[340px,1fr] checklists-grid">
-        <Card className="checklists-sidebar-card">
+      <div className="flat-cols grid gap-4 xl:gap-6 xl:grid-cols-[340px,1fr] checklists-grid">
+        <Card className="checklists-sidebar-card glass-sep">
           <CardHeader>
             <CardTitle className="text-base">Memo</CardTitle>
             <CardDescription>Catalogo memo operativi disponibili per il workspace.</CardDescription>
@@ -490,7 +490,7 @@ const ChecklistTemplatesContent = ({ access }) => {
           </CardContent>
         </Card>
 
-        <Card className="checklists-detail-card">
+        <Card className="checklists-detail-card glass-sep">
           {!selectedTemplateId && (
             <CardContent className="pt-6">
               <p className="mb-0 text-sm text-textMuted">Seleziona un memo per visualizzare e modificare gli step.</p>

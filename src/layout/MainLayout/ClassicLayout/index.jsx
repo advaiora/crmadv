@@ -3,6 +3,7 @@ import classNames from 'classnames';
 import { connect } from 'react-redux';
 import { useRouteMatch } from 'react-router-dom';
 import { toggleCollapsedNav } from '../../../redux/action/Theme';
+import GlassPointer from '../../../components/effects/GlassPointer';
 import PageFooter from '../../Footer/PageFooter';
 import TopNav from '../../Header/TopNav';
 import MobileBottomNav from '../../Mobile/MobileBottomNav';
@@ -48,6 +49,8 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
             data-footer="simple"
             data-hover={dataHover ? "active" : ""}
         >
+            {/* Riflesso vetro reattivo al mouse su bordi e separatori */}
+            <GlassPointer />
             {/* Top Navbar */}
             <TopNav />
             {/* Vertical Nav */}

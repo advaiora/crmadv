@@ -4,7 +4,7 @@ import { Skeleton } from '../../../components/ui/skeleton';
 import { formatNumber } from './formatters';
 
 const KpiCard = ({ title, value, helper, delta = null, icon: Icon = null, loading = false }) => (
-  <Card className="glass-edge glass-edge-interactive rounded-2xl border-0 bg-card transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-card">
+  <Card className="glass-edge glass-edge-interactive glass-sep rounded-2xl border-0 bg-card transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-card">
     <CardContent className="p-5 md:p-6">
       <div className="flex items-center justify-between gap-3">
         <p className="mb-0 text-sm font-medium text-textMuted">{title}</p>

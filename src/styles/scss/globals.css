@@ -1094,15 +1094,26 @@ small.text-muted,
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--foreground) 26%, transparent) 0%,
-    color-mix(in srgb, var(--foreground) 6%, transparent) 22%,
-    transparent 44%,
-    transparent 58%,
-    color-mix(in srgb, var(--foreground) 10%, transparent) 80%,
-    color-mix(in srgb, var(--foreground) 24%, transparent) 100%
-  );
+  /* Due strati sovrapposti, entrambi ritagliati sul solo bordo dalla maschera:
+     1) il riflesso che segue il mouse (radiale su --gx/--gy, intensità --glass-glow:
+        a riposo glow=0 → strato trasparente, resta solo l'anello);
+     2) l'anello vetro discontinuo di base (lineare). */
+  background:
+    radial-gradient(
+      circle at var(--gx, 50%) var(--gy, 50%),
+      rgb(var(--color-text) / calc(0.5 * var(--glass-glow, 0))) 0%,
+      rgb(var(--color-text) / calc(0.16 * var(--glass-glow, 0))) 26%,
+      transparent 58%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--foreground) 26%, transparent) 0%,
+      color-mix(in srgb, var(--foreground) 6%, transparent) 22%,
+      transparent 44%,
+      transparent 58%,
+      color-mix(in srgb, var(--foreground) 10%, transparent) 80%,
+      color-mix(in srgb, var(--foreground) 24%, transparent) 100%
+    );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -1114,15 +1125,22 @@ small.text-muted,
 /* Variante per blocchi "a colpo d'occhio" (KPI): l'anello si ravviva appena
    al passaggio, come luce che scorre sul vetro. */
 .glass-edge-interactive:hover::before {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--foreground) 34%, transparent) 0%,
-    color-mix(in srgb, var(--foreground) 8%, transparent) 22%,
-    transparent 42%,
-    transparent 56%,
-    color-mix(in srgb, var(--foreground) 14%, transparent) 78%,
-    color-mix(in srgb, var(--foreground) 30%, transparent) 100%
-  );
+  background:
+    radial-gradient(
+      circle at var(--gx, 50%) var(--gy, 50%),
+      rgb(var(--color-text) / calc(0.5 * var(--glass-glow, 0))) 0%,
+      rgb(var(--color-text) / calc(0.16 * var(--glass-glow, 0))) 26%,
+      transparent 58%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--foreground) 34%, transparent) 0%,
+      color-mix(in srgb, var(--foreground) 8%, transparent) 22%,
+      transparent 42%,
+      transparent 56%,
+      color-mix(in srgb, var(--foreground) 14%, transparent) 78%,
+      color-mix(in srgb, var(--foreground) 30%, transparent) 100%
+    );
 }
 
 .dropdown-item,

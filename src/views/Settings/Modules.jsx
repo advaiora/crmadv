@@ -49,7 +49,7 @@ const ModulesSettingsPage = () => {
 
   return (
     <ModulePermissionGate requiredModule="modules" requiredPermission="modules.manage" moduleName="Moduli">
-      <div className="container-fluid">
+      <div className="container-fluid page-flat">
         <div className="hk-pg-header pt-7 pb-4">
           <h1 className="pg-title">Gestione Moduli</h1>
           <p>Abilita o disabilita i moduli per il workspace corrente.</p>
@@ -66,9 +66,9 @@ const ModulesSettingsPage = () => {
           )}
 
           {!loading && (
-            <div className="d-flex flex-column gap-3">
+            <div className="flat-list d-flex flex-column gap-3">
               {items.map((entry) => (
-                <Card key={entry.key} className="card-border">
+                <Card key={entry.key} className="card-border glass-sep">
                   <Card.Body className="d-flex flex-wrap align-items-center justify-content-between gap-3">
                     <div>
                       <div className="d-flex align-items-center gap-2">
