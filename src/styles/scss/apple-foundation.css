@@ -163,6 +163,10 @@
                          impostazioni): linee orizzontali tra le righe,
                          centrate nel gap del contenitore (passo regolabile
                          con `--flat-list-gap`).
+   - `.flat-keep`        opt-out per il singolo blocco: dentro una pagina
+                         `.page-flat` MANTIENE la scatola (con l'anello vetro
+                         reattivo). È l'attrezzo dell'approccio MISTO per le
+                         pagine dense: scatola su tabelle/form, flat sul resto.
    I singoli blocchi/righe da separare portano la classe `.glass-sep`.
    Tutto reversibile: togliendo `.page-flat` tornano le scatole.
 
@@ -176,14 +180,14 @@
    Bootstrap (`.card`), così il sistema vale anche sulle pagine non ancora
    migrate. (Il bordo è già trasparente di suo — globals.css per .glass-edge,
    punto 2 qui sopra per .card — quindi basta togliere sfondo, ombra e anello.) */
-.hk-wrapper .page-flat .glass-edge,
-.hk-wrapper .page-flat :where(.card):not(.no-glass):not(.card-flat) {
+.hk-wrapper .page-flat .glass-edge:not(.flat-keep),
+.hk-wrapper .page-flat :where(.card):not(.no-glass):not(.card-flat):not(.flat-keep) {
   background-color: transparent !important;
   box-shadow: none !important;
 }
 
-.hk-wrapper .page-flat .glass-edge::before,
-.hk-wrapper .page-flat :where(.card):not(.no-glass):not(.card-flat)::before {
+.hk-wrapper .page-flat .glass-edge:not(.flat-keep)::before,
+.hk-wrapper .page-flat :where(.card):not(.no-glass):not(.card-flat):not(.flat-keep)::before {
   content: none !important;
 }
 

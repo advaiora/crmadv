@@ -912,3 +912,17 @@
   }
 }
 
+/* Approccio misto "senza scatole" (pagina dentro `.page-flat`, vedi
+   apple-foundation.css): intestazione e barra filtri perdono la scatola,
+   quindi va spento anche il pannello decorativo a gradiente dei loro corpi
+   (altrimenti il riquadro si vedrebbe comunque). La tabella (`.flat-keep`)
+   invece resta una scatola e non è toccata. Le varianti scure ripetono la
+   regola per vincere, a pari specificità, su quelle `[data-bs-theme="dark"]`
+   dichiarate più sopra. */
+.page-flat .clients-page-header .card-body,
+.page-flat .clients-toolbar-card .card-body,
+[data-bs-theme="dark"] .page-flat .clients-page-header .card-body,
+[data-bs-theme="dark"] .page-flat .clients-toolbar-card .card-body {
+  background: transparent;
+}
+

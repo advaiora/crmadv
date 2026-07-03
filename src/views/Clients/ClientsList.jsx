@@ -390,7 +390,7 @@ const ClientsList = () => {
         const paginationTotalPages = Math.max(clientsData.pageInfo.totalPages || 0, 1);
 
         return (
-          <div className="container-fluid clients-page-container">
+          <div className="container-fluid clients-page-container page-flat">
             <div className="clients-page-shell pt-3">
               <PageHeader
                 icon={Users}
@@ -497,7 +497,7 @@ const ClientsList = () => {
                 </Alert>
               )}
 
-              <Card className="clients-list-card card-border mb-3">
+              <Card className="clients-list-card card-border flat-keep mb-3">
                 <Card.Body className="py-2">
                   <div className="table-responsive d-none d-md-block data-table-shell clients-list-table-shell">
                     <Table hover className="clients-list-table mb-0 align-middle">
