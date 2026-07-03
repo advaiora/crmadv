@@ -116,6 +116,21 @@ Se vuoi caricare i dati di seed previsti dal progetto:
 npm run db:seed
 ```
 
+### Dati demo per test (opzionale)
+
+Per popolare il CRM con contenuti verosimili — utile per valutare le pagine
+"piene" e per i test in generale — dopo il seed base puoi lanciare:
+
+```powershell
+npm run db:seed:demo
+```
+
+Crea nel workspace Demo: 12 clienti (persone/aziende con tag e contatti),
+14 preventivi in tutti gli stati con voci e totali, 2 template preventivo,
+6 membri team con ruoli e stati misti (password `demo123`) e 2 inviti.
+È **ripetibile senza duplicare**: clienti e membri vengono aggiornati, i
+preventivi demo ricreati da zero. Lo script è `prisma/seed-demo.ts`.
+
 ## 9. Avvia il backend API
 
 Apri un primo terminale nella cartella del progetto e lancia:
