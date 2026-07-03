@@ -10,7 +10,7 @@ import MobileBottomNav from '../../Mobile/MobileBottomNav';
 import Sidebar from '../../Sidebar/Sidebar';
 import { useWindowWidth } from '@react-hook/window-size';
 
-const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapsedNav, maximize }) => {
+const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapsedNav }) => {
 
     const [dataHover, setDataHover] = useState(navCollapsed);
     const appRoutes = useRouteMatch('/apps/');
@@ -41,7 +41,7 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
 
     return (
         <div
-            className={classNames("hk-wrapper", { "hk-pg-auth": errro404Route }, { "hk__email__backdrop": maximize })}
+            className={classNames("hk-wrapper", { "hk-pg-auth": errro404Route })}
             data-layout="vertical"
             data-layout-style={navCollapsed ? "collapsed" : "default"}
             data-navbar-style={topNavCollapsed ? "collapsed" : ""}
@@ -64,10 +64,9 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
     )
 }
 
-const mapStateToProps = ({ theme, emailReducer }) => {
+const mapStateToProps = ({ theme }) => {
     const { navCollapsed, topNavCollapsed } = theme;
-    const { maximize } = emailReducer
-    return { navCollapsed, topNavCollapsed, maximize }
+    return { navCollapsed, topNavCollapsed }
 };
 
 export default connect(mapStateToProps, { toggleCollapsedNav })(LayoutClassic)
