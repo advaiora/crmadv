@@ -65,7 +65,7 @@ export const SidebarMenu = [
         requiredPermission: "clients.view",
         childrens: [
           {
-            name: "Lista Clienti",
+            name: "Clienti",
             path: "/apps/clients",
             grp_name: "apps",
           },
@@ -86,7 +86,7 @@ export const SidebarMenu = [
         requiredPermission: "team.view",
         childrens: [
           {
-            name: "Membri Workspace",
+            name: "Team",
             path: "/apps/team",
             requiredPermission: "team.view",
             grp_name: "apps",
@@ -136,7 +136,7 @@ export const SidebarMenu = [
         requiredPermission: "web.view",
         childrens: [
           {
-            name: "Asset Web",
+            name: "Web Asset Management",
             path: "/apps/web-assets",
             requiredPermission: "web.view",
             grp_name: "apps",
@@ -152,7 +152,7 @@ export const SidebarMenu = [
         requiredPermission: "vault.view_list",
         childrens: [
           {
-            name: "Credenziali",
+            name: "Vault",
             path: "/apps/vault",
             requiredPermission: "vault.view_list",
             grp_name: "apps",
@@ -195,7 +195,7 @@ export const SidebarMenu = [
         requiredPermission: "checklists.view",
         childrens: [
           {
-            name: "Libreria Memo",
+            name: "Memo Operativi",
             path: "/checklists/templates",
             requiredPermission: "checklists.view",
             grp_name: "apps",
