@@ -609,6 +609,30 @@ body,
   color: var(--accent-foreground) !important;
 }
 
+/* Menu RIDOTTO a binario di icone (desktop, `data-layout-style="collapsed"`),
+   quando il mouse NON è sopra (al passaggio il template lo riespande da solo,
+   quindi tutte queste regole decadono con :not(:hover)). Il template nasconde
+   il testo delle voci solo con visibility:hidden: il testo continua a occupare
+   spazio nel flex e schiaccia l'icona a larghezza zero (riquadro attivo blu
+   vuoto); inoltre le sottovoci aperte restano visibili tagliate. Qui: via il
+   testo e la freccetta dal flusso, sottovoci nascoste, icona a misura piena
+   e centrata nel binario. */
+@media (min-width: 1200px) {
+  .hk-wrapper[data-layout-style="collapsed"] .hk-menu:not(:hover) .menu-group .nav-link-text,
+  .hk-wrapper[data-layout-style="collapsed"] .hk-menu:not(:hover) .menu-group .nav-link::after,
+  .hk-wrapper[data-layout-style="collapsed"] .hk-menu:not(:hover) .menu-group .nav-children {
+    display: none !important;
+  }
+
+  .hk-wrapper[data-layout-style="collapsed"] .hk-menu:not(:hover) .menu-group .nav-icon-wrap {
+    flex-shrink: 0 !important;
+  }
+
+  .hk-wrapper[data-layout-style="collapsed"] .hk-menu:not(:hover) .menu-group .navbar-nav > .nav-item > .nav-link {
+    justify-content: center !important;
+  }
+}
+
 .hk-wrapper .hk-menu .menu-header .navbar-toggle,
 .hk-wrapper .hk-menu .menu-header .navbar-toggle:hover,
 .hk-wrapper .hk-menu .menu-header .navbar-toggle:focus,

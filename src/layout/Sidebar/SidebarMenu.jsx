@@ -108,7 +108,7 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
-            name: "Crea Preventivo",
+            name: "Nuovo Preventivo",
             path: "/apps/quotes/new",
             requiredPermission: "quotes.create",
             grp_name: "apps",

@@ -25,6 +25,30 @@ const isPathActive = (currentPath, targetPath) => {
     return currentPath.startsWith(`${targetPath}/`);
 };
 
+/* Evidenziazione delle sottovoci: NavLink senza `exact` considera attivo ogni
+   link il cui percorso è un PREFISSO della pagina corrente, quindi
+   "/apps/quotes" (Elenco) restava evidenziato anche su "/apps/quotes/new" o
+   "/apps/quotes/templates". Qui la sottovoce è attiva solo sul suo percorso
+   esatto o su un suo sotto-percorso NON coperto da una voce sorella più
+   specifica (così "/apps/quotes/123" accende comunque l'Elenco). */
+const buildChildIsActive = (childPath, siblings = []) => (match, location) => {
+    const currentPath = location.pathname;
+
+    if (currentPath === childPath) {
+        return true;
+    }
+
+    if (!childPath || !currentPath.startsWith(`${childPath}/`)) {
+        return false;
+    }
+
+    return !siblings.some((sibling) => (
+        sibling.path &&
+        sibling.path !== childPath &&
+        (currentPath === sibling.path || currentPath.startsWith(`${sibling.path}/`))
+    ));
+};
+
 const hasActivePath = (items, currentPath) => {
     if (!Array.isArray(items) || items.length === 0) {
         return false;
@@ -265,7 +289,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                                             <li className="nav-item">
                                                                                                 <ul className="nav flex-column">
                                                                                                     <li className="nav-item">
-                                                                                                        <Nav.Link as={NavLink} to={childrenPath.path} onClick={handleLeafClick}>
+                                                                                                        <Nav.Link as={NavLink} to={childrenPath.path} isActive={buildChildIsActive(childrenPath.path, subMenu.childrens)} onClick={handleLeafClick}>
                                                                                                             <span className="nav-link-text">
                                                                                                                 {childrenPath.name}
                                                                                                             </span>
@@ -279,7 +303,7 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                                                                 </li>
                                                                                 :
                                                                                 <li className="nav-item" key={indx}>
-                                                                                    <Nav.Link as={NavLink} to={subMenu.path} onClick={handleLeafClick}>
+                                                                                    <Nav.Link as={NavLink} to={subMenu.path} isActive={buildChildIsActive(subMenu.path, menus.childrens)} onClick={handleLeafClick}>
                                                                                         <span className="nav-link-text">
                                                                                             {subMenu.name}
                                                                                         </span>
