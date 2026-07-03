@@ -14,6 +14,7 @@ import { useSession } from '../../hooks/useSession';
 import { resetGoogleIdentitySession } from '../../utils/googleIdentity';
 import { readUserAvatar, USER_PROFILE_PREFS_CHANGED_EVENT } from '../../lib/userProfilePrefs';
 import { PROFILE_UPDATED_EVENT } from '../../lib/profileEvents';
+import { CommandPaletteTrigger } from '../../components/command-palette/CommandPalette';
 import { listMessagingUsers } from '../../modules/messaging/api/messagingApi';
 import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from '../../modules/messaging/ui/constants';
 import 'react-toastify/dist/ReactToastify.css';
@@ -383,7 +384,11 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                 </div>
 
                 <div className="nav-end-wrap">
-                    <Nav className="navbar-nav flex-row">
+                    <Nav className="navbar-nav flex-row align-items-center">
+                        <Nav.Item className="app-topnav-search-item d-none d-sm-flex">
+                            <CommandPaletteTrigger />
+                        </Nav.Item>
+
                         <Nav.Item className="ms-2 app-topnav-theme-item">
                             <ThemeSwitcher />
                         </Nav.Item>

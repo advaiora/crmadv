@@ -1,0 +1,234 @@
+/* Command Palette (Advanced Find / Cmd-K) — ricerca globale e navigazione.
+   Tutti i colori vengono dai token del tema: chiaro/scuro funzionano da soli. */
+
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, var(--background) 55%, transparent);
+  backdrop-filter: saturate(140%) blur(6px);
+  -webkit-backdrop-filter: saturate(140%) blur(6px);
+  animation: cmdk-fade var(--duration-fast, 150ms) var(--ease-out, ease);
+}
+
+@keyframes cmdk-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cmdk-panel {
+  width: 100%;
+  max-width: 640px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-lg);
+  animation: cmdk-pop var(--duration-base, 250ms) var(--ease-out, ease);
+}
+
+@keyframes cmdk-pop {
+  from { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.cmdk-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.cmdk-search-icon {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  display: inline-flex;
+}
+
+.cmdk-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: var(--text-md, 16px);
+  line-height: 1.4;
+}
+
+.cmdk-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.cmdk-kbd {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 2px 6px;
+  line-height: 1.4;
+}
+
+.cmdk-results {
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.cmdk-group-label {
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  padding: 10px 10px 4px;
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cmdk-item:hover,
+.cmdk-item.is-active {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.cmdk-item-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.cmdk-item.is-active .cmdk-item-icon {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.cmdk-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cmdk-item-label {
+  font-size: var(--text-base, 15px);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmdk-item-sub {
+  font-size: var(--text-sm, 13px);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmdk-item.is-active .cmdk-item-sub {
+  color: color-mix(in srgb, var(--accent-foreground) 75%, transparent);
+}
+
+.cmdk-item-hint {
+  flex-shrink: 0;
+  font-size: var(--text-xs, 12px);
+  color: var(--muted-foreground);
+}
+
+.cmdk-empty,
+.cmdk-loading {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm, 13px);
+}
+
+.cmdk-footer {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-xs, 12px);
+  color: var(--muted-foreground);
+}
+
+.cmdk-footer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cmdk-footer-key {
+  font-weight: 600;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Trigger nella barra superiore */
+.cmdk-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px 0 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: var(--radius-pill, 999px);
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm, 13px);
+  cursor: pointer;
+  transition: border-color var(--duration-fast, 150ms) var(--ease-out, ease),
+    background-color var(--duration-fast, 150ms) var(--ease-out, ease);
+}
+
+.cmdk-trigger:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  background: var(--muted);
+}
+
+.cmdk-trigger-label {
+  white-space: nowrap;
+}
+
+.cmdk-trigger-kbd {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 1px 6px;
+}
+
+@media (max-width: 575.98px) {
+  .cmdk-overlay {
+    padding: 8vh 10px 10px;
+  }
+}
