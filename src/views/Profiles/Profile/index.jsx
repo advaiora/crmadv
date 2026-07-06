@@ -9,8 +9,16 @@ import { normalizeUserAvatarValue, readUserAvatar, removeUserAvatar, writeUserAv
 import { ApiRequestError, apiPatch } from '../../../utils/apiClient';
 import { readSession, writeSession } from '../../../lib/session';
 import { PROFILE_UPDATED_EVENT } from '../../../lib/profileEvents';
+import { useTheme } from '../../../utils/theme-provider/theme-provider';
 
 const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024;
+const AVATAR_MAX_DIMENSION = 256;
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Chiaro' },
+  { value: 'dark', label: 'Scuro' },
+  { value: 'system', label: 'Automatico' },
+];
 
 const initialsFromUser = (user) => {
   const displayName = user?.name?.trim();
@@ -23,16 +31,38 @@ const initialsFromUser = (user) => {
   return fallback ? fallback.slice(0, 2).toUpperCase() : 'U';
 };
 
-const fileToDataUrl = (file) =>
+// Ridimensiona l'immagine a un quadrato max 256px e la restituisce come data URL
+// JPEG leggero (poche decine di KB): così è persistibile sul server senza appesantire.
+const resizeImageToDataUrl = (file, maxDimension = AVATAR_MAX_DIMENSION) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
     reader.onerror = () => reject(new Error('Impossibile leggere il file selezionato.'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('Immagine non valida.'));
+      image.onload = () => {
+        const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('Elaborazione immagine non disponibile.'));
+          return;
+        }
+        context.drawImage(image, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      image.src = typeof reader.result === 'string' ? reader.result : '';
+    };
     reader.readAsDataURL(file);
   });
 
 const Profile = ({ toggleCollapsedNav }) => {
   const { access, loading, error, reload } = useWorkspaceAccess();
+  const { themePreference, setThemePreference } = useTheme();
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarUrlInput, setAvatarUrlInput] = useState('');
   const [avatarError, setAvatarError] = useState('');
@@ -64,10 +94,12 @@ const Profile = ({ toggleCollapsedNav }) => {
       return;
     }
 
-    const currentAvatar = readUserAvatar(userId);
+    // Sorgente di verità: il valore salvato sul server; fallback alla cache locale.
+    const serverAvatar = normalizeUserAvatarValue(user?.avatarUrl);
+    const currentAvatar = serverAvatar || readUserAvatar(userId);
     setAvatarUrl(currentAvatar);
     setAvatarUrlInput(currentAvatar);
-  }, [user?.id]);
+  }, [user?.id, user?.avatarUrl]);
 
   useEffect(() => {
     setProfileForm({
@@ -77,6 +109,32 @@ const Profile = ({ toggleCollapsedNav }) => {
   }, [user?.name, user?.email]);
 
   const canManageBranding = hasPermission({ permissions }, 'branding.manage');
+
+  // Salva l'avatar sul server (persistente), poi aggiorna cache locale e stato UI.
+  // value = data URL / URL http(s) per impostare, oppure null per rimuovere.
+  const persistAvatar = async (value) => {
+    if (!user?.id) {
+      return;
+    }
+    await apiPatch('/auth/me', { avatarUrl: value ?? null });
+
+    if (value) {
+      writeUserAvatar(user.id, value);
+    } else {
+      removeUserAvatar(user.id);
+    }
+    setAvatarUrl(value || '');
+    setAvatarUrlInput(value || '');
+    window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
+    await reload();
+  };
+
+  const describeAvatarError = (avatarSaveError, fallback) => {
+    if (avatarSaveError instanceof ApiRequestError) {
+      return avatarSaveError.message || fallback;
+    }
+    return avatarSaveError?.message || fallback;
+  };
 
   const handleAvatarChange = async (event) => {
     const file = event.target.files?.[0];
@@ -100,26 +158,19 @@ const Profile = ({ toggleCollapsedNav }) => {
 
     setAvatarBusy(true);
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await resizeImageToDataUrl(file);
       if (!dataUrl) {
         throw new Error('Formato immagine non supportato.');
       }
-
-      const saved = writeUserAvatar(user.id, dataUrl);
-      if (!saved) {
-        throw new Error('Impossibile salvare l immagine profilo.');
-      }
-
-      setAvatarUrl(dataUrl);
-      setAvatarUrlInput(dataUrl);
+      await persistAvatar(dataUrl);
     } catch (uploadError) {
-      setAvatarError(uploadError?.message || 'Errore durante il caricamento immagine.');
+      setAvatarError(describeAvatarError(uploadError, 'Errore durante il caricamento immagine.'));
     } finally {
       setAvatarBusy(false);
     }
   };
 
-  const handleAvatarUrlSave = () => {
+  const handleAvatarUrlSave = async () => {
     if (!user?.id) {
       return;
     }
@@ -132,25 +183,30 @@ const Profile = ({ toggleCollapsedNav }) => {
       return;
     }
 
-    const saved = writeUserAvatar(user.id, normalizedUrl);
-    if (!saved) {
-      setAvatarError('Impossibile salvare l immagine profilo.');
-      return;
+    setAvatarBusy(true);
+    try {
+      await persistAvatar(normalizedUrl);
+    } catch (saveError) {
+      setAvatarError(describeAvatarError(saveError, 'Impossibile salvare l immagine profilo.'));
+    } finally {
+      setAvatarBusy(false);
     }
-
-    setAvatarUrl(normalizedUrl);
-    setAvatarUrlInput(normalizedUrl);
   };
 
-  const handleAvatarRemove = () => {
+  const handleAvatarRemove = async () => {
     if (!user?.id) {
       return;
     }
 
-    removeUserAvatar(user.id);
-    setAvatarUrl('');
-    setAvatarUrlInput('');
-    setAvatarError('');
+    setAvatarBusy(true);
+    try {
+      await persistAvatar(null);
+      setAvatarError('');
+    } catch (removeError) {
+      setAvatarError(describeAvatarError(removeError, 'Impossibile rimuovere l immagine profilo.'));
+    } finally {
+      setAvatarBusy(false);
+    }
   };
 
   const handleProfileFieldChange = (field) => (event) => {
@@ -297,6 +353,30 @@ const Profile = ({ toggleCollapsedNav }) => {
                         </Button>
                       )}
                     </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col lg={12}>
+              <Card className="card-border shadow-none" style={pageCardStyle}>
+                <Card.Body className="p-4">
+                  <h5 className="mb-1">Aspetto</h5>
+                  <p className="text-muted small mb-3">
+                    Scegli il tema dell&apos;interfaccia. La preferenza ti segue su tutti i dispositivi.
+                  </p>
+                  <div className="d-flex flex-wrap gap-2">
+                    {THEME_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        type="button"
+                        size="sm"
+                        variant={themePreference === option.value ? 'primary' : 'outline-secondary'}
+                        onClick={() => setThemePreference(option.value)}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
                   </div>
                 </Card.Body>
               </Card>

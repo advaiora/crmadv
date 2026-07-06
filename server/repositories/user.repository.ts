@@ -5,6 +5,8 @@ const userSelect = {
   email: true,
   name: true,
   role: true,
+  themePreference: true,
+  avatarUrl: true,
 } as const;
 
 const loginUserSelect = {

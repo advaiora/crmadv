@@ -1,6 +1,8 @@
 import { apiGet } from './apiClient';
 import { readSession, writeSession } from '../lib/session';
 import { applyWorkspaceBranding } from '../lib/workspaceBranding';
+import { removeUserAvatar, writeUserAvatar } from '../lib/userProfilePrefs';
+import { applyServerThemePreference } from './theme-provider/themePreferenceEvents';
 
 export const fetchWorkspaceAccess = async () => {
     const session = readSession();
@@ -21,6 +23,17 @@ export const fetchWorkspaceAccess = async () => {
             workspaceBranding,
         });
         applyWorkspaceBranding(workspaceBranding ?? null);
+    }
+
+    // Preferenze utente persistenti (server → client): tema e avatar.
+    const serverUser = result?.user;
+    if (serverUser?.id) {
+        applyServerThemePreference(serverUser.themePreference);
+        if (serverUser.avatarUrl) {
+            writeUserAvatar(serverUser.id, serverUser.avatarUrl);
+        } else {
+            removeUserAvatar(serverUser.id);
+        }
     }
 
     return result;

@@ -1,7 +1,14 @@
 // app/components/theme-provider.jsx
 "use client";
 
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { apiPatch } from "../apiClient";
+import { readSession } from "../../lib/session";
+import {
+  THEME_PREFERENCE_CHANGED_EVENT,
+  THEME_PREFERENCE_STORAGE_KEY,
+  isValidThemePreference,
+} from "./themePreferenceEvents";
 
 // Create the context
 const ThemeContext = createContext();
@@ -23,48 +30,93 @@ const getSystemTheme = () =>
     ? "dark"
     : "light";
 
+// Preferenza iniziale: chiave nuova → chiave legacy "theme" (migrazione) → "system".
+const readInitialPreference = () => {
+  if (typeof window === "undefined") {
+    return "system";
+  }
+  const stored = window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY);
+  if (isValidThemePreference(stored)) {
+    return stored;
+  }
+  const legacy = window.localStorage.getItem("theme");
+  if (legacy === "light" || legacy === "dark") {
+    return legacy;
+  }
+  return "system";
+};
+
+// Salva la preferenza sul server (solo se loggati), senza bloccare la UI.
+const persistPreferenceToServer = (preference) => {
+  if (!readSession()?.accessToken) {
+    return;
+  }
+  apiPatch("/auth/me", { themePreference: preference }).catch(() => {});
+};
+
 // The main provider component
 export function ThemeProvider({ children }) {
-  // Default: segue il tema di sistema. Se l'utente ha scelto esplicitamente
-  // un tema (salvato in localStorage), quella scelta ha la precedenza.
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") {
-      return "light";
-    }
-    const storedTheme = localStorage.getItem("theme");
-    return storedTheme === "dark" || storedTheme === "light" ? storedTheme : getSystemTheme();
-  });
+  const [themePreference, setThemePreferenceState] = useState(readInitialPreference);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
 
-  // Applica il tema al tag <html>.
+  // Tema effettivo: derivato (nessun setState in effetto). Con "system" segue l'OS.
+  const theme = themePreference === "system" ? systemTheme : themePreference;
+
+  // Applica il tema effettivo al tag <html>.
   useEffect(() => {
     document.documentElement.setAttribute("data-bs-theme", theme === "dark" ? "dark" : "light");
   }, [theme]);
 
-  // Finché l'utente non ha una preferenza salvata, segue i cambi di tema del sistema.
+  // Ascolta i cambi di tema del sistema operativo (aggiorna solo quando serve).
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) {
       return undefined;
     }
-    const storedTheme = localStorage.getItem("theme");
-    if (storedTheme === "dark" || storedTheme === "light") {
-      return undefined; // scelta esplicita: non seguire più il sistema
-    }
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleSystemChange = (event) => setTheme(event.matches ? "dark" : "light");
+    const handleSystemChange = (event) => setSystemTheme(event.matches ? "dark" : "light");
     mediaQuery.addEventListener("change", handleSystemChange);
     return () => mediaQuery.removeEventListener("change", handleSystemChange);
-  }, [theme]);
+  }, []);
 
-  const toggleTheme = () => {
-    setTheme((prevTheme) => {
-      const nextTheme = prevTheme === "light" ? "dark" : "light";
-      localStorage.setItem("theme", nextTheme); // scelta esplicita dell'utente: la salviamo
-      return nextTheme;
-    });
-  };
+  // Sincronizzazione server → client: quando /auth/me scrive la preferenza in
+  // localStorage e notifica, la applichiamo qui (senza riscriverla sul server).
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const syncFromStorage = () => {
+      const stored = window.localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY);
+      if (isValidThemePreference(stored)) {
+        setThemePreferenceState(stored);
+      }
+    };
+    window.addEventListener(THEME_PREFERENCE_CHANGED_EVENT, syncFromStorage);
+    window.addEventListener("storage", syncFromStorage);
+    return () => {
+      window.removeEventListener(THEME_PREFERENCE_CHANGED_EVENT, syncFromStorage);
+      window.removeEventListener("storage", syncFromStorage);
+    };
+  }, []);
+
+  // Scelta esplicita dell'utente: applica, salva in locale e sul server.
+  const setThemePreference = useCallback((preference) => {
+    if (!isValidThemePreference(preference)) {
+      return;
+    }
+    setThemePreferenceState(preference);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, preference);
+    }
+    persistPreferenceToServer(preference);
+  }, []);
+
+  // Interruttore chiaro/scuro della barra superiore: fissa una scelta esplicita.
+  const toggleTheme = useCallback(() => {
+    setThemePreference(theme === "light" ? "dark" : "light");
+  }, [theme, setThemePreference]);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, themePreference, setThemePreference, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

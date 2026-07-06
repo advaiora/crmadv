@@ -130,9 +130,49 @@ const updateMeSchema = z
         z.string().email().optional(),
       )
       .optional(),
+    themePreference: z
+      .union([z.enum(['light', 'dark', 'system']), z.null()])
+      .optional(),
+    avatarUrl: z
+      .preprocess(
+        (value) => {
+          if (value === undefined) {
+            return undefined;
+          }
+          if (value === null) {
+            return null;
+          }
+          if (typeof value !== 'string') {
+            return value;
+          }
+          const normalized = value.trim();
+          return normalized.length > 0 ? normalized : null;
+        },
+        z
+          .union([
+            z
+              .string()
+              .max(1_000_000, 'Immagine profilo troppo grande')
+              .refine(
+                (value) =>
+                  value.startsWith('data:image/')
+                  || value.startsWith('http://')
+                  || value.startsWith('https://'),
+                'avatarUrl deve essere un data:image o un URL http(s)',
+              ),
+            z.null(),
+          ])
+          .optional(),
+      )
+      .optional(),
   })
   .superRefine((value, context) => {
-    if (value.name === undefined && value.email === undefined) {
+    if (
+      value.name === undefined
+      && value.email === undefined
+      && value.themePreference === undefined
+      && value.avatarUrl === undefined
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'At least one field is required',
@@ -1147,6 +1187,16 @@ const authRoute: FastifyPluginAsync = async (app) => {
       changedFields.push('email');
     }
 
+    if (payload.themePreference !== undefined && payload.themePreference !== user.themePreference) {
+      patch.themePreference = payload.themePreference;
+      changedFields.push('themePreference');
+    }
+
+    if (payload.avatarUrl !== undefined && payload.avatarUrl !== user.avatarUrl) {
+      patch.avatarUrl = payload.avatarUrl;
+      changedFields.push('avatarUrl');
+    }
+
     if (changedFields.length === 0) {
       return ok(reply, {
         user: {
@@ -1154,6 +1204,8 @@ const authRoute: FastifyPluginAsync = async (app) => {
           email: user.email,
           name: user.name,
           role: user.role,
+          themePreference: user.themePreference ?? null,
+          avatarUrl: user.avatarUrl ?? null,
         },
         changedFields: [],
       });
@@ -1176,6 +1228,8 @@ const authRoute: FastifyPluginAsync = async (app) => {
           email: true,
           name: true,
           role: true,
+          themePreference: true,
+          avatarUrl: true,
         },
       });
 
@@ -1277,6 +1331,8 @@ const authRoute: FastifyPluginAsync = async (app) => {
         email: user.email,
         name: user.name,
         role: effectiveUserRole,
+        themePreference: user.themePreference ?? null,
+        avatarUrl: user.avatarUrl ?? null,
       },
       workspace: activeMembership.workspace,
       branding,
