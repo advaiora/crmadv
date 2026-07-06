@@ -68,3 +68,16 @@
 - Al primo timeout di `preview_screenshot`, eseguire subito `preview_eval` con `document.visibilityState`. Se risponde `"hidden"`, **la finestra di anteprima non è visibile a schermo**: il browser non disegna fotogrammi per le pagine nascoste e la cattura aspetta un frame che non arriva mai. Il codice non c'entra.
 - Soluzione: chiedere all'utente di **aprire/mostrare il pannello di anteprima** e ritentare. Con `visibilityState === "visible"` lo screenshot riesce (verificato: stessa pagina, stesso effetto attivo, screenshot ok quando visibile).
 - Nota collegata: gli stili si possono comunque verificare senza screenshot (ispezione con `preview_eval`/`preview_inspect`), che funziona anche a finestra nascosta.
+
+---
+
+## 5. Lint generale (`npm run lint`): serve la variabile d'ambiente + ha errori preesistenti
+
+**Contesto:** dopo aver aggiunto/modificato file `.jsx`, per controllare la qualità del codice (variabili inutilizzate, regole React) serve il lint generale, non solo `lint:css`/`lint:colors` (che coprono **solo** `src/modules/**`).
+
+**Errore:** lanciare `eslint` direttamente (`npx eslint …` o `./node_modules/.bin/eslint …`) fallisce con *"ESLint couldn't find an eslint.config.(js|mjs|cjs) file"*: il binario installato è ESLint 9 (default flat-config), ma il progetto usa ancora `.eslintrc.cjs` (formato legacy).
+
+**Modo corretto:**
+- Lanciare `npm run lint` (che usa lo script del progetto) **oppure**, per lintare solo alcuni file, anteporre la variabile: `ESLINT_USE_FLAT_CONFIG=false ./node_modules/.bin/eslint --ext js,jsx <percorsi>`.
+- **`npm run lint` NON è verde sul repo**: alcuni file preesistenti (es. `src/components/command-palette/CommandPalette.jsx`, `src/routes/RouteList.jsx`) violano già regole nuove del plugin react-hooks (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`). Sono **preesistenti** (verificabili lintando la versione `git show HEAD:…`), non vanno "sistemati" di straforo. Verificare quindi solo che **i propri file nuovi/modificati** siano puliti, lintandoli singolarmente.
+- Regole react-hooks recenti utili da conoscere: non scrivere `ref.current = …` **durante il render** (`react-hooks/refs`) — farlo dentro un `useEffect`; ed evitare `setState` sincrono nel corpo di un `useEffect` quando possibile.

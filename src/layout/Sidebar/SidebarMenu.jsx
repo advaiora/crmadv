@@ -266,6 +266,11 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
+            name: "Scorciatoie",
+            path: "/settings/shortcuts",
+            grp_name: "apps",
+          },
+          {
             name: "Branding Workspace",
             path: "/pages/workspace-branding",
             requiredModule: "branding",

@@ -5,6 +5,7 @@ import { useRouteMatch } from 'react-router-dom';
 import { toggleCollapsedNav } from '../../../redux/action/Theme';
 import GlassPointer from '../../../components/effects/GlassPointer';
 import CommandPalette from '../../../components/command-palette/CommandPalette';
+import ShortcutsManager from '../../../components/shortcuts/ShortcutsManager';
 import PageFooter from '../../Footer/PageFooter';
 import TopNav from '../../Header/TopNav';
 import MobileBottomNav from '../../Mobile/MobileBottomNav';
@@ -54,6 +55,8 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
             <GlassPointer />
             {/* Ricerca globale / navigazione (Cmd/Ctrl+K) */}
             <CommandPalette />
+            {/* Scorciatoie da tastiera globali + overlay di aiuto ("?") */}
+            <ShortcutsManager />
             {/* Top Navbar */}
             <TopNav />
             {/* Vertical Nav */}

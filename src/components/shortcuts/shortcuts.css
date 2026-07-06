@@ -1,0 +1,219 @@
+/* Scorciatoie da tastiera — overlay di aiuto e chip dei tasti.
+   Tutti i colori vengono dai token del tema: chiaro/scuro funzionano da soli. */
+
+.sc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, var(--background) 55%, transparent);
+  backdrop-filter: saturate(140%) blur(6px);
+  -webkit-backdrop-filter: saturate(140%) blur(6px);
+  animation: sc-fade var(--duration-fast, 150ms) var(--ease-out, ease);
+}
+
+@keyframes sc-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sc-panel {
+  width: 100%;
+  max-width: 560px;
+  max-height: 74vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-lg);
+  animation: sc-pop var(--duration-base, 250ms) var(--ease-out, ease);
+}
+
+@keyframes sc-pop {
+  from { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.sc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.sc-title {
+  margin: 0;
+  font-size: var(--text-md, 16px);
+  font-weight: 600;
+}
+
+.sc-close {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-sm, 8px);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.sc-body {
+  overflow-y: auto;
+  padding: 8px 10px 12px;
+}
+
+.sc-group {
+  padding: 6px 0;
+}
+
+.sc-group-label {
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  padding: 10px 8px 4px;
+}
+
+.sc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm, 8px);
+}
+
+.sc-row:hover {
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.sc-row-label {
+  font-size: var(--text-base, 15px);
+  font-weight: 500;
+  min-width: 0;
+}
+
+.sc-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sc-chord {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sc-then {
+  font-size: var(--text-xs, 12px);
+  color: var(--muted-foreground);
+}
+
+.sc-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.sc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-sm, 13px);
+  color: var(--muted-foreground);
+}
+
+.sc-link {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sc-link:hover {
+  text-decoration: underline;
+}
+
+/* --- Pagina impostazioni scorciatoie --- */
+
+.sc-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.sc-settings-row:last-child {
+  border-bottom: 0;
+}
+
+.sc-settings-label {
+  font-size: var(--text-base, 15px);
+  font-weight: 500;
+}
+
+.sc-settings-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sc-capture-hint {
+  font-size: var(--text-sm, 13px);
+  color: var(--muted-foreground);
+  min-width: 150px;
+  text-align: right;
+}
+
+.sc-capture-hint.is-conflict {
+  color: var(--destructive, var(--primary));
+}
+
+@media (max-width: 575.98px) {
+  .sc-overlay {
+    padding: 8vh 10px 10px;
+  }
+
+  .sc-settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .sc-capture-hint {
+    text-align: left;
+  }
+}
