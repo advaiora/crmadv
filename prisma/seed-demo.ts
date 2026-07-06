@@ -155,6 +155,129 @@ const DEMO_QUOTES: DemoQuote[] = [
   ] },
 ];
 
+// --- Progetti (board pipeline) -------------------------------------------------
+
+// Stage aggiuntivi nella categoria "Pipeline" (oltre a "Stage Gate Demo" del seed base),
+// così la board mostra più colonne con progetti distribuiti.
+const DEMO_PIPELINE_STAGES = [
+  { name: 'In lavorazione', sortOrder: 1, isClosed: false },
+  { name: 'In revisione', sortOrder: 2, isClosed: false },
+  { name: 'In pubblicazione', sortOrder: 3, isClosed: false },
+  { name: 'Completato', sortOrder: 4, isClosed: true },
+] as const;
+
+type DemoProject = {
+  name: string;
+  clientName: string;
+  stage: string;
+  value: number;
+  dueInDays: number;
+  description: string;
+};
+
+const DEMO_PROJECTS: DemoProject[] = [
+  { name: 'Sito corporate Rossi Costruzioni', clientName: 'Rossi Costruzioni SRL', stage: 'Completato', value: 5200, dueInDays: -10, description: 'Rifacimento completo del sito aziendale con sezione cantieri.' },
+  { name: 'E-commerce Dolce Vita', clientName: 'Pasticceria Dolce Vita', stage: 'In pubblicazione', value: 4360, dueInDays: 6, description: 'Shop online con ritiro in negozio e pagamenti.' },
+  { name: 'Landing Immobiliare Piemonte', clientName: 'Immobiliare Piemonte Casa', stage: 'In revisione', value: 1780, dueInDays: 9, description: 'Landing per lead generation con campagna Google Ads.' },
+  { name: 'Sito studio Bassi & Partner', clientName: 'Studio Legale Bassi & Partner', stage: 'In lavorazione', value: 2450, dueInDays: 18, description: 'Sito vetrina professionale con aree di competenza.' },
+  { name: 'Booking B&B Le Vigne', clientName: 'B&B Le Vigne', stage: 'In lavorazione', value: 3050, dueInDays: 22, description: 'Sito con motore di prenotazione e gallery struttura.' },
+  { name: 'App corsi UrbanFit', clientName: 'Palestra UrbanFit', stage: 'Stage Gate Demo', value: 6100, dueInDays: 35, description: 'MVP app prenotazione corsi e gestionale abbonamenti.' },
+  { name: 'Portfolio Martina Galli', clientName: 'Martina Galli', stage: 'In revisione', value: 750, dueInDays: 4, description: 'Portfolio online per freelance.' },
+  { name: 'Sito Farmacia San Carlo', clientName: 'Farmacia San Carlo', stage: 'In lavorazione', value: 1900, dueInDays: 27, description: 'Sito con turni, servizi e prenotazione autoanalisi.' },
+  { name: 'Portfolio fotografico Anna Fontana', clientName: 'Anna Fontana', stage: 'Completato', value: 1000, dueInDays: -3, description: 'Portfolio con galleria protetta per i clienti.' },
+];
+
+// --- Memo operativi (checklist template) --------------------------------------
+
+const DEMO_CHECKLIST_TEMPLATES = [
+  {
+    name: 'Onboarding Cliente',
+    description: 'Passi per avviare un nuovo cliente in modo ordinato.',
+    items: [
+      { title: 'Raccolta accessi e materiali', isRequired: true },
+      { title: 'Brief iniziale e obiettivi', isRequired: true },
+      { title: 'Creazione cartella progetto', isRequired: false },
+      { title: 'Presentazione del team di riferimento', isRequired: false },
+    ],
+  },
+  {
+    name: 'Consegna Progetto',
+    description: 'Verifiche prima della consegna finale al cliente.',
+    items: [
+      { title: 'Test su mobile e desktop', isRequired: true },
+      { title: 'Controllo velocità e SEO di base', isRequired: true },
+      { title: 'Backup e credenziali consegnate', isRequired: true },
+      { title: 'Formazione cliente completata', isRequired: false },
+    ],
+  },
+] as const;
+
+// --- Calendario ----------------------------------------------------------------
+// Nessun colore fisso: si lascia la categoria, il calendario colora di default.
+
+type DemoEvent = {
+  title: string;
+  category: string;
+  startInDays: number;
+  startHour: number;
+  durationHours: number;
+  allDay: boolean;
+  description?: string;
+  location?: string;
+};
+
+const DEMO_CALENDAR_EVENTS: DemoEvent[] = [
+  { title: 'Kickoff Rossi Costruzioni', category: 'Riunione', startInDays: -6, startHour: 10, durationHours: 1, allDay: false, description: 'Avvio del progetto sito corporate.', location: 'Ufficio' },
+  { title: 'Consegna E-commerce Dolce Vita', category: 'Scadenza', startInDays: 6, startHour: 9, durationHours: 0, allDay: true, description: 'Data di go-live prevista.' },
+  { title: 'Call UrbanFit — MVP app', category: 'Riunione', startInDays: 2, startHour: 15, durationHours: 1, allDay: false, description: 'Confronto sulle funzionalità della prima versione.' },
+  { title: 'Revisione landing Immobiliare', category: 'Attività', startInDays: 1, startHour: 11, durationHours: 2, allDay: false },
+  { title: 'Scadenza preventivo Palestra UrbanFit', category: 'Scadenza', startInDays: 4, startHour: 9, durationHours: 0, allDay: true },
+  { title: 'Servizio fotografico Le Vigne', category: 'Attività', startInDays: 8, startHour: 14, durationHours: 3, allDay: false, location: 'Alba' },
+  { title: 'Riunione settimanale team', category: 'Riunione', startInDays: 3, startHour: 9, durationHours: 1, allDay: false, description: 'Stato avanzamento progetti.' },
+  { title: 'Formazione gestionale Pasticceria', category: 'Attività', startInDays: -2, startHour: 16, durationHours: 2, allDay: false },
+];
+
+// --- Web Assets ----------------------------------------------------------------
+
+type DemoWebAsset = {
+  kind: 'website' | 'webapp' | 'ecommerce';
+  name: string;
+  url: string;
+  status: 'ACTIVE' | 'MAINTENANCE' | 'PAUSED' | 'ARCHIVED';
+  environment: 'DEVELOPMENT' | 'STAGING' | 'PRODUCTION';
+  clientName: string;
+  version?: string;
+};
+
+const DEMO_WEB_ASSETS: DemoWebAsset[] = [
+  { kind: 'website', name: 'rossicostruzioni.it', url: 'https://rossicostruzioni.it', status: 'ACTIVE', environment: 'PRODUCTION', clientName: 'Rossi Costruzioni SRL', version: '1.4.0' },
+  { kind: 'website', name: 'Studio Bassi (staging)', url: 'https://staging.bassilegal.it', status: 'MAINTENANCE', environment: 'STAGING', clientName: 'Studio Legale Bassi & Partner', version: '0.9.0' },
+  { kind: 'website', name: 'levignebb.it', url: 'https://levignebb.it', status: 'ACTIVE', environment: 'PRODUCTION', clientName: 'B&B Le Vigne', version: '2.1.0' },
+  { kind: 'webapp', name: 'UrbanFit Booking', url: 'https://app.urbanfit.club', status: 'ACTIVE', environment: 'DEVELOPMENT', clientName: 'Palestra UrbanFit', version: '0.3.0' },
+  { kind: 'webapp', name: 'Prenotazioni Farmacia San Carlo', url: 'https://prenota.farmaciasancarlo.it', status: 'PAUSED', environment: 'STAGING', clientName: 'Farmacia San Carlo' },
+  { kind: 'ecommerce', name: 'Shop Dolce Vita', url: 'https://shop.dolcevitatorino.it', status: 'ACTIVE', environment: 'PRODUCTION', clientName: 'Pasticceria Dolce Vita', version: '1.0.2' },
+];
+
+// --- Messaggi ------------------------------------------------------------------
+
+type DemoMessage = {
+  from: string; // email mittente
+  to: string;   // email destinatario
+  body: string;
+  daysAgo: number;
+  read: boolean;
+};
+
+const ADMIN_EMAIL = 'admin@test.com';
+
+const DEMO_MESSAGES: DemoMessage[] = [
+  { from: 'giulia.ferrari@demo.local', to: ADMIN_EMAIL, body: 'Ho aggiornato il preventivo per Rossi Costruzioni, quando puoi dagli un occhio.', daysAgo: 2, read: false },
+  { from: ADMIN_EMAIL, to: 'giulia.ferrari@demo.local', body: 'Perfetto, lo guardo oggi pomeriggio.', daysAgo: 2, read: true },
+  { from: 'marco.russo@demo.local', to: ADMIN_EMAIL, body: 'Il cliente UrbanFit chiede una call per la app corsi.', daysAgo: 1, read: false },
+  { from: ADMIN_EMAIL, to: 'marco.russo@demo.local', body: 'Organizza tu la call con UrbanFit per giovedì mattina.', daysAgo: 1, read: true },
+  { from: 'sara.colombo@demo.local', to: ADMIN_EMAIL, body: 'Screenshot finali del sito Le Vigne caricati nella cartella condivisa.', daysAgo: 0, read: false },
+];
+
 // --- Esecuzione ----------------------------------------------------------------
 
 async function main() {
@@ -168,6 +291,9 @@ async function main() {
     throw new Error('Utente admin@test.com non trovato: eseguire prima `npm run db:seed`.');
   }
 
+  // Mappa email → id utente (parte dall'admin), popolata creando i membri.
+  const userIdByEmail = new Map<string, string>([[adminUser.email, adminUser.id]]);
+
   // Team: utenti, membership con stati misti, ruoli di sistema.
   const memberPasswordHash = await bcrypt.hash('demo123', 10);
   for (const member of DEMO_MEMBERS) {
@@ -176,6 +302,7 @@ async function main() {
       update: { name: member.name },
       create: { email: member.email, name: member.name, passwordHash: memberPasswordHash, role: 'user' },
     });
+    userIdByEmail.set(member.email, user.id);
 
     await prisma.membership.upsert({
       where: { workspaceId_userId: { workspaceId: workspace.id, userId: user.id } },
@@ -332,11 +459,204 @@ async function main() {
     });
   }
 
+  // Progetti (board): categoria "Pipeline" + stage aggiuntivi + progetti distribuiti.
+  const pipelineCategory = await prisma.projectCategory.upsert({
+    where: { workspaceId_name: { workspaceId: workspace.id, name: 'Pipeline' } },
+    update: {},
+    create: { workspaceId: workspace.id, name: 'Pipeline', sortOrder: 0 },
+    select: { id: true },
+  });
+
+  const stageIdByName = new Map<string, string>();
+
+  // Stage già esistente dal seed base (gated): lo recuperiamo per collocarci un progetto.
+  const gateStage = await prisma.pipelineStage.findFirst({
+    where: { workspaceId: workspace.id, name: 'Stage Gate Demo' },
+    select: { id: true },
+  });
+  if (gateStage) {
+    stageIdByName.set('Stage Gate Demo', gateStage.id);
+  }
+
+  for (const stage of DEMO_PIPELINE_STAGES) {
+    const existing = await prisma.pipelineStage.findFirst({
+      where: { workspaceId: workspace.id, categoryId: pipelineCategory.id, name: stage.name },
+      select: { id: true },
+    });
+    const record = existing
+      ? await prisma.pipelineStage.update({
+          where: { id: existing.id },
+          data: { sortOrder: stage.sortOrder, isClosed: stage.isClosed },
+          select: { id: true },
+        })
+      : await prisma.pipelineStage.create({
+          data: {
+            workspaceId: workspace.id,
+            categoryId: pipelineCategory.id,
+            name: stage.name,
+            sortOrder: stage.sortOrder,
+            isClosed: stage.isClosed,
+          },
+          select: { id: true },
+        });
+    stageIdByName.set(stage.name, record.id);
+  }
+
+  // Progetti demo: riconosciuti per nome, ricreati da zero (senza toccare "Project Gate Demo").
+  const demoProjectNames = DEMO_PROJECTS.map((project) => project.name);
+  await prisma.project.deleteMany({
+    where: { workspaceId: workspace.id, name: { in: demoProjectNames } },
+  });
+
+  for (const project of DEMO_PROJECTS) {
+    const clientId = clientIdByName.get(project.clientName);
+    const stageId = stageIdByName.get(project.stage);
+    if (!stageId) {
+      throw new Error(`Stage demo mancante per il progetto: ${project.stage}`);
+    }
+
+    await prisma.project.create({
+      data: {
+        workspaceId: workspace.id,
+        name: project.name,
+        description: project.description,
+        value: project.value,
+        dueDate: daysFromNow(project.dueInDays),
+        pipelineStageId: stageId,
+        clientId: clientId ?? null,
+        ...(clientId ? { clientLinks: { create: [{ clientId }] } } : {}),
+      },
+    });
+  }
+
+  // Memo operativi (checklist template) demo, oltre a "Pre Pubblicazione" del seed base.
+  for (const template of DEMO_CHECKLIST_TEMPLATES) {
+    const record = await prisma.checklistTemplate.upsert({
+      where: { workspaceId_name: { workspaceId: workspace.id, name: template.name } },
+      update: { description: template.description, isArchived: false },
+      create: {
+        workspaceId: workspace.id,
+        name: template.name,
+        description: template.description,
+      },
+      select: { id: true },
+    });
+
+    await prisma.checklistTemplateItem.deleteMany({ where: { templateId: record.id } });
+    for (let index = 0; index < template.items.length; index += 1) {
+      const item = template.items[index];
+      await prisma.checklistTemplateItem.create({
+        data: {
+          workspaceId: workspace.id,
+          templateId: record.id,
+          title: item.title,
+          sortOrder: index,
+          isRequired: item.isRequired,
+        },
+      });
+    }
+  }
+
+  // Calendario: eventi demo riconosciuti per titolo, ricreati da zero.
+  await prisma.calendarEvent.deleteMany({
+    where: { workspaceId: workspace.id, title: { in: DEMO_CALENDAR_EVENTS.map((event) => event.title) } },
+  });
+  for (const event of DEMO_CALENDAR_EVENTS) {
+    const startAt = daysFromNow(event.startInDays);
+    startAt.setHours(event.startHour, 0, 0, 0);
+    const endAt = event.allDay
+      ? null
+      : new Date(startAt.getTime() + event.durationHours * 60 * 60 * 1000);
+
+    await prisma.calendarEvent.create({
+      data: {
+        workspaceId: workspace.id,
+        createdByUserId: adminUser.id,
+        title: event.title,
+        description: event.description ?? null,
+        location: event.location ?? null,
+        category: event.category,
+        startAt,
+        endAt,
+        allDay: event.allDay,
+      },
+    });
+  }
+
+  // Web Assets: upsert per URL (chiave unica per tabella), tabella diversa per tipo.
+  for (const asset of DEMO_WEB_ASSETS) {
+    const clientId = clientIdByName.get(asset.clientName) ?? null;
+    const data = {
+      workspaceId: workspace.id,
+      clientId,
+      ownerUserId: adminUser.id,
+      name: asset.name,
+      url: asset.url,
+      status: asset.status,
+      deploymentEnvironment: asset.environment,
+      version: asset.version ?? null,
+    };
+    const where = { workspaceId_url: { workspaceId: workspace.id, url: asset.url } };
+    const update = {
+      name: asset.name,
+      status: asset.status,
+      deploymentEnvironment: asset.environment,
+      version: asset.version ?? null,
+      clientId,
+    };
+
+    if (asset.kind === 'website') {
+      await prisma.websiteAsset.upsert({ where, update, create: data });
+    } else if (asset.kind === 'webapp') {
+      await prisma.webAppAsset.upsert({ where, update, create: data });
+    } else {
+      await prisma.ecommerceAsset.upsert({ where, update, create: data });
+    }
+  }
+
+  // Messaggi tra admin e membri demo: si ricreano da zero (nessuna chiave naturale).
+  const demoMemberIds = DEMO_MEMBERS
+    .map((member) => userIdByEmail.get(member.email))
+    .filter((id): id is string => Boolean(id));
+  await prisma.workspaceMessage.deleteMany({
+    where: {
+      workspaceId: workspace.id,
+      OR: [
+        { senderUserId: { in: demoMemberIds } },
+        { recipientUserId: { in: demoMemberIds } },
+      ],
+    },
+  });
+  for (const message of DEMO_MESSAGES) {
+    const senderUserId = userIdByEmail.get(message.from);
+    const recipientUserId = userIdByEmail.get(message.to);
+    if (!senderUserId || !recipientUserId) {
+      continue;
+    }
+    const createdAt = daysAgo(message.daysAgo);
+    await prisma.workspaceMessage.create({
+      data: {
+        workspaceId: workspace.id,
+        senderUserId,
+        recipientUserId,
+        body: message.body,
+        readAt: message.read ? createdAt : null,
+        createdAt,
+      },
+    });
+  }
+
   console.log('Seed demo completato');
   console.log(`Membri team: ${DEMO_MEMBERS.length} (+ ${DEMO_INVITES.length} inviti)`);
   console.log(`Clienti: ${DEMO_CLIENTS.length}`);
   console.log(`Template preventivi: ${DEMO_QUOTE_TEMPLATES.length}`);
   console.log(`Preventivi: ${DEMO_QUOTES.length}`);
+  console.log(`Progetti: ${DEMO_PROJECTS.length} (stage pipeline: ${DEMO_PIPELINE_STAGES.length} aggiunti)`);
+  console.log(`Memo operativi (checklist): ${DEMO_CHECKLIST_TEMPLATES.length}`);
+  console.log(`Eventi calendario: ${DEMO_CALENDAR_EVENTS.length}`);
+  console.log(`Web asset: ${DEMO_WEB_ASSETS.length}`);
+  console.log(`Messaggi: ${DEMO_MESSAGES.length}`);
+  console.log('Nota: Vault e Agency-OS non inclusi (vedi handoff).');
 }
 
 main()
