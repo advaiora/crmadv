@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useHistory } from 'react-router-dom';
-import { FileText, Search, Users } from 'lucide-react';
+import { FileText, FolderKanban, Search, Users } from 'lucide-react';
 import { SidebarMenu } from '../../layout/Sidebar/SidebarMenu';
 import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
 import { listClients } from '../../modules/clients/ui/clientApi';
 import { listQuotes } from '../../modules/quotes/api/quotesApi';
+import { listProjects } from '../../modules/projects/api/projects.api';
 import './command-palette.css';
 
 export const COMMAND_PALETTE_OPEN_EVENT = 'command-palette:open';
+export const COMMAND_PALETTE_TOGGLE_EVENT = 'command-palette:toggle';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const ENTITY_PAGE_SIZE = 6;
@@ -98,7 +100,7 @@ const CommandPalette = () => {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const [access, setAccess] = useState(null);
-  const [entity, setEntity] = useState({ clients: [], quotes: [], loading: false });
+  const [entity, setEntity] = useState({ clients: [], quotes: [], projects: [], loading: false });
 
   const inputRef = useRef(null);
   const listRef = useRef(null);
@@ -106,24 +108,20 @@ const CommandPalette = () => {
   const close = useCallback(() => {
     setOpen(false);
     setQuery('');
-    setEntity({ clients: [], quotes: [], loading: false });
+    setEntity({ clients: [], quotes: [], projects: [], loading: false });
   }, []);
 
-  // Apertura: scorciatoia Cmd/Ctrl+K + evento dalla barra superiore.
+  // Apertura via eventi: il gestore scorciatoie possiede la combinazione da tastiera
+  // (Cmd/Ctrl+K di default, rimappabile) e ci apre/chiude tramite questi eventi.
   useEffect(() => {
-    const onKeyDown = (event) => {
-      if ((event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'K')) {
-        event.preventDefault();
-        setOpen((current) => !current);
-      }
-    };
     const onOpenEvent = () => setOpen(true);
+    const onToggleEvent = () => setOpen((current) => !current);
 
-    window.addEventListener('keydown', onKeyDown);
     window.addEventListener(COMMAND_PALETTE_OPEN_EVENT, onOpenEvent);
+    window.addEventListener(COMMAND_PALETTE_TOGGLE_EVENT, onToggleEvent);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener(COMMAND_PALETTE_OPEN_EVENT, onOpenEvent);
+      window.removeEventListener(COMMAND_PALETTE_TOGGLE_EVENT, onToggleEvent);
     };
   }, []);
 
@@ -151,6 +149,7 @@ const CommandPalette = () => {
 
   const canSearchClients = hasModuleEnabled(access, 'clients') && hasPermission(access, 'clients.view');
   const canSearchQuotes = hasModuleEnabled(access, 'quotes') && hasPermission(access, 'quotes.view');
+  const canSearchProjects = hasModuleEnabled(access, 'projects') && hasPermission(access, 'projects.view');
 
   // Ricerca entità con debounce, ignorando le risposte scadute.
   useEffect(() => {
@@ -159,7 +158,7 @@ const CommandPalette = () => {
     }
     const trimmed = query.trim();
     if (trimmed.length < 2) {
-      setEntity({ clients: [], quotes: [], loading: false });
+      setEntity({ clients: [], quotes: [], projects: [], loading: false });
       return undefined;
     }
 
@@ -177,10 +176,15 @@ const CommandPalette = () => {
             .then((result) => (Array.isArray(result?.items) ? result.items : []))
             .catch(() => [])
         : Promise.resolve([]);
+      const projectsTask = canSearchProjects
+        ? listProjects({ query: trimmed })
+            .then((items) => (Array.isArray(items) ? items.slice(0, ENTITY_PAGE_SIZE) : []))
+            .catch(() => [])
+        : Promise.resolve([]);
 
-      const [clients, quotes] = await Promise.all([clientsTask, quotesTask]);
+      const [clients, quotes, projects] = await Promise.all([clientsTask, quotesTask, projectsTask]);
       if (!cancelled) {
-        setEntity({ clients, quotes, loading: false });
+        setEntity({ clients, quotes, projects, loading: false });
       }
     }, SEARCH_DEBOUNCE_MS);
 
@@ -188,7 +192,7 @@ const CommandPalette = () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query, open, canSearchClients, canSearchQuotes]);
+  }, [query, open, canSearchClients, canSearchQuotes, canSearchProjects]);
 
   const navItems = useMemo(() => buildNavItems(access), [access]);
 
@@ -243,6 +247,21 @@ const CommandPalette = () => {
           sub: [quote.status, formatQuoteTotal(quote.total, quote.currency)].filter(Boolean).join(' · '),
           path: `/apps/quotes/${quote.id}`,
           icon: <FileText size={16} />,
+        })),
+      });
+    }
+
+    if (entity.projects.length > 0) {
+      result.push({
+        key: 'projects',
+        label: 'Progetti',
+        items: entity.projects.map((project) => ({
+          id: `project:${project.id}`,
+          kind: 'project',
+          label: project.name || 'Progetto senza nome',
+          sub: [project.categoryName || project.stage?.name, project.clientName].filter(Boolean).join(' · '),
+          path: `/projects/${project.id}`,
+          icon: <FolderKanban size={16} />,
         })),
       });
     }
@@ -328,7 +347,7 @@ const CommandPalette = () => {
             ref={inputRef}
             className="cmdk-input"
             type="text"
-            placeholder="Cerca clienti, preventivi o vai a una pagina..."
+            placeholder="Cerca clienti, preventivi, progetti o vai a una pagina..."
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
