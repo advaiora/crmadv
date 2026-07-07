@@ -1,0 +1,66 @@
+/* Editor Ruoli — solo layout: i colori restano ai token Bootstrap/tema. */
+
+.roles-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 767.98px) {
+  .roles-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.roles-list-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.6rem;
+  background: transparent;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.roles-list-item:hover {
+  background: var(--bs-secondary-bg);
+}
+
+.roles-list-item.is-active {
+  border-color: var(--bs-primary);
+  background: var(--bs-secondary-bg);
+}
+
+.roles-list-item + .roles-list-item {
+  margin-top: 0.5rem;
+}
+
+.roles-perm-module {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.6rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.roles-perm-module + .roles-perm-module {
+  margin-top: 0.75rem;
+}
+
+.roles-perm-module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.roles-perm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.35rem 1.25rem;
+}

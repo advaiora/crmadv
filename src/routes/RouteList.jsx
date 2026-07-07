@@ -48,6 +48,7 @@ import ModulesSettingsPage from "../views/Settings/Modules";
 import ThemePreviewPage from "../views/Settings/ThemePreview";
 import ResponsiveQAPage from "../views/Settings/ResponsiveQA";
 import ShortcutsSettings from "../views/Settings/ShortcutsSettings";
+import RolesSettings from "../views/Settings/RolesSettings";
 import AuditPage from "../views/Audit";
 //Auth
 import Login from "../views/Authentication/LogIn/Login/Login";
@@ -118,6 +119,7 @@ export const routes = [
     { path: 'settings/modules', exact: true, component: ModulesSettingsPage },
     { path: 'settings/theme-preview', exact: true, component: ThemePreviewPage },
     { path: 'settings/shortcuts', exact: true, component: ShortcutsSettings },
+    { path: 'settings/roles', exact: true, component: RolesSettings },
     { path: 'settings/responsive-qa', exact: true, component: ResponsiveQAPage },
     { path: 'audit', exact: true, component: AuditPage },
     //Error

@@ -218,6 +218,113 @@ export const roleRepository = {
     return result.count > 0;
   },
 
+  async listRolesByIds(
+    workspaceId: string,
+    roleIds: string[],
+  ): Promise<{ id: string; name: string; isSystem: boolean }[]> {
+    if (roleIds.length === 0) {
+      return [];
+    }
+
+    return prisma.role.findMany({
+      where: {
+        workspaceId,
+        id: {
+          in: roleIds,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        isSystem: true,
+      },
+    });
+  },
+
+  async listUserCustomRoleIds(workspaceId: string, userId: string): Promise<string[]> {
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        workspaceId,
+        userId,
+        role: {
+          isSystem: false,
+        },
+      },
+      select: {
+        roleId: true,
+      },
+      orderBy: {
+        roleId: 'asc',
+      },
+    });
+
+    return userRoles.map((userRole) => userRole.roleId);
+  },
+
+  async listUserCustomRoles(
+    workspaceId: string,
+    userId: string,
+  ): Promise<{ id: string; name: string }[]> {
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        workspaceId,
+        userId,
+        role: {
+          isSystem: false,
+        },
+      },
+      select: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        role: {
+          name: 'asc',
+        },
+      },
+    });
+
+    return userRoles.map((userRole) => ({
+      id: userRole.role.id,
+      name: userRole.role.name,
+    }));
+  },
+
+  // Replace the user's additive custom (non-system) roles, leaving their system
+  // base role untouched. Callers must validate that roleIds are non-system roles.
+  async replaceUserCustomRoles(
+    workspaceId: string,
+    userId: string,
+    roleIds: string[],
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({
+        where: {
+          workspaceId,
+          userId,
+          role: {
+            isSystem: false,
+          },
+        },
+      });
+
+      if (roleIds.length > 0) {
+        await tx.userRole.createMany({
+          data: roleIds.map((roleId) => ({
+            workspaceId,
+            userId,
+            roleId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+  },
+
   async countRolesByIds(workspaceId: string, roleIds: string[]): Promise<number> {
     if (roleIds.length === 0) {
       return 0;

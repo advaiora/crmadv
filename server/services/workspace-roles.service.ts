@@ -1,5 +1,6 @@
 import { badRequest, conflict, forbidden, notFound } from '../core/errors.js';
 import { assignWorkspaceUserRole, normalizeWorkspaceSystemRoleName } from '../auth/workspace-bootstrap.js';
+import { SYSTEM_MODULE_CATALOG, SYSTEM_PERMISSION_CATALOG } from '../auth/rbac-catalog.js';
 import { membershipRepository } from '../repositories/membership.repository.js';
 import { prisma } from '../prisma.js';
 import { roleRepository } from '../repositories/role.repository.js';
@@ -74,8 +75,30 @@ export const workspaceRolesService = {
     return roles.map((role) => ({
       id: role.id,
       name: role.name,
+      isSystem: role.isSystem,
+      isSuperadmin: role.isSuperadmin,
       permissions: role.permissions,
     }));
+  },
+
+  // Full permission catalog (modules + permissions), grouped by module, for the
+  // "Discord-style" role editor UI. Source of truth is the static rbac-catalog.
+  getPermissionCatalog() {
+    const permissionsByModule = new Map<string, { key: string; description: string }[]>();
+    for (const permission of SYSTEM_PERMISSION_CATALOG) {
+      const list = permissionsByModule.get(permission.moduleKey) ?? [];
+      list.push({ key: permission.key, description: permission.description });
+      permissionsByModule.set(permission.moduleKey, list);
+    }
+
+    const modules = SYSTEM_MODULE_CATALOG.map((module) => ({
+      key: module.key,
+      name: module.name,
+      isCore: module.isCore,
+      permissions: permissionsByModule.get(module.key) ?? [],
+    })).filter((module) => module.permissions.length > 0);
+
+    return { modules };
   },
 
   parseRolePayload(body: unknown): RolePayload {
@@ -298,6 +321,75 @@ export const workspaceRolesService = {
       changes: {
         from: assignment.previousRoleName ? [assignment.previousRoleName] : [],
         to: [assignment.assignedRoleName],
+      },
+    };
+  },
+
+  parseCustomRoleIds(body: unknown): string[] {
+    if (!isObject(body)) {
+      throw badRequest('Body must be a JSON object');
+    }
+
+    if (!Array.isArray(body.roleIds)) {
+      throw badRequest('roleIds must be an array');
+    }
+
+    return body.roleIds.map((value, index) => {
+      if (typeof value !== 'string' || !value.trim()) {
+        throw badRequest(`roleIds[${index}] must be a non-empty string`);
+      }
+
+      return value.trim();
+    });
+  },
+
+  // Assign the additive set of CUSTOM (non-system) roles to a member. The member
+  // keeps their single system base role (managed elsewhere); these roles only add
+  // permissions on top. Passing an empty array clears all custom roles.
+  async assignUserCustomRoles(
+    workspaceId: string,
+    targetUserId: string,
+    body: unknown,
+  ) {
+    const requestedRoleIds = Array.from(new Set(this.parseCustomRoleIds(body)));
+
+    const isMember = await membershipRepository.isMember(targetUserId, workspaceId);
+    if (!isMember) {
+      throw notFound('User is not a member of the workspace', {
+        userId: targetUserId,
+        workspaceId,
+      });
+    }
+
+    if (requestedRoleIds.length > 0) {
+      const roles = await roleRepository.listRolesByIds(workspaceId, requestedRoleIds);
+      const rolesById = new Map(roles.map((role) => [role.id, role]));
+
+      const missingRoleIds = requestedRoleIds.filter((roleId) => !rolesById.has(roleId));
+      if (missingRoleIds.length > 0) {
+        throw badRequest('Unknown role ids for this workspace', {
+          missingRoleIds: missingRoleIds.sort(),
+        });
+      }
+
+      const systemRoleIds = requestedRoleIds.filter((roleId) => rolesById.get(roleId)?.isSystem);
+      if (systemRoleIds.length > 0) {
+        throw badRequest('System roles cannot be assigned as custom roles', {
+          systemRoleIds: systemRoleIds.sort(),
+        });
+      }
+    }
+
+    const previousRoleIds = await roleRepository.listUserCustomRoleIds(workspaceId, targetUserId);
+    await roleRepository.replaceUserCustomRoles(workspaceId, targetUserId, requestedRoleIds);
+    const roles = await roleRepository.listUserCustomRoles(workspaceId, targetUserId);
+
+    return {
+      userId: targetUserId,
+      roles,
+      changes: {
+        from: [...previousRoleIds].sort(),
+        to: [...requestedRoleIds].sort(),
       },
     };
   },

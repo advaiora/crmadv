@@ -33,6 +33,7 @@ import {
   revokeTeamInvite,
   setTeamMemberActiveState,
 } from '../../modules/team/api/teamApi';
+import { assignUserCustomRoles, listWorkspaceRoles } from '../../modules/roles/api/rolesApi';
 import { hasPermission } from '../../utils/workspaceAccess';
 import '../../modules/team/ui/team-ui.css';
 import 'react-toastify/dist/ReactToastify.css';
@@ -62,12 +63,15 @@ const errorMessage = (error, fallback) => {
   return error?.message || fallback;
 };
 const isSuperadmin = (member) => Array.isArray(member?.roles) && member.roles.includes('Superadmin');
+const CLOSED_ROLES_DIALOG = { open: false, member: null, roleName: 'Viewer', customRoleIds: [], initialCustomRoleIds: [], saving: false, error: '' };
+const sameIds = (a, b) => a.length === b.length && [...a].sort().every((value, index) => value === [...b].sort()[index]);
 
 const TeamWorkspacePage = ({ access }) => {
   const canInvite = hasPermission(access, TEAM_PERMISSIONS.invite);
   const canEdit = hasPermission(access, TEAM_PERMISSIONS.edit);
   const canDeactivate = hasPermission(access, TEAM_PERMISSIONS.deactivate);
   const canAssignRoles = hasPermission(access, TEAM_PERMISSIONS.rolesAssign);
+  const canAssignCustomRoles = hasPermission(access, 'roles.assign');
   const actorIsSuperadmin = Array.isArray(access?.roles) && access.roles.includes('Superadmin');
   const canDeleteMembers = canDeactivate && actorIsSuperadmin;
 
@@ -102,7 +106,8 @@ const TeamWorkspacePage = ({ access }) => {
   const [inviteCreated, setInviteCreated] = useState(null);
   const [inviteForm, setInviteForm] = useState({ email: '', rolePreset: 'Viewer', expiresInDays: 7 });
 
-  const [rolesDialog, setRolesDialog] = useState({ open: false, member: null, roleName: 'Viewer', saving: false, error: '' });
+  const [rolesDialog, setRolesDialog] = useState(CLOSED_ROLES_DIALOG);
+  const [customRoles, setCustomRoles] = useState([]);
   const [stateDialog, setStateDialog] = useState({ open: false, member: null, nextActive: false, saving: false, error: '' });
   const [deleteDialog, setDeleteDialog] = useState({ open: false, member: null, saving: false, error: '' });
   const [revokeLoading, setRevokeLoading] = useState({});
@@ -143,6 +148,26 @@ const TeamWorkspacePage = ({ access }) => {
 
   useEffect(() => { void loadMembers(); }, [loadMembers]);
   useEffect(() => { if (tab === 'invites') void loadInvites(); }, [tab, loadInvites]);
+
+  // Ruoli custom del workspace (per assegnarli in aggiunta al ruolo base).
+  useEffect(() => {
+    if (!canAssignCustomRoles) {
+      setCustomRoles([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await listWorkspaceRoles();
+        if (!cancelled) {
+          setCustomRoles((result?.roles ?? []).filter((role) => !role.isSystem));
+        }
+      } catch {
+        if (!cancelled) setCustomRoles([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [canAssignCustomRoles]);
   useEffect(() => setMemberPage(1), [memberSearch, memberStatus]);
   useEffect(() => setInvitePage(1), [inviteStatus]);
 
@@ -255,8 +280,15 @@ const TeamWorkspacePage = ({ access }) => {
     setRolesDialog((current) => ({ ...current, saving: true, error: '' }));
     try {
       await assignTeamMemberRole(rolesDialog.member.memberId, rolesDialog.roleName);
+      if (
+        canAssignCustomRoles
+        && rolesDialog.member.userId
+        && !sameIds(rolesDialog.customRoleIds, rolesDialog.initialCustomRoleIds)
+      ) {
+        await assignUserCustomRoles(rolesDialog.member.userId, rolesDialog.customRoleIds);
+      }
       toast.success('Ruolo aggiornato');
-      setRolesDialog({ open: false, member: null, roleName: 'Viewer', saving: false, error: '' });
+      setRolesDialog(CLOSED_ROLES_DIALOG);
       await loadMembers();
     } catch (error) {
       const message = errorMessage(error, 'Aggiornamento ruolo non riuscito');
@@ -423,7 +455,11 @@ const TeamWorkspacePage = ({ access }) => {
                             <div className="d-flex justify-content-end gap-2 flex-wrap">
                               <span title="Dettagli"><Button size="sm" variant="outline-secondary" onClick={() => setDetailMember(member)}><Info size={14} /></Button></span>
                               <span title={deactivateReason}><Button size="sm" variant="outline-danger" disabled={Boolean(deactivateReason)} onClick={() => setStateDialog({ open: true, member, nextActive, saving: false, error: '' })}><UserX size={14} /></Button></span>
-                              <span title={rolesReason}><Button size="sm" variant="outline-secondary" disabled={Boolean(rolesReason)} onClick={() => setRolesDialog({ open: true, member, roleName: TEAM_ROLE_PRESETS.includes(member.roles?.[0]) ? member.roles[0] : 'Viewer', saving: false, error: '' })}><UserCog size={14} /></Button></span>
+                              <span title={rolesReason}><Button size="sm" variant="outline-secondary" disabled={Boolean(rolesReason)} onClick={() => {
+                                const baseRole = (member.roles || []).find((role) => TEAM_ROLE_PRESETS.includes(role)) || 'Viewer';
+                                const memberCustomIds = customRoles.filter((role) => (member.roles || []).includes(role.name)).map((role) => role.id);
+                                setRolesDialog({ open: true, member, roleName: baseRole, customRoleIds: memberCustomIds, initialCustomRoleIds: memberCustomIds, saving: false, error: '' });
+                              }}><UserCog size={14} /></Button></span>
                               <span title={deleteReason}><Button size="sm" variant="outline-danger" disabled={Boolean(deleteReason)} onClick={() => setDeleteDialog({ open: true, member, saving: false, error: '' })}><Trash2 size={14} /></Button></span>
                             </div>
                           </td>
@@ -578,16 +614,37 @@ const TeamWorkspacePage = ({ access }) => {
         </Form>
       </Modal>
 
-      <Modal className="team-modal" show={rolesDialog.open} onHide={() => !rolesDialog.saving && setRolesDialog({ open: false, member: null, roleName: 'Viewer', saving: false, error: '' })} centered backdrop={rolesDialog.saving ? 'static' : true}>
+      <Modal className="team-modal" show={rolesDialog.open} onHide={() => !rolesDialog.saving && setRolesDialog(CLOSED_ROLES_DIALOG)} centered backdrop={rolesDialog.saving ? 'static' : true}>
         <Modal.Header closeButton={!rolesDialog.saving}><Modal.Title>Gestione ruolo</Modal.Title></Modal.Header>
         <Form onSubmit={onSaveRoles}>
           <Modal.Body>
             {rolesDialog.member && <div className="small text-muted mb-2">Membro: {rolesDialog.member.name || rolesDialog.member.email}</div>}
-            <Form.Group><Form.Label>Ruolo</Form.Label><Form.Select value={rolesDialog.roleName} onChange={(event) => setRolesDialog((current) => ({ ...current, roleName: event.target.value }))}>{TEAM_ROLE_PRESETS.map((role) => <option key={role} value={role}>{role}</option>)}</Form.Select></Form.Group>
+            <Form.Group><Form.Label>Ruolo base</Form.Label><Form.Select value={rolesDialog.roleName} onChange={(event) => setRolesDialog((current) => ({ ...current, roleName: event.target.value }))}>{TEAM_ROLE_PRESETS.map((role) => <option key={role} value={role}>{role}</option>)}</Form.Select></Form.Group>
+            {canAssignCustomRoles && customRoles.length > 0 && (
+              <Form.Group className="mt-3">
+                <Form.Label>Ruoli aggiuntivi</Form.Label>
+                <div className="small text-muted mb-2">Sommano permessi al ruolo base.</div>
+                {customRoles.map((role) => (
+                  <Form.Check
+                    key={role.id}
+                    type="checkbox"
+                    id={`custom-role-${role.id}`}
+                    label={role.name}
+                    checked={rolesDialog.customRoleIds.includes(role.id)}
+                    onChange={(event) => setRolesDialog((current) => ({
+                      ...current,
+                      customRoleIds: event.target.checked
+                        ? [...current.customRoleIds, role.id]
+                        : current.customRoleIds.filter((id) => id !== role.id),
+                    }))}
+                  />
+                ))}
+              </Form.Group>
+            )}
             {rolesDialog.error && <Alert variant="danger" className="mt-3 mb-0 py-2">{rolesDialog.error}</Alert>}
           </Modal.Body>
           <Modal.Footer>
-            <Button type="button" variant="outline-secondary" disabled={rolesDialog.saving} onClick={() => setRolesDialog({ open: false, member: null, roleName: 'Viewer', saving: false, error: '' })}>Annulla</Button>
+            <Button type="button" variant="outline-secondary" disabled={rolesDialog.saving} onClick={() => setRolesDialog(CLOSED_ROLES_DIALOG)}>Annulla</Button>
             <Button type="submit" disabled={rolesDialog.saving}>{rolesDialog.saving ? 'Salvataggio...' : 'Salva ruolo'}</Button>
           </Modal.Footer>
         </Form>

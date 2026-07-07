@@ -42,6 +42,22 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
+  app.get<{ Params: WorkspaceParams }>(
+    '/workspaces/:workspaceId/roles/catalog',
+    async (request, reply) => {
+      const user = await requireAuth(request);
+      const workspace = await requireWorkspaceFromParams(
+        request,
+        user.id,
+        request.params.workspaceId,
+      );
+
+      await requirePermission(user.id, workspace.id, VIEW_ROLES_PERMISSION);
+
+      return ok(reply, workspaceRolesService.getPermissionCatalog());
+    },
+  );
+
   app.post<{ Params: WorkspaceParams; Body: unknown }>(
     '/workspaces/:workspaceId/roles',
     async (request, reply) => {
@@ -160,6 +176,42 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'role.assign',
+        actorUserId: user.id,
+        workspaceId: workspace.id,
+        metadata: {
+          targetUserId: result.userId,
+          changes: result.changes,
+        },
+        request,
+      });
+
+      return ok(reply, {
+        userId: result.userId,
+        roles: result.roles,
+      });
+    },
+  );
+
+  app.put<{ Params: WorkspaceUserParams; Body: unknown }>(
+    '/workspaces/:workspaceId/users/:userId/custom-roles',
+    async (request, reply) => {
+      const user = await requireAuth(request);
+      const workspace = await requireWorkspaceFromParams(
+        request,
+        user.id,
+        request.params.workspaceId,
+      );
+
+      await requirePermission(user.id, workspace.id, ASSIGN_ROLES_PERMISSION);
+
+      const result = await workspaceRolesService.assignUserCustomRoles(
+        workspace.id,
+        request.params.userId,
+        request.body,
+      );
+
+      await audit.log({
+        event: 'role.custom_assign',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {

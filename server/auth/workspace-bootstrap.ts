@@ -555,11 +555,16 @@ export const assignWorkspaceUserRole = async ({
     });
   }
 
-  // Keep exactly one assigned role per workspace user to avoid permission drift.
+  // Keep exactly one assigned SYSTEM role per workspace user to avoid permission
+  // drift. Additive custom roles (isSystem: false) are managed separately and are
+  // intentionally preserved across base-role changes (Discord-style model).
   await tx.userRole.deleteMany({
     where: {
       workspaceId,
       userId: targetUserId,
+      role: {
+        isSystem: true,
+      },
     },
   });
 

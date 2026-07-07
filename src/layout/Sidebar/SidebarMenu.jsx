@@ -231,6 +231,14 @@ export const SidebarMenu = [
     group: "Sicurezza",
     contents: [
       {
+        id: "security_roles",
+        name: "Ruoli e permessi",
+        icon: <Icons.LockAccess />,
+        path: "/settings/roles",
+        requiredPermission: "roles.view",
+        grp_name: "apps",
+      },
+      {
         id: "security_audit",
         name: "Audit",
         icon: <Icons.History />,
