@@ -1,61 +1,31 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 /**
  * Primitiva di divulgazione progressiva: contenitore collassabile animato.
  *
- * Anima l'altezza tra valori in pixel misurati sul contenuto reale, con una
- * transizione CSS su `height`. Robusta e fluida in qualunque contesto (celle di
- * tabella, griglie a div). A fine apertura l'altezza torna a `auto` cosi' il
- * pannello si adatta se il contenuto cambia.
+ * Animazione basata su TRANSFORM (compositore/GPU), non su `height`: lo spazio
+ * viene riservato/rilasciato in un colpo (un solo reflow) e il contenuto scorre
+ * dentro/fuori con `translateY`. Cosi' l'animazione non tocca il layout della
+ * pagina ad ogni frame -> niente paint ripetuto ne' re-raster dei backdrop-filter
+ * (blur navbar), quindi resta fluida anche su questo template pesante.
+ * Compromesso: i vicini "saltano" alla posizione finale (i transform non spostano
+ * il layout), invece di crescere gradualmente.
  *
- * Da chiuso il contenuto e' reso `inert` (niente elementi interattivi focusabili
- * sotto un pannello a altezza zero).
+ * Da chiuso il contenuto e' reso `inert`.
  *
- * Ottimizzazione prestazioni: mentre una qualsiasi sezione anima, si aggiunge la
- * classe `ui-collapse-animating` su <html>. L'app-shell la usa (in globals.css)
- * per sospendere temporaneamente i costosi `backdrop-filter` (blur della navbar),
- * che altrimenti verrebbero ri-rasterizzati ad ogni frame durante il cambio di
- * layout, rendendo l'animazione scattosa. Un contatore condiviso gestisce piu'
- * sezioni animate insieme; un timeout di sicurezza garantisce il ripristino.
+ * Props: open, id, className, children (invariati).
  */
 
-const ROOT_ANIMATING_CLASS = 'ui-collapse-animating';
-let activeAnimationCount = 0;
-
-const markAnimatingStart = () => {
-  activeAnimationCount += 1;
-  if (typeof document !== 'undefined') {
-    document.documentElement.classList.add(ROOT_ANIMATING_CLASS);
-  }
-};
-
-const markAnimatingEnd = () => {
-  activeAnimationCount = Math.max(0, activeAnimationCount - 1);
-  if (activeAnimationCount === 0 && typeof document !== 'undefined') {
-    document.documentElement.classList.remove(ROOT_ANIMATING_CLASS);
-  }
-};
+const INNER_OPEN = { transform: 'translateY(0)' };
 
 const CollapsibleSection = ({ open = false, id, className = '', children }) => {
   const innerRef = useRef(null);
+  const rafRef = useRef(0);
   const [height, setHeight] = useState(open ? 'auto' : '0px');
+  const [innerStyle, setInnerStyle] = useState(() =>
+    open ? INNER_OPEN : { transform: 'translateY(-100%)', transition: 'none' },
+  );
   const didMountRef = useRef(false);
-  const isAnimatingRef = useRef(false);
-
-  // Segnala inizio/fine animazione al contatore condiviso (idempotente per istanza).
-  const startAnimating = useCallback(() => {
-    if (!isAnimatingRef.current) {
-      isAnimatingRef.current = true;
-      markAnimatingStart();
-    }
-  }, []);
-
-  const stopAnimating = useCallback(() => {
-    if (isAnimatingRef.current) {
-      isAnimatingRef.current = false;
-      markAnimatingEnd();
-    }
-  }, []);
 
   useEffect(() => {
     const inner = innerRef.current;
@@ -63,58 +33,65 @@ const CollapsibleSection = ({ open = false, id, className = '', children }) => {
       return undefined;
     }
 
-    // Al primo mount lo stato iniziale ('auto' o '0px') e' gia' corretto:
-    // niente animazione (eviterebbe un flash dei pannelli chiusi all'avvio).
+    // Al primo mount lo stato iniziale e' gia' corretto: niente animazione.
     if (!didMountRef.current) {
       didMountRef.current = true;
       return undefined;
     }
 
-    startAnimating();
-    // Rete di sicurezza: se `transitionend` non scatta (altezza invariata,
-    // motion ridotto, ecc.) ripristiniamo comunque lo stato animante.
-    const safetyTimer = window.setTimeout(stopAnimating, 420);
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (open) {
-      // Da 0px (o auto) all'altezza del contenuto: anima l'apertura; a fine
-      // transizione si passa ad 'auto' (vedi handleTransitionEnd).
-      setHeight(`${inner.offsetHeight}px`);
-      return () => window.clearTimeout(safetyTimer);
+      // Riserva lo spazio (un reflow) e mette il contenuto sopra.
+      setHeight(`${inner.scrollHeight}px`);
+      if (prefersReducedMotion) {
+        setInnerStyle(INNER_OPEN);
+        setHeight('auto');
+        return undefined;
+      }
+      setInnerStyle({ transform: 'translateY(-100%)', transition: 'none' });
+      // Al frame dopo: fa scorrere il contenuto in posizione (transizione dal CSS).
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = window.requestAnimationFrame(() => setInnerStyle(INNER_OPEN));
+      });
+    } else {
+      // Chiusura: fissa l'altezza e fa scorrere il contenuto fuori (verso l'alto).
+      setHeight(`${inner.scrollHeight}px`);
+      if (prefersReducedMotion) {
+        setInnerStyle({ transform: 'translateY(-100%)', transition: 'none' });
+        setHeight('0px');
+        return undefined;
+      }
+      setInnerStyle({ transform: 'translateY(-100%)' });
     }
 
-    // Chiusura: da 'auto' si fissa l'altezza attuale, poi 0px poco dopo (un breve
-    // setTimeout resta affidabile anche con la tab in background).
-    setHeight(`${inner.offsetHeight}px`);
-    const collapseTimer = window.setTimeout(() => setHeight('0px'), 20);
+    // Rete di sicurezza: se `transitionend` non scatta (tab in background, ecc.)
+    // fissa comunque lo stato finale dell'altezza.
+    const safetyTimer = window.setTimeout(() => setHeight(open ? 'auto' : '0px'), 360);
     return () => {
-      window.clearTimeout(collapseTimer);
+      window.cancelAnimationFrame(rafRef.current);
       window.clearTimeout(safetyTimer);
     };
-  }, [open, startAnimating, stopAnimating]);
-
-  // Se il componente si smonta durante un'animazione, non lasciare il contatore
-  // (e quindi la classe) appeso.
-  useEffect(() => stopAnimating, [stopAnimating]);
+  }, [open]);
 
   const handleTransitionEnd = (event) => {
-    if (event.target !== event.currentTarget || event.propertyName !== 'height') {
+    if (event.target !== innerRef.current || event.propertyName !== 'transform') {
       return;
     }
-    if (open) {
-      setHeight('auto');
-    }
-    stopAnimating();
+    // Aperto: altezza 'auto' (si adatta al contenuto). Chiuso: 0 (rilascia lo spazio).
+    setHeight(open ? 'auto' : '0px');
   };
 
   return (
-    <div
-      id={id}
-      className="ui-collapsible"
-      style={{ height }}
-      inert={open ? undefined : true}
-      onTransitionEnd={handleTransitionEnd}
-    >
-      <div ref={innerRef} className={`ui-collapsible__inner ${className}`.trim()}>
+    <div id={id} className="ui-collapsible" style={{ height }} inert={open ? undefined : true}>
+      <div
+        ref={innerRef}
+        className={`ui-collapsible__inner ${className}`.trim()}
+        style={innerStyle}
+        onTransitionEnd={handleTransitionEnd}
+      >
         {children}
       </div>
     </div>
