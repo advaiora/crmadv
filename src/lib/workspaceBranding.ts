@@ -1,6 +1,12 @@
+import { getPresetAccents } from './brandingPalette';
+
 const HEX_COLOR_REGEX = /^#[A-Fa-f0-9]{6}$/;
 const DEFAULT_PRIMARY_COLOR = '#0d6efd';
 const DEFAULT_SECONDARY_COLOR = '#6c757d';
+const STYLE_ELEMENT_ID = 'workspace-branding-vars';
+// Superficie scura di base (token surface-1 = 10 10 11): serve a calcolare la
+// tinta "soft" dell'accento nel tema scuro (accento mescolato col fondo, non col bianco).
+const DARK_SOFT_BASE = '#0f0f13';
 
 export type WorkspaceBrandingState = {
   logoUrl?: string;
@@ -123,6 +129,51 @@ export const normalizeWorkspaceBranding = (rawBranding: unknown): WorkspaceBrand
   };
 };
 
+// Calcola l'insieme dei token dell'accento per un dato tema.
+// `softBase` e' il colore verso cui si mescola la tinta tenue (bianco in chiaro,
+// fondo scuro in scuro) cosi' la "soft" resta coerente col tema.
+const buildAccentVariables = (accentColor: string, softBase: string) => {
+  const accentHover = mixHexColors(accentColor, '#000000', 0.14);
+  const accentActive = mixHexColors(accentColor, '#000000', 0.24);
+  const accentSoft = mixHexColors(accentColor, softBase, 0.84);
+
+  return {
+    '--branding-primary': toRgbSpace(accentColor),
+    '--brand-accent': accentColor,
+    '--brand-accent-hover': accentHover,
+    '--brand-accent-active': accentActive,
+    '--brand-accent-soft': accentSoft,
+    '--brand-accent-hover-foreground': getReadableTextColor(accentHover),
+    '--brand-accent-active-foreground': getReadableTextColor(accentActive),
+    '--brand-accent-soft-foreground': getReadableTextColor(accentSoft),
+    '--primary': accentColor,
+    '--primary-foreground': getReadableTextColor(accentColor),
+    '--accent': accentSoft,
+    '--accent-foreground': getReadableTextColor(accentSoft),
+    '--ring': accentColor,
+    '--focus-ring-shadow': toRgba(accentColor, 0.45),
+    '--bs-primary': accentColor,
+    '--bs-primary-rgb': toRgbCsv(accentColor),
+    // La sidebar segue il tema (token in globals.css), non il colore secondario:
+    // qui impostiamo solo lo stato attivo/hover sull'accento.
+    '--hk-menu-item-active-bg': accentColor,
+    '--hk-menu-item-active-text': getReadableTextColor(accentColor),
+    '--hk-menu-hover-bg': toRgba(accentColor, 0.12),
+  } as Record<string, string>;
+};
+
+const serializeVariables = (variables: Record<string, string>) =>
+  Object.entries(variables)
+    .map(([name, value]) => `  ${name}: ${value};`)
+    .join('\n');
+
+/**
+ * Applica il branding del workspace iniettando (o aggiornando) un foglio di stile
+ * con DUE blocchi theme-scoped: l'accento chiaro per il tema chiaro, quello scuro
+ * (desaturato) per il tema scuro. Il CSS commuta da solo al cambio tema.
+ *
+ * Il colore secondario resta ai token del tema (neutra), non viene sovrascritto.
+ */
 export const applyWorkspaceBranding = (workspaceBranding?: WorkspaceBrandingState | null) => {
   if (typeof document === 'undefined') {
     return;
@@ -130,41 +181,24 @@ export const applyWorkspaceBranding = (workspaceBranding?: WorkspaceBrandingStat
 
   const branding = workspaceBranding ?? DEFAULT_WORKSPACE_BRANDING;
   const primaryColor = normalizeHexColor(branding.primaryColor, DEFAULT_PRIMARY_COLOR);
-  const secondaryColor = normalizeHexColor(branding.secondaryColor, DEFAULT_SECONDARY_COLOR);
-  const primaryHover = mixHexColors(primaryColor, '#000000', 0.14);
-  const primaryActive = mixHexColors(primaryColor, '#000000', 0.24);
-  const primarySoft = mixHexColors(primaryColor, '#ffffff', 0.84);
-  const primaryForeground = getReadableTextColor(primaryColor);
-  const primaryHoverForeground = getReadableTextColor(primaryHover);
-  const primaryActiveForeground = getReadableTextColor(primaryActive);
-  const primarySoftForeground = getReadableTextColor(primarySoft);
-  const secondaryForeground = getReadableTextColor(secondaryColor);
+  // La coppia chiaro/scuro viene dalla palette curata; se il colore non e' un
+  // preset (workspace legacy con colore libero) si usa lo stesso valore su entrambi.
+  const { light: lightAccent, dark: darkAccent } = getPresetAccents(primaryColor);
 
-  const rootStyle = document.documentElement.style;
-  rootStyle.setProperty('--branding-primary', toRgbSpace(primaryColor));
-  rootStyle.setProperty('--branding-secondary', toRgbSpace(secondaryColor));
-  rootStyle.setProperty('--brand-accent', primaryColor);
-  rootStyle.setProperty('--brand-accent-hover', primaryHover);
-  rootStyle.setProperty('--brand-accent-active', primaryActive);
-  rootStyle.setProperty('--brand-accent-soft', primarySoft);
-  rootStyle.setProperty('--brand-accent-hover-foreground', primaryHoverForeground);
-  rootStyle.setProperty('--brand-accent-active-foreground', primaryActiveForeground);
-  rootStyle.setProperty('--brand-accent-soft-foreground', primarySoftForeground);
-  rootStyle.setProperty('--primary', primaryColor);
-  rootStyle.setProperty('--primary-foreground', primaryForeground);
-  rootStyle.setProperty('--secondary', secondaryColor);
-  rootStyle.setProperty('--secondary-foreground', secondaryForeground);
-  rootStyle.setProperty('--accent', primarySoft);
-  rootStyle.setProperty('--accent-foreground', primarySoftForeground);
-  rootStyle.setProperty('--ring', primaryColor);
-  rootStyle.setProperty('--focus-ring-shadow', toRgba(primaryColor, 0.45));
-  rootStyle.setProperty('--bs-primary', primaryColor);
-  rootStyle.setProperty('--bs-primary-rgb', toRgbCsv(primaryColor));
-  rootStyle.setProperty('--bs-secondary', secondaryColor);
-  rootStyle.setProperty('--bs-secondary-rgb', toRgbCsv(secondaryColor));
-  // La sidebar segue il tema (token in globals.css), non il colore secondario:
-  // qui impostiamo solo lo stato attivo/hover sull'accento.
-  rootStyle.setProperty('--hk-menu-item-active-bg', primaryColor);
-  rootStyle.setProperty('--hk-menu-item-active-text', primaryForeground);
-  rootStyle.setProperty('--hk-menu-hover-bg', toRgba(primaryColor, 0.12));
+  const css = [
+    `:root[data-bs-theme="light"] {\n${serializeVariables(
+      buildAccentVariables(lightAccent, '#ffffff'),
+    )}\n}`,
+    `:root[data-bs-theme="dark"] {\n${serializeVariables(
+      buildAccentVariables(darkAccent, DARK_SOFT_BASE),
+    )}\n}`,
+  ].join('\n\n');
+
+  let styleElement = document.getElementById(STYLE_ELEMENT_ID);
+  if (!(styleElement instanceof HTMLStyleElement)) {
+    styleElement = document.createElement('style');
+    styleElement.id = STYLE_ELEMENT_ID;
+    document.head.appendChild(styleElement);
+  }
+  styleElement.textContent = css;
 };
