@@ -21,4 +21,4 @@ const ClientAvatar = ({ name, type, size = 'md' }) => {
     );
 };
 
-export default ClientAvatar;
+export default React.memo(ClientAvatar);

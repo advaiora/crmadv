@@ -398,37 +398,70 @@
   box-shadow: 0 1px 2px rgb(var(--shadow-color) / 0.12);
 }
 
-.clients-list-table > :not(caption) > * > * {
-  vertical-align: middle;
-  padding-top: 0.95rem;
-  padding-bottom: 0.95rem;
-  border-bottom-color: rgb(var(--border-subtle) / 0.58) !important;
+/* Lista clienti a GRIGLIA CSS (div, non <table>): la linguetta si anima in un
+   contesto a blocco, senza il costoso re-layout di una tabella HTML ad ogni
+   frame. Colonne via grid-template-columns (proporzioni dell'ex tabella). */
+.clients-grid {
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
-.clients-list-table-head th {
+.clients-grid-inner {
+  min-width: 860px;
+}
+
+.clients-grid-head,
+.clients-grid-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 27fr) 112px minmax(0, 20fr) 128px minmax(0, 20fr) 84px;
+  align-items: center;
+}
+
+.clients-grid-head {
   background: rgb(var(--surface-2) / 0.62);
-  border-bottom: 1px solid rgb(var(--border-subtle) / 0.75) !important;
+  border-bottom: 1px solid rgb(var(--border-subtle) / 0.75);
   color: var(--foreground);
 }
 
-.clients-list-table tbody tr {
-  background: transparent;
+.clients-grid-head .clients-grid-cell {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.clients-grid-cell {
+  padding: 0.9rem 0.6rem;
+  min-width: 0;
+}
+
+.clients-grid-row {
+  border-bottom: 1px solid rgb(var(--border-subtle) / 0.58);
   transition: background-color 0.2s ease;
 }
 
-.clients-list-table tbody tr:hover > * {
-  background-color: rgb(var(--row-hover) / 0.72) !important;
+.clients-grid-row:hover {
+  background-color: rgb(var(--row-hover) / 0.72);
+}
+
+.clients-cell-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* I valori lunghi (es. email, nome) vengono troncati con i puntini. */
+.clients-cell-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-grid-row--loading {
+  display: block;
+  padding: 0.7rem 0.6rem;
 }
 
 .clients-list-card .card-body {
   overflow: visible;
   background: transparent;
-}
-
-.clients-list-card .table-responsive {
-  position: relative;
-  overflow-x: auto;
-  overflow-y: visible;
 }
 
 .clients-actions-menu.dropdown-menu {
@@ -444,19 +477,122 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  min-width: 260px;
+  min-width: 0;
+}
+
+.clients-row-name-wrap {
+  min-width: 0;
 }
 
 .clients-row-name {
   margin: 0;
   font-weight: 600;
   font-size: 0.96rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .clients-row-meta {
   margin-top: 0.2rem;
   color: var(--hk-text-secondary);
   font-size: 0.82rem;
+}
+
+/* --- Divulgazione progressiva: linguetta di riga (dettagli secondari) --- */
+.clients-col-disclosure {
+  display: flex;
+  justify-content: center;
+  padding-left: 0.35rem;
+  padding-right: 0;
+}
+
+.clients-row-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.clients-row-disclosure:hover {
+  background: rgb(var(--row-hover) / 0.72);
+  color: var(--foreground);
+}
+
+.clients-row-disclosure svg {
+  transition: transform 0.2s ease;
+}
+
+.clients-row-disclosure[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clients-row-disclosure svg {
+    transition: none;
+  }
+}
+
+/* Riga espansa: la linguetta si "attacca" alla riga (niente separatore in mezzo;
+   il bordo di separazione lo mette la griglia dei dettagli, sotto). */
+.clients-grid-row.clients-row-expanded {
+  border-bottom-color: transparent;
+  background-color: rgb(var(--row-hover) / 0.32);
+}
+
+.clients-row-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1.5rem;
+  padding: 0.4rem 1.25rem 1.15rem 3rem;
+  border-bottom: 1px solid rgb(var(--border-subtle) / 0.58);
+}
+
+.clients-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.clients-detail-field--full {
+  grid-column: 1 / -1;
+}
+
+.clients-detail-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+}
+
+.clients-detail-field-value {
+  color: var(--foreground);
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+.clients-detail-notes {
+  white-space: pre-wrap;
+}
+
+/* Mobile: la linguetta vive dentro la card, a piena larghezza. */
+.clients-mobile-detail .clients-row-detail-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  padding: 0.85rem 0 0.1rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid rgb(var(--border-subtle) / 0.5);
+  border-bottom: 0;
 }
 
 .clients-mobile-card {

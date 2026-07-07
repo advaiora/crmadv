@@ -1590,3 +1590,32 @@ canvas {
     min-width: 640px;
   }
 }
+
+/* ==========================================================================
+   Primitiva di divulgazione progressiva — CollapsibleSection
+   Contenitore collassabile animato (Apple-style "a sottrazione"): rivela i
+   dettagli secondari solo su richiesta, tenendo densa la vista principale.
+   L'altezza e' misurata in JS (px) e animata con transition su `height`:
+   fluido e affidabile ovunque, celle di tabella incluse. Solo struttura.
+   ========================================================================== */
+.ui-collapsible {
+  overflow: hidden;
+  transition: height 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-collapsible {
+    transition: none;
+  }
+}
+
+/* Mentre una sezione collassabile anima (classe messa da CollapsibleSection su
+   <html>), sospendi i backdrop-filter dei layer fissi. Chromium ri-rasterizza
+   quel blur ad ogni frame quando la pagina cambia layout, rendendo scattosa
+   l'animazione: qui lo mettiamo in pausa. Dura ~0.28s ed e' impercettibile. */
+html.ui-collapse-animating .hk-navbar,
+html.ui-collapse-animating .clients-pagination-wrap,
+html.ui-collapse-animating .app-mobile-bottom-nav {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

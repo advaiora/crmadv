@@ -121,6 +121,17 @@ Questo è il punto più delicato per **noi**. 🌐 Apple sul sito è a **densit�
 - **Fai:** separa i gruppi con **spazio** prima che con linee.
 - **Non fare:** riempire ogni pixel; ma nemmeno lasciare enormi vuoti senza gerarchia.
 
+### 3.4 Divulgazione progressiva in-linea (riga espandibile)
+È il modo concreto per conciliare la sottrazione con la densità gestionale (§3.2): la vista resta pulita e densa, i dati **secondari/occasionali** si celano dietro una "linguetta" che estende la voce **in-linea**, senza cambiare pagina. Complementare al *drill-down* (riepilogo → vista di dettaglio): la linguetta è una **sbirciata rapida**, non sostituisce la scheda completa.
+
+- **Fai:** tieni **sempre visibili** i campi primari (quelli che servono a colpo d'occhio: nome, stato, contatti chiave, tag, azioni). Sotto la linguetta vanno solo i campi che l'utente consulta **ogni tanto** (es. per Clienti: dati fiscali, indirizzo, note).
+- **Non fare (il guardrail di §9):** non nascondere dati che il power user guarda **di continuo** — se per aprire una linguetta si perde tempo a parità di lavoro, hai peggiorato il prodotto. Nel dubbio, un campo molto usato **resta nella riga**.
+- **Primitiva:** `CollapsibleSection` (`src/components/ui/CollapsibleSection.jsx`) — contenitore animato riusabile (altezza misurata in JS e animata con `transition: height`; affidabile anche dentro le celle di tabella). Lo stato aperto è controllato dal chiamante (es. un `Set` di id per multi-open).
+- **Motion:** transizione **0.2s ease** (lo standard di casa), e **`prefers-reduced-motion`** rispettato (nessuna animazione). Trigger a chevron che ruota di 90°.
+- **Accessibilità:** il trigger è un `<button>` con `aria-expanded` e `aria-controls` che punta all'id del pannello. Touch target ≥ zona comoda.
+- **Layout della lista:** le viste dense che adottano questo pattern devono usare un layout a **`div` con griglia CSS**, non una `<table>` HTML. Animare l'altezza di una riga dentro una `<table>` costringe il browser a rifare il layout dell'intera tabella ad ogni frame (scattoso); con la griglia a `div` l'animazione avviene in contesto a blocco (≈45× più leggera, misurato su Clienti). Mantieni la semantica con i ruoli ARIA (`role="table"/"row"/"columnheader"/"cell"`).
+- **Stato:** pilotata per prima sulla lista **Clienti** (fine V1). Da estendere ad altre viste dense **una alla volta**, cavalcando il redesign di ciascun modulo, non con un intervento unico su tutto.
+
 ---
 
 ## 4. Colore e accento

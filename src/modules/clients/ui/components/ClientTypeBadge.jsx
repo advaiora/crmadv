@@ -15,4 +15,4 @@ const ClientTypeBadge = ({ type }) => {
     );
 };
 
-export default ClientTypeBadge;
+export default React.memo(ClientTypeBadge);

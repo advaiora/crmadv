@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Col, Form, Modal, Placeholder, Row, Table } from "react-bootstrap";
+import { Alert, Button, Card, Col, Form, Modal, Placeholder, Row } from "react-bootstrap";
 import { Link, useHistory, useLocation } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
 import ClientsModuleGate from "../../modules/clients/ui/ClientsModuleGate";
 import { deleteClient, exportClients, importClients, listClients, updateClient } from "../../modules/clients/ui/clientApi";
 import { CLIENTS_PAGE_SIZE_OPTIONS, CLIENTS_PERMISSIONS, CLIENTS_PRESET_TAGS, CLIENTS_SORT_OPTIONS } from "../../modules/clients/ui/constants";
-import { ClientActionsMenu, ClientAvatar, ClientEmptyState, ClientFiltersBar, ClientTypeBadge, PageHeader } from "../../modules/clients/ui/components";
+import { ClientActionsMenu, ClientAvatar, ClientEmptyState, ClientFiltersBar, ClientRowDetails, ClientTypeBadge, PageHeader } from "../../modules/clients/ui/components";
 import { getClientTypeLabel, getTagBadgeStyle } from "../../modules/clients/ui/helpers";
+import CollapsibleSection from "../../components/ui/CollapsibleSection";
 import "../../modules/clients/ui/clients-ui.css";
 import { hasPermission } from "../../utils/workspaceAccess";
 
@@ -34,6 +35,165 @@ const parsePageSize = (value) => {
 const getSortLabel = (sort) => CLIENTS_SORT_OPTIONS.find((option) => option.value === sort)?.label || "Aggiornati di recente";
 const hasTag = (tags, tagValue) => tags.some((tag) => tag.toLowerCase() === tagValue.toLowerCase());
 
+// Tag di una riga cliente. Memoizzato: non si ri-renderizza all'apertura di una
+// linguetta finche' le sue props (client stabile, onEditTags stabile) non cambiano.
+const ClientTags = React.memo(function ClientTags({ client, maxVisible = 3, canEdit = false, onEditTags }) {
+  const tags = Array.isArray(client?.tags) ? client.tags.filter(Boolean) : [];
+  const visibleTags = tags.slice(0, maxVisible);
+  const remainingCount = tags.length - visibleTags.length;
+
+  return (
+    <div className="clients-tags clients-list-tags">
+      {visibleTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
+      {visibleTags.map((tag) => (
+        <span key={`${client.id}-${tag}`} className="badge clients-tag-badge" style={getTagBadgeStyle(tag)}>
+          {tag}
+        </span>
+      ))}
+      {remainingCount > 0 && <span className="badge bg-light text-muted border">+{remainingCount}</span>}
+      {canEdit && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline-secondary"
+          className="clients-tag-edit-btn"
+          onClick={() => onEditTags(client)}
+        >
+          Modifica tag
+        </Button>
+      )}
+    </div>
+  );
+});
+
+// Riga desktop completa (griglia + linguetta), memoizzata: aprire/chiudere una
+// riga NON ri-renderizza le altre 11 (props invariate) -> toggle quasi gratis.
+const ClientGridRow = React.memo(function ClientGridRow({
+  client,
+  isExpanded,
+  canEdit,
+  canDelete,
+  onToggle,
+  onOpen,
+  onEdit,
+  onDelete,
+  onEditTags,
+}) {
+  const detailId = `client-detail-${client.id}`;
+  return (
+    <>
+      <div
+        className={`clients-grid-row ${isExpanded ? "clients-row-expanded" : ""}`.trim()}
+        role="row"
+      >
+        <div className="clients-grid-cell clients-col-disclosure" role="cell">
+          <button
+            type="button"
+            className="clients-row-disclosure"
+            onClick={() => onToggle(client.id)}
+            aria-expanded={isExpanded}
+            aria-controls={detailId}
+            aria-label={isExpanded ? `Nascondi dettagli di ${client.name}` : `Mostra dettagli di ${client.name}`}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="clients-grid-cell" role="cell">
+          <div className="clients-row-primary">
+            <ClientAvatar name={client.name} type={client.type} />
+            <div className="clients-row-name-wrap">
+              <p className="clients-row-name">{client.name}</p>
+            </div>
+          </div>
+        </div>
+        <div className="clients-grid-cell" role="cell">
+          <ClientTypeBadge type={client.type} />
+        </div>
+        <div className="clients-grid-cell clients-cell-email" role="cell">
+          {client.email || <span className="text-muted">-</span>}
+        </div>
+        <div className="clients-grid-cell" role="cell">
+          {client.phone || <span className="text-muted">-</span>}
+        </div>
+        <div className="clients-grid-cell" role="cell">
+          <ClientTags client={client} maxVisible={3} canEdit={canEdit} onEditTags={onEditTags} />
+        </div>
+        <div className="clients-grid-cell clients-cell-actions" role="cell">
+          <ClientActionsMenu
+            client={client}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onOpen={onOpen}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      </div>
+      <CollapsibleSection open={isExpanded} id={detailId}>
+        <ClientRowDetails client={client} />
+      </CollapsibleSection>
+    </>
+  );
+});
+
+// Card mobile completa, memoizzata (stessa logica di ClientGridRow).
+const ClientMobileCard = React.memo(function ClientMobileCard({
+  client,
+  isExpanded,
+  canEdit,
+  canDelete,
+  onToggle,
+  onOpen,
+  onEdit,
+  onDelete,
+  onEditTags,
+}) {
+  const detailId = `client-detail-m-${client.id}`;
+  return (
+    <div className="clients-mobile-card">
+      <div className="d-flex justify-content-between align-items-start gap-2">
+        <div className="d-flex align-items-center gap-2">
+          <ClientAvatar name={client.name} type={client.type} size="sm" />
+          <div>
+            <div className="fw-semibold">{client.name}</div>
+            <div className="text-muted clients-mobile-meta">{client.email || "Email non impostata"}</div>
+          </div>
+        </div>
+        <div className="d-flex align-items-center gap-1">
+          <button
+            type="button"
+            className="clients-row-disclosure"
+            onClick={() => onToggle(client.id)}
+            aria-expanded={isExpanded}
+            aria-controls={detailId}
+            aria-label={isExpanded ? `Nascondi dettagli di ${client.name}` : `Mostra dettagli di ${client.name}`}
+          >
+            <ChevronRight size={16} />
+          </button>
+          <ClientActionsMenu
+            client={client}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            onOpen={onOpen}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </div>
+      </div>
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <ClientTypeBadge type={client.type} />
+        <div className="clients-mobile-tags">
+          <ClientTags client={client} maxVisible={2} canEdit={canEdit} onEditTags={onEditTags} />
+        </div>
+      </div>
+      <div className="text-muted clients-mobile-meta mt-2">{client.phone || "Telefono non impostato"}</div>
+      <CollapsibleSection open={isExpanded} id={detailId} className="clients-mobile-detail">
+        <ClientRowDetails client={client} />
+      </CollapsibleSection>
+    </div>
+  );
+});
+
 const ClientsList = () => {
   const history = useHistory();
   const location = useLocation();
@@ -56,7 +216,22 @@ const ClientsList = () => {
   const [tagEditorError, setTagEditorError] = useState("");
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const fileInputRef = useRef(null);
+
+  // Divulgazione progressiva: apre/chiude la "linguetta" di una riga cliente.
+  // Multi-open (Set): piu' righe possono restare espanse insieme.
+  const toggleExpanded = useCallback((clientId) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(clientId)) {
+        next.delete(clientId);
+      } else {
+        next.add(clientId);
+      }
+      return next;
+    });
+  }, []);
   const [clientsData, setClientsData] = useState({
     items: [],
     pageInfo: {
@@ -171,15 +346,38 @@ const ClientsList = () => {
     history.push("/apps/clients");
   };
 
-  const onDeleteClient = async (client) => {
-    try {
-      await deleteClient(client.id);
-      await loadClients();
-    } catch (deleteError) {
-      setError(deleteError?.message || "Errore durante eliminazione cliente.");
-      throw deleteError;
-    }
-  };
+  // Callback stabili: cosi' i componenti figli memoizzati (ClientActionsMenu,
+  // ClientRowDetails) NON si ri-renderizzano quando si apre/chiude una linguetta.
+  const onDeleteClient = useCallback(
+    async (client) => {
+      try {
+        await deleteClient(client.id);
+        await loadClients();
+      } catch (deleteError) {
+        setError(deleteError?.message || "Errore durante eliminazione cliente.");
+        throw deleteError;
+      }
+    },
+    [loadClients],
+  );
+
+  const handleOpenClient = useCallback(
+    (entry) =>
+      history.push({
+        pathname: `/apps/clients/${entry.id}`,
+        state: { fromListSearch: location.search },
+      }),
+    [history, location.search],
+  );
+
+  const handleEditClient = useCallback(
+    (entry) =>
+      history.push({
+        pathname: `/apps/clients/${entry.id}/edit`,
+        state: { fromListSearch: location.search },
+      }),
+    [history, location.search],
+  );
 
   const triggerImport = () => {
     if (!fileInputRef.current || importing) {
@@ -288,12 +486,12 @@ const ClientsList = () => {
     }));
   }, []);
 
-  const openTagsModal = (client) => {
+  const openTagsModal = useCallback((client) => {
     setTagEditorClient(client);
     setTagEditorTags(Array.isArray(client.tags) ? client.tags.filter(Boolean) : []);
     setTagEditorDraft("");
     setTagEditorError("");
-  };
+  }, []);
 
   const closeTagsModal = (force = false) => {
     const shouldForceClose = force === true;
@@ -344,39 +542,14 @@ const ClientsList = () => {
     }
   };
 
-  const renderClientTags = (client, maxVisible = 3, canEdit = false) => {
-    const tags = Array.isArray(client?.tags) ? client.tags.filter(Boolean) : [];
-    const visibleTags = tags.slice(0, maxVisible);
-    const remainingCount = tags.length - visibleTags.length;
-
-    return (
-      <div className="clients-tags clients-list-tags">
-        {visibleTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
-        {visibleTags.map((tag) => (
-          <span key={`${client.id}-${tag}`} className="badge clients-tag-badge" style={getTagBadgeStyle(tag)}>
-            {tag}
-          </span>
-        ))}
-        {remainingCount > 0 && <span className="badge bg-light text-muted border">+{remainingCount}</span>}
-        {canEdit && (
-          <Button type="button" size="sm" variant="outline-secondary" className="clients-tag-edit-btn" onClick={() => openTagsModal(client)}>
-            Modifica tag
-          </Button>
-        )}
-      </div>
-    );
-  };
-
   const renderLoadingRows = () => (
     <>
       {[1, 2, 3, 4, 5].map((row) => (
-        <tr key={row}>
-          <td colSpan={6}>
-            <Placeholder as="div" animation="glow">
-              <Placeholder xs={12} />
-            </Placeholder>
-          </td>
-        </tr>
+        <div className="clients-grid-row clients-grid-row--loading" role="row" key={row}>
+          <Placeholder as="div" animation="glow">
+            <Placeholder xs={12} />
+          </Placeholder>
+        </div>
       ))}
     </>
   );
@@ -499,62 +672,41 @@ const ClientsList = () => {
 
               <Card className="clients-list-card card-border flat-keep mb-3">
                 <Card.Body className="py-2">
-                  <div className="table-responsive d-none d-md-block data-table-shell clients-list-table-shell">
-                    <Table hover className="clients-list-table mb-0 align-middle">
-                      <thead className="clients-list-table-head">
-                        <tr>
-                          <th>Nome</th>
-                          <th>Tipo</th>
-                          <th>Email</th>
-                          <th>Telefono</th>
-                          <th>Tag</th>
-                          <th className="text-end">Azioni</th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                  <div className="clients-grid d-none d-md-block">
+                    <div className="clients-grid-inner" role="table" aria-label="Elenco clienti">
+                      <div className="clients-grid-head" role="row">
+                        <div className="clients-grid-cell clients-col-disclosure" role="columnheader">
+                          <span className="visually-hidden">Espandi</span>
+                        </div>
+                        <div className="clients-grid-cell" role="columnheader">Nome</div>
+                        <div className="clients-grid-cell" role="columnheader">Tipo</div>
+                        <div className="clients-grid-cell" role="columnheader">Email</div>
+                        <div className="clients-grid-cell" role="columnheader">Telefono</div>
+                        <div className="clients-grid-cell" role="columnheader">Tag</div>
+                        <div className="clients-grid-cell clients-cell-actions" role="columnheader">
+                          Azioni
+                        </div>
+                      </div>
+                      <div className="clients-grid-body" role="rowgroup">
                         {loading && renderLoadingRows()}
                         {!loading &&
                           items.length > 0 &&
                           items.map((client) => (
-                            <tr key={client.id}>
-                              <td>
-                                <div className="clients-row-primary">
-                                  <ClientAvatar name={client.name} type={client.type} />
-                                  <div>
-                                    <p className="clients-row-name">{client.name}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td>
-                                <ClientTypeBadge type={client.type} />
-                              </td>
-                              <td>{client.email || <span className="text-muted">-</span>}</td>
-                              <td>{client.phone || <span className="text-muted">-</span>}</td>
-                              <td>{renderClientTags(client, 3, canEdit)}</td>
-                              <td className="text-end">
-                                <ClientActionsMenu
-                                  client={client}
-                                  canEdit={canEdit}
-                                  canDelete={canDelete}
-                                  onOpen={(entry) =>
-                                    history.push({
-                                      pathname: `/apps/clients/${entry.id}`,
-                                      state: { fromListSearch: location.search },
-                                    })
-                                  }
-                                  onEdit={(entry) =>
-                                    history.push({
-                                      pathname: `/apps/clients/${entry.id}/edit`,
-                                      state: { fromListSearch: location.search },
-                                    })
-                                  }
-                                  onDelete={onDeleteClient}
-                                />
-                              </td>
-                            </tr>
+                            <ClientGridRow
+                              key={client.id}
+                              client={client}
+                              isExpanded={expandedIds.has(client.id)}
+                              canEdit={canEdit}
+                              canDelete={canDelete}
+                              onToggle={toggleExpanded}
+                              onOpen={handleOpenClient}
+                              onEdit={handleEditClient}
+                              onDelete={onDeleteClient}
+                              onEditTags={openTagsModal}
+                            />
                           ))}
-                      </tbody>
-                    </Table>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="d-md-none py-2">
@@ -572,40 +724,18 @@ const ClientsList = () => {
                     {!loading &&
                       items.length > 0 &&
                       items.map((client) => (
-                        <div className="clients-mobile-card" key={client.id}>
-                          <div className="d-flex justify-content-between align-items-start gap-2">
-                            <div className="d-flex align-items-center gap-2">
-                              <ClientAvatar name={client.name} type={client.type} size="sm" />
-                              <div>
-                                <div className="fw-semibold">{client.name}</div>
-                                <div className="text-muted clients-mobile-meta">{client.email || "Email non impostata"}</div>
-                              </div>
-                            </div>
-                            <ClientActionsMenu
-                              client={client}
-                              canEdit={canEdit}
-                              canDelete={canDelete}
-                              onOpen={(entry) =>
-                                history.push({
-                                  pathname: `/apps/clients/${entry.id}`,
-                                  state: { fromListSearch: location.search },
-                                })
-                              }
-                              onEdit={(entry) =>
-                                history.push({
-                                  pathname: `/apps/clients/${entry.id}/edit`,
-                                  state: { fromListSearch: location.search },
-                                })
-                              }
-                              onDelete={onDeleteClient}
-                            />
-                          </div>
-                          <div className="d-flex justify-content-between align-items-center mt-3">
-                            <ClientTypeBadge type={client.type} />
-                            <div className="clients-mobile-tags">{renderClientTags(client, 2, canEdit)}</div>
-                          </div>
-                          <div className="text-muted clients-mobile-meta mt-2">{client.phone || "Telefono non impostato"}</div>
-                        </div>
+                        <ClientMobileCard
+                          key={client.id}
+                          client={client}
+                          isExpanded={expandedIds.has(client.id)}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          onToggle={toggleExpanded}
+                          onOpen={handleOpenClient}
+                          onEdit={handleEditClient}
+                          onDelete={onDeleteClient}
+                          onEditTags={openTagsModal}
+                        />
                       ))}
                   </div>
                 </Card.Body>

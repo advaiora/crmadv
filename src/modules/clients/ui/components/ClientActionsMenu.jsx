@@ -123,4 +123,7 @@ const ClientActionsMenu = ({
     );
 };
 
-export default ClientActionsMenu;
+// Memoizzato: non si ri-renderizza quando la lista cambia stato (es. apertura
+// di una linguetta) finche' le sue props restano invariate. Evita di ricreare
+// dropdown/Popper/Modal per ogni riga ad ogni interazione.
+export default React.memo(ClientActionsMenu);
