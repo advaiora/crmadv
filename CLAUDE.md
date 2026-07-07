@@ -46,6 +46,12 @@ Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativ
 - **Database:** PostgreSQL via Prisma 6.
 - Avvio e comandi: vedi `installazione-e-avvio.md`.
 
+## Database — regola di metodo (migrazioni, non `db push`)
+
+Per ogni cambiamento di schema che finisce su `main` si usano **solo migrazioni tracciate** (`prisma migrate dev`, che genera un file di migrazione versionato), **mai `prisma db push`**. Il push cambia il database senza lasciare traccia: è così che a marzo 2026 si è accumulato l'arretrato dell'area Agency, poi finito impacchettato nella migrazione `20260706085001` (che su un DB già allineato dà errore *"relation already exists"*). Con le migrazioni tracciate ogni modifica è un file pulito e autosufficiente: chi riprende esegue `migrate deploy`/`migrate dev` e basta, e l'arretrato non si ricrea.
+
+Regola pratica quando si tocca lo schema: modifica `schema.prisma`, genera la migrazione con `prisma migrate dev`, **committa il file di migrazione** insieme al codice, e **segnala nell'handoff** che c'è una nuova migrazione (ricordando che l'arretrato `20260706085001` va riconciliato *prima*). **Non riscrivere migrazioni già applicate** (cambierebbe il loro checksum e romperebbe gli ambienti dove funzionano già).
+
 ## Colori e temi (chiaro/scuro) — regola d'oro
 
 Il tema è un sistema globale a token (variabili CSS) in `src/styles/scss/globals.css`. Sviluppando qualsiasi pagina/componente: **usa sempre i token `var(--…)` o i componenti Bootstrap standard, mai colori scritti a mano** (`#hex`/`rgb`/`rgba`), nemmeno negli stili inline in JSX. Così chiaro e scuro funzionano da soli, senza ritocchi pagina per pagina. Riferimento completo dei token: `archivio-documenti/design-system-temi.md`. Controlli automatici sui moduli: `npm run lint:css` (file CSS) e `npm run lint:colors` (stili inline in JSX).
