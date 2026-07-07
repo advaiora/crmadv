@@ -27,6 +27,38 @@ import {
 } from '../../modules/quotes/ui/helpers';
 import '../../modules/quotes/ui/quotes-ui.css';
 import { hasPermission } from '../../utils/workspaceAccess';
+import CollapsibleSection from '../../components/ui/CollapsibleSection';
+import RowDisclosureButton from '../../components/ui/RowDisclosureButton';
+import DetailField from '../../components/ui/DetailField';
+
+// Contenuto della linguetta di un preventivo: i campi economici/di dettaglio
+// gia' presenti nella risposta di lista ma non mostrati nella riga compatta.
+const emptyDetailValue = <span className="text-muted">—</span>;
+
+const QuoteRowDetails = React.memo(function QuoteRowDetails({ quote }) {
+  const notes = typeof quote?.notes === 'string' ? quote.notes.trim() : '';
+  const taxRate = Number.isFinite(quote?.taxRate) ? `${quote.taxRate}%` : null;
+  return (
+    <div className="ui-row-detail-grid">
+      <DetailField label="Subtotale">
+        {quote?.subtotal != null ? formatCurrency(quote.subtotal, quote.currency) : emptyDetailValue}
+      </DetailField>
+      <DetailField label="Imposte">
+        {quote?.taxTotal != null ? formatCurrency(quote.taxTotal, quote.currency) : emptyDetailValue}
+        {taxRate ? <span className="text-muted"> ({taxRate})</span> : null}
+      </DetailField>
+      <DetailField label="Emissione">
+        {quote?.issueDate ? formatDateTime(quote.issueDate) : emptyDetailValue}
+      </DetailField>
+      <DetailField label="Valido fino al">
+        {quote?.validUntil ? formatDateTime(quote.validUntil) : emptyDetailValue}
+      </DetailField>
+      <DetailField label="Note" fullWidth>
+        {notes || emptyDetailValue}
+      </DetailField>
+    </div>
+  );
+});
 
 const parsePositiveInt = (value, fallback) => {
   const parsed = Number(value);
@@ -98,6 +130,19 @@ const QuotesList = () => {
       hasPrevPage: false,
     },
   });
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+
+  const toggleExpanded = useCallback((quoteId) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(quoteId)) {
+        next.delete(quoteId);
+      } else {
+        next.add(quoteId);
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     setSearchDraft(activeSearch);
@@ -194,7 +239,7 @@ const QuotesList = () => {
     <>
       {[1, 2, 3, 4, 5].map((row) => (
         <tr key={row}>
-          <td colSpan={6}>
+          <td colSpan={7}>
             <Placeholder as="div" animation="glow">
               <Placeholder xs={12} />
             </Placeholder>
@@ -324,6 +369,9 @@ const QuotesList = () => {
                     <Table hover className="mb-0 align-middle">
                       <thead>
                         <tr>
+                          <th className="ui-col-disclosure">
+                            <span className="visually-hidden">Espandi</span>
+                          </th>
                           <th>Numero</th>
                           <th>Cliente</th>
                           <th>Stato</th>
@@ -336,25 +384,45 @@ const QuotesList = () => {
                         {loading && renderLoadingRows()}
                         {!loading && quotesData.items.length === 0 && (
                           <tr>
-                            <td colSpan={6} className="text-center text-muted py-4">
+                            <td colSpan={7} className="text-center text-muted py-4">
                               Nessun preventivo trovato.
                             </td>
                           </tr>
                         )}
-                        {!loading && quotesData.items.map((quote) => (
-                          <tr
-                            key={quote.id}
-                            className="quote-clickable-row"
-                            onClick={() => history.push(`/apps/quotes/${quote.id}`)}
-                          >
-                            <td>#{shortQuoteId(quote.id)}</td>
-                            <td>{quote?.client?.name || '-'}</td>
-                            <td><QuoteStatusBadge status={quote.status} /></td>
-                            <td className="text-end fw-semibold">{formatCurrency(quote.total, quote.currency)}</td>
-                            <td>{formatDateTime(quote.createdAt)}</td>
-                            <td>{formatDateTime(quote.updatedAt)}</td>
-                          </tr>
-                        ))}
+                        {!loading && quotesData.items.map((quote) => {
+                          const isExpanded = expandedIds.has(quote.id);
+                          const detailId = `quote-detail-${quote.id}`;
+                          return (
+                            <React.Fragment key={quote.id}>
+                              <tr
+                                className={`quote-clickable-row ${isExpanded ? 'ui-row-expanded' : ''}`.trim()}
+                                onClick={() => history.push(`/apps/quotes/${quote.id}`)}
+                              >
+                                <td className="ui-col-disclosure">
+                                  <RowDisclosureButton
+                                    expanded={isExpanded}
+                                    onToggle={() => toggleExpanded(quote.id)}
+                                    controlsId={detailId}
+                                    label={`preventivo ${shortQuoteId(quote.id)}`}
+                                  />
+                                </td>
+                                <td>#{shortQuoteId(quote.id)}</td>
+                                <td>{quote?.client?.name || '-'}</td>
+                                <td><QuoteStatusBadge status={quote.status} /></td>
+                                <td className="text-end fw-semibold">{formatCurrency(quote.total, quote.currency)}</td>
+                                <td>{formatDateTime(quote.createdAt)}</td>
+                                <td>{formatDateTime(quote.updatedAt)}</td>
+                              </tr>
+                              <tr className="ui-row-detail-row">
+                                <td colSpan={7} className="ui-row-detail-cell">
+                                  <CollapsibleSection open={isExpanded} id={detailId}>
+                                    <QuoteRowDetails quote={quote} />
+                                  </CollapsibleSection>
+                                </td>
+                              </tr>
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </Table>
                   </div>
