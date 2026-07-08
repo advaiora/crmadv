@@ -11,6 +11,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { badRequest, internalServerError, notFound } from '../../core/errors.js';
 import { agencyRepository } from './agency.repository.js';
+import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
 import { getOrCreateWorkspaceDEK } from '../vault/keys.js';
 import { z } from 'zod';
@@ -2304,6 +2305,28 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
       }
       const estimatedInputTokens = estimateAgencyAiTokens(userContent);
       const estimatedOutputTokens = estimateAgencyAiTokens(content);
+      const estimatedCostUsd = estimateAgencyAiCostUsd(model, estimatedInputTokens, estimatedOutputTokens);
+      const durationMs = Date.now() - startedAt;
+
+      // Log costi/consumi AI per la Console piattaforma (Fase 4b). Best-effort:
+      // un errore di scrittura non deve mai rompere la risposta AI.
+      if (input.workspaceId) {
+        try {
+          await aiUsageRepository.create({
+            workspaceId: input.workspaceId,
+            functionName,
+            model,
+            inputTokens: estimatedInputTokens,
+            outputTokens: estimatedOutputTokens,
+            costUsd: estimatedCostUsd,
+            durationMs,
+            status: 'success',
+          });
+        } catch {
+          // ignora: il log costi è accessorio rispetto alla risposta AI
+        }
+      }
+
       return {
         payload: JSON.parse(content) as Record<string, unknown>,
         meta: {
@@ -2312,8 +2335,8 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
           inputHash,
           estimatedInputTokens,
           estimatedOutputTokens,
-          estimatedCostUsd: estimateAgencyAiCostUsd(model, estimatedInputTokens, estimatedOutputTokens),
-          durationMs: Date.now() - startedAt,
+          estimatedCostUsd,
+          durationMs,
           cacheHit: false,
           status: 'success',
         },

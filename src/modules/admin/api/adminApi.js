@@ -30,3 +30,7 @@ export const promotePlatformAdmin = (userId) =>
 
 export const demotePlatformAdmin = (userId) =>
   apiDelete(`/admin/platform-admins/${userId}`);
+
+export const getAiUsage = (days = 30) => apiGet(`/admin/ai-usage?days=${days}`);
+
+export const getAiConfig = () => apiGet('/admin/ai-config');

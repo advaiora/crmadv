@@ -2,6 +2,38 @@ import { badRequest, conflict, notFound } from '../core/errors.js';
 import { prisma } from '../prisma.js';
 import { ensureWorkspaceSystemRoles } from '../auth/workspace-bootstrap.js';
 import { platformAdminRepository } from '../repositories/platform-admin.repository.js';
+import { aiUsageRepository } from '../repositories/ai-usage.repository.js';
+
+const AI_SETTING_KEYS = {
+  enabled: 'agency_ai_enabled',
+  model: 'agency_ai_model',
+  maxTokens: 'agency_ai_max_output_tokens',
+  apiKey: 'openai_api_key',
+} as const;
+
+const DEFAULT_USAGE_WINDOW_DAYS = 30;
+const MAX_USAGE_WINDOW_DAYS = 365;
+const RECENT_USAGE_LIMIT = 50;
+
+const readJsonBoolean = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.trim().toLowerCase() === 'true';
+  return fallback;
+};
+
+const readJsonString = (value: unknown, fallback: string | null): string | null => {
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+};
+
+const readJsonNumber = (value: unknown, fallback: number | null): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  return fallback;
+};
+
+const round6 = (value: number | null | undefined): number => Number((value ?? 0).toFixed(6));
 
 const MAX_NAME_LENGTH = 80;
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -202,5 +234,98 @@ export const platformAdminService = {
     }
 
     return platformAdminRepository.setUserPlatformAdmin(userId, false);
+  },
+
+  parseWindowDays(rawDays: unknown): number {
+    if (rawDays === undefined || rawDays === null || rawDays === '') {
+      return DEFAULT_USAGE_WINDOW_DAYS;
+    }
+    const parsed = Number(rawDays);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw badRequest('days deve essere un numero positivo');
+    }
+    return Math.min(Math.floor(parsed), MAX_USAGE_WINDOW_DAYS);
+  },
+
+  // Costi/consumi AI aggregati per workspace + totali + ultime chiamate.
+  async getAiUsage(windowDays: number) {
+    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+    const [grouped, totals, workspaces, recent] = await Promise.all([
+      aiUsageRepository.aggregateByWorkspace(since),
+      aiUsageRepository.totals(since),
+      platformAdminRepository.listWorkspaces(),
+      aiUsageRepository.recentLogs(RECENT_USAGE_LIMIT),
+    ]);
+
+    const infoById = new Map(workspaces.map((w) => [w.id, { name: w.name, slug: w.slug }]));
+
+    const perWorkspace = grouped
+      .map((row) => ({
+        workspaceId: row.workspaceId,
+        name: infoById.get(row.workspaceId)?.name ?? '(workspace rimosso)',
+        slug: infoById.get(row.workspaceId)?.slug ?? '',
+        calls: row._count._all,
+        costUsd: round6(row._sum.costUsd),
+        inputTokens: row._sum.inputTokens ?? 0,
+        outputTokens: row._sum.outputTokens ?? 0,
+        lastCallAt: row._max.createdAt,
+      }))
+      .sort((left, right) => right.costUsd - left.costUsd);
+
+    return {
+      windowDays,
+      totals: {
+        calls: totals._count._all,
+        costUsd: round6(totals._sum.costUsd),
+        inputTokens: totals._sum.inputTokens ?? 0,
+        outputTokens: totals._sum.outputTokens ?? 0,
+      },
+      perWorkspace,
+      recent: recent.map((log) => ({
+        id: log.id,
+        workspaceId: log.workspaceId,
+        name: infoById.get(log.workspaceId)?.name ?? '',
+        functionName: log.functionName,
+        model: log.model,
+        costUsd: log.costUsd,
+        inputTokens: log.inputTokens,
+        outputTokens: log.outputTokens,
+        durationMs: log.durationMs,
+        createdAt: log.createdAt,
+      })),
+    };
+  },
+
+  // Configurazione AI per workspace (senza esporre la chiave API in chiaro).
+  async getAiConfig() {
+    const [workspaces, settings] = await Promise.all([
+      platformAdminRepository.listWorkspaces(),
+      platformAdminRepository.listAiRuntimeSettings(Object.values(AI_SETTING_KEYS)),
+    ]);
+
+    const byWorkspace = new Map<string, Map<string, (typeof settings)[number]>>();
+    for (const setting of settings) {
+      let entry = byWorkspace.get(setting.workspaceId);
+      if (!entry) {
+        entry = new Map();
+        byWorkspace.set(setting.workspaceId, entry);
+      }
+      entry.set(setting.key, setting);
+    }
+
+    return workspaces.map((workspace) => {
+      const entry = byWorkspace.get(workspace.id);
+      const apiKeyRow = entry?.get(AI_SETTING_KEYS.apiKey);
+      return {
+        workspaceId: workspace.id,
+        name: workspace.name,
+        slug: workspace.slug,
+        aiEnabled: readJsonBoolean(entry?.get(AI_SETTING_KEYS.enabled)?.valueJson, false),
+        model: readJsonString(entry?.get(AI_SETTING_KEYS.model)?.valueJson, null),
+        maxOutputTokens: readJsonNumber(entry?.get(AI_SETTING_KEYS.maxTokens)?.valueJson, null),
+        apiKeyConfigured: Boolean(apiKeyRow?.ciphertext),
+      };
+    });
   },
 };

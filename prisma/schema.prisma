@@ -201,6 +201,7 @@ model Workspace {
   projectOpportunities       ProjectOpportunity[]
   projectTasks               ProjectTask[]
   agencyRuntimeSettings      AgencyRuntimeSetting[]
+  aiUsageLogs                AiUsageLog[]
 }
 
 model User {
@@ -502,6 +503,25 @@ model AgencyRuntimeSetting {
 
   @@unique([workspaceId, key])
   @@index([workspaceId])
+}
+
+// Log dei costi/consumi delle chiamate AI, una riga per chiamata effettiva.
+// Usato dalla Console piattaforma (Fase 4b) per aggregare i costi per workspace.
+model AiUsageLog {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  functionName String    @db.VarChar(120)
+  model        String    @db.VarChar(120)
+  inputTokens  Int       @default(0)
+  outputTokens Int       @default(0)
+  costUsd      Float     @default(0)
+  durationMs   Int       @default(0)
+  status       String    @db.VarChar(30)
+  createdAt    DateTime  @default(now())
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([createdAt])
 }
 
 model ProjectClient {

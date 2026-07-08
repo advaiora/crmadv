@@ -11,7 +11,7 @@ import {
   Spinner,
   Table,
 } from 'react-bootstrap';
-import { Plus, Pencil, Play, Pause, Trash2, ShieldCheck } from 'lucide-react';
+import { Plus, Pencil, Play, Pause, Trash2, ShieldCheck, Cpu, DollarSign } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import { useWorkspaceAccess } from '../../hooks/useWorkspaceAccess';
 import { isPlatformAdmin } from '../../utils/workspaceAccess';
@@ -19,6 +19,8 @@ import {
   activateAdminWorkspace,
   createAdminWorkspace,
   demotePlatformAdmin,
+  getAiConfig,
+  getAiUsage,
   listAdminWorkspaces,
   listPlatformAdmins,
   promotePlatformAdmin,
@@ -34,6 +36,24 @@ const formatDate = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('it-IT');
 };
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return '—';
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('it-IT');
+};
+
+const formatUsd = (value) => `$${Number(value || 0).toFixed(4)}`;
+
+const formatNum = (value) => Number(value || 0).toLocaleString('it-IT');
+
+const USAGE_WINDOWS = [
+  { days: 7, label: '7 giorni' },
+  { days: 30, label: '30 giorni' },
+  { days: 90, label: '90 giorni' },
+];
 
 const getErrorMessage = (error, fallback) => error?.message || fallback;
 
@@ -60,22 +80,44 @@ const PlatformConsole = () => {
   const [searching, setSearching] = useState(false);
   const [busyAdminId, setBusyAdminId] = useState('');
 
+  const [aiUsage, setAiUsage] = useState(null);
+  const [aiConfig, setAiConfig] = useState([]);
+  const [usageDays, setUsageDays] = useState(30);
+  const [usageLoading, setUsageLoading] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     try {
-      const [workspacesResult, adminsResult] = await Promise.all([
+      const [workspacesResult, adminsResult, usageResult, configResult] = await Promise.all([
         listAdminWorkspaces(),
         listPlatformAdmins(),
+        getAiUsage(30),
+        getAiConfig(),
       ]);
       setWorkspaces(workspacesResult?.workspaces ?? []);
       setAdmins(adminsResult?.admins ?? []);
+      setAiUsage(usageResult ?? null);
+      setAiConfig(configResult?.workspaces ?? []);
     } catch (error) {
       setLoadError(getErrorMessage(error, 'Impossibile caricare i dati della console.'));
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleChangeUsageDays = async (days) => {
+    setUsageDays(days);
+    setUsageLoading(true);
+    try {
+      const usageResult = await getAiUsage(days);
+      setAiUsage(usageResult ?? null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Errore caricamento costi AI'));
+    } finally {
+      setUsageLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (canUseConsole) {
@@ -458,6 +500,122 @@ const PlatformConsole = () => {
               </Table>
             )}
           </div>
+        </Card.Body>
+      </Card>
+
+      <Card className="card-border mb-4">
+        <Card.Header className="bg-transparent d-flex justify-content-between align-items-center gap-2 flex-wrap">
+          <h6 className="mb-0 d-flex align-items-center gap-2">
+            <DollarSign size={16} />
+            Costi AI
+          </h6>
+          <Form.Select
+            size="sm"
+            style={{ width: 'auto' }}
+            value={usageDays}
+            onChange={(event) => void handleChangeUsageDays(Number(event.target.value))}
+            disabled={usageLoading}
+          >
+            {USAGE_WINDOWS.map((window) => (
+              <option key={window.days} value={window.days}>
+                Ultimi {window.label}
+              </option>
+            ))}
+          </Form.Select>
+        </Card.Header>
+        <Card.Body>
+          {aiUsage && (
+            <Row className="g-3 mb-3">
+              <Col sm={3}>
+                <div className="small text-muted">Costo totale</div>
+                <div className="h5 mb-0">{formatUsd(aiUsage.totals?.costUsd)}</div>
+              </Col>
+              <Col sm={3}>
+                <div className="small text-muted">Chiamate</div>
+                <div className="h5 mb-0">{formatNum(aiUsage.totals?.calls)}</div>
+              </Col>
+              <Col sm={3}>
+                <div className="small text-muted">Token input</div>
+                <div className="h5 mb-0">{formatNum(aiUsage.totals?.inputTokens)}</div>
+              </Col>
+              <Col sm={3}>
+                <div className="small text-muted">Token output</div>
+                <div className="h5 mb-0">{formatNum(aiUsage.totals?.outputTokens)}</div>
+              </Col>
+            </Row>
+          )}
+
+          {!aiUsage || aiUsage.perWorkspace?.length === 0 ? (
+            <div className="text-muted">Nessun consumo AI registrato nel periodo.</div>
+          ) : (
+            <Table responsive hover className="mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Workspace</th>
+                  <th className="text-end">Chiamate</th>
+                  <th className="text-end">Costo</th>
+                  <th className="text-end">Token in</th>
+                  <th className="text-end">Token out</th>
+                  <th>Ultima chiamata</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aiUsage.perWorkspace.map((row) => (
+                  <tr key={row.workspaceId}>
+                    <td className="fw-semibold">{row.name}</td>
+                    <td className="text-end">{formatNum(row.calls)}</td>
+                    <td className="text-end">{formatUsd(row.costUsd)}</td>
+                    <td className="text-end">{formatNum(row.inputTokens)}</td>
+                    <td className="text-end">{formatNum(row.outputTokens)}</td>
+                    <td className="text-muted">{formatDateTime(row.lastCallAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card.Body>
+      </Card>
+
+      <Card className="card-border mb-4">
+        <Card.Header className="bg-transparent d-flex align-items-center gap-2">
+          <Cpu size={16} />
+          <h6 className="mb-0">Configurazione AI per workspace</h6>
+        </Card.Header>
+        <Card.Body className="p-0">
+          {aiConfig.length === 0 ? (
+            <div className="p-4 text-muted">Nessun workspace.</div>
+          ) : (
+            <Table responsive hover className="mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Workspace</th>
+                  <th>AI</th>
+                  <th>Modello</th>
+                  <th>Chiave API</th>
+                  <th className="text-end">Max token output</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aiConfig.map((row) => (
+                  <tr key={row.workspaceId}>
+                    <td className="fw-semibold">{row.name}</td>
+                    <td>
+                      <Badge bg={row.aiEnabled ? 'success' : 'secondary'}>
+                        {row.aiEnabled ? 'Attiva' : 'Spenta'}
+                      </Badge>
+                    </td>
+                    <td className="text-muted">{row.model || '—'}</td>
+                    <td>
+                      <Badge bg={row.apiKeyConfigured ? 'success' : 'secondary'}>
+                        {row.apiKeyConfigured ? 'Configurata' : 'Assente'}
+                      </Badge>
+                    </td>
+                    <td className="text-end">{row.maxOutputTokens != null ? formatNum(row.maxOutputTokens) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
         </Card.Body>
       </Card>
 

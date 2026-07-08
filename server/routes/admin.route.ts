@@ -105,6 +105,19 @@ const adminRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
+  app.get<{ Querystring: { days?: string } }>('/admin/ai-usage', async (request, reply) => {
+    await requirePlatformAdmin(request);
+    const windowDays = platformAdminService.parseWindowDays(request.query?.days);
+    const usage = await platformAdminService.getAiUsage(windowDays);
+    return ok(reply, usage);
+  });
+
+  app.get('/admin/ai-config', async (request, reply) => {
+    await requirePlatformAdmin(request);
+    const workspaces = await platformAdminService.getAiConfig();
+    return ok(reply, { workspaces });
+  });
+
   app.get('/admin/platform-admins', async (request, reply) => {
     await requirePlatformAdmin(request);
     const admins = await platformAdminService.listPlatformAdmins();

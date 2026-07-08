@@ -111,6 +111,16 @@ export const platformAdminRepository = {
       select: platformAdminUserSelect,
     });
   },
+
+  // Legge le impostazioni AI runtime di tutti i workspace per le chiavi indicate.
+  // NON restituisce il segreto in chiaro: per la chiave API espone solo la presenza
+  // del ciphertext.
+  listAiRuntimeSettings(keys: string[]) {
+    return prisma.agencyRuntimeSetting.findMany({
+      where: { key: { in: keys } },
+      select: { workspaceId: true, key: true, valueJson: true, ciphertext: true },
+    });
+  },
 };
 
 export type WorkspaceAdminRecord = Awaited<
