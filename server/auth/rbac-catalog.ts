@@ -69,6 +69,7 @@ export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   { key: 'audit', name: 'Audit', isCore: true, description: 'Audit module' },
   { key: DASHBOARD_MODULE_KEY, name: 'Dashboard', isCore: true, description: 'Operational dashboard module' },
   { key: TEAM_MODULE_KEY, name: 'Team', isCore: false, description: 'Team module' },
+  { key: 'departments', name: 'Departments', isCore: false, description: 'Departments module' },
   { key: 'clients', name: 'Clients', isCore: false, description: 'Clients module' },
   { key: 'projects', name: 'Projects', isCore: false, description: 'Projects module' },
   { key: 'checklists', name: 'Checklists', isCore: false, description: 'Checklists module' },
@@ -96,6 +97,10 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: TEAM_PERMISSIONS.edit, moduleKey: TEAM_MODULE_KEY, description: 'Edit team members' },
   { key: TEAM_PERMISSIONS.deactivate, moduleKey: TEAM_MODULE_KEY, description: 'Deactivate team members' },
   { key: TEAM_PERMISSIONS.rolesAssign, moduleKey: TEAM_MODULE_KEY, description: 'Assign team roles' },
+
+  { key: 'departments.view', moduleKey: 'departments', description: 'View departments' },
+  { key: 'departments.manage', moduleKey: 'departments', description: 'Create, edit and delete departments' },
+  { key: 'departments.assign', moduleKey: 'departments', description: 'Assign users to departments' },
 
   { key: 'clients.view', moduleKey: 'clients', description: 'View clients' },
   { key: 'clients.create', moduleKey: 'clients', description: 'Create clients' },
@@ -185,6 +190,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       TEAM_PERMISSIONS.invite,
       TEAM_PERMISSIONS.edit,
       DASHBOARD_PERMISSIONS.view,
+      'departments.view',
       'clients.view',
       'clients.create',
       'clients.edit',
@@ -225,6 +231,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
     permissions: [
       TEAM_PERMISSIONS.view,
       DASHBOARD_PERMISSIONS.view,
+      'departments.view',
       'clients.view',
       'clients.edit',
       'projects.view',
@@ -248,6 +255,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
     permissions: [
       TEAM_PERMISSIONS.view,
       DASHBOARD_PERMISSIONS.view,
+      'departments.view',
       'clients.view',
       'projects.view',
       'checklists.view',

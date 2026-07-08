@@ -239,6 +239,14 @@ export const SidebarMenu = [
         grp_name: "apps",
       },
       {
+        id: "security_departments",
+        name: "Reparti",
+        icon: <Icons.BuildingCommunity />,
+        path: "/settings/departments",
+        requiredPermission: "departments.view",
+        grp_name: "apps",
+      },
+      {
         id: "security_audit",
         name: "Audit",
         icon: <Icons.History />,

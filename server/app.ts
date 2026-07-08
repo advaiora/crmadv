@@ -15,6 +15,7 @@ import authRoute from "./routes/auth.route.js";
 import workspaceBrandingRoute from "./routes/workspace-branding.route.js";
 import workspaceModulesRoute from "./routes/workspace-modules.route.js";
 import workspaceRolesRoute from "./routes/workspace-roles.route.js";
+import workspaceDepartmentsRoute from "./routes/workspace-departments.route.js";
 import clientsRoute from "./modules/clients/routes.js";
 import workspaceChecklistsRoute from "./modules/checklists/routes/workspace-checklists.route.js";
 import workspaceChecklistInstancesRoute from "./modules/checklists/routes/workspace-checklist-instances.route.js";
@@ -345,6 +346,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceAgencyRoute);
   void app.register(workspaceWebAssetsRoute);
   void app.register(workspaceRolesRoute);
+  void app.register(workspaceDepartmentsRoute);
   void app.register(clientsRoute);
   void app.register(workspaceChecklistsRoute);
   void app.register(workspaceChecklistInstancesRoute);

@@ -154,6 +154,8 @@ model Workspace {
   workspaceModules           WorkspaceModule[]
   roles                      Role[]
   userRoles                  UserRole[]
+  departments                Department[]
+  departmentMembers          DepartmentMember[]
   branding                   WorkspaceBranding?
   quoteNotificationSettings  QuoteNotificationSettings?
   projects                   Project[]
@@ -210,6 +212,7 @@ model User {
   teamInvitesSent                       TeamInvite[]                @relation("TeamInviteInvitedByUser")
   teamInvitesAccepted                   TeamInvite[]                @relation("TeamInviteAcceptedByUser")
   userRoles                             UserRole[]
+  departmentMembers                     DepartmentMember[]
   createdQuotes                         Quote[]                     @relation("QuoteCreatedByUser")
   createdCalendarEvents                 CalendarEvent[]             @relation("CalendarEventCreatedByUser")
   updatedCalendarEvents                 CalendarEvent[]             @relation("CalendarEventUpdatedByUser")
@@ -990,6 +993,36 @@ model UserRole {
   @@unique([workspaceId, userId, roleId])
   @@index([workspaceId, userId])
   @@index([roleId])
+}
+
+model Department {
+  id          String             @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     DepartmentMember[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model DepartmentMember {
+  id           String     @id @default(cuid())
+  workspaceId  String
+  departmentId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([departmentId])
 }
 
 model WorkspaceBranding {
