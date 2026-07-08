@@ -68,6 +68,7 @@ export const departmentRepository = {
     const rows = await prisma.departmentMember.findMany({
       where: { workspaceId, departmentId },
       select: {
+        role: true,
         user: { select: { id: true, name: true, email: true } },
       },
       orderBy: { user: { email: 'asc' } },
@@ -77,6 +78,7 @@ export const departmentRepository = {
       id: row.user.id,
       name: row.user.name,
       email: row.user.email,
+      role: row.role,
     }));
   },
 
@@ -88,6 +90,63 @@ export const departmentRepository = {
     });
 
     return rows.map((row) => row.userId);
+  },
+
+  async listExistingDepartmentIds(workspaceId: string, ids: string[]): Promise<string[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const rows = await prisma.department.findMany({
+      where: { workspaceId, id: { in: ids } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  },
+
+  findMember(workspaceId: string, departmentId: string, userId: string) {
+    return prisma.departmentMember.findFirst({
+      where: { workspaceId, departmentId, userId },
+      select: { id: true, role: true },
+    });
+  },
+
+  async setMemberRole(
+    workspaceId: string,
+    departmentId: string,
+    userId: string,
+    role: string,
+  ): Promise<boolean> {
+    const result = await prisma.departmentMember.updateMany({
+      where: { workspaceId, departmentId, userId },
+      data: { role },
+    });
+    return result.count > 0;
+  },
+
+  // User ids that are members of any of the given departments (the "subordinates"
+  // a Capo Reparto can manage). Excludes nobody by role — leads included.
+  async listMemberUserIdsForDepartments(
+    workspaceId: string,
+    departmentIds: string[],
+  ): Promise<string[]> {
+    if (departmentIds.length === 0) {
+      return [];
+    }
+    const rows = await prisma.departmentMember.findMany({
+      where: { workspaceId, departmentId: { in: departmentIds } },
+      select: { userId: true },
+    });
+    return Array.from(new Set(rows.map((row) => row.userId)));
+  },
+
+  // Ids of the departments where the user is a lead (Capo Reparto).
+  async listLedDepartmentIds(workspaceId: string, userId: string): Promise<string[]> {
+    const rows = await prisma.departmentMember.findMany({
+      where: { workspaceId, userId, role: 'lead' },
+      select: { departmentId: true },
+    });
+
+    return rows.map((row) => row.departmentId);
   },
 
   async listActiveWorkspaceMemberUserIds(workspaceId: string): Promise<string[]> {

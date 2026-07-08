@@ -8,6 +8,8 @@ import {
   ensureProjectsMoveStageAccess,
 } from '../projects.policies.js';
 import { projectsService } from '../projects.service.js';
+import { projectAccessService } from '../project-access.service.js';
+import { audit } from '../../../audit/audit.js';
 
 type ProjectParams = {
   id: string;
@@ -241,8 +243,8 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get<{ Querystring: ProjectsQuery }>('/projects', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const projects = await projectsService.listProjects(workspace.id, request.query);
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const projects = await projectsService.listProjects(workspace.id, user.id, request.query);
 
     return ok(reply, { items: projects });
   });
@@ -250,8 +252,8 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: ProjectParams }>(
     '/projects/:id/history',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-      await projectsService.getProject(workspace.id, request.params.id);
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      await projectsService.getProject(workspace.id, user.id, request.params.id);
 
       // Placeholder endpoint to avoid noisy 404s on clients expecting stage history.
       return ok(reply, { items: [] });
@@ -261,8 +263,8 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: ProjectParams }>(
     '/projects/:id/stage-history',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-      await projectsService.getProject(workspace.id, request.params.id);
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      await projectsService.getProject(workspace.id, user.id, request.params.id);
 
       // Placeholder endpoint to avoid noisy 404s on clients expecting stage history.
       return ok(reply, { items: [] });
@@ -272,10 +274,71 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: ProjectParams }>(
     '/projects/:id',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-      const project = await projectsService.getProject(workspace.id, request.params.id);
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const project = await projectsService.getProject(workspace.id, user.id, request.params.id);
 
       return ok(reply, { project });
+    },
+  );
+
+  // Reparti e accessi di un progetto (gestione delegata: ruolo alto o capo reparto).
+  app.get<{ Params: ProjectParams }>(
+    '/projects/:id/access',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const result = await projectAccessService.getProjectAccess(
+        workspace.id,
+        user.id,
+        request.params.id,
+      );
+
+      return ok(reply, result);
+    },
+  );
+
+  app.put<{ Params: ProjectParams; Body: unknown }>(
+    '/projects/:id/departments',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const result = await projectAccessService.setProjectDepartments(
+        workspace.id,
+        user.id,
+        request.params.id,
+        request.body,
+      );
+
+      await audit.log({
+        event: 'project.departments_set',
+        actorUserId: user.id,
+        workspaceId: workspace.id,
+        metadata: { projectId: result.projectId, departmentIds: result.departmentIds },
+        request,
+      });
+
+      return ok(reply, result);
+    },
+  );
+
+  app.put<{ Params: ProjectParams; Body: unknown }>(
+    '/projects/:id/access',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const result = await projectAccessService.setProjectAccess(
+        workspace.id,
+        user.id,
+        request.params.id,
+        request.body,
+      );
+
+      await audit.log({
+        event: 'project.access_set',
+        actorUserId: user.id,
+        workspaceId: workspace.id,
+        metadata: { projectId: result.projectId, userIds: result.userIds },
+        request,
+      });
+
+      return ok(reply, result);
     },
   );
 

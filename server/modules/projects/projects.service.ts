@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { audit } from '../../audit/audit.js';
 import { HttpError, badRequest, notFound } from '../../core/errors.js';
 import { checklistsService } from '../checklists/checklists.service.js';
+import { departmentRepository } from '../../repositories/department.repository.js';
+import { rbacRepository } from '../../repositories/rbac.repository.js';
 import { projectsRepository } from './projects.repository.js';
 
 const MIN_OVERRIDE_REASON_LENGTH = 10;
@@ -1058,8 +1060,21 @@ export const projectsService = {
     };
   },
 
-  async listProjects(workspaceId: string, query: unknown) {
+  // Perimetro di visibilità dell'utente. Restituisce null se l'utente ha
+  // projects.view_all (vede tutto); altrimenti lo scope per il filtro.
+  async resolveProjectVisibility(workspaceId: string, userId: string) {
+    const hasViewAll = await rbacRepository.hasPermission(userId, workspaceId, 'projects.view_all');
+    if (hasViewAll) {
+      return null;
+    }
+
+    const ledDepartmentIds = await departmentRepository.listLedDepartmentIds(workspaceId, userId);
+    return { userId, ledDepartmentIds, isLead: ledDepartmentIds.length > 0 };
+  },
+
+  async listProjects(workspaceId: string, userId: string, query: unknown) {
     const filters = this.parseListProjectsQuery(query);
+    const visibility = await this.resolveProjectVisibility(workspaceId, userId);
 
     const projects = await projectsRepository.listProjects({
       workspaceId,
@@ -1067,16 +1082,30 @@ export const projectsService = {
       stageId: filters.stageId,
       clientId: filters.clientId,
       search: filters.search,
+      visibility,
     });
 
     return projects.map((project) => mapProject(project));
   },
 
-  async getProject(workspaceId: string, rawProjectId: string) {
+  async getProject(workspaceId: string, userId: string, rawProjectId: string) {
     const projectId = this.parseProjectId(rawProjectId);
     const project = await projectsRepository.findProjectWithStage(workspaceId, projectId);
     if (!project) {
       throw notFound('Project not found');
+    }
+
+    const visibility = await this.resolveProjectVisibility(workspaceId, userId);
+    if (visibility) {
+      const canAccess = await projectsRepository.userCanAccessProject({
+        workspaceId,
+        projectId,
+        scope: visibility,
+      });
+      // 404 (non 403) per non rivelare l'esistenza di progetti fuori perimetro.
+      if (!canAccess) {
+        throw notFound('Project not found');
+      }
     }
 
     return mapProject(project);

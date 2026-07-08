@@ -107,6 +107,39 @@ export const workspaceDepartmentsService = {
     return { departmentId, members };
   },
 
+  parseMemberRole(body: unknown): 'lead' | 'member' {
+    if (!isObject(body)) {
+      throw badRequest('Body must be a JSON object');
+    }
+    if (body.role !== 'lead' && body.role !== 'member') {
+      throw badRequest("role must be 'lead' or 'member'");
+    }
+    return body.role;
+  },
+
+  // Nomina/rimuove un Capo Reparto (grado lead/member) su un membro del reparto.
+  async setMemberRole(
+    workspaceId: string,
+    departmentId: string,
+    userId: string,
+    body: unknown,
+  ) {
+    const role = this.parseMemberRole(body);
+
+    const department = await departmentRepository.findById(workspaceId, departmentId);
+    if (!department) {
+      throw notFound('Department not found');
+    }
+
+    const member = await departmentRepository.findMember(workspaceId, departmentId, userId);
+    if (!member) {
+      throw notFound('User is not a member of this department');
+    }
+
+    await departmentRepository.setMemberRole(workspaceId, departmentId, userId, role);
+    return { departmentId, userId, role };
+  },
+
   parseMemberUserIds(body: unknown): string[] {
     if (!isObject(body)) {
       throw badRequest('Body must be a JSON object');

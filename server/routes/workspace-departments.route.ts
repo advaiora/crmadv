@@ -14,6 +14,10 @@ type WorkspaceDepartmentParams = WorkspaceParams & {
   departmentId: string;
 };
 
+type WorkspaceDepartmentMemberParams = WorkspaceDepartmentParams & {
+  userId: string;
+};
+
 const VIEW_PERMISSION = 'departments.view';
 const MANAGE_PERMISSION = 'departments.manage';
 const ASSIGN_PERMISSION = 'departments.assign';
@@ -138,6 +142,36 @@ const workspaceDepartmentsRoute: FastifyPluginAsync = async (app) => {
       });
 
       return ok(reply, { department });
+    },
+  );
+
+  app.put<{ Params: WorkspaceDepartmentMemberParams; Body: unknown }>(
+    '/workspaces/:workspaceId/departments/:departmentId/members/:userId/role',
+    async (request, reply) => {
+      const user = await requireAuth(request);
+      const workspace = await requireWorkspaceFromParams(
+        request,
+        user.id,
+        request.params.workspaceId,
+      );
+
+      await requirePermission(user.id, workspace.id, MANAGE_PERMISSION);
+      const result = await workspaceDepartmentsService.setMemberRole(
+        workspace.id,
+        request.params.departmentId,
+        request.params.userId,
+        request.body,
+      );
+
+      await audit.log({
+        event: 'department.member_role_set',
+        actorUserId: user.id,
+        workspaceId: workspace.id,
+        metadata: result,
+        request,
+      });
+
+      return ok(reply, result);
     },
   );
 

@@ -36,3 +36,14 @@ test('parseMemberUserIds rejects a non-array and non-string entries', () => {
   assert.throws(() => workspaceDepartmentsService.parseMemberUserIds({ userIds: 'nope' }));
   assert.throws(() => workspaceDepartmentsService.parseMemberUserIds({ userIds: ['ok', 7] }));
 });
+
+test('parseMemberRole accepts lead and member', () => {
+  assert.equal(workspaceDepartmentsService.parseMemberRole({ role: 'lead' }), 'lead');
+  assert.equal(workspaceDepartmentsService.parseMemberRole({ role: 'member' }), 'member');
+});
+
+test('parseMemberRole rejects any other value', () => {
+  assert.throws(() => workspaceDepartmentsService.parseMemberRole({ role: 'boss' }));
+  assert.throws(() => workspaceDepartmentsService.parseMemberRole({ role: '' }));
+  assert.throws(() => workspaceDepartmentsService.parseMemberRole({}));
+});

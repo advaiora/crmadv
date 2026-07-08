@@ -1,6 +1,38 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
 
+// Perimetro di visibilità di un utente non privilegiato (senza projects.view_all).
+// Un progetto è visibile se: l'utente ne è owner, oppure gli è assegnato
+// (ProjectAccess), oppure è capo di uno dei reparti del progetto, oppure (se è
+// capo di almeno un reparto) il progetto non appartiene ad alcun reparto.
+export type ProjectVisibilityScope = {
+  userId: string;
+  ledDepartmentIds: string[];
+  isLead: boolean;
+};
+
+const buildVisibilityOr = (scope: ProjectVisibilityScope): Prisma.ProjectWhereInput[] => {
+  const conditions: Prisma.ProjectWhereInput[] = [
+    { ownerUserId: scope.userId },
+    { access: { some: { userId: scope.userId } } },
+  ];
+
+  if (scope.ledDepartmentIds.length > 0) {
+    conditions.push({ departments: { some: { departmentId: { in: scope.ledDepartmentIds } } } });
+  }
+
+  if (scope.isLead) {
+    // I capi reparto vedono anche i progetti "generali" (senza alcun reparto).
+    conditions.push({ departments: { none: {} } });
+  }
+
+  return conditions;
+};
+
+const buildVisibilityWhere = (
+  scope: ProjectVisibilityScope | null | undefined,
+): Prisma.ProjectWhereInput => (scope ? { OR: buildVisibilityOr(scope) } : {});
+
 export type ProjectStageRecord = {
   id: string;
   workspaceId: string;
@@ -477,6 +509,7 @@ export const projectsRepository = {
     stageId?: string;
     clientId?: string;
     search?: string;
+    visibility?: ProjectVisibilityScope | null;
   }) {
     const [clientRelationReady, projectClientsReady, projectDetailsReady] = await Promise.all([
       this.isProjectClientSchemaReady(),
@@ -487,6 +520,7 @@ export const projectsRepository = {
     return prisma.project.findMany({
       where: {
         workspaceId: input.workspaceId,
+        ...buildVisibilityWhere(input.visibility),
         ...(input.categoryId
           ? {
               pipelineStage: {
@@ -528,6 +562,82 @@ export const projectsRepository = {
         includeClientLinks: projectClientsReady,
         includeDetails: projectDetailsReady,
       }),
+    });
+  },
+
+  // Verifica se un progetto rientra nel perimetro di visibilità dello scope dato.
+  async userCanAccessProject(input: {
+    workspaceId: string;
+    projectId: string;
+    scope: ProjectVisibilityScope;
+  }): Promise<boolean> {
+    const match = await prisma.project.findFirst({
+      where: {
+        id: input.projectId,
+        workspaceId: input.workspaceId,
+        OR: buildVisibilityOr(input.scope),
+      },
+      select: { id: true },
+    });
+
+    return Boolean(match);
+  },
+
+  async projectExists(workspaceId: string, projectId: string): Promise<boolean> {
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, workspaceId },
+      select: { id: true },
+    });
+    return Boolean(project);
+  },
+
+  async listProjectDepartmentIds(workspaceId: string, projectId: string): Promise<string[]> {
+    const rows = await prisma.projectDepartment.findMany({
+      where: { workspaceId, projectId },
+      select: { departmentId: true },
+      orderBy: { departmentId: 'asc' },
+    });
+    return rows.map((row) => row.departmentId);
+  },
+
+  async setProjectDepartments(
+    workspaceId: string,
+    projectId: string,
+    departmentIds: string[],
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.projectDepartment.deleteMany({ where: { workspaceId, projectId } });
+      if (departmentIds.length > 0) {
+        await tx.projectDepartment.createMany({
+          data: departmentIds.map((departmentId) => ({ workspaceId, projectId, departmentId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+  },
+
+  async listProjectAccessUserIds(workspaceId: string, projectId: string): Promise<string[]> {
+    const rows = await prisma.projectAccess.findMany({
+      where: { workspaceId, projectId },
+      select: { userId: true },
+      orderBy: { userId: 'asc' },
+    });
+    return rows.map((row) => row.userId);
+  },
+
+  async setProjectAccess(
+    workspaceId: string,
+    projectId: string,
+    userIds: string[],
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.projectAccess.deleteMany({ where: { workspaceId, projectId } });
+      if (userIds.length > 0) {
+        await tx.projectAccess.createMany({
+          data: userIds.map((userId) => ({ workspaceId, projectId, userId })),
+          skipDuplicates: true,
+        });
+      }
     });
   },
 

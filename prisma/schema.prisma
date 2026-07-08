@@ -213,6 +213,8 @@ model User {
   teamInvitesAccepted                   TeamInvite[]                @relation("TeamInviteAcceptedByUser")
   userRoles                             UserRole[]
   departmentMembers                     DepartmentMember[]
+  ownedProjects                         Project[]                   @relation("ProjectOwner")
+  projectAccess                         ProjectAccess[]
   createdQuotes                         Quote[]                     @relation("QuoteCreatedByUser")
   createdCalendarEvents                 CalendarEvent[]             @relation("CalendarEventCreatedByUser")
   updatedCalendarEvents                 CalendarEvent[]             @relation("CalendarEventUpdatedByUser")
@@ -342,6 +344,9 @@ model Project {
   projectAlerts        ProjectAlert[]
   projectOpportunities ProjectOpportunity[]
   projectTasks         ProjectTask[]
+  ownerUser            User?                 @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  departments          ProjectDepartment[]
+  access               ProjectAccess[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, clientId])
@@ -1004,6 +1009,7 @@ model Department {
   updatedAt   DateTime           @updatedAt
   workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members     DepartmentMember[]
+  projects    ProjectDepartment[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -1014,6 +1020,7 @@ model DepartmentMember {
   workspaceId  String
   departmentId String
   userId       String
+  role         String     @default("member")
   createdAt    DateTime   @default(now())
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -1023,6 +1030,36 @@ model DepartmentMember {
   @@index([workspaceId])
   @@index([userId])
   @@index([departmentId])
+}
+
+model ProjectDepartment {
+  id           String     @id @default(cuid())
+  workspaceId  String
+  projectId    String
+  departmentId String
+  createdAt    DateTime   @default(now())
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, departmentId])
+  @@index([workspaceId])
+  @@index([departmentId])
+  @@index([projectId])
+}
+
+model ProjectAccess {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectId   String
+  userId      String
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([projectId])
 }
 
 model WorkspaceBranding {
