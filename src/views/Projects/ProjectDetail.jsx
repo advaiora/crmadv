@@ -12,6 +12,7 @@ import {
     updateProject,
 } from '../../modules/projects/api/projects.api';
 import { useProject } from '../../modules/projects/hooks/useProjectsQueries';
+import ProjectAccessPanel from '../../modules/projects/ui/detail/ProjectAccessPanel';
 import ProjectDetailsCard from '../../modules/projects/ui/detail/ProjectDetailsCard';
 import ProjectEditForm from '../../modules/projects/ui/detail/ProjectEditForm';
 import ProjectHeader from '../../modules/projects/ui/detail/ProjectHeader';
@@ -254,6 +255,8 @@ const ProjectDetailContent = ({ access, id }) => {
             />
 
             <ProjectChecklistPanel project={project} access={access} />
+
+            <ProjectAccessPanel projectId={project.id} />
 
             <Modal
                 show={showDeleteConfirm}

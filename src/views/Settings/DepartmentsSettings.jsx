@@ -9,6 +9,7 @@ import {
   deleteDepartment,
   getDepartmentMembers,
   listDepartments,
+  setDepartmentMemberRole,
   updateDepartment,
 } from '../../modules/departments/api/departmentsApi';
 
@@ -38,6 +39,7 @@ const DepartmentsSettings = () => {
   const [draftDescription, setDraftDescription] = useState('');
   const [draftUserIds, setDraftUserIds] = useState(() => new Set());
   const [initialUserIds, setInitialUserIds] = useState(() => new Set());
+  const [departmentMembers, setDepartmentMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -89,6 +91,7 @@ const DepartmentsSettings = () => {
       setDraftDescription('');
       setDraftUserIds(new Set());
       setInitialUserIds(new Set());
+      setDepartmentMembers([]);
       return;
     }
     if (!selectedDepartment) {
@@ -111,6 +114,7 @@ const DepartmentsSettings = () => {
         );
         setDraftUserIds(new Set(ids));
         setInitialUserIds(new Set(ids));
+        setDepartmentMembers(result?.members ?? []);
       } catch (error) {
         if (!cancelled) setFormError(error?.message || 'Impossibile caricare i membri del reparto.');
       } finally {
@@ -165,12 +169,26 @@ const DepartmentsSettings = () => {
           await assignDepartmentMembers(selectedDepartment.id, [...draftUserIds]);
         }
         await load();
+        const refreshed = await getDepartmentMembers(selectedDepartment.id);
+        setDepartmentMembers(refreshed?.members ?? []);
         setFlash(`Reparto "${name}" aggiornato.`);
       }
     } catch (error) {
       setFormError(error?.message || 'Salvataggio non riuscito.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onToggleLead = async (userId, makeLead) => {
+    if (!selectedDepartment) return;
+    setFormError('');
+    try {
+      await setDepartmentMemberRole(selectedDepartment.id, userId, makeLead ? 'lead' : 'member');
+      const refreshed = await getDepartmentMembers(selectedDepartment.id);
+      setDepartmentMembers(refreshed?.members ?? []);
+    } catch (error) {
+      setFormError(error?.message || 'Aggiornamento grado non riuscito.');
     }
   };
 
@@ -317,6 +335,33 @@ const DepartmentsSettings = () => {
                             />
                           ))
                         )}
+                      </div>
+                    )}
+
+                    {canManage && departmentMembers.length > 0 && (
+                      <div className="mb-3">
+                        <Form.Label className="small text-muted mb-1">Capi reparto</Form.Label>
+                        <div className="small text-muted mb-2">
+                          Un capo reparto vede tutti i progetti del reparto e ne gestisce gli accessi dei membri.
+                        </div>
+                        {departmentMembers.map((member) => (
+                          <Form.Check
+                            key={`lead-${member.id}`}
+                            type="switch"
+                            id={`lead-${member.id}`}
+                            checked={member.role === 'lead'}
+                            disabled={saving}
+                            onChange={(event) => onToggleLead(member.id, event.target.checked)}
+                            label={
+                              <span>
+                                {member.name || member.email}
+                                {member.role === 'lead' && (
+                                  <Badge bg="primary" className="ms-2">Capo</Badge>
+                                )}
+                              </span>
+                            }
+                          />
+                        ))}
                       </div>
                     )}
 

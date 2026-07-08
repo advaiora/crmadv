@@ -28,3 +28,6 @@ export const deleteDepartment = (departmentId) =>
 
 export const assignDepartmentMembers = (departmentId, userIds) =>
   apiPut(`${departmentsBase()}/${departmentId}/members`, { userIds });
+
+export const setDepartmentMemberRole = (departmentId, userId, role) =>
+  apiPut(`${departmentsBase()}/${departmentId}/members/${userId}/role`, { role });

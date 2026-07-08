@@ -167,6 +167,22 @@ const normalizeProjectPayload = (payload) => {
     return payload;
 };
 
+// Accessi e reparti di un progetto (visibilità pertinente).
+export const getProjectAccess = (projectId) =>
+    projectsFetch(`/projects/${projectId}/access`);
+
+export const setProjectDepartments = (projectId, departmentIds) =>
+    projectsFetch(`/projects/${projectId}/departments`, {
+        method: 'PUT',
+        body: { departmentIds },
+    });
+
+export const setProjectAccess = (projectId, userIds) =>
+    projectsFetch(`/projects/${projectId}/access`, {
+        method: 'PUT',
+        body: { userIds },
+    });
+
 const normalizeCategoryPayload = (payload) => {
     if (!payload || typeof payload !== 'object') {
         return payload;
