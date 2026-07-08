@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { bootstrapRuntime } from './bootstrap/startup.js';
+import { bootstrapPlatformAdmins } from './bootstrap/platform-admin.js';
 import type { RuntimeEnv } from './bootstrap/runtime-env.js';
 
 type DisconnectablePrismaClient = {
@@ -19,6 +20,18 @@ export const startServer = async (): Promise<StartedServer> => {
   const prismaClient = initializePrisma(runtimeEnv.databaseUrl);
   const { createApp } = await import('./app.js');
   const app = createApp();
+
+  // Promuove i Super Admin di piattaforma indicati in PLATFORM_ADMIN_EMAILS.
+  // Non blocca l'avvio in caso di errore (es. DB non pronto): logga e prosegue.
+  try {
+    await bootstrapPlatformAdmins({
+      prisma: prismaClient,
+      emailsRaw: process.env.PLATFORM_ADMIN_EMAILS,
+      logger: app.log,
+    });
+  } catch (error) {
+    app.log.error(error, 'Platform admin bootstrap failed');
+  }
   const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? '';
   const frontendGoogleClientId = process.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? '';
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.trim() ?? '';

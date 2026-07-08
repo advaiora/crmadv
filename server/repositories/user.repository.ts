@@ -5,6 +5,7 @@ const userSelect = {
   email: true,
   name: true,
   role: true,
+  isPlatformAdmin: true,
   themePreference: true,
   avatarUrl: true,
 } as const;
@@ -14,6 +15,7 @@ const loginUserSelect = {
   email: true,
   name: true,
   role: true,
+  isPlatformAdmin: true,
   passwordHash: true,
   vaultPasswordHash: true,
 } as const;
@@ -45,6 +47,14 @@ export const userRepository = {
       where: { email: email.toLowerCase() },
       select: loginUserSelect,
     });
+  },
+
+  async isPlatformAdmin(userId: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isPlatformAdmin: true },
+    });
+    return Boolean(user?.isPlatformAdmin);
   },
 
   updateVaultPasswordHash(userId: string, vaultPasswordHash: string) {

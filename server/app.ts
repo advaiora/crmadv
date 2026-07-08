@@ -30,6 +30,7 @@ import workspaceTeamRoute from "./modules/team/routes/workspace-team.route.js";
 import workspaceVaultRoute from "./modules/vault/routes/workspace-vault.route.js";
 import workspaceAgencyRoute from "./modules/agency-os/routes/workspace-agency.route.js";
 import workspaceWebAssetsRoute from "./routes/workspace-web-assets.route.js";
+import adminRoute from "./routes/admin.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
 const DEV_DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
@@ -351,6 +352,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceChecklistsRoute);
   void app.register(workspaceChecklistInstancesRoute);
   void app.register(workspaceProjectsRoute);
+  void app.register(adminRoute);
 
   app.get("/health", async (_request, reply) => {
     try {

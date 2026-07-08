@@ -2,7 +2,25 @@ import type { FastifyRequest } from 'fastify';
 import { readHeaderValue } from '../auth/devAuth.js';
 import { badRequest, forbidden, notFound } from '../core/errors.js';
 import { membershipRepository } from '../repositories/membership.repository.js';
+import { userRepository } from '../repositories/user.repository.js';
 import { workspaceRepository } from '../repositories/workspace.repository.js';
+
+// Blocca l'accesso ai membri di un workspace sospeso; i Super Admin di piattaforma
+// restano esenti. La verifica del flag avviene solo se il workspace e' sospeso,
+// per non appesantire il percorso comune.
+const assertWorkspaceNotSuspended = async (
+  workspace: { id: string; status: string },
+  userId: string,
+) => {
+  if (workspace.status !== 'SUSPENDED') {
+    return;
+  }
+
+  const isPlatformAdmin = await userRepository.isPlatformAdmin(userId);
+  if (!isPlatformAdmin) {
+    throw forbidden('Workspace sospeso', { workspaceId: workspace.id });
+  }
+};
 
 export const requireWorkspace = async (request: FastifyRequest, userId: string) => {
   const workspaceId = readHeaderValue(request, 'x-workspace-id');
@@ -28,6 +46,8 @@ export const requireWorkspace = async (request: FastifyRequest, userId: string) 
       workspaceId: workspace.id,
     });
   }
+
+  await assertWorkspaceNotSuspended(workspace, userId);
 
   return workspace;
 };
@@ -69,6 +89,8 @@ export const requireWorkspaceFromParams = async (
       workspaceId: workspace.id,
     });
   }
+
+  await assertWorkspaceNotSuspended(workspace, userId);
 
   return workspace;
 };

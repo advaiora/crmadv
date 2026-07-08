@@ -54,3 +54,6 @@ export const hasPermission = (access, permissionKey) => {
 
     return access.permissions.includes(permissionKey);
 };
+
+// Super Admin di piattaforma: identita' globale sopra i workspace (non un permesso).
+export const isPlatformAdmin = (access) => Boolean(access?.user?.isPlatformAdmin);

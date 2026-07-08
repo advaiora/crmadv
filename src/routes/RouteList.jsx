@@ -50,6 +50,7 @@ import ResponsiveQAPage from "../views/Settings/ResponsiveQA";
 import ShortcutsSettings from "../views/Settings/ShortcutsSettings";
 import RolesSettings from "../views/Settings/RolesSettings";
 import DepartmentsSettings from "../views/Settings/DepartmentsSettings";
+import PlatformConsole from "../views/Settings/PlatformConsole";
 import AuditPage from "../views/Audit";
 //Auth
 import Login from "../views/Authentication/LogIn/Login/Login";
@@ -122,6 +123,7 @@ export const routes = [
     { path: 'settings/shortcuts', exact: true, component: ShortcutsSettings },
     { path: 'settings/roles', exact: true, component: RolesSettings },
     { path: 'settings/departments', exact: true, component: DepartmentsSettings },
+    { path: 'settings/platform-console', exact: true, component: PlatformConsole },
     { path: 'settings/responsive-qa', exact: true, component: ResponsiveQAPage },
     { path: 'audit', exact: true, component: AuditPage },
     //Error

@@ -4,6 +4,7 @@ const workspaceSelect = {
   id: true,
   name: true,
   slug: true,
+  status: true,
 } as const;
 
 export const workspaceRepository = {

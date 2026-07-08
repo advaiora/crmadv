@@ -32,7 +32,7 @@ Legenda stato:
 | Requisito Brief | Stato | Realtà nel codice | Intervento |
 |---|:---:|---|---|
 | Architettura multi-tenant pura (workspace isolati) | ✅ | `Workspace` + `workspaceId` ovunque, query workspace-scoped lato server | Mantenere |
-| **Super Admin: dashboard globale** per creare/sospendere/configurare workspace | ❌ | "Superadmin" esiste solo **dentro** un workspace; non c'è console cross-workspace; i workspace nascono da seed | Costruire **console Super Admin globale** + provisioning workspace |
+| **Super Admin: dashboard globale** per creare/sospendere/configurare workspace | 🟡 | **Fase 4a FATTA:** identità Super Admin di piattaforma (`User.isPlatformAdmin`, bootstrap da `PLATFORM_ADMIN_EMAILS`), console `/settings/platform-console`, provisioning workspace (crea/rinomina/sospendi/riattiva) + promozione admin. **Resta 4b:** log costi AI e vista config API globale | Fase 4b: tabella costi AI + aggregazione config API |
 | Ruoli custom granulari **"Discord-style"** | 🟡 | RBAC completo (`Role`/`Permission`/`RolePermission`) e catalogo permessi `{module}.{action}` già presente lato backend; manca UI builder e granularità "a spunta" | UI editor ruoli + permessi fine-grained |
 | **Vincoli gerarchici** (es. dipendente non fissa appuntamenti al capo reparto — "Source constraint") | ❌ | Nessuna business-logic gerarchica | Modellare gerarchia ruoli + regole di azione |
 | Personalizzazione utente (tema, colori, foto profilo) | 🟡 | Pagina `Profiles` ereditata dal template, non cablata ai dati | Wiring preferenze utente persistenti |
@@ -171,6 +171,8 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 **Obiettivo:** governance multi-tenant completa e organizzazione per reparti.
 **Contenuto:**
 - **Console Super Admin globale**: creazione/sospensione/configurazione workspace, log costi AI, config API.
+  - **Fase 4a — FATTA (8 luglio 2026):** identità Super Admin di piattaforma sopra i workspace (`User.isPlatformAdmin`, promossa all'avvio dalle email in `PLATFORM_ADMIN_EMAILS`, poi promozione/rimozione dalla console), nuovo guard `requirePlatformAdmin`, API `/admin/*` cross-workspace, pagina `src/views/Settings/PlatformConsole.jsx` (menu "Piattaforma" → "Console piattaforma", visibile solo ai platform admin). Un workspace **sospeso** blocca login/accesso dei suoi membri (i platform admin restano esenti). Migrazione `20260708133751_platform_admin_workspace_status`.
+  - **Fase 4b — DA FARE:** log costi AI (serve una tabella di tracciamento costi, oggi il costo è calcolato al volo e non salvato) e vista globale della config API (oggi per-workspace in `AgencyRuntimeSetting`).
 - **Editor ruoli "Discord-style"** (UI granulare su permessi già esistenti) + **vincoli gerarchici** (Source constraint sugli appuntamenti).
 - Modello **Reparti** (Web, Marketing, Social, Grafica, Laboratorio) + appartenenza.
 - **Visibilità pertinente** per assegnazione/reparto (dashboard "pulite"), con **gerarchia di reparto** (Capo Reparto vs sottoposti): il sottoposto vede di default solo i progetti a lui assegnati; il Capo Reparto vede tutti i progetti del proprio reparto e ne gestisce gli accessi dei sottoposti. Progetti senza reparto: gestibili solo da Capi Reparto e ruoli superiori, visibili solo agli utenti assegnati.

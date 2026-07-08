@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { HttpError, badRequest, conflict, isHttpError, internalServerError, unauthorized } from '../core/errors.js';
+import { HttpError, badRequest, conflict, forbidden, isHttpError, internalServerError, unauthorized } from '../core/errors.js';
 import { ok } from '../core/response.js';
 import { extractBearerToken, signAccessToken, verifyAccessToken } from '../auth/jwt.js';
 import {
@@ -41,6 +41,7 @@ const workspaceSelect = {
   id: true,
   name: true,
   slug: true,
+  status: true,
 } as const;
 
 const userWithCreatedAtSelect = {
@@ -601,6 +602,7 @@ type MembershipRecord = {
     id: string;
     name: string;
     slug: string;
+    status: string;
   };
 };
 
@@ -651,6 +653,7 @@ const createSessionPayload = async ({
     email: string;
     name: string | null;
     role: string;
+    isPlatformAdmin?: boolean;
   };
   workspace: {
     id: string;
@@ -679,6 +682,7 @@ const createSessionPayload = async ({
       email: user.email,
       name: user.name,
       role: user.role,
+      isPlatformAdmin: Boolean(user.isPlatformAdmin),
     },
     workspace,
     branding,
@@ -803,6 +807,10 @@ const authRoute: FastifyPluginAsync = async (app) => {
       const activeMembership = pickActiveMembership(memberships);
       if (!activeMembership) {
         throw unauthorized('Credenziali non valide');
+      }
+
+      if (activeMembership.workspace.status === 'SUSPENDED' && !user.isPlatformAdmin) {
+        throw forbidden('Questo workspace è stato sospeso. Contatta un amministratore di piattaforma.');
       }
 
       const repairedRole = await prisma.$transaction((tx) =>
@@ -1280,6 +1288,10 @@ const authRoute: FastifyPluginAsync = async (app) => {
       throw unauthorized('Sessione non valida');
     }
 
+    if (activeMembership.workspace.status === 'SUSPENDED' && !user.isPlatformAdmin) {
+      throw forbidden('Questo workspace è stato sospeso. Contatta un amministratore di piattaforma.');
+    }
+
     const repairedRole = await prisma.$transaction((tx) =>
       ensureWorkspaceAccessDefaults({
         tx,
@@ -1331,6 +1343,7 @@ const authRoute: FastifyPluginAsync = async (app) => {
         email: user.email,
         name: user.name,
         role: effectiveUserRole,
+        isPlatformAdmin: Boolean(user.isPlatformAdmin),
         themePreference: user.themePreference ?? null,
         avatarUrl: user.avatarUrl ?? null,
       },

@@ -9,7 +9,7 @@ import { SidebarMenu } from './SidebarMenu';
 import classNames from 'classnames';
 import { useWindowWidth } from '@react-hook/window-size';
 import { useWorkspaceAccess } from '../../hooks/useWorkspaceAccess';
-import { hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
+import { hasModuleEnabled, hasPermission, isPlatformAdmin } from '../../utils/workspaceAccess';
 
 const isExternalPath = (path) => typeof path === 'string' && /^https?:\/\//i.test(path);
 
@@ -91,6 +91,10 @@ const getActiveMenuState = (groups, currentPath) => {
 };
 
 const canRenderMenuEntry = (entry, access) => {
+    if (entry.requirePlatformAdmin && !isPlatformAdmin(access)) {
+        return false;
+    }
+
     if (entry.requiredModule && !hasModuleEnabled(access, entry.requiredModule)) {
         return false;
     }
