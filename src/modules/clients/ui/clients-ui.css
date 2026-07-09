@@ -442,6 +442,21 @@
   background-color: rgb(var(--row-hover) / 0.72);
 }
 
+/* Riga/card cliccabile: apre la scheda cliente cliccando ovunque tranne che
+   sugli elementi interattivi interni (menu, pulsanti, link). */
+.clients-row-clickable {
+  cursor: pointer;
+}
+
+.clients-row-clickable:focus-visible {
+  outline: 2px solid rgb(var(--ring) / 0.9);
+  outline-offset: -2px;
+}
+
+.clients-mobile-card.clients-row-clickable:hover {
+  background-color: rgb(var(--row-hover) / 0.72);
+}
+
 .clients-cell-actions {
   display: flex;
   justify-content: flex-end;

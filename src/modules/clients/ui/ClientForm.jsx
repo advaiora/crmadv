@@ -19,6 +19,7 @@ import {
 import { CLIENTS_PRESET_TAGS } from './constants';
 import { getClientNameLabel, getTagBadgeStyle } from './helpers';
 import { validateAndNormalizePhone } from '../../../../core/utils/phone';
+import { listCustomFields } from '../../customFields/api/customFieldsApi';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_ERROR_MESSAGE = 'Inserisci una email valida.';
@@ -40,6 +41,7 @@ const createDefaultFormValues = () => ({
     },
     notes: '',
     tags: [],
+    customFields: {},
 });
 
 export const mapClientToFormValues = (client) => {
@@ -63,6 +65,7 @@ export const mapClientToFormValues = (client) => {
         },
         notes: client.notes || '',
         tags: Array.isArray(client.tags) ? client.tags.filter(Boolean) : [],
+        customFields: client.customFields && typeof client.customFields === 'object' ? client.customFields : {},
     };
 };
 
@@ -117,6 +120,42 @@ const ClientForm = ({
     const [emailTouched, setEmailTouched] = useState(false);
     const [phoneTouched, setPhoneTouched] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
+    const [customDefs, setCustomDefs] = useState([]);
+
+    useEffect(() => {
+        let active = true;
+        listCustomFields('client')
+            .then((result) => {
+                if (!active) {
+                    return;
+                }
+                // Solo i campi attivi vengono mostrati nella scheda cliente.
+                setCustomDefs((result?.definitions ?? []).filter((definition) => definition.active));
+            })
+            .catch(() => {
+                if (active) {
+                    setCustomDefs([]);
+                }
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    const updateCustomField = (key, value) => {
+        setFormValues((prev) => ({
+            ...prev,
+            customFields: { ...(prev.customFields || {}), [key]: value },
+        }));
+        setErrors((prev) => {
+            if (!prev[`cf:${key}`]) {
+                return prev;
+            }
+            const next = { ...prev };
+            delete next[`cf:${key}`];
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (!initialValues) {
@@ -247,6 +286,20 @@ const ClientForm = ({
         setSubmitAttempted(true);
 
         const validationErrors = validateForm(formValues, phoneValidation);
+
+        // Validazione dei campi personalizzati obbligatori (il server la ripete comunque).
+        const currentCustom = formValues.customFields || {};
+        customDefs.forEach((definition) => {
+            if (!definition.required) {
+                return;
+            }
+            const value = currentCustom[definition.key];
+            const isEmpty = value === undefined || value === null || value === '' || value === false;
+            if (isEmpty) {
+                validationErrors[`cf:${definition.key}`] = 'Questo campo è obbligatorio.';
+            }
+        });
+
         setErrors(validationErrors);
         if (Object.keys(validationErrors).length > 0) {
             return;
@@ -268,6 +321,7 @@ const ClientForm = ({
                 province: normalizeOptional(formValues.address.province),
                 country: normalizeOptional(formValues.address.country),
             },
+            customFields: currentCustom,
         };
 
         await onSubmit(payload);
@@ -643,6 +697,89 @@ const ClientForm = ({
                     )}
                 </Card.Body>
             </Card>
+
+            {customDefs.length > 0 && (
+                <Card className="clients-form-section card-border mb-3">
+                    <Card.Header className="clients-form-section-header py-3">
+                        <h6 className="mb-0">Sezione 7 - Campi personalizzati</h6>
+                    </Card.Header>
+                    <Card.Body>
+                        <Row className="g-3">
+                            {customDefs.map((definition) => {
+                                const rawValue = formValues.customFields?.[definition.key];
+                                const fieldError = errors[`cf:${definition.key}`];
+                                const label = (
+                                    <Form.Label>
+                                        {definition.label}
+                                        {definition.required && <span className="text-danger ms-1">*</span>}
+                                    </Form.Label>
+                                );
+
+                                if (definition.type === 'boolean') {
+                                    return (
+                                        <Col md={6} key={definition.id}>
+                                            <Form.Group>
+                                                {label}
+                                                <Form.Check
+                                                    type="switch"
+                                                    id={`cf-${definition.key}`}
+                                                    label={rawValue ? 'Sì' : 'No'}
+                                                    checked={Boolean(rawValue)}
+                                                    onChange={(event) => updateCustomField(definition.key, event.target.checked)}
+                                                    disabled={loading}
+                                                />
+                                            </Form.Group>
+                                        </Col>
+                                    );
+                                }
+
+                                return (
+                                    <Col md={6} key={definition.id}>
+                                        <Form.Group>
+                                            {label}
+                                            {definition.type === 'select' ? (
+                                                <Form.Select
+                                                    value={rawValue ?? ''}
+                                                    onChange={(event) => updateCustomField(definition.key, event.target.value)}
+                                                    isInvalid={Boolean(fieldError)}
+                                                    disabled={loading}
+                                                >
+                                                    <option value="">— Seleziona —</option>
+                                                    {(definition.options || []).map((option) => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label || option.value}
+                                                        </option>
+                                                    ))}
+                                                </Form.Select>
+                                            ) : definition.type === 'textarea' ? (
+                                                <Form.Control
+                                                    as="textarea"
+                                                    rows={3}
+                                                    value={rawValue ?? ''}
+                                                    onChange={(event) => updateCustomField(definition.key, event.target.value)}
+                                                    isInvalid={Boolean(fieldError)}
+                                                    disabled={loading}
+                                                />
+                                            ) : (
+                                                <Form.Control
+                                                    type={definition.type === 'number' ? 'number' : definition.type === 'date' ? 'date' : 'text'}
+                                                    value={rawValue ?? ''}
+                                                    onChange={(event) => updateCustomField(definition.key, event.target.value)}
+                                                    isInvalid={Boolean(fieldError)}
+                                                    disabled={loading}
+                                                />
+                                            )}
+                                            <Form.Control.Feedback type="invalid" className={fieldError ? 'd-block' : ''}>
+                                                {fieldError}
+                                            </Form.Control.Feedback>
+                                        </Form.Group>
+                                    </Col>
+                                );
+                            })}
+                        </Row>
+                    </Card.Body>
+                </Card>
+            )}
 
             <div className="clients-form-actions d-flex flex-wrap align-items-center gap-2">
                 <Button type="submit" disabled={loading}>

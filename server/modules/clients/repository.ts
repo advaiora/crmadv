@@ -36,6 +36,7 @@ type CreateClientInput = {
   country: string | null;
   notes: string | null;
   tags: string[];
+  customFields?: Prisma.InputJsonValue;
 };
 
 type UpdateClientInput = Partial<CreateClientInput>;
@@ -56,6 +57,7 @@ const clientSelect = {
   country: true,
   notes: true,
   tags: true,
+  customFields: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -259,6 +261,7 @@ export const clientsRepository = {
         country: input.country,
         notes: input.notes,
         tags: input.tags,
+        customFields: input.customFields ?? {},
       },
       select: clientSelect,
     });

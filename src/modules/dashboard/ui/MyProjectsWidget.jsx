@@ -5,6 +5,7 @@ import { Button } from '../../../components/ui/button';
 import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 import { formatDateTime } from './formatters';
+import { rowActivationProps } from '../../../utils/rowActivation';
 
 const RowSkeleton = () => (
   <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
@@ -41,7 +42,12 @@ const MyProjectsWidget = ({ title = 'My projects', data, loading = false }) => {
       {!loading && items.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {items.map((item, index) => (
-            <div key={`${item.id || item.href || 'project'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
+            <div
+              key={`${item.id || item.href || 'project'}-${index}`}
+              className={`rounded-xl px-3 py-3 transition-colors hover:bg-hover${item.href ? ' row-clickable' : ''}`}
+              aria-label={item.href ? `Apri ${item.name}` : undefined}
+              {...(item.href ? rowActivationProps(() => window.location.assign(item.href)) : {})}
+            >
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">{item.name}</span>
                 <Badge variant="outline">{item.stage}</Badge>

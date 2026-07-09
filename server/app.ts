@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { audit } from "./audit/audit.js";
 import { readHeaderValue } from "./auth/devAuth.js";
 import { isHttpError } from "./core/errors.js";
+import { requestContext } from "./core/request-context.js";
 import { fail, ok } from "./core/response.js";
 import { requireAuth } from "./guards/requireAuth.js";
 import { requireModuleEnabled } from "./guards/requireModule.js";
@@ -17,6 +18,7 @@ import workspaceModulesRoute from "./routes/workspace-modules.route.js";
 import workspaceRolesRoute from "./routes/workspace-roles.route.js";
 import workspaceDepartmentsRoute from "./routes/workspace-departments.route.js";
 import clientsRoute from "./modules/clients/routes.js";
+import customFieldsRoute from "./modules/custom-fields/custom-fields.route.js";
 import workspaceChecklistsRoute from "./modules/checklists/routes/workspace-checklists.route.js";
 import workspaceChecklistInstancesRoute from "./modules/checklists/routes/workspace-checklist-instances.route.js";
 import workspaceProjectsRoute from "./modules/projects/routes/workspace-projects.route.js";
@@ -193,6 +195,10 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   }
 
   app.addHook("onRequest", async (request, reply) => {
+    // Apre lo store di contesto per questa richiesta: l'autenticazione vi scriverà
+    // lo userId, che i livelli profondi (es. log costi AI) potranno leggere.
+    requestContext.start();
+
     const requestOriginRaw = typeof request.headers.origin === "string" ? request.headers.origin : null;
     const corsDecision = buildCorsDecision(requestOriginRaw, corsAllowedOriginsSet);
     const isGoogleAuthRoute = request.url.startsWith("/auth/google");
@@ -349,6 +355,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceRolesRoute);
   void app.register(workspaceDepartmentsRoute);
   void app.register(clientsRoute);
+  void app.register(customFieldsRoute);
   void app.register(workspaceChecklistsRoute);
   void app.register(workspaceChecklistInstancesRoute);
   void app.register(workspaceProjectsRoute);

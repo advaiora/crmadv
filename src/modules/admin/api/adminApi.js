@@ -31,6 +31,12 @@ export const promotePlatformAdmin = (userId) =>
 export const demotePlatformAdmin = (userId) =>
   apiDelete(`/admin/platform-admins/${userId}`);
 
-export const getAiUsage = (days = 30) => apiGet(`/admin/ai-usage?days=${days}`);
+export const getAiUsage = ({ days = 30, userId, model, functionName } = {}) => {
+  const params = new URLSearchParams({ days: String(days) });
+  if (userId) params.set('userId', userId);
+  if (model) params.set('model', model);
+  if (functionName) params.set('functionName', functionName);
+  return apiGet(`/admin/ai-usage?${params.toString()}`);
+};
 
 export const getAiConfig = () => apiGet('/admin/ai-config');

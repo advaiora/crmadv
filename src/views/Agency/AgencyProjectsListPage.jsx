@@ -1,10 +1,11 @@
 import React from "react";
 import { Alert, Badge, Button, Spinner, Table } from "react-bootstrap";
-import { Link } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
 import { getAgencyProjects } from "../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../modules/agency-os/data/agencyDataSource";
 import AgencyPageShell from "./AgencyPageShell";
 import AgencyDataSourceBadge from "./AgencyDataSourceBadge";
+import { rowActivationProps } from "../../utils/rowActivation";
 
 const PROJECT_TYPE_LABEL_FALLBACK = "Non definito";
 
@@ -63,6 +64,7 @@ const toPriorityLabel = (value) => {
 };
 
 const AgencyProjectsListPage = () => {
+  const history = useHistory();
   const [projects, setProjects] = React.useState([]);
   const [dataMeta, setDataMeta] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -176,7 +178,15 @@ const AgencyProjectsListPage = () => {
                   : [];
 
                 return (
-                  <tr key={project.id}>
+                  <tr
+                    key={project.id}
+                    className="row-clickable"
+                    aria-label={`Apri progetto ${project.name || ""}`}
+                    {...rowActivationProps(() =>
+                      history.push(`/agency/projects/${encodeURIComponent(project.id)}/overview`),
+                      { role: "row" },
+                    )}
+                  >
                     <td>
                       <div className="fw-semibold">{project.name || "Progetto senza nome"}</div>
                       <div className="small text-muted">{project.goal || "Goal non ancora definito"}</div>

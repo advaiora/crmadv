@@ -11,6 +11,7 @@ import { Button } from '../../../components/ui/button';
 import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 import { formatDateTime } from './formatters';
+import { rowActivationProps } from '../../../utils/rowActivation';
 
 const severityVariant = {
   high: 'destructive',
@@ -65,7 +66,9 @@ const UrgentList = ({ title = 'Needs attention', items = [], loading = false }) 
           return (
             <div
               key={`${item.type}-${item.href}-${index}`}
-              className="group flex items-start justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-hover"
+              className={`group flex items-start justify-between gap-3 rounded-xl px-3 py-3 transition-colors hover:bg-hover${item.href ? ' row-clickable' : ''}`}
+              aria-label={item.href ? `Apri ${item.title}` : undefined}
+              {...(item.href ? rowActivationProps(() => window.location.assign(item.href)) : {})}
             >
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">

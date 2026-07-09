@@ -6,6 +6,7 @@ import {
   Card,
   Col,
   Form,
+  Modal,
   Row,
   Spinner,
   Table,
@@ -721,7 +722,21 @@ const WebAssetsPage = () => {
     });
   };
 
+  // Chiude il pannello di dettaglio e azzera lo stato collegato.
+  const closeDetail = useCallback(() => {
+    setSelectedAsset(null);
+    setVersions([]);
+    setCompareSelection({ leftVersionId: '', rightVersionId: '' });
+    setCompareResult(null);
+    setVersionMessage('');
+  }, []);
+
   const handleViewAsset = async (item) => {
+    // Secondo click sulla stessa riga: chiude il pannello (toggle).
+    if (selectedAsset?.id === item.id) {
+      closeDetail();
+      return;
+    }
     setSelectedAsset(item);
     setDetailSection('overview');
     setVersionMessage('');
@@ -1500,6 +1515,38 @@ const WebAssetsPage = () => {
                     </div>
                   </div>
 
+                  {(filters.clientId || filters.projectId) && (
+                    <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                      <span className="small text-muted">Filtri attivi:</span>
+                      {filters.clientId && (
+                        <span className="badge text-bg-light border d-inline-flex align-items-center gap-1">
+                          Cliente: {clients.find((entry) => entry.id === filters.clientId)?.name || filters.clientId}
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-reset lh-1 d-inline-flex"
+                            aria-label="Rimuovi filtro cliente"
+                            onClick={() => applyQuickFilter('clientId', '')}
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      )}
+                      {filters.projectId && (
+                        <span className="badge text-bg-light border d-inline-flex align-items-center gap-1">
+                          Progetto: {filterProjectOptions.find((entry) => entry.id === filters.projectId)?.name || filters.projectId}
+                          <button
+                            type="button"
+                            className="btn btn-link btn-sm p-0 text-reset lh-1 d-inline-flex"
+                            aria-label="Rimuovi filtro progetto"
+                            onClick={() => applyQuickFilter('projectId', '')}
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <Table responsive hover className="web-assets-table">
                     <thead>
                       <tr>
@@ -1663,8 +1710,23 @@ const WebAssetsPage = () => {
                 </Card.Body>
               </Card>
 
+              <Modal
+                show={Boolean(selectedAsset)}
+                onHide={closeDetail}
+                size="xl"
+                scrollable
+                fullscreen="lg-down"
+                dialogClassName="web-assets-detail-modal"
+                aria-labelledby="web-asset-detail-title"
+              >
+                <Modal.Header closeButton>
+                  <Modal.Title id="web-asset-detail-title" className="h6 mb-0">
+                    {selectedAsset ? `Dettaglio: ${selectedAsset.name}` : 'Dettaglio asset'}
+                  </Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
               {selectedAsset && (
-                <Card className="card-border mt-3">
+                <Card className="card-border">
                   <Card.Body className="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                     <div>
                       <div className="small text-muted mb-1">Asset selezionato</div>
@@ -2272,6 +2334,8 @@ const WebAssetsPage = () => {
                   </Card.Body>
                 </Card>
               )}
+                </Modal.Body>
+              </Modal>
 
               {canAuditView && showAuditPanel && (
                 <Card className="card-border mt-3">

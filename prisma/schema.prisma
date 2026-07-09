@@ -35,6 +35,17 @@ enum ClientType {
   company
 }
 
+// Tipo di un campo personalizzato (Custom Fields, V3). Determina come si
+// renderizza nel form e come si valida il valore.
+enum CustomFieldType {
+  text
+  textarea
+  number
+  date
+  boolean
+  select
+}
+
 enum MembershipStatus {
   ACTIVE
   INACTIVE
@@ -158,6 +169,7 @@ model Workspace {
   memberships                Membership[]
   teamInvites                TeamInvite[]
   clients                    Client[]
+  customFieldDefinitions     CustomFieldDefinition[]
   workspaceModules           WorkspaceModule[]
   roles                      Role[]
   userRoles                  UserRole[]
@@ -247,6 +259,7 @@ model User {
   assignedChecklistItems                ChecklistInstanceItem[]     @relation("ChecklistItemAssignedToUser")
   assignedChecklistItemsBy              ChecklistInstanceItem[]     @relation("ChecklistItemAssignedByUser")
   defaultAssignedChecklistTemplateItems ChecklistTemplateItem[]     @relation("ChecklistTemplateItemDefaultAssignedToUser")
+  aiUsageLogs                           AiUsageLog[]
 }
 
 model TeamInvite {
@@ -303,6 +316,9 @@ model Client {
   country         String?
   notes           String?
   tags            String[]         @default([])
+  // Valori dei campi personalizzati del workspace, mappa { chiaveCampo: valore }.
+  // Le definizioni dei campi stanno in CustomFieldDefinition (V3).
+  customFields    Json             @default("{}")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -318,6 +334,29 @@ model Client {
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
   @@index([workspaceId, updatedAt])
+}
+
+// Definizione di un campo personalizzato per workspace (Custom Fields, V3).
+// I valori compilati stanno nella colonna JSON dell'entità (es. Client.customFields),
+// mappati per `key`. Per ora l'unica entità supportata è "client".
+model CustomFieldDefinition {
+  id          String          @id @default(cuid())
+  workspaceId String
+  entity      String          @default("client") @db.VarChar(40)
+  key         String          @db.VarChar(60)
+  label       String          @db.VarChar(120)
+  type        CustomFieldType @default(text)
+  // Per i campi "select": array JSON di opzioni [{ value, label }].
+  options     Json?
+  required    Boolean         @default(false)
+  order       Int             @default(0)
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, entity, key])
+  @@index([workspaceId, entity, order])
 }
 
 model Project {
@@ -510,6 +549,7 @@ model AgencyRuntimeSetting {
 model AiUsageLog {
   id           String    @id @default(cuid())
   workspaceId  String
+  userId       String?
   functionName String    @db.VarChar(120)
   model        String    @db.VarChar(120)
   inputTokens  Int       @default(0)
@@ -519,8 +559,10 @@ model AiUsageLog {
   status       String    @db.VarChar(30)
   createdAt    DateTime  @default(now())
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
+  @@index([userId, createdAt])
   @@index([createdAt])
 }
 

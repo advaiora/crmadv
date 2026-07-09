@@ -1,5 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import { unauthorized } from '../core/errors.js';
+import { requestContext } from '../core/request-context.js';
 import { extractBearerToken, type AccessTokenClaims, verifyAccessToken } from '../auth/jwt.js';
 import { userRepository } from '../repositories/user.repository.js';
 
@@ -25,6 +26,10 @@ export const requireAuthIdentity = async (request: FastifyRequest): Promise<Auth
   if (!user) {
     throw unauthorized('Authenticated user was not found');
   }
+
+  // Registra l'utente autenticato nel contesto di richiesta: così i livelli
+  // profondi (es. log costi AI) sanno chi ha avviato l'azione senza propagazioni.
+  requestContext.setUserId(user.id);
 
   return {
     user,

@@ -1381,6 +1381,39 @@ canvas {
   padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
+/* Barra di sottoschede in cima al modulo (sostituisce le sottosezioni del menu
+   a tendina). Colori dai token Bootstrap (Nav pills); qui solo spaziatura e
+   scorrimento orizzontale su schermi stretti. */
+.module-tabs-bar {
+  padding-top: 1.25rem;
+}
+
+.module-tabs-bar .module-tabs-nav {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.module-tabs-bar .module-tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* Riga/card cliccabile verso la pagina di dettaglio collegata (pattern globale).
+   Gli elementi interattivi interni (pulsanti, link, menu) restano gestiti a sé:
+   la navigazione di riga li ignora via utils/rowActivation. */
+.row-clickable {
+  cursor: pointer;
+}
+
+.row-clickable:focus-visible {
+  outline: 2px solid rgb(var(--ring) / 0.9);
+  outline-offset: -2px;
+}
+
+tr.row-clickable:hover,
+.row-clickable-hover:hover {
+  background-color: rgb(var(--row-hover) / 0.55);
+}
+
 .app-shell-no-footer-gap {
   padding-bottom: 0;
 }

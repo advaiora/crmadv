@@ -1,5 +1,6 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
+import { rowActivationProps } from "../../../utils/rowActivation";
 import {
   formatOpportunityLabel,
   getOpportunityBadgeClass,
@@ -14,6 +15,7 @@ const AgencyOpportunityList = ({
   groupBy = "type",
   showProjectLink = false,
 }) => {
+  const history = useHistory();
   const grouped = React.useMemo(() => {
     if (groupBy === "none") {
       return [
@@ -47,8 +49,17 @@ const AgencyOpportunityList = ({
             </div>
           )}
 
-          {group.items.map((entry) => (
-            <div key={entry.id} className="border rounded-3 p-3">
+          {group.items.map((entry) => {
+            const projectHref = showProjectLink && entry.projectId
+              ? `/agency/projects/${encodeURIComponent(entry.projectId)}/opportunities`
+              : null;
+            return (
+            <div
+              key={entry.id}
+              className={`border rounded-3 p-3${projectHref ? " row-clickable row-clickable-hover" : ""}`}
+              aria-label={projectHref ? `Vai al progetto di ${entry.title}` : undefined}
+              {...(projectHref ? rowActivationProps(() => history.push(projectHref)) : {})}
+            >
               <div className="d-flex flex-column gap-2">
                 <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
                   <div>
@@ -103,7 +114,8 @@ const AgencyOpportunityList = ({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ))}
     </div>

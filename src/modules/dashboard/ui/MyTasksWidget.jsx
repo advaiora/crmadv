@@ -4,6 +4,7 @@ import { Button } from '../../../components/ui/button';
 import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 import { formatDate } from './formatters';
+import { rowActivationProps } from '../../../utils/rowActivation';
 
 const RowSkeleton = () => (
   <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
@@ -37,7 +38,12 @@ const MyTasksWidget = ({ title = 'My tasks', data, loading = false }) => {
       {!loading && items.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {items.map((item, index) => (
-            <div key={`${item.id || item.href || 'task'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
+            <div
+              key={`${item.id || item.href || 'task'}-${index}`}
+              className={`rounded-xl px-3 py-3 transition-colors hover:bg-hover${item.href ? ' row-clickable' : ''}`}
+              aria-label={item.href ? `Apri ${item.title}` : undefined}
+              {...(item.href ? rowActivationProps(() => window.location.assign(item.href)) : {})}
+            >
               <p className="mb-1 text-sm font-medium">{item.title}</p>
               <p className="mb-2 text-xs text-textMuted">
                 {item.due ? `Scadenza: ${formatDate(item.due)}` : 'Nessuna scadenza'}

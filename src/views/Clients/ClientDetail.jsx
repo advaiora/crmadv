@@ -12,6 +12,7 @@ import { Link, useHistory, useLocation, useParams } from 'react-router-dom';
 import {
     ArrowLeft,
     FolderKanban,
+    ListChecks,
     Mail,
     MapPin,
     Pencil,
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import ClientsModuleGate from '../../modules/clients/ui/ClientsModuleGate';
 import { deleteClient, getClient } from '../../modules/clients/ui/clientApi';
+import { listCustomFields } from '../../modules/customFields/api/customFieldsApi';
 import { CLIENTS_PERMISSIONS } from '../../modules/clients/ui/constants';
 import {
     ClientTypeBadge,
@@ -51,6 +53,53 @@ const ClientDetail = () => {
     const [deleting, setDeleting] = useState(false);
     const [flash, setFlash] = useState(() => location.state?.flash || '');
     const [copiedField, setCopiedField] = useState('');
+    const [customDefs, setCustomDefs] = useState([]);
+
+    useEffect(() => {
+        let active = true;
+        listCustomFields('client')
+            .then((result) => {
+                if (active) {
+                    setCustomDefs((result?.definitions ?? []).filter((definition) => definition.active));
+                }
+            })
+            .catch(() => {
+                if (active) {
+                    setCustomDefs([]);
+                }
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // Valori dei campi personalizzati da mostrare: solo i campi attivi che hanno
+    // un valore salvato sul cliente, con l'etichetta della definizione (e, per i
+    // select, l'etichetta dell'opzione).
+    const customFieldRows = useMemo(() => {
+        const values = client?.customFields;
+        if (!values || typeof values !== 'object') {
+            return [];
+        }
+        return customDefs
+            .map((definition) => {
+                const raw = values[definition.key];
+                if (raw === undefined || raw === null || raw === '') {
+                    return null;
+                }
+                let display;
+                if (definition.type === 'boolean') {
+                    display = raw ? 'Sì' : 'No';
+                } else if (definition.type === 'select') {
+                    const option = (definition.options || []).find((entry) => entry.value === raw);
+                    display = option?.label || String(raw);
+                } else {
+                    display = String(raw);
+                }
+                return { id: definition.id, label: definition.label, display };
+            })
+            .filter(Boolean);
+    }, [client, customDefs]);
 
     const listSearch = location.state?.fromListSearch || '';
     const listPath = useMemo(() => `/apps/clients${listSearch || ''}`, [listSearch]);
@@ -278,6 +327,31 @@ const ClientDetail = () => {
                                                 {addressValue ? addressValue : <span className="text-muted">Non impostato</span>}
                                             </Card.Body>
                                         </Card>
+
+                                        {customDefs.length > 0 && (
+                                            <Card className="card-border mb-3">
+                                                <Card.Header className="bg-transparent">
+                                                    <h6 className="mb-0 d-inline-flex align-items-center gap-2">
+                                                        <ListChecks size={15} />
+                                                        Campi personalizzati
+                                                    </h6>
+                                                </Card.Header>
+                                                <Card.Body>
+                                                    {customFieldRows.length > 0 ? (
+                                                        <ul className="clients-detail-list">
+                                                            {customFieldRows.map((row) => (
+                                                                <li key={row.id}>
+                                                                    <span className="text-muted">{row.label}</span>
+                                                                    <span>{row.display}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : (
+                                                        <span className="text-muted">Non impostato</span>
+                                                    )}
+                                                </Card.Body>
+                                            </Card>
+                                        )}
                                     </div>
 
                                     <div>

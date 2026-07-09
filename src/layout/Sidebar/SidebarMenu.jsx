@@ -75,6 +75,12 @@ export const SidebarMenu = [
             requiredPermission: "clients.create",
             grp_name: "apps",
           },
+          {
+            name: "Campi personalizzati",
+            path: "/apps/clients/custom-fields",
+            requiredPermission: "clients.edit",
+            grp_name: "apps",
+          },
         ],
       },
       {

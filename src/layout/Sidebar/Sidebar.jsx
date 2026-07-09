@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Nav } from 'react-bootstrap';
 import SimpleBar from 'simplebar-react';
 import { connect } from 'react-redux';
@@ -9,136 +9,10 @@ import { SidebarMenu } from './SidebarMenu';
 import classNames from 'classnames';
 import { useWindowWidth } from '@react-hook/window-size';
 import { useWorkspaceAccess } from '../../hooks/useWorkspaceAccess';
-import { hasModuleEnabled, hasPermission, isPlatformAdmin } from '../../utils/workspaceAccess';
-
-const isExternalPath = (path) => typeof path === 'string' && /^https?:\/\//i.test(path);
-
-const isPathActive = (currentPath, targetPath) => {
-    if (!targetPath || isExternalPath(targetPath)) {
-        return false;
-    }
-
-    if (currentPath === targetPath) {
-        return true;
-    }
-
-    return currentPath.startsWith(`${targetPath}/`);
-};
-
-/* Evidenziazione delle sottovoci: NavLink senza `exact` considera attivo ogni
-   link il cui percorso è un PREFISSO della pagina corrente, quindi
-   "/apps/quotes" (Elenco) restava evidenziato anche su "/apps/quotes/new" o
-   "/apps/quotes/templates". Qui la sottovoce è attiva solo sul suo percorso
-   esatto o su un suo sotto-percorso NON coperto da una voce sorella più
-   specifica (così "/apps/quotes/123" accende comunque l'Elenco). */
-const buildChildIsActive = (childPath, siblings = []) => (match, location) => {
-    const currentPath = location.pathname;
-
-    if (currentPath === childPath) {
-        return true;
-    }
-
-    if (!childPath || !currentPath.startsWith(`${childPath}/`)) {
-        return false;
-    }
-
-    return !siblings.some((sibling) => (
-        sibling.path &&
-        sibling.path !== childPath &&
-        (currentPath === sibling.path || currentPath.startsWith(`${sibling.path}/`))
-    ));
-};
-
-const hasActivePath = (items, currentPath) => {
-    if (!Array.isArray(items) || items.length === 0) {
-        return false;
-    }
-
-    return items.some((item) => (
-        isPathActive(currentPath, item.path) ||
-        (Array.isArray(item.childrens) && hasActivePath(item.childrens, currentPath))
-    ));
-};
-
-const getActiveMenuState = (groups, currentPath) => {
-    for (const group of groups) {
-        for (const menu of group.contents) {
-            if (!Array.isArray(menu.childrens)) {
-                continue;
-            }
-
-            const menuMatches = isPathActive(currentPath, menu.path) || hasActivePath(menu.childrens, currentPath);
-            if (!menuMatches) {
-                continue;
-            }
-
-            const subMenu = menu.childrens.find((item) => (
-                Array.isArray(item.childrens) &&
-                (isPathActive(currentPath, item.path) || hasActivePath(item.childrens, currentPath))
-            ));
-
-            return {
-                menuName: menu.name,
-                subMenuName: subMenu?.name,
-            };
-        }
-    }
-
-    return {
-        menuName: undefined,
-        subMenuName: undefined,
-    };
-};
-
-const canRenderMenuEntry = (entry, access) => {
-    if (entry.requirePlatformAdmin && !isPlatformAdmin(access)) {
-        return false;
-    }
-
-    if (entry.requiredModule && !hasModuleEnabled(access, entry.requiredModule)) {
-        return false;
-    }
-
-    if (entry.requiredPermission && !hasPermission(access, entry.requiredPermission)) {
-        return false;
-    }
-
-    return true;
-};
-
-const filterMenuEntries = (entries, access) => {
-    if (!Array.isArray(entries) || entries.length === 0) {
-        return [];
-    }
-
-    return entries.reduce((accumulator, entry) => {
-        if (!canRenderMenuEntry(entry, access)) {
-            return accumulator;
-        }
-
-        const nextEntry = { ...entry };
-        if (Array.isArray(entry.childrens)) {
-            const filteredChildren = filterMenuEntries(entry.childrens, access);
-            if (filteredChildren.length === 0) {
-                if (!entry.path) {
-                    return accumulator;
-                }
-
-                delete nextEntry.childrens;
-            } else {
-                nextEntry.childrens = filteredChildren;
-            }
-        }
-
-        accumulator.push(nextEntry);
-        return accumulator;
-    }, []);
-};
+import { filterMenuEntries, hasActivePath, isExternalPath, isPathActive, resolveMenuLinkPath } from './menuUtils';
 
 const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
 
-    const [activeMenu, setActiveMenu] = useState();
-    const [activeSubMenu, setActiveSubMenu] = useState();
     const menuPanelRef = useRef(null);
 
     const windowWidth = useWindowWidth();
@@ -157,12 +31,6 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
     );
 
     useEffect(() => {
-        const { menuName, subMenuName } = getActiveMenuState(menuGroups, location.pathname);
-        setActiveMenu(menuName);
-        setActiveSubMenu(subMenuName);
-    }, [location.pathname, menuGroups]);
-
-    useEffect(() => {
         if (windowWidth > 1199 || !navCollapsed) {
             return undefined;
         }
@@ -175,6 +43,25 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
 
         window.addEventListener('keydown', closeOnEscape);
         return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [navCollapsed, toggleCollapsedNav, windowWidth]);
+
+    // Desktop: quando il menu è aperto in modalità "fissa" (pieno), un click in
+    // qualunque punto FUORI dal menu lo richiude (torna alla barra mini). Prima
+    // si poteva chiudere solo dal pulsante in alto a destra.
+    useEffect(() => {
+        if (windowWidth <= 1199 || navCollapsed) {
+            return undefined;
+        }
+
+        const handlePointerDown = (event) => {
+            const panel = menuPanelRef.current;
+            if (panel && !panel.contains(event.target)) {
+                toggleCollapsedNav(true);
+            }
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
     }, [navCollapsed, toggleCollapsedNav, windowWidth]);
 
     useEffect(() => {
@@ -225,14 +112,6 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
         }
     };
 
-    const handleMenuToggle = (menuName) => {
-        setActiveMenu((currentMenu) => (currentMenu === menuName ? undefined : menuName));
-    };
-
-    const handleSubMenuToggle = (subMenuName) => {
-        setActiveSubMenu((currentSubMenu) => (currentSubMenu === subMenuName ? undefined : subMenuName));
-    };
-
     const backDropToggle = () => {
         toggleCollapsedNav(!navCollapsed);
     };
@@ -251,99 +130,39 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
                                     {routes.group && <div className="nav-header" >
                                         <span>{routes.group}</span>
                                     </div>}
+                                    {/* Ogni modulo è una singola voce: le sottosezioni sono
+                                        ora tab in cima alla pagina (ModuleTabs), non più nel
+                                        menu a tendina. La voce resta attiva anche sui suoi
+                                        sotto-percorsi (via hasActivePath sulle childrens). */}
                                     {routes.contents.map((menus, idx) => (
                                         <Nav bsPrefix="navbar-nav" className="flex-column" key={idx}>
-                                            <Nav.Item className={classNames({ active: isPathActive(location.pathname, menus.path) || hasActivePath(menus.childrens, location.pathname) })}  >
+                                            <Nav.Item className={classNames({ active: isPathActive(location.pathname, menus.path) || hasActivePath(menus.childrens, location.pathname) })}>
                                                 {
-                                                    menus.childrens
+                                                    isExternalPath(menus.path)
                                                         ?
-                                                        <>
-                                                            <Nav.Link aria-expanded={activeMenu === menus.name ? "true" : "false"} onClick={() => handleMenuToggle(menus.name)} >
-                                                                <span className={classNames("nav-icon-wrap", { "position-relative": menus.iconBadge })}>
-                                                                    {menus.iconBadge && menus.iconBadge}
-                                                                    <span className="svg-icon">
-                                                                        {menus.icon}
-                                                                    </span>
+                                                        <a className="nav-link" href={menus.path} target="_blank" rel="noreferrer" >
+                                                            <span className="nav-icon-wrap">
+                                                                <span className="svg-icon">
+                                                                    {menus.icon}
                                                                 </span>
-                                                                <span className={classNames("nav-link-text", { "position-relative": menus.badgeIndicator })} >
-                                                                    {menus.name}
-                                                                    {menus.badgeIndicator && menus.badgeIndicator}
-                                                                </span>
-                                                                {menus.badge && menus.badge}
-                                                            </Nav.Link>
-
-                                                            <ul id={menus.id} className={classNames("nav flex-column nav-children", { "collapse": activeMenu !== menus.name })}>
-                                                                <li className="nav-item">
-                                                                    <ul className="nav flex-column">
-                                                                        {menus.childrens.map((subMenu, indx) => (
-                                                                            subMenu.childrens
-                                                                                ?
-                                                                                <li className={classNames("nav-item", { active: isPathActive(location.pathname, subMenu.path) || hasActivePath(subMenu.childrens, location.pathname) })} key={indx} >
-                                                                                    <Nav.Link href={`#${subMenu.id}`} className="nav-link" aria-expanded={activeSubMenu === subMenu.name ? "true" : "false"} onClick={(event) => {
-                                                                                        event.preventDefault();
-                                                                                        handleSubMenuToggle(subMenu.name);
-                                                                                    }}>
-                                                                                        <span className="nav-link-text">
-                                                                                            {subMenu.name}
-                                                                                        </span>
-                                                                                    </Nav.Link>
-
-                                                                                    {subMenu.childrens.map((childrenPath, i) => (
-                                                                                        <ul id={subMenu.id} className={classNames("nav flex-column nav-children", { "collapse": activeSubMenu !== subMenu.name })} key={i}>
-                                                                                            <li className="nav-item">
-                                                                                                <ul className="nav flex-column">
-                                                                                                    <li className="nav-item">
-                                                                                                        <Nav.Link as={NavLink} to={childrenPath.path} isActive={buildChildIsActive(childrenPath.path, subMenu.childrens)} onClick={handleLeafClick}>
-                                                                                                            <span className="nav-link-text">
-                                                                                                                {childrenPath.name}
-                                                                                                            </span>
-                                                                                                        </Nav.Link>
-                                                                                                    </li>
-                                                                                                </ul>
-                                                                                            </li>
-                                                                                        </ul>
-                                                                                    ))}
-
-                                                                                </li>
-                                                                                :
-                                                                                <li className="nav-item" key={indx}>
-                                                                                    <Nav.Link as={NavLink} to={subMenu.path} isActive={buildChildIsActive(subMenu.path, menus.childrens)} onClick={handleLeafClick}>
-                                                                                        <span className="nav-link-text">
-                                                                                            {subMenu.name}
-                                                                                        </span>
-                                                                                    </Nav.Link>
-                                                                                </li>
-                                                                        ))}
-                                                                    </ul>
-                                                                </li>
-                                                            </ul>
-                                                        </>
+                                                            </span>
+                                                            <span className="nav-link-text">{menus.name}</span>
+                                                            {menus.badge && menus.badge}
+                                                        </a>
                                                         :
-                                                        <>
-                                                            {
-                                                                isExternalPath(menus.path)
-                                                                    ?
-                                                                    <a className="nav-link" href={menus.path} target="_blank" rel="noreferrer" >
-                                                                        <span className="nav-icon-wrap">
-                                                                            <span className="svg-icon">
-                                                                                {menus.icon}
-                                                                            </span>
-                                                                        </span>
-                                                                        <span className="nav-link-text">{menus.name}</span>
-                                                                        {menus.badge && menus.badge}
-                                                                    </a>
-                                                                    :
-                                                                    <Nav.Link as={NavLink} exact={true} activeClassName="active" to={menus.path} onClick={handleLeafClick} >
-                                                                        <span className="nav-icon-wrap">
-                                                                            <span className="svg-icon">
-                                                                                {menus.icon}
-                                                                            </span>
-                                                                        </span>
-                                                                        <span className="nav-link-text">{menus.name}</span>
-                                                                        {menus.badge && menus.badge}
-                                                                    </Nav.Link>
-                                                            }
-                                                        </>
+                                                        <Nav.Link as={NavLink} activeClassName="active" to={resolveMenuLinkPath(menus)} onClick={handleLeafClick} >
+                                                            <span className={classNames("nav-icon-wrap", { "position-relative": menus.iconBadge })}>
+                                                                {menus.iconBadge && menus.iconBadge}
+                                                                <span className="svg-icon">
+                                                                    {menus.icon}
+                                                                </span>
+                                                            </span>
+                                                            <span className={classNames("nav-link-text", { "position-relative": menus.badgeIndicator })}>
+                                                                {menus.name}
+                                                                {menus.badgeIndicator && menus.badgeIndicator}
+                                                            </span>
+                                                            {menus.badge && menus.badge}
+                                                        </Nav.Link>
                                                 }
                                             </Nav.Item>
                                         </Nav>

@@ -16,6 +16,7 @@ import {
 import QuotesModuleGate from '../../modules/quotes/ui/QuotesModuleGate';
 import { QUOTES_PERMISSIONS } from '../../modules/quotes/ui/constants';
 import { formatDateTime, getApiErrorMessage } from '../../modules/quotes/ui/helpers';
+import { rowActivationProps } from '../../utils/rowActivation';
 import '../../modules/quotes/ui/quotes-ui.css';
 
 const QuoteTemplatesList = () => {
@@ -137,7 +138,15 @@ const QuoteTemplatesList = () => {
                     )}
 
                     {!loading && items.map((template) => (
-                      <tr key={template.id}>
+                      <tr
+                        key={template.id}
+                        className="row-clickable"
+                        aria-label={`Modifica template ${template.name}`}
+                        {...rowActivationProps(
+                          () => history.push(`/apps/quotes/templates/${template.id}/edit`),
+                          { role: 'row' },
+                        )}
+                      >
                         <td className="fw-semibold">{template.name}</td>
                         <td>{template.description || <span className="text-muted">-</span>}</td>
                         <td className="text-center">{template.itemsCount || 0}</td>
@@ -177,7 +186,7 @@ const QuoteTemplatesList = () => {
           <Modal.Title>Elimina template</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          Confermi l'eliminazione del template <strong>{deletingTemplate?.name}</strong>?
+          Confermi l&apos;eliminazione del template <strong>{deletingTemplate?.name}</strong>?
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setDeletingTemplate(null)} disabled={deleting}>

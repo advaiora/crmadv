@@ -10,6 +10,7 @@ import PageFooter from '../../Footer/PageFooter';
 import TopNav from '../../Header/TopNav';
 import MobileBottomNav from '../../Mobile/MobileBottomNav';
 import Sidebar from '../../Sidebar/Sidebar';
+import ModuleTabs from '../../ModuleTabs/ModuleTabs';
 import { useWindowWidth } from '@react-hook/window-size';
 
 const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapsedNav }) => {
@@ -62,6 +63,9 @@ const LayoutClassic = ({ children, navCollapsed, topNavCollapsed, toggleCollapse
             {/* Vertical Nav */}
             <Sidebar />
             <div className={classNames("hk-pg-wrapper app-shell-content", { "app-shell-no-footer-gap": appRoutes })}>
+                {/* Sottoschede del modulo corrente (sostituiscono le sottosezioni
+                    che prima comparivano nel menu a tendina della sidebar). */}
+                <ModuleTabs />
                 {children}
                 {!appRoutes && <PageFooter />}
             </div>

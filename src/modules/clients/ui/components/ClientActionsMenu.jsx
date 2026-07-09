@@ -61,6 +61,7 @@ const ClientActionsMenu = ({
                     className="clients-actions-menu"
                     renderOnMount
                     popperConfig={CLIENTS_ACTIONS_POPPER_CONFIG}
+                    data-row-nav-ignore
                 >
                     <Dropdown.Item
                         onClick={() => onOpen?.(client)}

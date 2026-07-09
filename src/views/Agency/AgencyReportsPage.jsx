@@ -1,6 +1,7 @@
 import React from "react";
 import { Form } from "react-bootstrap";
-import { Link } from "react-router-dom";
+import { Link, useHistory } from "react-router-dom";
+import { rowActivationProps } from "../../utils/rowActivation";
 import { getAgencyWorkspaceReports } from "../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../modules/agency-os/data/agencyDataSource";
 import {
@@ -26,6 +27,7 @@ const formatDateTime = (value) => {
 };
 
 const AgencyReportsPage = () => {
+  const history = useHistory();
   const [reports, setReports] = React.useState([]);
   const [dataMeta, setDataMeta] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -168,7 +170,14 @@ const AgencyReportsPage = () => {
         )}
 
         {!loading && filteredReports.map((entry) => (
-          <div key={entry.projectId} className="border rounded-3 p-3">
+          <div
+            key={entry.projectId}
+            className="border rounded-3 p-3 row-clickable row-clickable-hover"
+            aria-label={`Vai al report di ${entry.projectName}`}
+            {...rowActivationProps(() =>
+              history.push(`/agency/projects/${encodeURIComponent(entry.projectId)}/reports`),
+            )}
+          >
             <div className="d-flex flex-column gap-2">
               <div className="d-flex flex-wrap align-items-start justify-content-between gap-2">
                 <div>

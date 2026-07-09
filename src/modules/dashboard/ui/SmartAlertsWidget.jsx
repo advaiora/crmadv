@@ -4,6 +4,7 @@ import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
+import { rowActivationProps } from '../../../utils/rowActivation';
 
 const severityVariant = {
   critical: 'destructive',
@@ -47,7 +48,12 @@ const SmartAlertsWidget = ({ title = 'Smart alerts', data, loading = false }) =>
       {!loading && alerts.length > 0 ? (
         <div className="max-h-[340px] space-y-1 overflow-y-auto pr-1">
           {alerts.map((alert, index) => (
-            <div key={`${alert.id || alert.href || 'alert'}-${index}`} className="rounded-xl px-3 py-3 transition-colors hover:bg-hover">
+            <div
+              key={`${alert.id || alert.href || 'alert'}-${index}`}
+              className={`rounded-xl px-3 py-3 transition-colors hover:bg-hover${alert.href ? ' row-clickable' : ''}`}
+              aria-label={alert.href ? `Apri ${alert.title}` : undefined}
+              {...(alert.href ? rowActivationProps(() => window.location.assign(alert.href)) : {})}
+            >
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Badge variant={severityVariant[alert.severity] || 'secondary'}>{alert.severity}</Badge>
                 <Badge variant="outline">{alert.category}</Badge>

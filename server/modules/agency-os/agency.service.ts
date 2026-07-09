@@ -10,6 +10,7 @@ import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { badRequest, internalServerError, notFound } from '../../core/errors.js';
+import { requestContext } from '../../core/request-context.js';
 import { agencyRepository } from './agency.repository.js';
 import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
@@ -2314,6 +2315,9 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
         try {
           await aiUsageRepository.create({
             workspaceId: input.workspaceId,
+            // Utente che ha avviato l'azione (dal contesto di richiesta). Null per
+            // i job di sistema (sync automatiche senza richiesta HTTP).
+            userId: requestContext.getUserId(),
             functionName,
             model,
             inputTokens: estimatedInputTokens,

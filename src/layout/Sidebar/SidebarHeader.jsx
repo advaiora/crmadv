@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { connect } from 'react-redux';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { Link } from 'react-router-dom';
-import { ArrowBarToLeft } from 'tabler-icons-react';
+import { ArrowLeft } from 'tabler-icons-react';
 import { Button } from 'react-bootstrap';
 import { useSession } from '../../hooks/useSession';
 
@@ -107,7 +107,7 @@ const SidebarHeader = ({ navCollapsed, toggleCollapsedNav }) => {
                 <Button id="tggl-btn" variant="flush-dark" onClick={toggleSidebar} className="btn-icon btn-rounded flush-soft-hover navbar-toggle">
                     <span className="icon">
                         <span className="svg-icon fs-5">
-                            <ArrowBarToLeft />
+                            <ArrowLeft />
                         </span>
                     </span>
                 </Button>

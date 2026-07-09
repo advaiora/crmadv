@@ -5,6 +5,7 @@ import { badRequest, isHttpError, notFound } from '../../core/errors.js';
 import { validateAndNormalizePhone } from '../../../core/utils/phone.js';
 import { buildPhoneFieldSchema, PHONE_INVALID_MESSAGE } from './clients.schema.js';
 import { detectCsvDelimiter, parseCsvRows, stringifyCsv } from './csv.js';
+import { customFieldsService } from '../custom-fields/custom-fields.service.js';
 import {
   clientsRepository,
   type ClientSortDirection,
@@ -57,6 +58,7 @@ const CLIENT_BODY_FIELDS = [
   'address',
   'notes',
   'tags',
+  'customFields',
 ] as const;
 
 type AddressField = (typeof ADDRESS_FIELDS)[number];
@@ -642,6 +644,7 @@ const mapClient = (record: ClientRecord, options: MapClientOptions = {}) => ({
   },
   notes: record.notes,
   tags: record.tags,
+  customFields: (record.customFields ?? {}) as Record<string, unknown>,
   ...(options.includeProjects
     ? {
         projects: (options.projects ?? []).map((project) => mapClientProject(project)),
@@ -1045,7 +1048,15 @@ export const clientsService = {
     request: FastifyRequest;
   }) {
     const payload = this.parseCreatePayload(input.body);
-    const created = await clientsRepository.create(input.workspaceId, payload);
+    // Valida i valori dei campi personalizzati contro le definizioni del workspace.
+    const rawCustomFields = isObject(input.body) ? input.body.customFields : undefined;
+    const customFields = await customFieldsService.validateValues(
+      input.workspaceId,
+      'client',
+      rawCustomFields,
+      { enforceRequired: true },
+    );
+    const created = await clientsRepository.create(input.workspaceId, { ...payload, customFields });
 
     const fieldsUpdated = sortUniqueFields(
       [
@@ -1089,7 +1100,13 @@ export const clientsService = {
     request: FastifyRequest;
   }) {
     const current = await this.requireClient(input.workspaceId, input.clientId);
-    const patch = this.parsePatchPayload(input.body);
+
+    const body = isObject(input.body) ? input.body : {};
+    const hasCustomFields = 'customFields' in body;
+    const hasScalarFields = Object.keys(body).some((key) => key !== 'customFields');
+
+    // Campi scalari (se il body contiene solo customFields, il patch scalare è vuoto).
+    const patch: ClientPatchPayload = hasScalarFields ? this.parsePatchPayload(input.body) : {};
     if ('phone' in patch && patch.phone) {
       const countryForPhone =
         typeof patch.country === 'string' || patch.country === null
@@ -1098,10 +1115,21 @@ export const clientsService = {
       patch.phone = normalizePhoneForStorage(patch.phone, countryForPhone);
     }
 
+    // Valori dei campi personalizzati, validati contro le definizioni attive.
+    const customFields = hasCustomFields
+      ? await customFieldsService.validateValues(input.workspaceId, 'client', body.customFields, {
+          enforceRequired: true,
+        })
+      : undefined;
+
+    if (!hasScalarFields && !hasCustomFields) {
+      throw badRequest('At least one field is required');
+    }
+
     const updated = await clientsRepository.update(
       input.workspaceId,
       this.parseClientId(input.clientId),
-      patch,
+      { ...patch, ...(customFields !== undefined ? { customFields } : {}) },
     );
     if (!updated) {
       throw notFound('Client not found');
@@ -1147,6 +1175,12 @@ export const clientsService = {
     }
     if ('country' in patch && current.country !== updated.country) {
       changedFields.push('address.country');
+    }
+    if (
+      hasCustomFields &&
+      JSON.stringify(current.customFields ?? {}) !== JSON.stringify(updated.customFields ?? {})
+    ) {
+      changedFields.push('customFields');
     }
 
     await audit.log({
