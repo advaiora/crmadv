@@ -81,6 +81,12 @@ export const SidebarMenu = [
             requiredPermission: "clients.edit",
             grp_name: "apps",
           },
+          {
+            name: "Integrazioni",
+            path: "/apps/clients/integrations",
+            requiredPermission: "clients.edit",
+            grp_name: "apps",
+          },
         ],
       },
       {

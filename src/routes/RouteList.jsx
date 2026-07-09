@@ -26,6 +26,7 @@ import ClientEdit from "../views/Clients/ClientEdit";
 import ClientsList from "../views/Clients/ClientsList";
 import ClientNew from "../views/Clients/ClientNew";
 import CustomFieldsPage from "../modules/customFields/ui/CustomFieldsPage";
+import IntegrationsPage from "../modules/integrations/ui/IntegrationsPage";
 import Dashboard from "../views/Dashboard";
 import Team from "../views/Team";
 import Email from "../views/Email";
@@ -78,6 +79,7 @@ export const routes = [
     { path: 'apps/clients', exact: true, component: ClientsList },
     { path: 'apps/clients/new', exact: true, component: ClientNew },
     { path: 'apps/clients/custom-fields', exact: true, component: CustomFieldsPage },
+    { path: 'apps/clients/integrations', exact: true, component: IntegrationsPage },
     { path: 'apps/clients/:id/edit', exact: true, component: ClientEdit },
     { path: 'apps/clients/:id', exact: true, component: ClientDetail },
     { path: 'apps/team', exact: true, component: Team },
