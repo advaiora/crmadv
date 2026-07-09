@@ -46,6 +46,9 @@ const CSV_HEADER_COLUMNS = [
 ] as const;
 const MAX_IMPORT_ERRORS = 100;
 const TAG_CELL_SEPARATOR = '|';
+// Prefisso delle colonne CSV dedicate ai campi personalizzati: es. "cf:budget".
+// Il prefisso evita collisioni con le colonne standard e i loro alias.
+const CUSTOM_FIELD_CSV_PREFIX = 'cf:';
 
 const ADDRESS_FIELDS = ['street', 'city', 'zip', 'province', 'country'] as const;
 const CLIENT_BODY_FIELDS = [
@@ -100,10 +103,18 @@ type ClientImportError = {
 type ClientImportRow = {
   row: number;
   payload: ClientWritePayload;
+  customFields: Record<string, string | number | boolean>;
 };
 type CsvImportHeaderCell = {
   raw: string;
   canonical: CsvHeaderColumn | null;
+  // Valorizzato per le colonne "cf:<chiave>" dei campi personalizzati.
+  customFieldKey?: string | null;
+};
+// Colonna custom field pronta per l'export: chiave + intestazione CSV.
+type ExportCustomFieldColumn = {
+  key: string;
+  header: string;
 };
 
 type ClientRecord = NonNullable<Awaited<ReturnType<typeof clientsRepository.findById>>>;
@@ -480,6 +491,18 @@ const assertCsvColumns = (header: string[]) => {
   const unique = new Set<string>();
   const unknownColumns: string[] = [];
   const mapped: CsvImportHeaderCell[] = normalized.map((column) => {
+    // Colonne dei campi personalizzati: prefisso "cf:". La chiave che segue è
+    // usata così com'è (minuscola); le chiavi sconosciute vengono poi ignorate
+    // in fase di validazione dei valori.
+    if (column.toLowerCase().startsWith(CUSTOM_FIELD_CSV_PREFIX)) {
+      const customFieldKey = column.slice(CUSTOM_FIELD_CSV_PREFIX.length).trim().toLowerCase();
+      return {
+        raw: column,
+        canonical: null,
+        customFieldKey: customFieldKey || null,
+      };
+    }
+
     const token = normalizeImportHeaderToken(column);
     if (!token) {
       return {
@@ -540,12 +563,23 @@ const parseTagsCell = (value: string | undefined) => {
 
 const toImportBodyFromCsvRow = (header: CsvImportHeaderCell[], row: string[]) => {
   const byColumn = new Map<string, string>();
+  const customFields = new Map<string, string>();
   header.forEach((column, index) => {
+    const cellValue = row[index] ?? '';
+
+    if (column.customFieldKey) {
+      const existing = customFields.get(column.customFieldKey);
+      if (existing && existing.trim().length > 0) {
+        return;
+      }
+      customFields.set(column.customFieldKey, cellValue);
+      return;
+    }
+
     if (!column.canonical) {
       return;
     }
 
-    const cellValue = row[index] ?? '';
     const existing = byColumn.get(column.canonical);
     if (existing && existing.trim().length > 0) {
       return;
@@ -579,24 +613,43 @@ const toImportBodyFromCsvRow = (header: CsvImportHeaderCell[], row: string[]) =>
       province: byColumn.get('province') ?? '',
       country: byColumn.get('country') ?? '',
     },
+    customFields: Object.fromEntries(customFields),
   };
 };
 
-const toExportCsvRow = (record: ClientRecord) => [
-  record.type,
-  record.name,
-  record.email ?? '',
-  record.phone ?? '',
-  record.vatNumber ?? '',
-  record.taxCode ?? '',
-  record.street ?? '',
-  record.city ?? '',
-  record.zip ?? '',
-  record.province ?? '',
-  record.country ?? '',
-  record.notes ?? '',
-  record.tags.join(TAG_CELL_SEPARATOR),
-];
+// Converte un valore di campo personalizzato nella sua cella CSV (stringa).
+const formatCustomFieldCell = (value: unknown): string => {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  return String(value);
+};
+
+const toExportCsvRow = (
+  record: ClientRecord,
+  customFieldColumns: ExportCustomFieldColumn[],
+) => {
+  const values = (record.customFields ?? {}) as Record<string, unknown>;
+  return [
+    record.type,
+    record.name,
+    record.email ?? '',
+    record.phone ?? '',
+    record.vatNumber ?? '',
+    record.taxCode ?? '',
+    record.street ?? '',
+    record.city ?? '',
+    record.zip ?? '',
+    record.province ?? '',
+    record.country ?? '',
+    record.notes ?? '',
+    record.tags.join(TAG_CELL_SEPARATOR),
+    ...customFieldColumns.map((column) => formatCustomFieldCell(values[column.key])),
+  ];
+};
 
 const arraysAreEqual = (left: string[], right: string[]) =>
   left.length === right.length && left.every((value, index) => value === right[index]);
@@ -895,19 +948,30 @@ export const clientsService = {
 
   async exportClientsCsv(workspaceId: string, query: unknown) {
     const filters = this.parseExportFilters(query);
-    const clients = await clientsRepository.listForExport({
-      workspaceId,
-      query: filters.query,
-      type: filters.type,
-      sortField: filters.sortField,
-      sortDirection: filters.sortDirection,
-    });
+    const [clients, customFieldDefinitions] = await Promise.all([
+      clientsRepository.listForExport({
+        workspaceId,
+        query: filters.query,
+        type: filters.type,
+        sortField: filters.sortField,
+        sortDirection: filters.sortDirection,
+      }),
+      customFieldsService.listActiveDefinitions(workspaceId, 'client'),
+    ]);
+
+    // Una colonna per ogni campo personalizzato attivo, con intestazione "cf:<chiave>".
+    const customFieldColumns: ExportCustomFieldColumn[] = customFieldDefinitions.map(
+      (definition) => ({
+        key: definition.key,
+        header: `${CUSTOM_FIELD_CSV_PREFIX}${definition.key}`,
+      }),
+    );
 
     const delimiter = ',';
     const csv = stringifyCsv(
       [
-        [...CSV_HEADER_COLUMNS],
-        ...clients.map((client) => toExportCsvRow(client)),
+        [...CSV_HEADER_COLUMNS, ...customFieldColumns.map((column) => column.header)],
+        ...clients.map((client) => toExportCsvRow(client, customFieldColumns)),
       ],
       delimiter,
     );
@@ -960,6 +1024,13 @@ export const clientsService = {
       throw badRequest('CSV has no data rows');
     }
 
+    // Definizioni dei campi personalizzati lette una sola volta: la validazione
+    // per riga avviene in memoria, senza interrogare il DB riga per riga.
+    const customFieldDefinitions = await customFieldsService.listActiveDefinitions(
+      input.workspaceId,
+      'client',
+    );
+
     const validRows: ClientImportRow[] = [];
     const errors: ClientImportError[] = [];
     let failedRowsCount = 0;
@@ -968,9 +1039,15 @@ export const clientsService = {
       const rowBody = toImportBodyFromCsvRow(header, entry.values);
       try {
         const payload = this.parseCreatePayload(rowBody);
+        const customFields = customFieldsService.validateValuesWithDefinitions(
+          customFieldDefinitions,
+          rowBody.customFields,
+          { enforceRequired: true },
+        );
         validRows.push({
           row: entry.row,
           payload,
+          customFields,
         });
       } catch (error) {
         failedRowsCount += 1;
@@ -997,7 +1074,10 @@ export const clientsService = {
     if (!parsedBody.dryRun) {
       for (const entry of validRows) {
         try {
-          await clientsRepository.create(input.workspaceId, entry.payload);
+          await clientsRepository.create(input.workspaceId, {
+            ...entry.payload,
+            customFields: entry.customFields,
+          });
           createdRows += 1;
         } catch (error) {
           failedRowsCount += 1;

@@ -195,6 +195,15 @@ const serializeDefinition = (definition: {
   updatedAt: definition.updatedAt,
 });
 
+// Forma minima di una definizione necessaria per validare un valore.
+type FieldDefinitionForValidation = {
+  key: string;
+  label: string;
+  type: string;
+  options: unknown;
+  required: boolean;
+};
+
 export const customFieldsService = {
   parseEntityQuery: normalizeEntity,
 
@@ -204,23 +213,26 @@ export const customFieldsService = {
     return definitions.map(serializeDefinition);
   },
 
-  // Valida e normalizza una mappa di valori { chiave: valore } contro le
-  // definizioni ATTIVE dell'entità. Ritorna solo i valori validi e non vuoti;
-  // le chiavi sconosciute (campi rimossi) vengono ignorate. Con enforceRequired
-  // i campi obbligatori vuoti generano un errore.
-  async validateValues(
-    workspaceId: string,
-    entityInput: unknown,
+  // Restituisce le definizioni ATTIVE di un'entità. Utile per validare molti
+  // record (es. import CSV) recuperando le definizioni una sola volta.
+  async listActiveDefinitions(workspaceId: string, entityInput: unknown) {
+    const entity = normalizeEntity(entityInput);
+    return customFieldsRepository.listActive(workspaceId, entity);
+  },
+
+  // Variante pura di validateValues: valida una mappa { chiave: valore } contro
+  // un elenco di definizioni GIÀ recuperato (nessun accesso al DB). Usata per
+  // l'import CSV, dove le definizioni si leggono una volta sola.
+  validateValuesWithDefinitions(
+    definitions: readonly FieldDefinitionForValidation[],
     rawValues: unknown,
     options?: { enforceRequired?: boolean },
-  ): Promise<Record<string, string | number | boolean>> {
-    const entity = normalizeEntity(entityInput);
+  ): Record<string, string | number | boolean> {
     const values = rawValues === undefined || rawValues === null ? {} : rawValues;
     if (!isObject(values)) {
       throw badRequest('customFields deve essere un oggetto');
     }
 
-    const definitions = await customFieldsRepository.listActive(workspaceId, entity);
     const result: Record<string, string | number | boolean> = {};
 
     for (const definition of definitions) {
@@ -235,6 +247,20 @@ export const customFieldsService = {
     }
 
     return result;
+  },
+
+  // Valida e normalizza una mappa di valori { chiave: valore } contro le
+  // definizioni ATTIVE dell'entità. Ritorna solo i valori validi e non vuoti;
+  // le chiavi sconosciute (campi rimossi) vengono ignorate. Con enforceRequired
+  // i campi obbligatori vuoti generano un errore.
+  async validateValues(
+    workspaceId: string,
+    entityInput: unknown,
+    rawValues: unknown,
+    options?: { enforceRequired?: boolean },
+  ): Promise<Record<string, string | number | boolean>> {
+    const definitions = await this.listActiveDefinitions(workspaceId, entityInput);
+    return this.validateValuesWithDefinitions(definitions, rawValues, options);
   },
 
   async createDefinition(workspaceId: string, body: unknown) {
