@@ -214,6 +214,7 @@ model Workspace {
   projectTasks               ProjectTask[]
   agencyRuntimeSettings      AgencyRuntimeSetting[]
   aiUsageLogs                AiUsageLog[]
+  integrations               Integration[]
 }
 
 model User {
@@ -541,6 +542,32 @@ model AgencyRuntimeSetting {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, key])
+  @@index([workspaceId])
+}
+
+// Connettori esterni configurati per workspace (V3 — layer integrazioni).
+// Una riga per provider (es. "brevo"). La chiave API è cifrata a riposo con la
+// DEK di workspace del vault (AES-256-GCM), mai in chiaro nel DB. La config non
+// segreta (es. id lista) sta in `configJson`.
+model Integration {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  provider        String    @db.VarChar(60)
+  enabled         Boolean   @default(false)
+  configJson      Json?
+  ciphertext      String?   @db.Text
+  iv              String?   @db.VarChar(255)
+  authTag         String?   @db.VarChar(255)
+  keyVersion      Int?
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?   @db.VarChar(30)
+  lastSyncMessage String?   @db.Text
+  lastSyncStats   Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
   @@index([workspaceId])
 }
 
