@@ -43,6 +43,7 @@ const SEARCH_STATUS_LABEL = {
 const AI_PROVIDER_OPTIONS = [
   { value: "none", label: "Nessuno" },
   { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic (Claude)" },
 ];
 
 const SEARCH_PROVIDER_OPTIONS = [
@@ -66,6 +67,8 @@ const buildRuntimeForm = (runtimeSettings) => ({
   aiFunctionModelsText: JSON.stringify(runtimeSettings?.ai?.functionModels || {}, null, 2),
   openAiApiKey: "",
   clearOpenAiApiKey: false,
+  anthropicApiKey: "",
+  clearAnthropicApiKey: false,
   competitorSearchEnabled: Boolean(runtimeSettings?.competitorSearch?.enabled),
   competitorSearchProvider: runtimeSettings?.competitorSearch?.provider || "none",
 });
@@ -154,7 +157,8 @@ const AgencySettingsPage = () => {
 
   const canManage = Boolean(runtimeSettings?.canManage);
   const storageReady = runtimeSettings?.storageReady !== false;
-  const aiApiKeyConfigured = Boolean(runtimeSettings?.ai?.apiKeyConfigured || aiStatus?.apiKeyConfigured);
+  const aiApiKeyConfigured = Boolean(runtimeSettings?.ai?.openAiApiKeyConfigured ?? (runtimeSettings?.ai?.apiKeyConfigured || aiStatus?.apiKeyConfigured));
+  const anthropicApiKeyConfigured = Boolean(runtimeSettings?.ai?.anthropicApiKeyConfigured);
 
   const updateFormField = (field, value) => {
     setRuntimeForm((current) => ({
@@ -204,6 +208,10 @@ const AgencySettingsPage = () => {
             ? { openAiApiKey: runtimeForm.openAiApiKey.trim() }
             : {}),
           clearOpenAiApiKey: runtimeForm.clearOpenAiApiKey,
+          ...(runtimeForm.anthropicApiKey.trim()
+            ? { anthropicApiKey: runtimeForm.anthropicApiKey.trim() }
+            : {}),
+          clearAnthropicApiKey: runtimeForm.clearAnthropicApiKey,
         },
         competitorSearch: {
           enabled: runtimeForm.competitorSearchEnabled,
@@ -356,6 +364,35 @@ const AgencySettingsPage = () => {
                         checked={runtimeForm.clearOpenAiApiKey}
                         disabled={!canManage || !storageReady}
                         onChange={(event) => updateFormField("clearOpenAiApiKey", event.target.checked)}
+                      />
+                    </div>
+                  </Col>
+
+                  <Col lg={6}>
+                    <div className="border rounded-3 p-3 h-100">
+                      <h6 className="mb-3">API key Anthropic (Claude)</h6>
+                      <Form.Group controlId="agency-anthropic-api-key">
+                        <Form.Label>Nuova API key</Form.Label>
+                        <Form.Control
+                          type="password"
+                          autoComplete="new-password"
+                          value={runtimeForm.anthropicApiKey}
+                          disabled={!canManage || !storageReady || runtimeForm.clearAnthropicApiKey}
+                          onChange={(event) => updateFormField("anthropicApiKey", event.target.value)}
+                          placeholder={anthropicApiKeyConfigured ? "API key gia configurata: inserisci un valore solo per sostituirla" : "Inserisci API key lato server"}
+                        />
+                        <Form.Text>
+                          Serve quando il provider AI e impostato su Anthropic (Claude). Campo write-only.
+                        </Form.Text>
+                      </Form.Group>
+                      <Form.Check
+                        className="mt-3"
+                        type="checkbox"
+                        id="agency-anthropic-clear-key"
+                        label="Rimuovi la API key salvata nel CRM"
+                        checked={runtimeForm.clearAnthropicApiKey}
+                        disabled={!canManage || !storageReady}
+                        onChange={(event) => updateFormField("clearAnthropicApiKey", event.target.checked)}
                       />
                     </div>
                   </Col>

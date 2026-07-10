@@ -1808,6 +1808,7 @@ const AGENCY_RUNTIME_SETTING_KEYS = {
   aiDebugEnabled: 'agency_ai_debug_enabled',
   aiFunctionModels: 'agency_ai_function_models',
   openAiApiKey: 'openai_api_key',
+  anthropicApiKey: 'anthropic_api_key',
   competitorSearchEnabled: 'agency_competitor_search_enabled',
   competitorSearchProvider: 'agency_competitor_search_provider',
 } as const;
@@ -1815,7 +1816,7 @@ const AGENCY_RUNTIME_SETTING_KEYS = {
 const runtimeSettingsPayloadSchema = z.object({
   ai: z.object({
     enabled: z.boolean().optional(),
-    provider: z.enum(['none', 'openai']).optional(),
+    provider: z.enum(['none', 'openai', 'anthropic']).optional(),
     model: z.string().trim().min(1).max(120).optional(),
     timeoutMs: z.coerce.number().int().min(5000).max(180000).optional(),
     inputMaxChars: z.coerce.number().int().min(6000).max(120000).optional(),
@@ -1827,6 +1828,8 @@ const runtimeSettingsPayloadSchema = z.object({
     functionModels: z.record(z.string().trim().min(1).max(80), z.string().trim().min(1).max(120)).optional(),
     openAiApiKey: z.string().trim().min(1).max(4096).optional(),
     clearOpenAiApiKey: z.boolean().optional(),
+    anthropicApiKey: z.string().trim().min(1).max(4096).optional(),
+    clearAnthropicApiKey: z.boolean().optional(),
   }).optional(),
   competitorSearch: z.object({
     enabled: z.boolean().optional(),
@@ -1936,6 +1939,28 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
     : envOpenAiApiKey
       ? 'env'
       : 'missing';
+
+  // Chiave Anthropic/Claude: stesso schema di OpenAI (segreto cifrato su DB, con
+  // fallback alla variabile d'ambiente). Consente il provider multi-modello.
+  const anthropicSecretRecord = settingsByKey.get(AGENCY_RUNTIME_SETTING_KEYS.anthropicApiKey);
+  let dbAnthropicApiKey: string | null = null;
+  let dbAnthropicSecretReadable = false;
+  if (anthropicSecretRecord) {
+    try {
+      dbAnthropicApiKey = await decryptAgencyRuntimeSecret(anthropicSecretRecord);
+      dbAnthropicSecretReadable = Boolean(dbAnthropicApiKey);
+    } catch {
+      dbAnthropicApiKey = null;
+      dbAnthropicSecretReadable = false;
+    }
+  }
+  const envAnthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
+  const anthropicApiKey = dbAnthropicApiKey || envAnthropicApiKey;
+  const anthropicApiKeySource = dbAnthropicApiKey
+    ? 'db'
+    : envAnthropicApiKey
+      ? 'env'
+      : 'missing';
   const aiEnabled = getRuntimeSettingBoolean(
     settingsByKey,
     AGENCY_RUNTIME_SETTING_KEYS.aiEnabled,
@@ -2022,6 +2047,11 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
       apiKeySource: openAiApiKeySource,
       dbSecretConfigured: Boolean(openAiSecretRecord),
       dbSecretReadable,
+      anthropicApiKey,
+      anthropicApiKeyConfigured: Boolean(anthropicApiKey),
+      anthropicApiKeySource,
+      anthropicDbSecretConfigured: Boolean(anthropicSecretRecord),
+      anthropicDbSecretReadable: dbAnthropicSecretReadable,
     },
     competitorSearch: {
       enabled: competitorSearchEnabled,
@@ -2032,19 +2062,32 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
 
 const getAgencyAiStatusPayload = async (workspaceId?: string) => {
   const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
+  const provider = runtimeConfig.ai.provider;
+  // Chiave pertinente al provider selezionato: OpenAI usa la sua, Anthropic la sua.
+  const providerKeyConfigured = provider === 'anthropic'
+    ? runtimeConfig.ai.anthropicApiKeyConfigured
+    : provider === 'openai'
+      ? runtimeConfig.ai.apiKeyConfigured
+      : false;
   const configured = runtimeConfig.ai.enabled
-    && runtimeConfig.ai.provider === 'openai'
-    && runtimeConfig.ai.apiKeyConfigured;
+    && (provider === 'openai' || provider === 'anthropic')
+    && providerKeyConfigured;
+
+  // Modello effettivo: se il provider è Anthropic ma il modello configurato non è
+  // un modello Claude (default storico gpt-*), si usa il default Claude.
+  const model = resolveAgencyProviderModel(provider, runtimeConfig.ai.model);
 
   return {
     status: configured ? 'configured' : 'not_configured',
     configured,
     enabled: runtimeConfig.ai.enabled,
-    provider: runtimeConfig.ai.provider,
-    model: runtimeConfig.ai.model,
+    provider,
+    model,
     serverSideOnly: true,
-    apiKeyConfigured: runtimeConfig.ai.apiKeyConfigured,
-    apiKeySource: runtimeConfig.ai.apiKeySource,
+    apiKeyConfigured: providerKeyConfigured,
+    apiKeySource: provider === 'anthropic'
+      ? runtimeConfig.ai.anthropicApiKeySource
+      : runtimeConfig.ai.apiKeySource,
     storageReady: runtimeConfig.storageReady,
     message: configured
       ? 'AI configurata lato server. Le generazioni possono usare il provider AI.'
@@ -2136,6 +2179,27 @@ const stringifyCompactAgencyAiPayload = (payload: unknown, maxChars = AGENCY_AI_
 
 const estimateAgencyAiTokens = (text: string) => Math.ceil(text.length / 4);
 
+// Provider AI supportati dal motore (oltre a 'none').
+const AGENCY_AI_PROVIDERS = ['openai', 'anthropic'] as const;
+type AgencyAiProvider = (typeof AGENCY_AI_PROVIDERS)[number];
+
+// Default quando il provider è Anthropic: modello premium e tetto token (Anthropic
+// richiede sempre max_tokens, a differenza di OpenAI dove è opzionale).
+const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-4-8';
+const DEFAULT_ANTHROPIC_MAX_TOKENS = 4096;
+const ANTHROPIC_API_VERSION = '2023-06-01';
+
+// Modello effettivo per il provider. Se il provider è Anthropic ma il modello
+// configurato non è un modello Claude (retaggio: default storico 'gpt-4o-mini'),
+// si ricade sul default Claude, così switchare provider non richiede anche di
+// riscrivere il modello a mano.
+const resolveAgencyProviderModel = (provider: string, configuredModel: string): string => {
+  if (provider === 'anthropic') {
+    return configuredModel.toLowerCase().startsWith('claude') ? configuredModel : DEFAULT_ANTHROPIC_MODEL;
+  }
+  return configuredModel;
+};
+
 const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputTokens: number) => {
   const normalizedModel = model.toLowerCase();
   const rates = normalizedModel.includes('gpt-4o-mini')
@@ -2144,10 +2208,42 @@ const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputToken
       ? { inputPerMillion: 5, outputPerMillion: 15 }
       : normalizedModel.includes('gpt-5')
         ? { inputPerMillion: 1.25, outputPerMillion: 10 }
-        : { inputPerMillion: 2, outputPerMillion: 8 };
+        // Modelli Claude/Anthropic (prezzi per 1M token, input/output).
+        : normalizedModel.includes('claude-haiku') || normalizedModel.includes('haiku')
+          ? { inputPerMillion: 1, outputPerMillion: 5 }
+          : normalizedModel.includes('claude-sonnet') || normalizedModel.includes('sonnet')
+            ? { inputPerMillion: 3, outputPerMillion: 15 }
+            : normalizedModel.includes('claude-opus') || normalizedModel.includes('opus')
+              ? { inputPerMillion: 5, outputPerMillion: 25 }
+              : normalizedModel.includes('claude-fable') || normalizedModel.includes('fable')
+                ? { inputPerMillion: 10, outputPerMillion: 50 }
+                : normalizedModel.includes('claude')
+                  ? { inputPerMillion: 5, outputPerMillion: 25 }
+                  : { inputPerMillion: 2, outputPerMillion: 8 };
   const cost = ((inputTokens / 1_000_000) * rates.inputPerMillion)
     + ((outputTokens / 1_000_000) * rates.outputPerMillion);
   return Number(cost.toFixed(6));
+};
+
+// Estrae il testo dalla risposta Anthropic Messages API: content è un array di
+// blocchi, i blocchi di tipo 'text' contengono il testo generato.
+const extractAnthropicTextContent = (payload: unknown): string => {
+  if (!isRecord(payload)) {
+    return '';
+  }
+  const content = Array.isArray(payload.content) ? payload.content : [];
+  const text = content
+    .map((part) => (isRecord(part) && typeof part.text === 'string' ? part.text : ''))
+    .join('');
+  return text;
+};
+
+// Claude a volte incornicia il JSON in un blocco markdown (```json … ```). Lo
+// stripping rende il parse robusto senza forzare structured outputs.
+const stripJsonCodeFence = (raw: string): string => {
+  const trimmed = raw.trim();
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
+  return fenced ? fenced[1].trim() : trimmed;
 };
 
 const extractOpenAiTextContent = (payload: unknown): string => {
@@ -2304,61 +2400,100 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), input.timeoutMs || runtimeConfig.ai.timeoutMs);
     try {
-      const model = runtimeConfig.ai.functionModels[functionName] || status.model;
-      const requestBody: Record<string, unknown> = {
-        model,
-        input: [
-          { role: 'system', content: `${input.system}\nRispondi solo con JSON valido.` },
-          { role: 'user', content: userContent },
-        ],
-        text: {
-          format: { type: 'json_object' },
-        },
-      };
-      if (runtimeConfig.ai.maxOutputTokens > 0) {
-        requestBody.max_output_tokens = runtimeConfig.ai.maxOutputTokens;
-      }
-      let response = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${runtimeConfig.ai.openAiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-      });
+      const provider = status.provider as AgencyAiProvider;
+      const model = resolveAgencyProviderModel(
+        provider,
+        runtimeConfig.ai.functionModels[functionName] || status.model,
+      );
+      const systemPrompt = `${input.system}\nRispondi solo con JSON valido.`;
 
-      if (!response.ok && response.status !== 401 && response.status !== 403) {
-        const chatRequestBody: Record<string, unknown> = {
+      let content: string;
+      if (provider === 'anthropic') {
+        // Anthropic Messages API. max_tokens è obbligatorio: usa il tetto
+        // configurato o il default. Il JSON è richiesto via system prompt e reso
+        // robusto in parse (strip del code fence markdown).
+        const maxTokens = runtimeConfig.ai.maxOutputTokens > 0
+          ? runtimeConfig.ai.maxOutputTokens
+          : DEFAULT_ANTHROPIC_MAX_TOKENS;
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': runtimeConfig.ai.anthropicApiKey ?? '',
+            'anthropic-version': ANTHROPIC_API_VERSION,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: maxTokens,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: userContent }],
+          }),
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Anthropic API error ${response.status}`);
+        }
+        const responsePayload = await response.json();
+        content = extractAnthropicTextContent(responsePayload);
+        if (!content.trim()) {
+          throw new Error('Anthropic response empty');
+        }
+      } else {
+        const requestBody: Record<string, unknown> = {
           model,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: `${input.system}\nRispondi solo con JSON valido.` },
+          input: [
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
           ],
+          text: {
+            format: { type: 'json_object' },
+          },
         };
         if (runtimeConfig.ai.maxOutputTokens > 0) {
-          chatRequestBody.max_completion_tokens = runtimeConfig.ai.maxOutputTokens;
+          requestBody.max_output_tokens = runtimeConfig.ai.maxOutputTokens;
         }
-        response = await fetch('https://api.openai.com/v1/chat/completions', {
+        let response = await fetch('https://api.openai.com/v1/responses', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${runtimeConfig.ai.openAiApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(chatRequestBody),
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
-      }
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error ${response.status}`);
-      }
+        if (!response.ok && response.status !== 401 && response.status !== 403) {
+          const chatRequestBody: Record<string, unknown> = {
+            model,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userContent },
+            ],
+          };
+          if (runtimeConfig.ai.maxOutputTokens > 0) {
+            chatRequestBody.max_completion_tokens = runtimeConfig.ai.maxOutputTokens;
+          }
+          response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${runtimeConfig.ai.openAiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chatRequestBody),
+            signal: controller.signal,
+          });
+        }
 
-      const responsePayload = await response.json();
-      const content = extractOpenAiTextContent(responsePayload);
-      if (!content.trim()) {
-        throw new Error('OpenAI response empty');
+        if (!response.ok) {
+          throw new Error(`OpenAI API error ${response.status}`);
+        }
+
+        const responsePayload = await response.json();
+        content = extractOpenAiTextContent(responsePayload);
+        if (!content.trim()) {
+          throw new Error('OpenAI response empty');
+        }
       }
       const estimatedInputTokens = estimateAgencyAiTokens(userContent);
       const estimatedOutputTokens = estimateAgencyAiTokens(content);
@@ -2388,7 +2523,7 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
       }
 
       return {
-        payload: JSON.parse(content) as Record<string, unknown>,
+        payload: JSON.parse(stripJsonCodeFence(content)) as Record<string, unknown>,
         meta: {
           functionName,
           model,
@@ -6571,6 +6706,12 @@ export const agencyService = {
         status: ai.status,
         apiKeyConfigured: ai.apiKeyConfigured,
         apiKeySource: ai.apiKeySource,
+        // Stato di entrambe le chiavi, indipendente dal provider attivo, così la
+        // UI può gestirle entrambe (senza esporre i segreti).
+        openAiApiKeyConfigured: runtimeConfig.ai.apiKeyConfigured,
+        openAiApiKeySource: runtimeConfig.ai.apiKeySource,
+        anthropicApiKeyConfigured: runtimeConfig.ai.anthropicApiKeyConfigured,
+        anthropicApiKeySource: runtimeConfig.ai.anthropicApiKeySource,
         message: ai.message,
       },
       competitorSearch: {
@@ -6581,7 +6722,7 @@ export const agencyService = {
         message: competitorSearch.message,
       },
       availableProviders: {
-        ai: ['none', 'openai'],
+        ai: ['none', 'openai', 'anthropic'],
         competitorSearch: ['none', 'openai_web_search', 'serpapi', 'custom'],
       },
       security: {
@@ -6720,6 +6861,26 @@ export const agencyService = {
       writes.push(agencyRepository.upsertAgencyRuntimeSetting({
         workspaceId: input.workspaceId,
         key: AGENCY_RUNTIME_SETTING_KEYS.openAiApiKey,
+        valueJson: null,
+        encrypted,
+        isSecret: true,
+      }));
+    }
+
+    if (payload.ai?.clearAnthropicApiKey) {
+      writes.push(agencyRepository.deleteAgencyRuntimeSetting({
+        workspaceId: input.workspaceId,
+        key: AGENCY_RUNTIME_SETTING_KEYS.anthropicApiKey,
+      }));
+    } else if (payload.ai?.anthropicApiKey) {
+      const encrypted = await encryptAgencyRuntimeSecret({
+        workspaceId: input.workspaceId,
+        key: AGENCY_RUNTIME_SETTING_KEYS.anthropicApiKey,
+        value: payload.ai.anthropicApiKey,
+      });
+      writes.push(agencyRepository.upsertAgencyRuntimeSetting({
+        workspaceId: input.workspaceId,
+        key: AGENCY_RUNTIME_SETTING_KEYS.anthropicApiKey,
         valueJson: null,
         encrypted,
         isSecret: true,
