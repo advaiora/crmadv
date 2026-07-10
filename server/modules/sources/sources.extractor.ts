@@ -1,8 +1,20 @@
-// Estrazione del testo di una fonte (V4 — Modulo Fonti). Per ora URL e testo
-// incollato; il caricamento file (Word/PDF) arriverà in uno step successivo.
-// Nessuna dipendenza esterna: fetch globale (Node 18+) + strip HTML basilare.
+// Estrazione del testo di una fonte (V4 — Modulo Fonti): URL, testo incollato e
+// caricamento file (Word/PDF/TXT/CSV/MD). Per gli URL basta fetch globale (Node
+// 18+) + strip HTML; per i file si riusano le librerie già in uso lato Agency
+// (`mammoth` per .docx, `pdf-parse` per .pdf), importate on-demand.
 
 export const MAX_CONTENT_CHARS = 200_000;
+
+// Formati file di cui sappiamo estrarre il testo. Il resto (immagini, zip…) va
+// rifiutato con un messaggio chiaro invece di salvare una fonte vuota.
+export const SUPPORTED_FILE_EXTENSIONS = ['.txt', '.csv', '.md', '.docx', '.pdf'] as const;
+export type SupportedFileExtension = (typeof SUPPORTED_FILE_EXTENSIONS)[number];
+
+// Estensione (minuscola, col punto) dal nome file. '' se assente/sconosciuta.
+export const getFileExtension = (fileName: string): string => {
+  const match = /\.[a-z0-9]+$/i.exec((fileName ?? '').trim());
+  return match ? match[0].toLowerCase() : '';
+};
 const FETCH_TIMEOUT_MS = 15_000;
 const USER_AGENT = 'AdvaioraCRM/1.0 (+source-fetcher)';
 
@@ -55,6 +67,34 @@ export const normalizeText = (raw: unknown): string => {
 
 type FetchLike = typeof fetch;
 
+// Estrae il testo da un PDF riusando `pdf-parse` (già dipendenza del progetto,
+// usata anche lato Agency). L'import è dinamico: la libreria è pesante e serve
+// solo quando arriva davvero un PDF. Gestisce sia l'API nuova (classe PDFParse)
+// sia quella legacy (funzione default).
+const extractPdfText = async (buffer: Buffer): Promise<string> => {
+  const pdfParseModule = (await import('pdf-parse')) as {
+    PDFParse?: new (options: { data: Buffer }) => {
+      getText: () => Promise<{ text?: string }>;
+      destroy?: () => Promise<void> | void;
+    };
+    default?: (buffer: Buffer) => Promise<{ text?: string }>;
+  };
+  if (pdfParseModule.PDFParse) {
+    const parser = new pdfParseModule.PDFParse({ data: buffer });
+    try {
+      const extracted = await parser.getText();
+      return extracted.text ?? '';
+    } finally {
+      await parser.destroy?.();
+    }
+  }
+  if (pdfParseModule.default) {
+    const extracted = await pdfParseModule.default(buffer);
+    return extracted.text ?? '';
+  }
+  throw new SourceExtractionError('Parser PDF non disponibile nel runtime.');
+};
+
 export const sourceExtractor = {
   // Scarica un URL ed estrae il testo. `fetchImpl` iniettabile per i test.
   async fromUrl(
@@ -104,5 +144,51 @@ export const sourceExtractor = {
     }
 
     return { content, title };
+  },
+
+  // Estrae il testo da un file caricato in base all'estensione. TXT/CSV/MD sono
+  // letti come UTF-8; DOCX via mammoth; PDF via pdf-parse. Un formato non gestito
+  // o un file illeggibile diventano un SourceExtractionError (stato "error").
+  async fromFile(input: {
+    buffer: Buffer;
+    fileName: string;
+  }): Promise<{ content: string; title: null }> {
+    const extension = getFileExtension(input.fileName);
+    if (!SUPPORTED_FILE_EXTENSIONS.includes(extension as SupportedFileExtension)) {
+      throw new SourceExtractionError(
+        `Formato non supportato${extension ? ` (${extension})` : ''}. Ammessi: TXT, CSV, MD, DOCX, PDF.`,
+      );
+    }
+
+    let raw: string;
+    try {
+      if (extension === '.txt' || extension === '.csv' || extension === '.md') {
+        raw = input.buffer.toString('utf8');
+      } else if (extension === '.docx') {
+        const mammoth = await import('mammoth');
+        const extracted = await mammoth.extractRawText({ buffer: input.buffer });
+        raw = extracted.value ?? '';
+      } else {
+        // extension === '.pdf'
+        raw = await extractPdfText(input.buffer);
+      }
+    } catch (error) {
+      if (error instanceof SourceExtractionError) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('password') || message.includes('encrypted')) {
+        throw new SourceExtractionError('File protetto da password: impossibile leggerne il contenuto.');
+      }
+      throw new SourceExtractionError('Estrazione del testo dal file non riuscita.');
+    }
+
+    const content = normalizeText(raw);
+    if (!content) {
+      throw new SourceExtractionError(
+        'Nessun testo estraibile dal file (potrebbe essere vuoto o contenere solo immagini).',
+      );
+    }
+    return { content, title: null };
   },
 };

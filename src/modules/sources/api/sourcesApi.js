@@ -18,6 +18,16 @@ export const listProjectSources = (projectId) =>
 export const createProjectSource = (projectId, payload) =>
   apiPost(`/projects/${encodeURIComponent(projectId)}/sources`, payload, { headers: getHeaders() });
 
+// Caricamento file (Word/PDF/TXT/CSV/MD) come fonte. Usa FormData: apiClient non
+// imposta Content-Type quando il body è FormData (lo fa il browser col boundary).
+export const uploadProjectSourceFile = (projectId, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiPost(`/projects/${encodeURIComponent(projectId)}/sources/files`, formData, {
+    headers: getHeaders(),
+  });
+};
+
 export const getProjectSource = (id) =>
   apiGet(`/sources/${encodeURIComponent(id)}`, { headers: getHeaders() });
 

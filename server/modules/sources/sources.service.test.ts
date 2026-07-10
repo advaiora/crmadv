@@ -103,7 +103,7 @@ test('createSource url fallita: creata comunque con stato error e messaggio', as
   assert.equal(result.status, 'error');
 });
 
-test('createSource: tipo file non ancora supportato', async (t) => {
+test('createSource: tipo file va sull\'endpoint dedicato, non su body.type', async (t) => {
   stubCommon(t);
   await assert.rejects(
     () =>
@@ -114,7 +114,71 @@ test('createSource: tipo file non ancora supportato', async (t) => {
         body: { type: 'file' },
         request: {} as never,
       }),
-    /non è ancora supportato/i,
+    /endpoint dedicato/i,
+  );
+});
+
+test('createFileSource: estrae testo dal file e salva come tipo file/ready', async (t) => {
+  stubCommon(t);
+  let created: any;
+  t.mock.method(sourcesRepository, 'create', async (input: any) => {
+    created = input;
+    return baseRecord(input);
+  });
+
+  const result = await sourcesService.createFileSource({
+    workspaceId: 'w1',
+    projectId: 'p1',
+    actorUserId: 'u1',
+    file: { buffer: Buffer.from('Contenuto del documento', 'utf8'), fileName: 'brief.txt', mimeType: 'text/plain' },
+    request: {} as never,
+  });
+
+  assert.equal(created.type, 'file');
+  assert.equal(created.title, 'brief.txt'); // titolo di default = nome file
+  assert.equal(created.fileName, 'brief.txt');
+  assert.equal(created.mimeType, 'text/plain');
+  assert.equal(created.fileSize, Buffer.from('Contenuto del documento', 'utf8').length);
+  assert.equal(created.content, 'Contenuto del documento');
+  assert.equal(created.status, 'ready');
+  assert.equal(result.status, 'ready');
+});
+
+test('createFileSource: file illeggibile salvato con stato error e messaggio', async (t) => {
+  stubCommon(t);
+  let created: any;
+  t.mock.method(sourcesRepository, 'create', async (input: any) => {
+    created = input;
+    return baseRecord(input);
+  });
+
+  const result = await sourcesService.createFileSource({
+    workspaceId: 'w1',
+    projectId: 'p1',
+    actorUserId: 'u1',
+    file: { buffer: Buffer.from([0, 1, 2, 3]), fileName: 'immagine.png', mimeType: 'image/png' },
+    request: {} as never,
+  });
+
+  assert.equal(created.type, 'file');
+  assert.equal(created.status, 'error');
+  assert.equal(created.content, null);
+  assert.match(created.error, /non supportato/i);
+  assert.equal(result.status, 'error');
+});
+
+test('createFileSource: file vuoto rifiutato', async (t) => {
+  stubCommon(t);
+  await assert.rejects(
+    () =>
+      sourcesService.createFileSource({
+        workspaceId: 'w1',
+        projectId: 'p1',
+        actorUserId: 'u1',
+        file: { buffer: Buffer.alloc(0), fileName: 'vuoto.txt', mimeType: 'text/plain' },
+        request: {} as never,
+      }),
+    /vuoto/i,
   );
 });
 

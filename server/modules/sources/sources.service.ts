@@ -4,17 +4,24 @@ import { badRequest, notFound } from '../../core/errors.js';
 import {
   MAX_CONTENT_CHARS,
   SourceExtractionError,
+  SUPPORTED_FILE_EXTENSIONS,
   normalizeText,
   sourceExtractor,
 } from './sources.extractor.js';
 import { sourcesRepository } from './sources.repository.js';
 
-// Tipi di fonte gestiti ORA. Il caricamento file (Word/PDF) è previsto ma non
-// ancora implementato: la colonna/metadati file esistono già nel modello.
+// Tipi di fonte gestiti. 'url'/'text' passano dalla rotta JSON; 'file' arriva
+// invece dalla rotta multipart dedicata (createFileSource), non da body.type.
 export const SOURCE_TYPES = ['url', 'text'] as const;
 export type SourceType = (typeof SOURCE_TYPES)[number];
 
+// Limite dimensione file allineato al limite multipart di Fastify (app.ts).
+export const MAX_FILE_SIZE = 20 * 1024 * 1024;
+export { SUPPORTED_FILE_EXTENSIONS };
+
 const MAX_TITLE_LENGTH = 200;
+const MAX_FILE_NAME_LENGTH = 255;
+const MAX_MIME_TYPE_LENGTH = 120;
 const PREVIEW_LENGTH = 300;
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -24,7 +31,9 @@ type SourceRecord = NonNullable<Awaited<ReturnType<typeof sourcesRepository.find
 
 const normalizeType = (value: unknown): SourceType => {
   if (value === 'file') {
-    throw badRequest('Il caricamento di file non è ancora supportato', { comingSoon: true });
+    throw badRequest('Le fonti da file si caricano dall\'endpoint dedicato /sources/files', {
+      useEndpoint: 'POST /projects/:projectId/sources/files',
+    });
   }
   if (typeof value !== 'string' || !SOURCE_TYPES.includes(value as SourceType)) {
     throw badRequest('Tipo di fonte non valido', { allowed: SOURCE_TYPES });
@@ -185,6 +194,71 @@ export const sourcesService = {
       entityType: 'ProjectSource',
       entityId: created.id,
       metadata: { projectId, type, status: created.status },
+      request: input.request,
+    });
+
+    return serializeSource(created, { full: true });
+  },
+
+  // Crea una fonte da file caricato (Word/PDF/TXT/CSV/MD). Il testo viene estratto
+  // e salvato in `content`; il binario NON viene conservato (per il RAG serve solo
+  // il testo). Un file illeggibile viene salvato con stato "error" e messaggio,
+  // così la fonte resta visibile ma segnalata, come per gli URL non raggiungibili.
+  async createFileSource(input: {
+    workspaceId: string;
+    projectId: string;
+    actorUserId: string;
+    file: { buffer: Buffer; fileName: string; mimeType: string };
+    title?: unknown;
+    request: FastifyRequest;
+  }) {
+    const projectId = await requireProject(input.workspaceId, input.projectId);
+
+    const fileName = (input.file.fileName || 'file').slice(0, MAX_FILE_NAME_LENGTH);
+    const mimeType = (input.file.mimeType || '').slice(0, MAX_MIME_TYPE_LENGTH) || null;
+    const fileSize = input.file.buffer.length;
+    if (fileSize === 0) {
+      throw badRequest('Il file caricato è vuoto');
+    }
+
+    let content = '';
+    let status: 'ready' | 'error' = 'ready';
+    let error: string | null = null;
+    try {
+      const extracted = await sourceExtractor.fromFile({ buffer: input.file.buffer, fileName });
+      content = extracted.content;
+    } catch (extractionError) {
+      if (extractionError instanceof SourceExtractionError) {
+        status = 'error';
+        error = extractionError.message;
+      } else {
+        throw extractionError;
+      }
+    }
+
+    const title = normalizeTitle(input.title, fileName);
+    const created = await sourcesRepository.create({
+      workspaceId: input.workspaceId,
+      projectId,
+      type: 'file',
+      title,
+      url: null,
+      fileName,
+      mimeType,
+      fileSize,
+      content: content || null,
+      contentChars: content.length,
+      status,
+      error,
+    });
+
+    await audit.log({
+      event: 'sources.create',
+      actorUserId: input.actorUserId,
+      workspaceId: input.workspaceId,
+      entityType: 'ProjectSource',
+      entityId: created.id,
+      metadata: { projectId, type: 'file', status: created.status, fileName },
       request: input.request,
     });
 

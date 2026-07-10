@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Form, Spinner } from 'react-bootstrap';
-import { FileText, Link2, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, Link2, RefreshCw, Trash2, Upload } from 'lucide-react';
 import {
   createProjectSource,
   deleteProjectSource,
   listProjectSources,
   refreshProjectSource,
+  uploadProjectSourceFile,
 } from '../api/sourcesApi';
+
+const FILE_ACCEPT = '.pdf,.docx,.txt,.csv,.md';
 
 // Pannello "Fonti indicizzabili per l'AI" (V4 — Modulo Fonti). Gestisce i record
 // normalizzati ProjectSource (URL o testo con contenuto estratto), la base per la
@@ -17,6 +20,22 @@ const STATUS_META = {
   ready: { variant: 'success', label: 'Pronta' },
   error: { variant: 'danger', label: 'Errore' },
   pending: { variant: 'secondary', label: 'In attesa' },
+};
+
+const TYPE_META = {
+  url: { variant: 'secondary', label: 'URL' },
+  text: { variant: 'info', label: 'Testo' },
+  file: { variant: 'primary', label: 'File' },
+};
+
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes < 1024) {
+    return `${bytes || 0} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const getErrorMessage = (error, fallback) => error?.message || fallback;
@@ -31,6 +50,8 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
   const [url, setUrl] = useState('');
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
+  const [file, setFile] = useState(null);
+  const fileInputRef = useRef(null);
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState('');
 
@@ -58,10 +79,39 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
     setUrl('');
     setText('');
     setTitle('');
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleAdd = async () => {
     setFeedback('');
+
+    if (type === 'file') {
+      if (!file) {
+        setFeedback('Scegli un file da caricare.');
+        return;
+      }
+      setAdding(true);
+      try {
+        const result = await uploadProjectSourceFile(projectId, file);
+        const created = result?.source;
+        if (created?.status === 'error') {
+          setFeedback(`File caricato ma non letto: ${created.error || 'errore di estrazione'}.`);
+        } else {
+          setFeedback('File caricato e indicizzabile.');
+        }
+        resetForm();
+        await load();
+      } catch (error) {
+        setFeedback(getErrorMessage(error, 'Caricamento del file non riuscito.'));
+      } finally {
+        setAdding(false);
+      }
+      return;
+    }
+
     const payload =
       type === 'url'
         ? { type: 'url', url: url.trim(), ...(title.trim() ? { title: title.trim() } : {}) }
@@ -161,9 +211,17 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
             >
               <FileText size={14} /> Testo
             </Button>
+            <Button
+              size="sm"
+              variant={type === 'file' ? 'primary' : 'outline-primary'}
+              className="d-inline-flex align-items-center gap-1"
+              onClick={() => setType('file')}
+            >
+              <Upload size={14} /> File
+            </Button>
           </div>
 
-          {type === 'url' ? (
+          {type === 'url' && (
             <Form.Control
               size="sm"
               className="mb-2"
@@ -171,7 +229,8 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://www.cliente.it/pagina"
             />
-          ) : (
+          )}
+          {type === 'text' && (
             <Form.Control
               as="textarea"
               rows={4}
@@ -182,21 +241,41 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
               placeholder="Incolla qui il testo da usare come fonte (brief, appunti, contenuti…)"
             />
           )}
+          {type === 'file' && (
+            <>
+              <Form.Control
+                ref={fileInputRef}
+                type="file"
+                size="sm"
+                className="mb-1"
+                accept={FILE_ACCEPT}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+              <p className="small text-muted mb-2">
+                Formati ammessi: PDF, Word (.docx), testo (.txt, .csv, .md). Massimo 20MB.
+                Viene estratto e indicizzato il testo del documento.
+              </p>
+            </>
+          )}
 
-          <Form.Control
-            size="sm"
-            className="mb-2"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Titolo (opzionale)"
-          />
+          {type !== 'file' && (
+            <Form.Control
+              size="sm"
+              className="mb-2"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Titolo (opzionale)"
+            />
+          )}
 
           <Button size="sm" variant="primary" onClick={() => void handleAdd()} disabled={adding}>
             {adding ? (
               <>
                 <Spinner animation="border" size="sm" className="me-2" />
-                Aggiunta…
+                {type === 'file' ? 'Caricamento…' : 'Aggiunta…'}
               </>
+            ) : type === 'file' ? (
+              'Carica file'
             ) : (
               'Aggiungi fonte'
             )}
@@ -215,13 +294,12 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
           <div className="d-flex flex-column gap-2">
             {sources.map((source) => {
               const meta = STATUS_META[source.status] || STATUS_META.pending;
+              const typeMeta = TYPE_META[source.type] || TYPE_META.text;
               return (
                 <div key={source.id} className="agency-record-row">
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2 mb-1">
-                      <Badge bg={source.type === 'url' ? 'secondary' : 'info'}>
-                        {source.type === 'url' ? 'URL' : 'Testo'}
-                      </Badge>
+                      <Badge bg={typeMeta.variant}>{typeMeta.label}</Badge>
                       <span className="fw-semibold small">{source.title}</span>
                       <Badge bg={meta.variant}>{meta.label}</Badge>
                     </div>
@@ -229,6 +307,12 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
                       <a className="small d-block text-truncate" href={source.url} target="_blank" rel="noreferrer">
                         {source.url}
                       </a>
+                    )}
+                    {source.type === 'file' && source.fileName && (
+                      <div className="small text-muted text-truncate">
+                        {source.fileName}
+                        {source.fileSize ? ` · ${formatFileSize(source.fileSize)}` : ''}
+                      </div>
                     )}
                     {source.status === 'error' ? (
                       <div className="small text-danger">{source.error}</div>

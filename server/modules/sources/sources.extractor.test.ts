@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeText, sourceExtractor, SourceExtractionError } from './sources.extractor.js';
+import {
+  getFileExtension,
+  normalizeText,
+  sourceExtractor,
+  SourceExtractionError,
+} from './sources.extractor.js';
 
 const htmlResponse = (html: string, status = 200) =>
   ({
@@ -44,6 +49,40 @@ test('fromUrl: errore di rete genera SourceExtractionError', async () => {
 test('fromUrl: HTML senza testo utile genera errore "nessun testo"', async () => {
   await assert.rejects(
     () => sourceExtractor.fromUrl('https://esempio.it', async () => htmlResponse('<html><body>   </body></html>')),
+    (error: unknown) => error instanceof SourceExtractionError && /nessun testo/i.test((error as Error).message),
+  );
+});
+
+test('getFileExtension: minuscolo col punto, o stringa vuota se assente', () => {
+  assert.equal(getFileExtension('Brief Cliente.PDF'), '.pdf');
+  assert.equal(getFileExtension('note.finali.docx'), '.docx');
+  assert.equal(getFileExtension('senza-estensione'), '');
+});
+
+test('fromFile: estrae testo da .txt normalizzandolo', async () => {
+  const buffer = Buffer.from('  Riga uno\r\n\r\n\r\n\r\nRiga due  ', 'utf8');
+  const result = await sourceExtractor.fromFile({ buffer, fileName: 'appunti.txt' });
+  assert.equal(result.content, 'Riga uno\n\nRiga due');
+  assert.equal(result.title, null);
+});
+
+test('fromFile: legge anche .csv e .md come testo', async () => {
+  const csv = await sourceExtractor.fromFile({ buffer: Buffer.from('a,b\n1,2', 'utf8'), fileName: 'dati.csv' });
+  assert.equal(csv.content, 'a,b\n1,2');
+  const md = await sourceExtractor.fromFile({ buffer: Buffer.from('# Titolo', 'utf8'), fileName: 'readme.md' });
+  assert.equal(md.content, '# Titolo');
+});
+
+test('fromFile: formato non supportato genera SourceExtractionError', async () => {
+  await assert.rejects(
+    () => sourceExtractor.fromFile({ buffer: Buffer.from([0, 1, 2]), fileName: 'foto.png' }),
+    (error: unknown) => error instanceof SourceExtractionError && /non supportato/i.test((error as Error).message),
+  );
+});
+
+test('fromFile: file di testo vuoto genera errore "nessun testo estraibile"', async () => {
+  await assert.rejects(
+    () => sourceExtractor.fromFile({ buffer: Buffer.from('   \n  ', 'utf8'), fileName: 'vuoto.txt' }),
     (error: unknown) => error instanceof SourceExtractionError && /nessun testo/i.test((error as Error).message),
   );
 });
