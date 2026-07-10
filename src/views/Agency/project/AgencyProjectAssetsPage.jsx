@@ -11,6 +11,7 @@ import {
   uploadAgencyProjectSourceFile,
 } from "../../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSource";
+import ProjectAiSourcesPanel from "../../../modules/sources/ui/ProjectAiSourcesPanel";
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
 
 const EMPTY_FILE = {
@@ -751,6 +752,10 @@ const AgencyProjectAssetsPage = () => {
               </Button>
             </div>
           </div>
+        </Col>
+
+        <Col lg={12}>
+          <ProjectAiSourcesPanel projectId={projectId} />
         </Col>
 
         <Col lg={6}>
