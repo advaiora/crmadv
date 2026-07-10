@@ -215,6 +215,7 @@ model Workspace {
   agencyRuntimeSettings      AgencyRuntimeSetting[]
   aiUsageLogs                AiUsageLog[]
   integrations               Integration[]
+  projectSources             ProjectSource[]
 }
 
 model User {
@@ -393,6 +394,7 @@ model Project {
   projectAlerts        ProjectAlert[]
   projectOpportunities ProjectOpportunity[]
   projectTasks         ProjectTask[]
+  sources              ProjectSource[]
   ownerUser            User?                 @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   departments          ProjectDepartment[]
   access               ProjectAccess[]
@@ -456,6 +458,32 @@ model ProjectMemory {
   project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, projectId])
+}
+
+// Fonte di un progetto (V4 — Modulo Fonti). Una riga per fonte: URL, file
+// caricato o testo incollato. `content` conserva il testo estratto/normalizzato,
+// base per la futura vettorizzazione (embeddings) quando pgvector sarà disponibile.
+model ProjectSource {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  projectId    String
+  type         String    @db.VarChar(20)
+  title        String    @db.VarChar(200)
+  url          String?   @db.Text
+  fileName     String?   @db.VarChar(255)
+  mimeType     String?   @db.VarChar(120)
+  fileSize     Int?
+  content      String?   @db.Text
+  contentChars Int       @default(0)
+  status       String    @default("pending") @db.VarChar(20)
+  error        String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, projectId])
+  @@index([projectId, createdAt])
 }
 
 model ProjectAlert {
