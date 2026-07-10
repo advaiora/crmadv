@@ -1,6 +1,6 @@
 <#
-  install-pgvector-win.ps1 — Installa l'estensione pgvector su PostgreSQL 17 (Windows, build EDB).
-  V4 — Modulo Fonti: pgvector serve per la vettorizzazione/RAG (embeddings + ricerca semantica).
+  install-pgvector-win.ps1 - Installa l'estensione pgvector su PostgreSQL 17 (Windows, build EDB).
+  V4 - Modulo Fonti: pgvector serve per la vettorizzazione/RAG (embeddings + ricerca semantica).
 
   PERCHE' SERVE ESEGUIRLO A MANO (come amministratore):
   - pgvector non e' incluso in PostgreSQL: va aggiunto ai file dell'installazione (cartella "lib" e
@@ -117,5 +117,5 @@ Write-Step "Abilito l'estensione 'vector' su '$Database'"
 if ($LASTEXITCODE -ne 0) { throw "CREATE EXTENSION vector non riuscito." }
 $ver = & $psql -U $DbUser -d $Database -tAc "SELECT extversion FROM pg_extension WHERE extname='vector';"
 Write-Host ""
-Write-Host "OK — pgvector installato e abilitato su '$Database' (versione $($ver.Trim()))." -ForegroundColor Green
+Write-Host "OK - pgvector installato e abilitato su '$Database' (versione $($ver.Trim()))." -ForegroundColor Green
 Write-Host "Ora la parte di vettorizzazione/RAG della V4 puo' essere costruita." -ForegroundColor Green
