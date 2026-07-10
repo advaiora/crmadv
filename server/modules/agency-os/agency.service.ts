@@ -1353,6 +1353,62 @@ const buildSourceReadiness = (sources: AgencyProjectSourcesPayload) => {
   };
 };
 
+// --- Merge Modulo Fonti (V4) → pipeline Agency ----------------------------
+// Converte i record normalizzati ProjectSource (URL/testo con contenuto estratto)
+// in "materiali" sintetici, così readiness e Discovery li usano come le altre
+// fonti senza modifiche alla logica esistente. NON persistiti: iniettati solo in
+// lettura (getProject, generazione Discovery), mai nel blob salvato dall'editor.
+type IndexedProjectSourceRecord = {
+  id: string;
+  type: string;
+  title: string;
+  url: string | null;
+  content: string | null;
+  contentChars: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+const INDEXED_SOURCE_MARKER = 'ai_sources_module';
+
+const buildSyntheticFilesFromIndexedSources = (
+  records: IndexedProjectSourceRecord[],
+): AgencyUploadedFileSource[] =>
+  records
+    .filter((record) => (record.content ?? '').trim().length > 0)
+    .map((record) => ({
+      id: `psrc_${record.id}`,
+      name: record.title || (record.type === 'url' ? record.url ?? 'Fonte URL' : 'Fonte testo'),
+      originalName: record.title || undefined,
+      type: record.type === 'url' ? 'url' : 'text',
+      size: record.contentChars || (record.content ?? '').length,
+      status: 'parsed' as const,
+      source: INDEXED_SOURCE_MARKER,
+      notes: record.url ? `Fonte URL indicizzata: ${record.url}` : 'Fonte testo indicizzata',
+      uploadedAt: record.createdAt.toISOString(),
+      parseStatus: 'parsed' as const,
+      extractedTextPreview: (record.content ?? '').slice(0, 12000),
+      extractedTextLength: (record.content ?? '').length,
+      parsedAt: record.updatedAt.toISOString(),
+      markedUseful: true,
+    }));
+
+// Ritorna una copia del blob fonti con i record indicizzati aggiunti come
+// materiali; ri-normalizza così stato/summary/diagnostica includono i nuovi.
+const augmentSourcesWithIndexedRecords = (
+  sources: AgencyProjectSourcesPayload,
+  records: IndexedProjectSourceRecord[],
+): AgencyProjectSourcesPayload => {
+  const synthetic = buildSyntheticFilesFromIndexedSources(records);
+  if (synthetic.length === 0) {
+    return sources;
+  }
+  return normalizeProjectSources({
+    ...sources,
+    uploadedFiles: [...sources.uploadedFiles, ...synthetic],
+  });
+};
+
 const buildProjectSourcesFromInput = (input: {
   websiteUrl?: string;
   primaryWebsiteUrl?: string;
@@ -4608,7 +4664,9 @@ export const agencyService = {
       throw notFound('Project not found');
     }
 
-    const sources = await this.getProjectSources(workspaceId, projectId);
+    const loadedSources = await this.getProjectSources(workspaceId, projectId);
+    const indexedRecords = await agencyRepository.listIndexedProjectSources(workspaceId, projectId);
+    const sources = augmentSourcesWithIndexedRecords(loadedSources, indexedRecords);
     return mapProjectRecordToPayload(project, 'db', sources);
   },
 
@@ -6870,11 +6928,13 @@ export const agencyService = {
   },
 
   async regenerateProjectDiscoveryFromSources(workspaceId: string, projectId: string): Promise<DiscoveryPayload> {
-    const [project, sources, existingMemory] = await Promise.all([
+    const [project, loadedSources, existingMemory, indexedRecords] = await Promise.all([
       this.getProject(workspaceId, projectId),
       this.getProjectSources(workspaceId, projectId),
       agencyRepository.findProjectMemory(workspaceId, projectId),
+      agencyRepository.listIndexedProjectSources(workspaceId, projectId),
     ]);
+    const sources = augmentSourcesWithIndexedRecords(loadedSources, indexedRecords);
     const generated = buildDiscoveryFromProjectSources({ project, sources });
     const confidenceBySection = Object.fromEntries(
       Object.keys(generated.sections).map((key) => [
@@ -6939,11 +6999,13 @@ export const agencyService = {
       };
     }
 
-    const [project, sources, existingMemory] = await Promise.all([
+    const [project, loadedSources, existingMemory, indexedRecords] = await Promise.all([
       this.getProject(workspaceId, projectId),
       this.getProjectSources(workspaceId, projectId),
       agencyRepository.findProjectMemory(workspaceId, projectId),
+      agencyRepository.listIndexedProjectSources(workspaceId, projectId),
     ]);
+    const sources = augmentSourcesWithIndexedRecords(loadedSources, indexedRecords);
     const fallback = buildDiscoveryFromProjectSources({ project, sources });
     const existingSections = normalizeDiscoverySectionsFromBriefJson(existingMemory?.briefJson as Prisma.JsonValue | null);
     const existingBriefJson = isRecord(existingMemory?.briefJson) ? existingMemory.briefJson as Record<string, unknown> : {};

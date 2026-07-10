@@ -806,6 +806,30 @@ export const agencyRepository = {
     });
   },
 
+  // Fonti normalizzate del Modulo Fonti (V4) pronte per l'indicizzazione AI.
+  // Guardia try/catch: su un DB dove la migrazione ProjectSource non è ancora
+  // applicata, l'augmentazione viene semplicemente saltata (nessuna fonte).
+  async listIndexedProjectSources(workspaceId: string, projectId: string) {
+    try {
+      return await prisma.projectSource.findMany({
+        where: { workspaceId, projectId, status: 'ready' },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          url: true,
+          content: true,
+          contentChars: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch {
+      return [];
+    }
+  },
+
   async findProjectMemorySources(workspaceId: string, projectId: string) {
     const memorySchemaReady = await this.isProjectMemorySchemaReady();
     if (!memorySchemaReady) {
