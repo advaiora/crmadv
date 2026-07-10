@@ -193,7 +193,7 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 ### 🟦 V4 — Motore AI Context-Aware *(il cuore)*
 **Obiettivo:** memoria di progetto vera + AI economicamente controllata.
 **Contenuto:**
-- **Modulo Fonti** completo: URL/social + Word/PDF + asset brand → **vettorizzazione (embeddings + pgvector)** → memoria persistente.
+- **Modulo Fonti** completo: URL/social + Word/PDF + asset brand → **vettorizzazione (embeddings + pgvector)** → memoria persistente. **FONDAMENTA FATTE (10 luglio 2026):** modulo isolato `server/modules/sources/` — modello `ProjectSource` (una riga per fonte, `content` estratto già pronto per il chunking/embedding; migrazione `20260710081730_project_sources`), estrattore testo per **URL** (strip HTML) e **testo incollato**, CRUD + `refresh`, rotte `/projects/:id/sources` e `/sources/:id` protette da `projects.view`/`projects.edit`. Verificato end-to-end + test. **Ancora da fare:** (a) caricamento **file Word/PDF** (estrazione con libreria dedicata); (b) UI Fonti nella pagina progetto; (c) **vettorizzazione** — ⚠️ **`pgvector` NON è installato sul Postgres** (`pg_available_extensions` non trova `vector`): va abilitato lato server prima di poter fare embeddings/RAG; (d) aggancio alla Discovery/`ProjectMemory` dell'area Agency.
 - **Discovery** consolidata su RAG reale (Business Recap, Obiettivi/Target, Offerta/Competitor).
 - **Chat AI di progetto** context-aware.
 - **Multi-provider**: aggiunta **Claude/Anthropic** (prompt architect) accanto a OpenAI; mapping modello-per-funzione (economico vs premium).
