@@ -2,6 +2,19 @@ import * as Icons from "tabler-icons-react";
 
 export const SidebarMenu = [
   {
+    group: "Piattaforma",
+    contents: [
+      {
+        id: "platform_console",
+        name: "Console piattaforma",
+        icon: <Icons.World />,
+        path: "/settings/platform-console",
+        requirePlatformAdmin: true,
+        grp_name: "apps",
+      },
+    ],
+  },
+  {
     group: "",
     contents: [
       {
@@ -265,19 +278,6 @@ export const SidebarMenu = [
         path: "/audit",
         requiredModule: "audit",
         requiredPermission: "audit.view",
-        grp_name: "apps",
-      },
-    ],
-  },
-  {
-    group: "Piattaforma",
-    contents: [
-      {
-        id: "platform_console",
-        name: "Console piattaforma",
-        icon: <Icons.World />,
-        path: "/settings/platform-console",
-        requirePlatformAdmin: true,
         grp_name: "apps",
       },
     ],

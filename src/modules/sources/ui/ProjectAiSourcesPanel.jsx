@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, Form, Spinner } from 'react-bootstrap';
-import { FileText, Link2, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { Boxes, FileText, Link2, RefreshCw, Trash2, Upload } from 'lucide-react';
 import {
   createProjectSource,
   deleteProjectSource,
   listProjectSources,
   refreshProjectSource,
+  reindexProjectSources,
   uploadProjectSourceFile,
 } from '../api/sourcesApi';
 
@@ -54,6 +55,7 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
   const fileInputRef = useRef(null);
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState('');
+  const [reindexing, setReindexing] = useState(false);
 
   const load = useCallback(async () => {
     if (!projectId) {
@@ -157,6 +159,29 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
     }
   };
 
+  const handleReindexAll = async () => {
+    setReindexing(true);
+    setFeedback('');
+    try {
+      const result = await reindexProjectSources(projectId);
+      const indexed = result?.indexed ?? 0;
+      const total = result?.total ?? 0;
+      const chunks = result?.chunks ?? 0;
+      if (indexed === 0) {
+        setFeedback(
+          'Nessuna fonte indicizzata. Verifica che la chiave OpenAI sia configurata in Impostazioni Agency.',
+        );
+      } else {
+        setFeedback(`Indicizzate ${indexed}/${total} fonti (${chunks} blocchi totali).`);
+      }
+      await load();
+    } catch (error) {
+      setFeedback(getErrorMessage(error, 'Reindicizzazione non riuscita.'));
+    } finally {
+      setReindexing(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     setBusyId(id);
     setFeedback('');
@@ -181,9 +206,26 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
               ricerca semantica). Il testo viene estratto e salvato automaticamente.
             </p>
           </div>
-          <Button size="sm" variant="outline-secondary" onClick={() => void load()} disabled={loading}>
-            Ricarica
-          </Button>
+          <div className="d-flex align-items-center gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              variant="outline-primary"
+              className="d-inline-flex align-items-center gap-1"
+              onClick={() => void handleReindexAll()}
+              disabled={reindexing || loading || sources.length === 0}
+              title="Vettorizza tutte le fonti (richiede la chiave OpenAI)"
+            >
+              {reindexing ? (
+                <Spinner animation="border" size="sm" />
+              ) : (
+                <Boxes size={14} />
+              )}
+              Reindicizza tutte
+            </Button>
+            <Button size="sm" variant="outline-secondary" onClick={() => void load()} disabled={loading}>
+              Ricarica
+            </Button>
+          </div>
         </div>
 
         {loadError && <Alert variant="danger" className="py-2">{loadError}</Alert>}
@@ -302,6 +344,16 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
                       <Badge bg={typeMeta.variant}>{typeMeta.label}</Badge>
                       <span className="fw-semibold small">{source.title}</span>
                       <Badge bg={meta.variant}>{meta.label}</Badge>
+                      {source.status === 'ready' && (
+                        source.indexedChunks > 0 ? (
+                          <Badge bg="success" className="d-inline-flex align-items-center gap-1">
+                            <Boxes size={11} />
+                            {`Indicizzata · ${source.indexedChunks} ${source.indexedChunks === 1 ? 'blocco' : 'blocchi'}`}
+                          </Badge>
+                        ) : (
+                          <Badge bg="secondary" className="opacity-75">Non indicizzata</Badge>
+                        )
+                      )}
                     </div>
                     {source.url && (
                       <a className="small d-block text-truncate" href={source.url} target="_blank" rel="noreferrer">

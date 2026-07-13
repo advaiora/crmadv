@@ -13,6 +13,9 @@ import { badRequest, internalServerError, notFound } from '../../core/errors.js'
 import { requestContext } from '../../core/request-context.js';
 import { agencyRepository } from './agency.repository.js';
 import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
+import { aiBudgetRepository, AI_BUDGET_DEFAULT_USER } from '../../repositories/ai-budget.repository.js';
+import { teamRepository } from '../team/team.repository.js';
+import { createLoggingOpenAiEmbedder, searchProjectSources } from '../sources/sources.rag.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
 import { getOrCreateWorkspaceDEK } from '../vault/keys.js';
 import { z } from 'zod';
@@ -2060,6 +2063,14 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
   };
 };
 
+// Espone la sola chiave OpenAI risolta (segreto cifrato su DB o env), per riuso da
+// altri moduli (es. vettorizzazione Fonti) senza duplicare la logica di decifratura.
+// Ritorna null se non configurata.
+export const resolveAgencyOpenAiApiKey = async (workspaceId?: string): Promise<string | null> => {
+  const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
+  return runtimeConfig.ai.openAiApiKey ?? null;
+};
+
 const getAgencyAiStatusPayload = async (workspaceId?: string) => {
   const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
   const provider = runtimeConfig.ai.provider;
@@ -2225,6 +2236,52 @@ const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputToken
   return Number(cost.toFixed(6));
 };
 
+// Errore dedicato al superamento del budget AI giornaliero (V4 — cost control).
+// Distinto dagli altri errori così i chiamanti possono mostrarlo chiaramente
+// invece di trattarlo come un fallback silenzioso.
+export class AiBudgetExceededError extends Error {
+  readonly code = 'AI_BUDGET_EXCEEDED';
+  readonly dailyLimitUsd: number;
+  readonly spentTodayUsd: number;
+
+  constructor(dailyLimitUsd: number, spentTodayUsd: number) {
+    super(
+      `Budget AI giornaliero superato: spesi $${spentTodayUsd.toFixed(4)} su un limite di $${dailyLimitUsd.toFixed(2)}. Riprova domani o chiedi all'amministratore di alzare il limite.`,
+    );
+    this.name = 'AiBudgetExceededError';
+    this.dailyLimitUsd = dailyLimitUsd;
+    this.spentTodayUsd = spentTodayUsd;
+  }
+}
+
+// Mezzanotte locale del server: inizio della giornata corrente per il budget.
+const startOfToday = (): Date => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return now;
+};
+
+// Controllo budget PRIMA di una chiamata AI a pagamento. Salta se non c'è un utente
+// nel contesto (job di sistema) o se il limite è 0 (nessun limite). Se la spesa già
+// registrata oggi raggiunge/supera il limite, solleva AiBudgetExceededError.
+const assertWithinAiBudget = async (workspaceId?: string): Promise<void> => {
+  if (!workspaceId) {
+    return;
+  }
+  const userId = requestContext.getUserId();
+  if (!userId) {
+    return;
+  }
+  const { dailyLimitUsd } = await aiBudgetRepository.resolveLimitForUser(workspaceId, userId);
+  if (!dailyLimitUsd || dailyLimitUsd <= 0) {
+    return;
+  }
+  const spentToday = await aiUsageRepository.sumCostForUser(workspaceId, userId, startOfToday());
+  if (spentToday >= dailyLimitUsd) {
+    throw new AiBudgetExceededError(dailyLimitUsd, spentToday);
+  }
+};
+
 // Estrae il testo dalla risposta Anthropic Messages API: content è un array di
 // blocchi, i blocchi di tipo 'text' contengono il testo generato.
 const extractAnthropicTextContent = (payload: unknown): string => {
@@ -2360,6 +2417,56 @@ const buildAgencyAiSourceSnapshot = (sources: AgencyProjectSourcesPayload) => ({
   unreadableFiles: (sources.unreadableFiles || []).slice(0, 8),
 });
 
+// Recupero semantico (RAG, passo 4b): fornisce al modello i passaggi delle Fonti
+// più pertinenti al progetto, oltre agli snapshot troncati. Best-effort: se manca
+// la chiave OpenAI, non ci sono chunk indicizzati o la ricerca fallisce, ritorna []
+// senza disturbare la generazione (comportamento invariato). Gli embeddings usano
+// sempre OpenAI (Anthropic non ne ha), a prescindere dal provider di generazione.
+const retrieveRelevantSourceExcerpts = async (input: {
+  workspaceId: string;
+  projectId: string;
+  project: AgencyProjectPayload;
+  topK?: number;
+}): Promise<Array<{ sourceId: string; chunkIndex: number; excerpt: string; score: number }>> => {
+  try {
+    const apiKey = await resolveAgencyOpenAiApiKey(input.workspaceId);
+    if (!apiKey) {
+      return [];
+    }
+    const query = [input.project.name, input.project.clientName, input.project.goal]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .filter(Boolean)
+      .join('. ')
+      .slice(0, 1000);
+    if (!query) {
+      return [];
+    }
+    const hits = await searchProjectSources({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      query,
+      topK: input.topK ?? 8,
+      embedder: createLoggingOpenAiEmbedder({
+        apiKey,
+        workspaceId: input.workspaceId,
+        functionName: 'sources.embed.search',
+      }),
+    });
+    return hits.map((hit) => ({
+      sourceId: hit.sourceId,
+      chunkIndex: hit.chunkIndex,
+      excerpt: clipAgencyAiText(hit.content, 800),
+      score: Math.round(hit.score * 1000) / 1000,
+    }));
+  } catch (error) {
+    logAgencyServiceEvent('RAG retrieval saltato (best-effort).', {
+      projectId: input.projectId,
+      reason: (error as Error).message,
+    });
+    return [];
+  }
+};
+
 const buildAgencyAiDiscoverySnapshot = (sections: DiscoverySections, notes = '') => ({
   sections: Object.fromEntries(DISCOVERY_SECTION_KEYS.map((key) => [
     key,
@@ -2381,6 +2488,8 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
   if (!status.configured) {
     return null;
   }
+  // Cost control: blocca la chiamata se l'utente ha esaurito il budget giornaliero.
+  await assertWithinAiBudget(input.workspaceId);
   const functionName = input.functionName || 'agency_ai_generation';
   const userContent = stringifyCompactAgencyAiPayload(input.user, runtimeConfig.ai.inputMaxChars);
   const inputHash = buildAgencyAiInputHash({
@@ -6677,6 +6786,79 @@ export const agencyService = {
     return getAgencyAiStatusPayload(workspaceId);
   },
 
+  // Budget AI giornaliero (V4 — cost control): default del workspace + spesa odierna
+  // e limite per ciascun dipendente. Per la config in Impostazioni Agency.
+  async getAiBudgets(workspaceId: string) {
+    const [members, budgetRows, spentByUser] = await Promise.all([
+      teamRepository.listMembers(workspaceId),
+      aiBudgetRepository.listByWorkspace(workspaceId),
+      aiUsageRepository.sumCostByUserSince(workspaceId, startOfToday()),
+    ]);
+    const defaultRow = budgetRows.find((row) => row.userId === AI_BUDGET_DEFAULT_USER);
+    const overrideByUser = new Map(
+      budgetRows
+        .filter((row) => row.userId !== AI_BUDGET_DEFAULT_USER)
+        .map((row) => [row.userId, row.dailyLimitUsd] as const),
+    );
+    const defaultDailyLimitUsd = defaultRow?.dailyLimitUsd ?? 0;
+    return {
+      defaultDailyLimitUsd,
+      members: members.map((member) => {
+        const override = overrideByUser.get(member.userId);
+        return {
+          userId: member.userId,
+          name: member.name,
+          email: member.email,
+          status: member.status,
+          // null = nessun override personale: vale il default del workspace.
+          overrideDailyLimitUsd: override ?? null,
+          effectiveDailyLimitUsd: override ?? defaultDailyLimitUsd,
+          spentTodayUsd: Number((spentByUser[member.userId] ?? 0).toFixed(6)),
+        };
+      }),
+    };
+  },
+
+  async saveAiBudgets(input: { workspaceId: string; body: unknown }) {
+    const schema = z.object({
+      defaultDailyLimitUsd: z.coerce.number().min(0).max(100000).optional(),
+      overrides: z
+        .array(
+          z.object({
+            userId: z.string().trim().min(1),
+            // null = rimuovi l'override (torna al default del workspace).
+            dailyLimitUsd: z.coerce.number().min(0).max(100000).nullable(),
+          }),
+        )
+        .optional(),
+    });
+    const parsed = schema.safeParse(input.body ?? {});
+    if (!parsed.success) {
+      throw badRequest('Payload budget AI non valido', { issues: parsed.error.flatten() });
+    }
+    const payload = parsed.data;
+
+    if (payload.defaultDailyLimitUsd !== undefined) {
+      await aiBudgetRepository.upsert(input.workspaceId, AI_BUDGET_DEFAULT_USER, payload.defaultDailyLimitUsd);
+    }
+    if (payload.overrides?.length) {
+      // Solo utenti realmente membri del workspace (evita righe spurie).
+      const members = await teamRepository.listMembers(input.workspaceId);
+      const memberIds = new Set(members.map((member) => member.userId));
+      for (const entry of payload.overrides) {
+        if (!memberIds.has(entry.userId)) {
+          continue;
+        }
+        if (entry.dailyLimitUsd === null) {
+          await aiBudgetRepository.remove(input.workspaceId, entry.userId);
+        } else {
+          await aiBudgetRepository.upsert(input.workspaceId, entry.userId, entry.dailyLimitUsd);
+        }
+      }
+    }
+    return this.getAiBudgets(input.workspaceId);
+  },
+
   async getAgencyRuntimeSettings(input: {
     workspaceId: string;
     canManage: boolean;
@@ -7170,10 +7352,13 @@ export const agencyService = {
     const fallback = buildDiscoveryFromProjectSources({ project, sources });
     const existingSections = normalizeDiscoverySectionsFromBriefJson(existingMemory?.briefJson as Prisma.JsonValue | null);
     const existingBriefJson = isRecord(existingMemory?.briefJson) ? existingMemory.briefJson as Record<string, unknown> : {};
+    // RAG: passaggi delle Fonti più pertinenti (best-effort, [] se non disponibili).
+    const relevantExcerpts = await retrieveRelevantSourceExcerpts({ workspaceId, projectId, project });
     const aiUserPayload = {
       task: 'generateStructuredBrief',
       project: buildAgencyAiProjectSnapshot(project),
       sources: buildAgencyAiSourceSnapshot(sources),
+      relevantExcerpts,
       existingBrief: buildAgencyAiDiscoverySnapshot(existingSections),
       requiredOutput: {
         sections: Object.keys(DISCOVERY_SECTION_LABELS),
@@ -7193,6 +7378,7 @@ export const agencyService = {
       const systemPrompt = [
           'Sei un senior strategist per agenzie digitali.',
           'Genera un brief Discovery strutturato usando solo le fonti dichiarate.',
+          'Il campo relevantExcerpts contiene i passaggi testuali piu pertinenti estratti dalle fonti tramite ricerca semantica: usali come prova primaria, preferendoli agli estratti troncati quando disponibili.',
           'Non inventare target, offerta, CTA, USP o dati di mercato non presenti.',
           'Se una informazione manca, scrivi che va validata e proponi domande operative.',
         ].join(' ');
@@ -7320,6 +7506,23 @@ export const agencyService = {
       } as DiscoveryPayload & { aiGeneration: Record<string, unknown> };
     } catch (error) {
       const fallbackPayload = await this.regenerateProjectDiscoveryFromSources(workspaceId, projectId);
+      // Budget esaurito: segnalato esplicitamente (non un fallback silenzioso).
+      // Si restituisce comunque il brief rule-based, ma con modalità e messaggio chiari.
+      if (error instanceof AiBudgetExceededError) {
+        return {
+          ...fallbackPayload,
+          aiGeneration: {
+            mode: 'budget_exceeded',
+            aiConfigured: true,
+            provider: aiStatus.provider,
+            model: aiStatus.model,
+            budgetExceeded: true,
+            dailyLimitUsd: error.dailyLimitUsd,
+            spentTodayUsd: error.spentTodayUsd,
+            message: error.message,
+          },
+        };
+      }
       return {
         ...fallbackPayload,
         aiGeneration: {

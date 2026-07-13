@@ -48,6 +48,8 @@ import {
   fetchAgencyAiStatus as fetchAgencyAiStatusApi,
   fetchAgencyRuntimeSettings as fetchAgencyRuntimeSettingsApi,
   updateAgencyRuntimeSettings as updateAgencyRuntimeSettingsApi,
+  fetchAgencyAiBudgets as fetchAgencyAiBudgetsApi,
+  updateAgencyAiBudgets as updateAgencyAiBudgetsApi,
 } from "../api/agency.api";
 import {
   getMockMemorySummary,
@@ -1591,6 +1593,16 @@ export const getAgencyRuntimeSettings = async () => {
 
 export const saveAgencyRuntimeSettings = async (payload) => {
   const result = await updateAgencyRuntimeSettingsApi(payload);
+  return withDataSource(result || null, AGENCY_DATA_SOURCE.DB);
+};
+
+export const getAgencyAiBudgets = async () => {
+  const result = await fetchAgencyAiBudgetsApi();
+  return withDataSource(result || { defaultDailyLimitUsd: 0, members: [] }, AGENCY_DATA_SOURCE.DB);
+};
+
+export const saveAgencyAiBudgets = async (payload) => {
+  const result = await updateAgencyAiBudgetsApi(payload);
   return withDataSource(result || null, AGENCY_DATA_SOURCE.DB);
 };
 

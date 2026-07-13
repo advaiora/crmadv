@@ -73,7 +73,11 @@ const normalizeUrl = (value: unknown): string => {
 
 // Vista pubblica di una fonte. Con `full` include l'intero contenuto estratto;
 // altrimenti solo un'anteprima (le liste possono contenere testi molto lunghi).
-const serializeSource = (record: SourceRecord, options?: { full?: boolean }) => {
+// `indexedChunks` = numero di blocchi vettorizzati (0 = non ancora indicizzata).
+const serializeSource = (
+  record: SourceRecord,
+  options?: { full?: boolean; indexedChunks?: number },
+) => {
   const content = record.content ?? '';
   return {
     id: record.id,
@@ -87,6 +91,7 @@ const serializeSource = (record: SourceRecord, options?: { full?: boolean }) => 
     contentChars: record.contentChars,
     status: record.status,
     error: record.error,
+    indexedChunks: options?.indexedChunks ?? 0,
     ...(options?.full
       ? { content }
       : { contentPreview: content.slice(0, PREVIEW_LENGTH) }),
@@ -137,7 +142,8 @@ export const sourcesService = {
   async listSources(workspaceId: string, projectId: string) {
     const validProjectId = await requireProject(workspaceId, projectId);
     const records = await sourcesRepository.listByProject(workspaceId, validProjectId);
-    return records.map((record) => serializeSource(record));
+    const chunkCounts = await sourcesRepository.countChunksBySource(records.map((record) => record.id));
+    return records.map((record) => serializeSource(record, { indexedChunks: chunkCounts[record.id] ?? 0 }));
   },
 
   async getSource(workspaceId: string, id: string) {
@@ -145,7 +151,21 @@ export const sourcesService = {
     if (!record) {
       throw notFound('Fonte non trovata');
     }
-    return serializeSource(record, { full: true });
+    const chunkCounts = await sourcesRepository.countChunksBySource([record.id]);
+    return serializeSource(record, { full: true, indexedChunks: chunkCounts[record.id] ?? 0 });
+  },
+
+  // Fonti in forma "indicizzabile" (id + contenuto + stato), per la reindicizzazione
+  // di tutte le fonti di un progetto (l'indicizzazione vera è orchestrata dalla rotta).
+  async listIndexableSources(workspaceId: string, projectId: string) {
+    const validProjectId = await requireProject(workspaceId, projectId);
+    const records = await sourcesRepository.listByProject(workspaceId, validProjectId);
+    return records.map((record) => ({
+      id: record.id,
+      projectId: record.projectId,
+      status: record.status,
+      content: record.content,
+    }));
   },
 
   async createSource(input: {

@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
 
 // Accesso ai dati delle fonti di progetto (V4 — Modulo Fonti).
@@ -67,5 +68,23 @@ export const sourcesRepository = {
     return prisma.projectSource.deleteMany({
       where: { id, workspaceId },
     });
+  },
+
+  // Numero di chunk indicizzati (embedding) per ciascuna fonte. Query raw perché
+  // ProjectSourceChunk ha una colonna `vector` (tipo non gestito da Prisma Client).
+  async countChunksBySource(sourceIds: string[]): Promise<Record<string, number>> {
+    if (sourceIds.length === 0) {
+      return {};
+    }
+    const rows = await prisma.$queryRaw<Array<{ sourceId: string; count: bigint }>>`
+      SELECT "sourceId", count(*)::bigint AS count
+      FROM "ProjectSourceChunk"
+      WHERE "sourceId" IN (${Prisma.join(sourceIds)})
+      GROUP BY "sourceId"`;
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.sourceId] = Number(row.count);
+    }
+    return result;
   },
 };

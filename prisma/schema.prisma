@@ -178,6 +178,7 @@ model Workspace {
   branding                   WorkspaceBranding?
   quoteNotificationSettings  QuoteNotificationSettings?
   projects                   Project[]
+  aiBudgets                  AiBudget[]
   projectCategories          ProjectCategory[]
   pipelineStages             PipelineStage[]
   quotes                     Quote[]
@@ -481,9 +482,49 @@ model ProjectSource {
   updatedAt    DateTime  @updatedAt
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  chunks       ProjectSourceChunk[]
 
   @@index([workspaceId, projectId])
   @@index([projectId, createdAt])
+}
+
+// Spezzone vettorizzato di una fonte (V4 — RAG). Ogni riga è un blocco di testo
+// della fonte con il suo embedding (pgvector, 1536 dim = OpenAI text-embedding-3-small).
+// La ricerca semantica ordina per distanza coseno (operatore `<=>`). Gli embedding
+// si scrivono/leggono via SQL raw perché Prisma non gestisce nativamente il tipo
+// `vector`. Per ora ricerca esatta (full scan): sui volumi per-progetto è istantanea;
+// un indice ANN (hnsw) andrà aggiunto quando i dati cresceranno.
+model ProjectSourceChunk {
+  id          String                      @id @default(cuid())
+  workspaceId String
+  projectId   String
+  sourceId    String
+  chunkIndex  Int
+  content     String                      @db.Text
+  embedding   Unsupported("vector(1536)")
+  createdAt   DateTime                    @default(now())
+  source      ProjectSource               @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([sourceId, chunkIndex])
+  @@index([workspaceId, projectId])
+}
+
+// Budget di spesa AI giornaliero (V4 — cost control). Limite in USD sulla spesa AI
+// giornaliera. Una riga per dipendente (override), più una riga "default" del
+// workspace identificata da un userId sentinella (vedi AI_BUDGET_DEFAULT_USER nel
+// repository) — così l'unicità su (workspaceId, userId) resta pulita senza NULL.
+// dailyLimitUsd = 0 significa "nessun limite" (illimitato).
+model AiBudget {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  userId        String
+  dailyLimitUsd Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
 }
 
 model ProjectAlert {

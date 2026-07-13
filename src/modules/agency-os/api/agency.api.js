@@ -338,6 +338,25 @@ export const updateAgencyRuntimeSettings = async (payload, { signal } = {}) => {
   return result?.runtimeSettings || null;
 };
 
+export const fetchAgencyAiBudgets = async ({ signal } = {}) => {
+  const result = await agencyFetch("/agency/settings/ai-budgets", {
+    method: "GET",
+    signal,
+  });
+
+  return result?.budgets || null;
+};
+
+export const updateAgencyAiBudgets = async (payload, { signal } = {}) => {
+  const result = await agencyFetch("/agency/settings/ai-budgets", {
+    method: "PUT",
+    body: payload,
+    signal,
+  });
+
+  return result?.budgets || null;
+};
+
 export const fetchAgencyProjectWeb = async (projectId, { signal } = {}) => {
   const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/web`, {
     method: "GET",

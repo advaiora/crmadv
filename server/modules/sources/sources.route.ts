@@ -2,7 +2,26 @@ import type { FastifyPluginAsync } from 'fastify';
 import { badRequest } from '../../core/errors.js';
 import { ok } from '../../core/response.js';
 import { PROJECTS_PERMISSIONS, ensureProjectsAccess } from '../projects/projects.policies.js';
+import { indexSourceBestEffort } from './sources.indexing.js';
 import { sourcesService } from './sources.service.js';
+
+// Indicizza la fonte per il RAG in modo best-effort (non blocca la risposta).
+// `source` è la vista serializzata "full" (contiene `content`).
+const indexAfterWrite = (
+  workspaceId: string,
+  source: { id: string; projectId: string; status: string; content?: string },
+  logger: { warn: (msg: string) => void },
+) =>
+  indexSourceBestEffort(
+    {
+      workspaceId,
+      projectId: source.projectId,
+      id: source.id,
+      content: source.content ?? '',
+      status: source.status,
+    },
+    { logger },
+  );
 
 // Modulo Fonti (V4). Le fonti appartengono a un progetto, quindi sono protette
 // dai permessi del modulo Progetti: lettura projects.view, gestione projects.edit.
@@ -31,6 +50,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
         body: request.body,
         request,
       });
+      await indexAfterWrite(workspace.id, source, request.log);
       return ok(reply, { source }, 201);
     },
   );
@@ -76,7 +96,32 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
         },
         request,
       });
+      await indexAfterWrite(workspace.id, source, request.log);
       return ok(reply, { source }, 201);
+    },
+  );
+
+  // Reindicizza (vettorizza) tutte le fonti di un progetto. Utile quando la chiave
+  // OpenAI viene configurata dopo aver già caricato le fonti. Best-effort per fonte.
+  app.post<{ Params: ProjectParams }>(
+    '/projects/:projectId/sources/reindex',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const items = await sourcesService.listIndexableSources(workspace.id, request.params.projectId);
+      let indexed = 0;
+      let chunks = 0;
+      for (const item of items) {
+        const outcome = await indexAfterWrite(
+          workspace.id,
+          { id: item.id, projectId: item.projectId, status: item.status, content: item.content ?? '' },
+          request.log,
+        );
+        if (outcome.indexed) {
+          indexed += 1;
+          chunks += outcome.chunks ?? 0;
+        }
+      }
+      return ok(reply, { total: items.length, indexed, chunks });
     },
   );
 
@@ -94,6 +139,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
       actorUserId: user.id,
       request,
     });
+    await indexAfterWrite(workspace.id, source, request.log);
     return ok(reply, { source });
   });
 

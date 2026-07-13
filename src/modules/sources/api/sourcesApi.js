@@ -31,6 +31,12 @@ export const uploadProjectSourceFile = (projectId, file) => {
 export const getProjectSource = (id) =>
   apiGet(`/sources/${encodeURIComponent(id)}`, { headers: getHeaders() });
 
+// Reindicizza (vettorizza) tutte le fonti del progetto. Senza body.
+export const reindexProjectSources = (projectId) =>
+  apiPost(`/projects/${encodeURIComponent(projectId)}/sources/reindex`, undefined, {
+    headers: getHeaders(),
+  });
+
 // refresh non ha body: passando `undefined` l'apiClient non imposta Content-Type
 // (evita il 400 di Fastify sul body vuoto).
 export const refreshProjectSource = (id) =>

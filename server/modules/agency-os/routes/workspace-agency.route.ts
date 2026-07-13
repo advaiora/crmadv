@@ -331,6 +331,23 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.get('/agency/settings/ai-budgets', async (request, reply) => {
+    const { workspace } = await ensureAgencySuperadminAccess(request);
+    const budgets = await agencyService.getAiBudgets(workspace.id);
+
+    return ok(reply, { budgets });
+  });
+
+  app.put<{ Body: unknown }>('/agency/settings/ai-budgets', async (request, reply) => {
+    const { workspace } = await ensureAgencySuperadminAccess(request);
+    const budgets = await agencyService.saveAiBudgets({
+      workspaceId: workspace.id,
+      body: request.body,
+    });
+
+    return ok(reply, { budgets });
+  });
+
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/web',
     async (request, reply) => {

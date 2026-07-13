@@ -75,6 +75,33 @@ export const aiUsageRepository = {
     });
   },
 
+  // Somma del costo AI (USD) per un utente in un workspace a partire da `since`.
+  // Usata dal controllo budget giornaliero (spesa già accumulata oggi).
+  async sumCostForUser(workspaceId: string, userId: string, since: Date): Promise<number> {
+    const result = await prisma.aiUsageLog.aggregate({
+      where: { workspaceId, userId, createdAt: { gte: since } },
+      _sum: { costUsd: true },
+    });
+    return result._sum.costUsd ?? 0;
+  },
+
+  // Costo AI (USD) per utente in un workspace da `since`, in un'unica query.
+  // Usato dalla config budget per mostrare la spesa odierna di ogni dipendente.
+  async sumCostByUserSince(workspaceId: string, since: Date): Promise<Record<string, number>> {
+    const rows = await prisma.aiUsageLog.groupBy({
+      by: ['userId'],
+      where: { workspaceId, createdAt: { gte: since }, userId: { not: null } },
+      _sum: { costUsd: true },
+    });
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      if (row.userId) {
+        result[row.userId] = row._sum.costUsd ?? 0;
+      }
+    }
+    return result;
+  },
+
   recentLogs(filter: AiUsageFilter, limit: number) {
     return prisma.aiUsageLog.findMany({
       where: buildWhere(filter),
