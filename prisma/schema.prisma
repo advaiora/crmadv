@@ -339,6 +339,7 @@ model Client {
   webAppAssets    WebAppAsset[]    @relation("WebAppAssetClient")
   ecommerceAssets EcommerceAsset[] @relation("EcommerceAssetClient")
   vaultItems      VaultItem[]
+  aiConversations AiConversation[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, email])
@@ -517,28 +518,35 @@ model ProjectSourceChunk {
   @@index([workspaceId, projectId])
 }
 
-// Conversazione AI collaborativa (post-V4 — Chat AI collaborativa, Fase 1).
+// Conversazione AI collaborativa (post-V4 — Chat AI collaborativa).
 // Evoluzione della vecchia ProjectChatMessage (che era per-utente) verso una
-// chat CONDIVISA con un concetto di "ambito" (scope): per ora solo 'project';
-// in Fase 2 anche 'client'/'general'. Per l'ambito progetto c'e' una sola
-// conversazione per progetto (thread unico), condivisa tra i partecipanti invitati.
+// chat CONDIVISA con un concetto di "ambito" (scope): 'project' (una conversazione
+// per progetto), 'client' (una per cliente, Fase 2) o 'general' (una per workspace,
+// senza contesto CRM). Condivisa tra i partecipanti invitati. L'unicita' per progetto
+// e per cliente e' garantita dai vincoli sotto (i NULL non collidono in Postgres);
+// per 'general' (projectId e clientId entrambi null) l'unicita' per workspace e'
+// gestita a livello applicativo nel repository (get-or-create con findFirst).
 model AiConversation {
   id              String                      @id @default(cuid())
   workspaceId     String
   scope           String                      @default("project") @db.VarChar(16)
   projectId       String?
+  clientId        String?
   title           String?                     @db.VarChar(200)
   createdByUserId String?
   createdAt       DateTime                    @default(now())
   updatedAt       DateTime                    @updatedAt
   workspace       Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project         Project?                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  client          Client?                     @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdByUser   User?                       @relation("AiConversationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   participants    AiConversationParticipant[]
   messages        AiConversationMessage[]
 
   @@unique([projectId])
+  @@unique([clientId])
   @@index([workspaceId, scope])
+  @@index([workspaceId, clientId])
 }
 
 // Partecipante a una conversazione (Fase 1 — condivisione su invito esplicito).

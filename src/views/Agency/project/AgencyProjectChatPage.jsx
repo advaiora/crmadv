@@ -12,76 +12,11 @@ import {
 import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSource";
 import { useSession } from "../../../hooks/useSession";
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
+import ChatBubble from "../chat/chatBubble";
+import { mentionsAi } from "../chat/chatShared";
 
-const formatTime = (value) => {
-  if (!value) {
-    return "";
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("it-IT");
-};
-
-// Etichetta autore da mostrare sopra la bolla: nome, email o fallback.
-const authorLabel = (message) => {
-  if (message.role === "assistant") {
-    return "Assistente AI";
-  }
-  const author = message.author;
-  return author?.name || author?.email || "Utente";
-};
-
-// Rileva se l'AI e' interpellata via menzione @AI (stessa regola del server).
-const mentionsAi = (text) => /(^|\s)@ai\b/i.test(text || "");
-
-// Una bolla di conversazione. I messaggi propri a destra; quelli degli altri
-// (utenti o AI) a sinistra, con l'autore mostrato sopra. Le fonti citate (RAG)
-// dell'assistente sono in un dettaglio richiudibile sotto la risposta.
-const ChatBubble = ({ message, currentUserId }) => {
-  const isAssistant = message.role === "assistant";
-  const isMine = !isAssistant && Boolean(message.author?.id) && message.author.id === currentUserId;
-  const citations = Array.isArray(message.citations) ? message.citations : [];
-  const label = isMine ? "Tu" : authorLabel(message);
-
-  return (
-    <div className={`d-flex mb-3 ${isMine ? "justify-content-end" : "justify-content-start"}`}>
-      <div style={{ maxWidth: "80%" }}>
-        <div className={`small text-muted mb-1 ${isMine ? "text-end" : ""}`}>
-          {isAssistant ? "🤖 " : ""}
-          {label}
-        </div>
-        <div
-          className={`rounded-3 px-3 py-2 ${isMine ? "bg-primary text-white" : "bg-body-secondary border"}`}
-          style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
-        >
-          {message.content}
-        </div>
-        <div className={`small text-muted mt-1 ${isMine ? "text-end" : ""}`}>{formatTime(message.createdAt)}</div>
-        {isAssistant && citations.length > 0 && (
-          <details className="small mt-1">
-            <summary className="text-muted" style={{ cursor: "pointer" }}>
-              Fonti citate ({citations.length})
-            </summary>
-            <div className="mt-2 d-flex flex-column gap-2">
-              {citations.map((citation, index) => (
-                <div key={`${citation.sourceId}-${index}`} className="border rounded-2 p-2 bg-body">
-                  <div className="d-flex align-items-center gap-2 mb-1">
-                    <Badge bg="light" text="dark" className="border">
-                      [{index + 1}] {citation.sourceTitle}
-                    </Badge>
-                    {typeof citation.score === "number" && (
-                      <span className="text-muted">rilevanza {Math.round(citation.score * 100)}%</span>
-                    )}
-                  </div>
-                  <div className="text-muted">{citation.excerpt}</div>
-                </div>
-              ))}
-            </div>
-          </details>
-        )}
-      </div>
-    </div>
-  );
-};
+// ChatBubble e la utility mentionsAi sono ora condivisi con il popup di Chat
+// globale (Fase 2): vedi ../chat/chatBubble.
 
 // Pannello di gestione dei partecipanti: elenco con ruolo, invito di un membro
 // del workspace, uscita/rimozione. Condivisione su invito esplicito (Fase 1).

@@ -57,6 +57,94 @@ export const aiConversationRepository = {
     return this.createProjectConversation(workspaceId, projectId, creatorUserId);
   },
 
+  // --- Ambito CLIENTE (Fase 2): una conversazione condivisa per cliente. Stessa
+  // logica dell'ambito progetto ma agganciata a un clientId. ---
+  findClientConversation(workspaceId: string, clientId: string) {
+    return prisma.aiConversation.findFirst({
+      where: { workspaceId, scope: 'client', clientId },
+    });
+  },
+
+  async createClientConversation(workspaceId: string, clientId: string, creatorUserId: string) {
+    return prisma.aiConversation.create({
+      data: {
+        workspaceId,
+        scope: 'client',
+        clientId,
+        createdByUserId: creatorUserId,
+        participants: {
+          create: {
+            workspaceId,
+            userId: creatorUserId,
+            role: 'owner',
+            invitedByUserId: creatorUserId,
+          },
+        },
+      },
+    });
+  },
+
+  async getOrCreateClientConversation(workspaceId: string, clientId: string, creatorUserId: string) {
+    const existing = await this.findClientConversation(workspaceId, clientId);
+    if (existing) {
+      return existing;
+    }
+    return this.createClientConversation(workspaceId, clientId, creatorUserId);
+  },
+
+  // --- Ambito GENERALE (Fase 2): una sola conversazione condivisa per workspace,
+  // senza contesto CRM. Non c'e' un vincolo DB (projectId e clientId sono entrambi
+  // null): l'unicita' e' garantita qui dal findFirst nel get-or-create. ---
+  findGeneralConversation(workspaceId: string) {
+    return prisma.aiConversation.findFirst({
+      where: { workspaceId, scope: 'general' },
+      orderBy: { createdAt: 'asc' },
+    });
+  },
+
+  async createGeneralConversation(workspaceId: string, creatorUserId: string) {
+    return prisma.aiConversation.create({
+      data: {
+        workspaceId,
+        scope: 'general',
+        createdByUserId: creatorUserId,
+        participants: {
+          create: {
+            workspaceId,
+            userId: creatorUserId,
+            role: 'owner',
+            invitedByUserId: creatorUserId,
+          },
+        },
+      },
+    });
+  },
+
+  async getOrCreateGeneralConversation(workspaceId: string, creatorUserId: string) {
+    const existing = await this.findGeneralConversation(workspaceId);
+    if (existing) {
+      return existing;
+    }
+    return this.createGeneralConversation(workspaceId, creatorUserId);
+  },
+
+  // Id dei progetti di un cliente, unendo il legame diretto (Project.clientId) e
+  // quello molti-a-molti (ProjectClient). Serve al RAG dell'ambito Cliente, che
+  // cerca sulle Fonti di TUTTI i progetti del cliente.
+  async listClientProjectIds(workspaceId: string, clientId: string): Promise<string[]> {
+    const [direct, links] = await Promise.all([
+      prisma.project.findMany({ where: { workspaceId, clientId }, select: { id: true } }),
+      prisma.projectClient.findMany({
+        where: { clientId, project: { workspaceId } },
+        select: { projectId: true },
+      }),
+    ]);
+    const ids = new Set<string>();
+    direct.forEach((row) => ids.add(row.id));
+    links.forEach((row) => ids.add(row.projectId));
+    return [...ids];
+  },
+
   // Messaggi della conversazione dal piu' vecchio al piu' recente (ordine di
   // lettura). Include l'autore (per mostrarlo nella UI). `limit` tiene solo gli
   // ultimi N quando serve limitare il contesto passato all'AI.

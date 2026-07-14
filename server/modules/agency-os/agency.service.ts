@@ -15,8 +15,10 @@ import { agencyRepository } from './agency.repository.js';
 import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
 import { aiBudgetRepository, AI_BUDGET_DEFAULT_USER } from '../../repositories/ai-budget.repository.js';
 import { aiConversationRepository, type ConversationMessageInput } from '../../repositories/ai-conversation.repository.js';
+import { rbacRepository } from '../../repositories/rbac.repository.js';
+import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
-import { createLoggingOpenAiEmbedder, searchProjectSources } from '../sources/sources.rag.js';
+import { createLoggingOpenAiEmbedder, searchProjectSources, searchClientSources } from '../sources/sources.rag.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
 import { getOrCreateWorkspaceDEK } from '../vault/keys.js';
 import { z } from 'zod';
@@ -2617,6 +2619,141 @@ const mapConversationParticipant = (row: {
   email: row.user?.email ?? null,
   joinedAt: row.createdAt.toISOString(),
 });
+
+// --- Chat AI con AMBITI (Fase 2): oltre a 'project', anche 'client' e 'general'. ---
+
+// Bersaglio d'ambito di una conversazione: identifica quale conversazione (e quale
+// contesto RAG) usare. project -> un progetto; client -> tutti i progetti del
+// cliente; general -> nessun contesto CRM.
+type ChatScopeTarget =
+  | { scope: 'project'; projectId: string }
+  | { scope: 'client'; clientId: string }
+  | { scope: 'general' };
+
+// Trova/crea la conversazione condivisa giusta per l'ambito.
+const resolveScopedConversation = (workspaceId: string, target: ChatScopeTarget, userId: string) => {
+  if (target.scope === 'project') {
+    return aiConversationRepository.getOrCreateProjectConversation(workspaceId, target.projectId, userId);
+  }
+  if (target.scope === 'client') {
+    return aiConversationRepository.getOrCreateClientConversation(workspaceId, target.clientId, userId);
+  }
+  return aiConversationRepository.getOrCreateGeneralConversation(workspaceId, userId);
+};
+
+// Prompt di sistema per l'ambito Cliente: come quello di progetto ma il contesto
+// sono le Fonti di TUTTI i progetti del cliente.
+const buildClientChatSystemPrompt = (input: { clientName: string; citations: ProjectChatCitation[] }): string => {
+  const rules = [
+    "Sei l'assistente AI di un'agenzia, a supporto di un intero CLIENTE (che puo' avere piu' progetti). Rispondi in italiano, in modo chiaro e conciso.",
+    'Usa ESCLUSIVAMENTE le informazioni del contesto qui sotto (estratti delle Fonti dei progetti del cliente).',
+    'Se la risposta non e\' nel contesto, dillo esplicitamente ("Questa informazione non e\' presente nelle fonti del cliente") invece di inventare.',
+    'Quando usi un estratto, cita la fonte tra parentesi con il suo numero, es. [1].',
+  ].join(' ');
+  const profile = `CLIENTE: ${input.clientName || 'n/d'}`;
+  const sources = input.citations.length > 0
+    ? ['ESTRATTI DELLE FONTI (tutti i progetti del cliente):', ...input.citations.map((c, i) => `[${i + 1}] (${c.sourceTitle}) ${c.excerpt}`)].join('\n')
+    : 'ESTRATTI DELLE FONTI: nessun estratto pertinente trovato per questa domanda.';
+  return `${rules}\n\n${profile}\n\n${sources}`;
+};
+
+// Prompt di sistema per l'ambito Generale: nessun contesto CRM specifico.
+const buildGeneralChatSystemPrompt = (): string => [
+  "Sei l'assistente AI di un'agenzia di marketing. Rispondi in italiano, in modo chiaro e conciso.",
+  "Questa e' una chat GENERALE: non hai un progetto o un cliente specifico come contesto.",
+  "Aiuta su domande generali di marketing, strategia e uso del CRM. Se serve un'informazione specifica di un progetto o cliente, invita a usare la chat di quel progetto o cliente.",
+].join(' ');
+
+// Recupero RAG per l'ambito Cliente: come retrieveSourceExcerptsForQuery ma sui
+// chunk di PIU' progetti. Best-effort: senza chiave/chunk ritorna [].
+const retrieveClientSourceExcerptsForQuery = async (input: {
+  workspaceId: string;
+  projectIds: string[];
+  query: string;
+  topK?: number;
+}): Promise<Array<{ sourceId: string; chunkIndex: number; excerpt: string; score: number }>> => {
+  const query = (input.query ?? '').trim().slice(0, 1000);
+  if (!query || input.projectIds.length === 0) {
+    return [];
+  }
+  try {
+    const apiKey = await resolveAgencyOpenAiApiKey(input.workspaceId);
+    if (!apiKey) {
+      return [];
+    }
+    const hits = await searchClientSources({
+      workspaceId: input.workspaceId,
+      projectIds: input.projectIds,
+      query,
+      topK: input.topK ?? 6,
+      embedder: createLoggingOpenAiEmbedder({
+        apiKey,
+        workspaceId: input.workspaceId,
+        functionName: 'sources.embed.search',
+      }),
+    });
+    return hits.map((hit) => ({
+      sourceId: hit.sourceId,
+      chunkIndex: hit.chunkIndex,
+      excerpt: clipAgencyAiText(hit.content, 900),
+      score: Math.round(hit.score * 1000) / 1000,
+    }));
+  } catch (error) {
+    logAgencyServiceEvent('RAG chat cliente saltato (best-effort).', {
+      clientProjects: input.projectIds.length,
+      reason: (error as Error).message,
+    });
+    return [];
+  }
+};
+
+// Costruisce il contesto AI (system prompt + citazioni RAG) per l'ambito indicato.
+const buildScopedChatContext = async (
+  workspaceId: string,
+  target: ChatScopeTarget,
+  message: string,
+): Promise<{ system: string; citations: ProjectChatCitation[] }> => {
+  if (target.scope === 'general') {
+    return { system: buildGeneralChatSystemPrompt(), citations: [] };
+  }
+  if (target.scope === 'project') {
+    const [project, excerpts, indexedSources] = await Promise.all([
+      agencyRepository.findAgencyProject(workspaceId, target.projectId),
+      retrieveSourceExcerptsForQuery({ workspaceId, projectId: target.projectId, query: message, topK: 6 }),
+      agencyRepository.listIndexedProjectSources(workspaceId, target.projectId),
+    ]);
+    const titleById = new Map(indexedSources.map((source) => [source.id, source.title]));
+    const citations: ProjectChatCitation[] = excerpts.map((excerpt) => ({
+      sourceId: excerpt.sourceId,
+      sourceTitle: titleById.get(excerpt.sourceId) || 'Fonte',
+      excerpt: excerpt.excerpt,
+      score: excerpt.score,
+    }));
+    const system = buildProjectChatSystemPrompt({
+      projectName: project?.name || '',
+      clientName: project?.client?.name ?? null,
+      goal: project?.goal || '',
+      citations,
+    });
+    return { system, citations };
+  }
+  // client: RAG su tutte le Fonti dei progetti del cliente, titoli risolti insieme.
+  const [client, projectIds] = await Promise.all([
+    agencyRepository.findAgencyClient(workspaceId, target.clientId),
+    aiConversationRepository.listClientProjectIds(workspaceId, target.clientId),
+  ]);
+  const excerpts = await retrieveClientSourceExcerptsForQuery({ workspaceId, projectIds, query: message, topK: 6 });
+  const titles = await agencyRepository.listSourceTitlesByIds(workspaceId, excerpts.map((excerpt) => excerpt.sourceId));
+  const titleById = new Map(titles.map((source) => [source.id, source.title]));
+  const citations: ProjectChatCitation[] = excerpts.map((excerpt) => ({
+    sourceId: excerpt.sourceId,
+    sourceTitle: titleById.get(excerpt.sourceId) || 'Fonte',
+    excerpt: excerpt.excerpt,
+    score: excerpt.score,
+  }));
+  const system = buildClientChatSystemPrompt({ clientName: client?.name || '', citations });
+  return { system, citations };
+};
 
 const buildAgencyAiDiscoverySnapshot = (sections: DiscoverySections, notes = '') => ({
   sections: Object.fromEntries(DISCOVERY_SECTION_KEYS.map((key) => [
@@ -7305,6 +7442,36 @@ export const agencyService = {
     };
   },
 
+  // Progetti per il selettore della Chat globale (Fase 2). Applica la visibilita'
+  // V2 (owner/assegnazione/reparti; chi ha projects.view_all vede tutto) e marca
+  // quelli "assegnati a me" e con Fonti indicizzate, per ordinarli in cima lato UI.
+  // La risoluzione del perimetro ricalca projectsService.resolveProjectVisibility
+  // usando i repository condivisi, per non accoppiare Agency al modulo projects.
+  async listChatProjects(input: { workspaceId: string; userId: string }) {
+    const hasViewAll = await rbacRepository.hasPermission(
+      input.userId,
+      input.workspaceId,
+      'projects.view_all',
+    );
+    const ledDepartmentIds = hasViewAll
+      ? []
+      : await departmentRepository.listLedDepartmentIds(input.workspaceId, input.userId);
+    const scope = hasViewAll
+      ? null
+      : { userId: input.userId, ledDepartmentIds, isLead: ledDepartmentIds.length > 0 };
+
+    const rows = await agencyRepository.listAgencyChatProjects(input.workspaceId, scope, input.userId);
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      clientId: row.clientId,
+      clientName: row.clientName,
+      assignedToMe: row.assignedToMe,
+      hasIndexedSources: row.hasIndexedSources,
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  },
+
   // Chat AI collaborativa di progetto (Fase 1). Conversazione CONDIVISA (un thread
   // per progetto) con partecipanti su invito. Chi apre per primo la chat la crea e
   // ne diventa owner; gli altri vedono i messaggi solo se invitati.
@@ -7554,6 +7721,217 @@ export const agencyService = {
       await aiConversationRepository.removeParticipant(conversation.id, input.targetUserId);
     }
     return this.listProjectChatParticipants({ workspaceId: input.workspaceId, projectId: input.projectId, userId: input.userId });
+  },
+
+  // --- Chat AI scoped (Fase 2): stessa logica della chat di progetto, ma per un
+  // ambito qualsiasi (progetto/cliente/generale). Le rotte di progetto (Fase 1)
+  // restano invariate; questi metodi servono agli ambiti Cliente e Generale. ---
+
+  // Verifica che il bersaglio dell'ambito esista (progetto/cliente); 404 altrimenti.
+  async assertScopeTargetExists(workspaceId: string, target: ChatScopeTarget) {
+    if (target.scope === 'project') {
+      const project = await agencyRepository.findAgencyProject(workspaceId, target.projectId);
+      if (!project) {
+        throw notFound('Project not found');
+      }
+    } else if (target.scope === 'client') {
+      const client = await agencyRepository.findAgencyClient(workspaceId, target.clientId);
+      if (!client) {
+        throw notFound('Client not found');
+      }
+    }
+  },
+
+  async getScopedChat(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    const [participants, status] = await Promise.all([
+      aiConversationRepository.listParticipants(conversation.id),
+      getAgencyAiStatusPayload(input.workspaceId),
+    ]);
+    const isParticipant = participants.some((row) => row.userId === input.userId);
+    const messages = isParticipant
+      ? (await aiConversationRepository.listMessages(conversation.id)).map(mapConversationMessage)
+      : [];
+    return {
+      aiConfigured: status.configured,
+      scope: input.target.scope,
+      conversationId: conversation.id,
+      isParticipant,
+      participants: participants.map(mapConversationParticipant),
+      messages,
+    };
+  },
+
+  async clearScopedChat(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
+    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    const participants = await aiConversationRepository.listParticipants(conversation.id);
+    const me = participants.find((row) => row.userId === input.userId);
+    if (!me || me.role !== 'owner') {
+      throw forbidden('Solo il proprietario della conversazione puo azzerarla.');
+    }
+    await aiConversationRepository.clearMessages(conversation.id);
+    return { messages: [] as ReturnType<typeof mapConversationMessage>[] };
+  },
+
+  async sendScopedChatMessage(input: { workspaceId: string; userId: string; target: ChatScopeTarget; body: unknown }) {
+    const schema = z.object({
+      message: z.string().trim().min(1).max(4000),
+      askAi: z.boolean().optional(),
+    });
+    const parsed = schema.safeParse(input.body ?? {});
+    if (!parsed.success) {
+      throw badRequest('Messaggio non valido.', { issues: parsed.error.flatten() });
+    }
+    const message = parsed.data.message;
+
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    const isParticipant = await aiConversationRepository.isParticipant(conversation.id, input.userId);
+    if (!isParticipant) {
+      throw forbidden('Non fai parte di questa conversazione. Chiedi a un partecipante di invitarti.');
+    }
+
+    // Salva sempre il messaggio umano, con il suo autore.
+    await aiConversationRepository.createMessages([
+      {
+        workspaceId: input.workspaceId,
+        conversationId: conversation.id,
+        authorUserId: input.userId,
+        role: 'user',
+        content: message,
+      },
+    ]);
+
+    const buildResult = async (extra: Record<string, unknown> = {}) => {
+      const rows = await aiConversationRepository.listMessages(conversation.id);
+      return {
+        conversationId: conversation.id,
+        scope: input.target.scope,
+        messages: rows.map(mapConversationMessage),
+        ...extra,
+      };
+    };
+
+    const invokeAi = parsed.data.askAi === true || /(^|\s)@ai\b/i.test(message);
+    if (!invokeAi) {
+      return buildResult({ aiInvoked: false });
+    }
+
+    const status = await getAgencyAiStatusPayload(input.workspaceId);
+    if (!status.configured) {
+      return buildResult({ aiInvoked: false, aiConfigured: false });
+    }
+
+    // Contesto per l'ambito (profilo + RAG) e storico recente.
+    const [context, history] = await Promise.all([
+      buildScopedChatContext(input.workspaceId, input.target, message),
+      aiConversationRepository.listMessages(conversation.id, CHAT_HISTORY_CONTEXT_LIMIT),
+    ]);
+    const contextMessages = history.map((row) => ({
+      role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+      content: row.content,
+    }));
+
+    let result: AgencyAiTextResult | null;
+    try {
+      result = await runAgencyAiTextWithMeta({
+        workspaceId: input.workspaceId,
+        system: context.system,
+        messages: contextMessages,
+        functionName: `chat.${input.target.scope}`,
+      });
+    } catch (error) {
+      if (error instanceof AiBudgetExceededError) {
+        return buildResult({ aiInvoked: false, budgetExceeded: true, budgetMessage: error.message });
+      }
+      throw error;
+    }
+    if (!result) {
+      throw badRequest('Generazione della risposta non riuscita.');
+    }
+
+    await aiConversationRepository.createMessages([
+      {
+        workspaceId: input.workspaceId,
+        conversationId: conversation.id,
+        authorUserId: null,
+        role: 'assistant',
+        content: result.text,
+        citationsJson: context.citations as unknown as Prisma.InputJsonValue,
+      },
+    ]);
+
+    return buildResult({ aiInvoked: true });
+  },
+
+  async listScopedChatParticipants(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
+    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    const [participants, members] = await Promise.all([
+      aiConversationRepository.listParticipants(conversation.id),
+      aiConversationRepository.listWorkspaceMembers(input.workspaceId),
+    ]);
+    const participantIds = new Set(participants.map((row) => row.userId));
+    const invitable = members
+      .filter((member) => !participantIds.has(member.userId))
+      .map((member) => ({ userId: member.userId, name: member.user?.name ?? null, email: member.user?.email ?? null }));
+    return {
+      conversationId: conversation.id,
+      scope: input.target.scope,
+      participants: participants.map(mapConversationParticipant),
+      invitable,
+    };
+  },
+
+  async addScopedChatParticipant(input: { workspaceId: string; userId: string; target: ChatScopeTarget; body: unknown }) {
+    const schema = z.object({ userId: z.string().min(1) });
+    const parsed = schema.safeParse(input.body ?? {});
+    if (!parsed.success) {
+      throw badRequest('Dati invito non validi.', { issues: parsed.error.flatten() });
+    }
+    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    const actorIsParticipant = await aiConversationRepository.isParticipant(conversation.id, input.userId);
+    if (!actorIsParticipant) {
+      throw forbidden('Solo un partecipante puo invitare altri.');
+    }
+    const members = await aiConversationRepository.listWorkspaceMembers(input.workspaceId);
+    const invited = members.find((member) => member.userId === parsed.data.userId);
+    if (!invited) {
+      throw badRequest('Utente non appartenente al workspace.');
+    }
+    await aiConversationRepository.addParticipant({
+      workspaceId: input.workspaceId,
+      conversationId: conversation.id,
+      userId: parsed.data.userId,
+      role: 'member',
+      invitedByUserId: input.userId,
+    });
+    return this.listScopedChatParticipants(input);
+  },
+
+  async removeScopedChatParticipant(input: { workspaceId: string; userId: string; target: ChatScopeTarget; targetUserId: string }) {
+    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    const participants = await aiConversationRepository.listParticipants(conversation.id);
+    const actor = participants.find((row) => row.userId === input.userId);
+    if (!actor) {
+      throw forbidden('Non fai parte di questa conversazione.');
+    }
+    const targetMember = participants.find((row) => row.userId === input.targetUserId);
+    if (targetMember) {
+      if (targetMember.role === 'owner') {
+        throw badRequest('Il proprietario della conversazione non puo essere rimosso.');
+      }
+      const removingSelf = input.targetUserId === input.userId;
+      if (!removingSelf && actor.role !== 'owner') {
+        throw forbidden('Solo il proprietario puo rimuovere altri partecipanti.');
+      }
+      await aiConversationRepository.removeParticipant(conversation.id, input.targetUserId);
+    }
+    return this.listScopedChatParticipants({
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      target: input.target,
+    });
   },
 
   async saveAiBudgets(input: { workspaceId: string; body: unknown }) {

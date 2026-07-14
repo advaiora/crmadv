@@ -1,7 +1,7 @@
 # Spec — Chat AI collaborativa (estensione AI, post-V4)
 
 > Fonte di verità di questa feature. Concordata a staffetta il **14 luglio 2026** (Jacopo).
-> **Stato: PIANIFICATA — sviluppo NON iniziato.** Si parte dopo le rifiniture V4 e, per le parti AI, quando saranno configurate le **chiavi reali OpenAI/Anthropic** (a fine V, come da decisione).
+> **Stato: Fase 1 e Fase 2 FATTE (14/7/2026, Jacopo). Fasi 3–6 da fare.** Le parti AI (turni, RAG cliente) si **collaudano davvero** quando saranno configurate le **chiavi reali OpenAI/Anthropic** (a fine V, come da decisione): finora provate a fondo lato dati/UI con AI "non configurata".
 >
 > Base di partenza già in `main`: la **chat di progetto per-utente** (motore di generazione a testo `runAgencyAiTextWithMeta`, RAG sulla domanda, persistenza `ProjectChatMessage`, scheda "Chat" nel progetto, integrazione budget+log costi). Questa spec la **evolve** in una chat collaborativa multi-ambito.
 
@@ -30,7 +30,7 @@ Una **sola Chat AI** con un concetto di **ambito** (Generale / Cliente / Progett
 
 ## 3. Piano a fasi (ognuna rilasciabile)
 
-### Fase 1 — Modello conversazioni + chat di progetto condivisa
+### Fase 1 — Modello conversazioni + chat di progetto condivisa ✅ FATTA (14/7/2026)
 - Nuovo modello dati: `AiConversation` (per ambito: progetto/cliente/generale) + `AiConversationParticipant` (invito esplicito); i messaggi si agganciano alla conversazione (evoluzione di `ProjectChatMessage`, che oggi è per-utente).
 - **Migrazione dedicata** (da segnalare a Claudio). La chat per-utente attuale viene **subsumed** nel nuovo modello (i dati dev locali si possono azzerare, non c'è uso reale).
 - La chat di progetto diventa **condivisa su invito**, con **autore** mostrato su ogni messaggio.
@@ -38,12 +38,13 @@ Una **sola Chat AI** con un concetto di **ambito** (Generale / Cliente / Progett
 - *(Tempo reale rimandato alla Fase 4: qui basta un aggiornamento semplice.)*
 - **Done quando:** più utenti invitati lavorano sulla chat di un progetto e chiamano l'AI a richiesta.
 
-### Fase 2 — Ambiti + popup globale + selettore
-- **Popup chat globale** disponibile in tutto il CRM.
-- **Selettore d'ambito** (Generale/Cliente/Progetto), con **"assegnati a me"** in cima → **dipende dal modello di assegnazione/visibilità di V2** (coordinare con Claudio).
-- Ambito **Cliente** = RAG su **tutti i progetti del cliente** (estensione della ricerca, oggi per-progetto).
-- Popup con ambito "Progetto X" = **stessa conversazione** della scheda (grazie al modello di Fase 1).
-- **Done quando:** la chat è raggiungibile ovunque e l'ambito è scegliibile, con la stessa conversazione condivisa tra popup e scheda.
+### Fase 2 — Ambiti + popup globale + selettore ✅ FATTA (14/7/2026)
+- **Popup chat globale** disponibile in tutto il CRM. *(Fatto: `src/views/Agency/chat/AiChatWidget.jsx`, montato nello shell `ClassicLayout`, icona nella topbar.)*
+- **Selettore d'ambito** (Progetto/Cliente/Generale), con **"assegnati a me"** in cima → si appoggia al modello di assegnazione/visibilità di **V2** (fatta da **Jacopo**, confermato: niente coordinamento con Claudio). *(Fatto: endpoint `GET /agency/chat/projects` con scoping V2; i clienti sono derivati dai progetti visibili, perché V2 non ha assegnazione diretta utente↔cliente.)*
+- Ambito **Cliente** = RAG su **tutti i progetti del cliente** *(Fatto: `searchClientSources` + `listClientProjectIds` che unisce `Project.clientId` e `ProjectClient`).*
+- Popup con ambito "Progetto X" = **stessa conversazione** della scheda (riusa gli endpoint `/agency/projects/:id/chat`).
+- **Nuova migrazione** `20260714170302_ai_conversation_client_general_scope` (aggiunge `clientId` + indici ad `AiConversation`; ambito 'general' senza vincolo DB, unicità applicativa). Additiva, non distruttiva.
+- **Done quando:** la chat è raggiungibile ovunque e l'ambito è scegliibile, con la stessa conversazione condivisa tra popup e scheda. ✅
 
 ### Fase 3 — Allegati + "Chiedi all'AI" sugli elementi
 - **"Allega"** nel popup: file (doc/immagini) ed **entità CRM** (incluso **thread di messaggistica**, con nota privacy: solo thread di cui fai parte).

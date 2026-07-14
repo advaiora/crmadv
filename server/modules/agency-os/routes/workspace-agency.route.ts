@@ -64,6 +64,20 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     });
   });
 
+  // Progetti per il selettore della Chat globale (Fase 2): filtrati per la
+  // visibilita' dell'utente, con flag "assegnato a me" e "ha Fonti indicizzate".
+  app.get('/agency/chat/projects', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const projects = await agencyService.listChatProjects({
+      workspaceId: workspace.id,
+      userId: user.id,
+    });
+
+    return ok(reply, {
+      projects,
+    });
+  });
+
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId',
     async (request, reply) => {
@@ -441,6 +455,137 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       return ok(reply, { participants });
     },
   );
+
+  // --- Chat AI ambito CLIENTE (Fase 2): RAG su tutti i progetti del cliente. ---
+  app.get<{ Params: { clientId: string } }>('/agency/chat/client/:clientId', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const chat = await agencyService.getScopedChat({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'client', clientId: request.params.clientId },
+    });
+    return ok(reply, { chat });
+  });
+
+  app.post<{ Params: { clientId: string }; Body: unknown }>('/agency/chat/client/:clientId', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const chat = await agencyService.sendScopedChatMessage({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'client', clientId: request.params.clientId },
+      body: request.body,
+    });
+    return ok(reply, { chat });
+  });
+
+  app.delete<{ Params: { clientId: string } }>('/agency/chat/client/:clientId', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const chat = await agencyService.clearScopedChat({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'client', clientId: request.params.clientId },
+    });
+    return ok(reply, { chat });
+  });
+
+  app.get<{ Params: { clientId: string } }>('/agency/chat/client/:clientId/participants', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const participants = await agencyService.listScopedChatParticipants({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'client', clientId: request.params.clientId },
+    });
+    return ok(reply, { participants });
+  });
+
+  app.post<{ Params: { clientId: string }; Body: unknown }>('/agency/chat/client/:clientId/participants', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const participants = await agencyService.addScopedChatParticipant({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'client', clientId: request.params.clientId },
+      body: request.body,
+    });
+    return ok(reply, { participants });
+  });
+
+  app.delete<{ Params: { clientId: string; memberId: string } }>(
+    '/agency/chat/client/:clientId/participants/:memberId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.removeScopedChatParticipant({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'client', clientId: request.params.clientId },
+        targetUserId: request.params.memberId,
+      });
+      return ok(reply, { participants });
+    },
+  );
+
+  // --- Chat AI ambito GENERALE (Fase 2): una conversazione per workspace, no CRM. ---
+  app.get('/agency/chat/general', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const chat = await agencyService.getScopedChat({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'general' },
+    });
+    return ok(reply, { chat });
+  });
+
+  app.post<{ Body: unknown }>('/agency/chat/general', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const chat = await agencyService.sendScopedChatMessage({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'general' },
+      body: request.body,
+    });
+    return ok(reply, { chat });
+  });
+
+  app.delete('/agency/chat/general', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const chat = await agencyService.clearScopedChat({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'general' },
+    });
+    return ok(reply, { chat });
+  });
+
+  app.get('/agency/chat/general/participants', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const participants = await agencyService.listScopedChatParticipants({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'general' },
+    });
+    return ok(reply, { participants });
+  });
+
+  app.post<{ Body: unknown }>('/agency/chat/general/participants', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const participants = await agencyService.addScopedChatParticipant({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'general' },
+      body: request.body,
+    });
+    return ok(reply, { participants });
+  });
+
+  app.delete<{ Params: { memberId: string } }>('/agency/chat/general/participants/:memberId', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const participants = await agencyService.removeScopedChatParticipant({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: { scope: 'general' },
+      targetUserId: request.params.memberId,
+    });
+    return ok(reply, { participants });
+  });
 
   app.get('/agency/ai/estimates', async (request, reply) => {
     const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);

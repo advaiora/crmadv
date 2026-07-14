@@ -351,6 +351,54 @@ export const fetchAgencyAiUsage = async ({ days = 30, userId, model, functionNam
   return result?.usage || null;
 };
 
+export const fetchAgencyChatProjects = async ({ signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/projects`, {
+    method: "GET",
+    signal,
+  });
+
+  return Array.isArray(result?.projects) ? result.projects : [];
+};
+
+// --- Chat AI ambito CLIENTE e GENERALE (Fase 2) ---
+export const fetchAgencyClientChat = async (clientId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/client/${encodeURIComponent(clientId)}`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const sendAgencyClientChatMessage = async (clientId, message, { askAi = false, signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/client/${encodeURIComponent(clientId)}`, {
+    method: "POST",
+    body: { message, askAi },
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const fetchAgencyGeneralChat = async ({ signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/general`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const sendAgencyGeneralChatMessage = async (message, { askAi = false, signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/general`, {
+    method: "POST",
+    body: { message, askAi },
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
 export const fetchAgencyProjectChat = async (projectId, { signal } = {}) => {
   const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
     method: "GET",

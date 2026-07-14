@@ -8,6 +8,33 @@ import {
 import { prisma } from '../../prisma.js';
 
 const PROJECT_TABLE = 'Project';
+
+// Perimetro di visibilita' utente->progetto (V2). Replica locale, per il modulo
+// Agency, della logica canonica di projects.repository.buildVisibilityOr: un
+// membro vede i progetti di cui e' owner o a cui e' assegnato (ProjectAccess),
+// piu' quelli dei reparti che guida e i progetti "generali" senza reparto.
+// `scope` null a monte = l'utente ha projects.view_all e vede tutto.
+export type AgencyProjectVisibilityScope = {
+  userId: string;
+  ledDepartmentIds: string[];
+  isLead: boolean;
+};
+
+const buildAgencyProjectVisibilityOr = (
+  scope: AgencyProjectVisibilityScope,
+): Prisma.ProjectWhereInput[] => {
+  const conditions: Prisma.ProjectWhereInput[] = [
+    { ownerUserId: scope.userId },
+    { access: { some: { userId: scope.userId } } },
+  ];
+  if (scope.ledDepartmentIds.length > 0) {
+    conditions.push({ departments: { some: { departmentId: { in: scope.ledDepartmentIds } } } });
+  }
+  if (scope.isLead) {
+    conditions.push({ departments: { none: {} } });
+  }
+  return conditions;
+};
 const PROJECT_TYPE_TABLE = 'ProjectType';
 const PROJECT_MEMORY_TABLE = 'ProjectMemory';
 const PROJECT_ACTIVE_MODULE_TABLE = 'ProjectActiveModule';
@@ -530,6 +557,55 @@ export const agencyRepository = {
     });
   },
 
+  // Progetti per il selettore della Chat globale (Fase 2). Applica la visibilita'
+  // V2 (scope null = vede tutto) e restituisce, per ciascun progetto, se e'
+  // "assegnato a me" (owner o ProjectAccess) e se ha Fonti indicizzate (chunk RAG),
+  // cosi' la UI puo' mettere in cima gli assegnati e segnalare quelli interrogabili.
+  async listAgencyChatProjects(
+    workspaceId: string,
+    scope: AgencyProjectVisibilityScope | null,
+    userId: string,
+  ) {
+    const projects = await prisma.project.findMany({
+      where: {
+        workspaceId,
+        ...(scope ? { OR: buildAgencyProjectVisibilityOr(scope) } : {}),
+      },
+      orderBy: [{ updatedAt: 'desc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        clientId: true,
+        ownerUserId: true,
+        updatedAt: true,
+        client: { select: { id: true, name: true } },
+        access: { where: { userId }, select: { id: true } },
+      },
+    });
+
+    // Quali progetti hanno almeno una Fonte indicizzata (un chunk RAG presente):
+    // una sola query aggregata invece di N controlli per riga.
+    const projectIds = projects.map((project) => project.id);
+    const indexedRows = projectIds.length
+      ? await prisma.projectSourceChunk.findMany({
+          where: { workspaceId, projectId: { in: projectIds } },
+          distinct: ['projectId'],
+          select: { projectId: true },
+        })
+      : [];
+    const indexedProjectIds = new Set(indexedRows.map((row) => row.projectId));
+
+    return projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      clientId: project.clientId,
+      clientName: project.client?.name ?? null,
+      updatedAt: project.updatedAt,
+      assignedToMe: project.ownerUserId === userId || project.access.length > 0,
+      hasIndexedSources: indexedProjectIds.has(project.id),
+    }));
+  },
+
   async findAgencyProject(workspaceId: string, projectId: string) {
     return prisma.project.findFirst({
       where: {
@@ -537,6 +613,26 @@ export const agencyRepository = {
         id: projectId,
       },
       select: agencyProjectListSelect,
+    });
+  },
+
+  // Cliente del workspace (nome per il prompt della Chat, ambito Cliente — Fase 2).
+  findAgencyClient(workspaceId: string, clientId: string) {
+    return prisma.client.findFirst({
+      where: { workspaceId, id: clientId },
+      select: { id: true, name: true },
+    });
+  },
+
+  // Titoli delle fonti citate (RAG), per etichettare le citazioni quando gli estratti
+  // arrivano da piu' progetti (ambito Cliente): risolve i titoli in una sola query.
+  listSourceTitlesByIds(workspaceId: string, sourceIds: string[]) {
+    if (sourceIds.length === 0) {
+      return Promise.resolve([] as Array<{ id: string; title: string }>);
+    }
+    return prisma.projectSource.findMany({
+      where: { workspaceId, id: { in: sourceIds } },
+      select: { id: true, title: true },
     });
   },
 

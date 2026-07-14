@@ -270,3 +270,43 @@ export const searchProjectSources = async (input: {
     score: Number(row.score),
   }));
 };
+
+// Ricerca semantica sulle Fonti di PIU' progetti (ambito Cliente — Fase 2): stessa
+// logica di searchProjectSources ma sui chunk di tutti i progetti passati. Ritorna
+// [] se non ci sono progetti o query, senza toccare il DB.
+export const searchClientSources = async (input: {
+  workspaceId: string;
+  projectIds: string[];
+  query: string;
+  topK?: number;
+  embedder: Embedder;
+}): Promise<SourceSearchHit[]> => {
+  const query = (input.query ?? '').trim();
+  if (!query || input.projectIds.length === 0) {
+    return [];
+  }
+  const topK = Math.min(Math.max(input.topK ?? 6, 1), 50);
+  const [vector] = await input.embedder([query]);
+  if (!vector) {
+    return [];
+  }
+  const literal = toVectorLiteral(vector);
+  const rows = await prisma.$queryRaw<Array<{
+    sourceId: string;
+    chunkIndex: number;
+    content: string;
+    score: number;
+  }>>`
+    SELECT "sourceId", "chunkIndex", "content",
+           1 - ("embedding" <=> ${literal}::vector) AS score
+    FROM "ProjectSourceChunk"
+    WHERE "workspaceId" = ${input.workspaceId} AND "projectId" = ANY(${input.projectIds})
+    ORDER BY "embedding" <=> ${literal}::vector
+    LIMIT ${topK}`;
+  return rows.map((row) => ({
+    sourceId: row.sourceId,
+    chunkIndex: Number(row.chunkIndex),
+    content: row.content,
+    score: Number(row.score),
+  }));
+};
