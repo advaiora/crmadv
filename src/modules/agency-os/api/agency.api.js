@@ -360,10 +360,10 @@ export const fetchAgencyProjectChat = async (projectId, { signal } = {}) => {
   return result?.chat || null;
 };
 
-export const sendAgencyProjectChatMessage = async (projectId, message, { signal } = {}) => {
+export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false, signal } = {}) => {
   const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
     method: "POST",
-    body: { message },
+    body: { message, askAi },
     signal,
   });
 
@@ -377,6 +377,37 @@ export const clearAgencyProjectChat = async (projectId, { signal } = {}) => {
   });
 
   return result?.chat || null;
+};
+
+export const fetchAgencyProjectChatParticipants = async (projectId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat/participants`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.participants || null;
+};
+
+export const addAgencyProjectChatParticipant = async (projectId, userId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat/participants`, {
+    method: "POST",
+    body: { userId },
+    signal,
+  });
+
+  return result?.participants || null;
+};
+
+export const removeAgencyProjectChatParticipant = async (projectId, memberId, { signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants/${encodeURIComponent(memberId)}`,
+    {
+      method: "DELETE",
+      signal,
+    },
+  );
+
+  return result?.participants || null;
 };
 
 export const fetchAgencyAiEstimates = async ({ signal } = {}) => {

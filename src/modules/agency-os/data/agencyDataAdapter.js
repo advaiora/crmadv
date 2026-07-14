@@ -52,6 +52,9 @@ import {
   fetchAgencyProjectChat as fetchAgencyProjectChatApi,
   sendAgencyProjectChatMessage as sendAgencyProjectChatMessageApi,
   clearAgencyProjectChat as clearAgencyProjectChatApi,
+  fetchAgencyProjectChatParticipants as fetchAgencyProjectChatParticipantsApi,
+  addAgencyProjectChatParticipant as addAgencyProjectChatParticipantApi,
+  removeAgencyProjectChatParticipant as removeAgencyProjectChatParticipantApi,
   fetchAgencyAiEstimates as fetchAgencyAiEstimatesApi,
   fetchAgencyAiBudgets as fetchAgencyAiBudgetsApi,
   updateAgencyAiBudgets as updateAgencyAiBudgetsApi,
@@ -1623,14 +1626,26 @@ export const getAgencyProjectChat = async (projectId) => {
   return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
 };
 
-export const sendAgencyProjectChatMessage = async (projectId, message) => {
-  const result = await sendAgencyProjectChatMessageApi(projectId, message);
+export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false } = {}) => {
+  const result = await sendAgencyProjectChatMessageApi(projectId, message, { askAi });
   return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
 };
 
 export const clearAgencyProjectChat = async (projectId) => {
   const result = await clearAgencyProjectChatApi(projectId);
   return withDataSource(result || { messages: [] }, AGENCY_DATA_SOURCE.DB);
+};
+
+export const getAgencyProjectChatParticipants = async (projectId) => {
+  return fetchAgencyProjectChatParticipantsApi(projectId);
+};
+
+export const addAgencyProjectChatParticipant = async (projectId, userId) => {
+  return addAgencyProjectChatParticipantApi(projectId, userId);
+};
+
+export const removeAgencyProjectChatParticipant = async (projectId, memberId) => {
+  return removeAgencyProjectChatParticipantApi(projectId, memberId);
 };
 
 export const getAgencyAiEstimates = async () => {

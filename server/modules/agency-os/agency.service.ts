@@ -9,12 +9,12 @@ import type {
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { badRequest, internalServerError, notFound } from '../../core/errors.js';
+import { badRequest, forbidden, internalServerError, notFound } from '../../core/errors.js';
 import { requestContext } from '../../core/request-context.js';
 import { agencyRepository } from './agency.repository.js';
 import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
 import { aiBudgetRepository, AI_BUDGET_DEFAULT_USER } from '../../repositories/ai-budget.repository.js';
-import { projectChatRepository } from '../../repositories/project-chat.repository.js';
+import { aiConversationRepository, type ConversationMessageInput } from '../../repositories/ai-conversation.repository.js';
 import { teamRepository } from '../team/team.repository.js';
 import { createLoggingOpenAiEmbedder, searchProjectSources } from '../sources/sources.rag.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
@@ -2583,18 +2583,39 @@ const buildProjectChatSystemPrompt = (input: {
   return `${rules}\n\n${profile}\n\n${sources}`;
 };
 
-const mapProjectChatMessage = (row: {
+// Autore da mostrare in UI: null per i messaggi dell'AI (authorUserId assente).
+type ConversationAuthorRow = { id: string; name: string | null; email: string } | null | undefined;
+
+const mapConversationMessage = (row: {
   id: string;
   role: string;
   content: string;
   citationsJson: unknown;
   createdAt: Date;
+  authorUserId: string | null;
+  author?: ConversationAuthorRow;
 }) => ({
   id: row.id,
   role: row.role,
   content: row.content,
   citations: Array.isArray(row.citationsJson) ? (row.citationsJson as ProjectChatCitation[]) : [],
   createdAt: row.createdAt.toISOString(),
+  author: row.authorUserId
+    ? { id: row.authorUserId, name: row.author?.name ?? null, email: row.author?.email ?? null }
+    : null,
+});
+
+const mapConversationParticipant = (row: {
+  userId: string;
+  role: string;
+  createdAt: Date;
+  user?: ConversationAuthorRow;
+}) => ({
+  userId: row.userId,
+  role: row.role,
+  name: row.user?.name ?? null,
+  email: row.user?.email ?? null,
+  joinedAt: row.createdAt.toISOString(),
 });
 
 const buildAgencyAiDiscoverySnapshot = (sections: DiscoverySections, notes = '') => ({
@@ -7284,69 +7305,121 @@ export const agencyService = {
     };
   },
 
-  // Chat AI di progetto (V4). Storico della conversazione dell'utente su un
-  // progetto + stato AI (per far capire alla UI se la chat è utilizzabile).
+  // Chat AI collaborativa di progetto (Fase 1). Conversazione CONDIVISA (un thread
+  // per progetto) con partecipanti su invito. Chi apre per primo la chat la crea e
+  // ne diventa owner; gli altri vedono i messaggi solo se invitati.
   async getProjectChat(input: { workspaceId: string; projectId: string; userId: string }) {
     const project = await agencyRepository.findAgencyProject(input.workspaceId, input.projectId);
     if (!project) {
       throw notFound('Project not found');
     }
-    const [messages, status] = await Promise.all([
-      projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId),
+    const conversation = await aiConversationRepository.getOrCreateProjectConversation(
+      input.workspaceId,
+      input.projectId,
+      input.userId,
+    );
+    const [participants, status] = await Promise.all([
+      aiConversationRepository.listParticipants(conversation.id),
       getAgencyAiStatusPayload(input.workspaceId),
     ]);
+    const isParticipant = participants.some((row) => row.userId === input.userId);
+    const messages = isParticipant
+      ? (await aiConversationRepository.listMessages(conversation.id)).map(mapConversationMessage)
+      : [];
     return {
       aiConfigured: status.configured,
-      messages: messages.map(mapProjectChatMessage),
+      conversationId: conversation.id,
+      isParticipant,
+      participants: participants.map(mapConversationParticipant),
+      messages,
     };
   },
 
+  // Azzera la conversazione condivisa. Trattandosi di una chat di gruppo, solo il
+  // proprietario (chi l'ha creata) puo svuotarla.
   async clearProjectChat(input: { workspaceId: string; projectId: string; userId: string }) {
-    const project = await agencyRepository.findAgencyProject(input.workspaceId, input.projectId);
-    if (!project) {
-      throw notFound('Project not found');
+    const conversation = await aiConversationRepository.findProjectConversation(input.workspaceId, input.projectId);
+    if (!conversation) {
+      return { messages: [] as ReturnType<typeof mapConversationMessage>[] };
     }
-    await projectChatRepository.deleteForUser(input.workspaceId, input.projectId, input.userId);
-    return { messages: [] as ReturnType<typeof mapProjectChatMessage>[] };
+    const participants = await aiConversationRepository.listParticipants(conversation.id);
+    const me = participants.find((row) => row.userId === input.userId);
+    if (!me || me.role !== 'owner') {
+      throw forbidden('Solo il proprietario della conversazione puo azzerarla.');
+    }
+    await aiConversationRepository.clearMessages(conversation.id);
+    return { messages: [] as ReturnType<typeof mapConversationMessage>[] };
   },
 
-  // Invia un messaggio: recupera i passaggi pertinenti delle Fonti (RAG), genera
-  // la risposta "grounded" col motore AI (rispettando budget e log costi) e salva
-  // la coppia domanda+risposta. Se l'AI non è configurata non salva nulla e
-  // segnala lo stato, così la UI può guidare alla configurazione.
+  // Invia un messaggio nella conversazione condivisa. Il messaggio umano viene
+  // SEMPRE salvato (gli altri partecipanti lo vedono). L'AI risponde SOLO se
+  // interpellata: pulsante "Chiedi all'AI" (askAi) o menzione @AI nel testo. Quando
+  // interpellata, fa RAG sull'ultimo messaggio e legge lo storico come contesto,
+  // rispettando budget e log costi. Salva la risposta come messaggio dell'AI.
   async sendProjectChatMessage(input: {
     workspaceId: string;
     projectId: string;
     userId: string;
     body: unknown;
   }) {
-    const schema = z.object({ message: z.string().trim().min(1).max(4000) });
+    const schema = z.object({
+      message: z.string().trim().min(1).max(4000),
+      askAi: z.boolean().optional(),
+    });
     const parsed = schema.safeParse(input.body ?? {});
     if (!parsed.success) {
       throw badRequest('Messaggio non valido.', { issues: parsed.error.flatten() });
     }
-    const question = parsed.data.message;
+    const message = parsed.data.message;
 
     const project = await this.getProject(input.workspaceId, input.projectId);
-    const status = await getAgencyAiStatusPayload(input.workspaceId);
-    if (!status.configured) {
-      const current = await projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId);
-      return {
-        aiConfigured: false,
-        messages: current.map(mapProjectChatMessage),
-      };
+    const conversation = await aiConversationRepository.getOrCreateProjectConversation(
+      input.workspaceId,
+      input.projectId,
+      input.userId,
+    );
+    const isParticipant = await aiConversationRepository.isParticipant(conversation.id, input.userId);
+    if (!isParticipant) {
+      throw forbidden('Non fai parte di questa conversazione. Chiedi a un partecipante di invitarti.');
     }
 
-    // Recupero RAG sulla domanda + risoluzione dei titoli delle fonti citate.
+    // Salva sempre il messaggio umano, con il suo autore.
+    await aiConversationRepository.createMessages([
+      {
+        workspaceId: input.workspaceId,
+        conversationId: conversation.id,
+        authorUserId: input.userId,
+        role: 'user',
+        content: message,
+      },
+    ]);
+
+    const buildResult = async (extra: Record<string, unknown> = {}) => {
+      const rows = await aiConversationRepository.listMessages(conversation.id);
+      return { conversationId: conversation.id, messages: rows.map(mapConversationMessage), ...extra };
+    };
+
+    // L'AI interviene solo se interpellata (pulsante o menzione @AI).
+    const invokeAi = parsed.data.askAi === true || /(^|\s)@ai\b/i.test(message);
+    if (!invokeAi) {
+      return buildResult({ aiInvoked: false });
+    }
+
+    const status = await getAgencyAiStatusPayload(input.workspaceId);
+    if (!status.configured) {
+      return buildResult({ aiInvoked: false, aiConfigured: false });
+    }
+
+    // Recupero RAG sull'ultimo messaggio + risoluzione titoli delle fonti citate.
     const [excerpts, indexedSources, history] = await Promise.all([
       retrieveSourceExcerptsForQuery({
         workspaceId: input.workspaceId,
         projectId: input.projectId,
-        query: question,
+        query: message,
         topK: 6,
       }),
       agencyRepository.listIndexedProjectSources(input.workspaceId, input.projectId),
-      projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId, CHAT_HISTORY_CONTEXT_LIMIT),
+      aiConversationRepository.listMessages(conversation.id, CHAT_HISTORY_CONTEXT_LIMIT),
     ]);
     const titleById = new Map(indexedSources.map((source) => [source.id, source.title]));
     const citations: ProjectChatCitation[] = excerpts.map((excerpt) => ({
@@ -7362,33 +7435,24 @@ export const agencyService = {
       goal: project.goal,
       citations,
     });
-    const conversation: Array<{ role: 'user' | 'assistant'; content: string }> = [
-      ...history.map((row) => ({
-        role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-        content: row.content,
-      })),
-      { role: 'user', content: question },
-    ];
+    // Lo storico appena riletto include gia' il messaggio umano corrente (ultimo).
+    const contextMessages = history.map((row) => ({
+      role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+      content: row.content,
+    }));
 
-    // Budget esaurito: segnalato esplicitamente (come nella generazione Discovery),
-    // senza salvare nulla, così la UI mostra un avviso invece di un errore generico.
+    // Budget esaurito: il messaggio umano resta salvato, segnaliamo solo l'avviso.
     let result: AgencyAiTextResult | null;
     try {
       result = await runAgencyAiTextWithMeta({
         workspaceId: input.workspaceId,
         system,
-        messages: conversation,
+        messages: contextMessages,
         functionName: 'chat.project',
       });
     } catch (error) {
       if (error instanceof AiBudgetExceededError) {
-        const current = await projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId);
-        return {
-          aiConfigured: true,
-          budgetExceeded: true,
-          budgetMessage: error.message,
-          messages: current.map(mapProjectChatMessage),
-        };
+        return buildResult({ aiInvoked: false, budgetExceeded: true, budgetMessage: error.message });
       }
       throw error;
     }
@@ -7396,31 +7460,100 @@ export const agencyService = {
       throw badRequest('Generazione della risposta non riuscita.');
     }
 
-    // Salva domanda + risposta solo a generazione riuscita (storico coerente).
-    await projectChatRepository.createMany([
+    // Salva la risposta come messaggio dell'AI (authorUserId null).
+    await aiConversationRepository.createMessages([
       {
         workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        userId: input.userId,
-        role: 'user',
-        content: question,
-      },
-      {
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        userId: input.userId,
+        conversationId: conversation.id,
+        authorUserId: null,
         role: 'assistant',
         content: result.text,
         citationsJson: citations as unknown as Prisma.InputJsonValue,
       },
     ]);
 
-    // Rilegge lo storico aggiornato: modo semplice per restituire gli id/date reali.
-    const messages = await projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId);
+    return buildResult({ aiInvoked: true });
+  },
+
+  // Partecipanti della conversazione di progetto + membri del workspace invitabili
+  // (quelli non ancora dentro). Serve alla UI per gestire gli inviti.
+  async listProjectChatParticipants(input: { workspaceId: string; projectId: string; userId: string }) {
+    const conversation = await aiConversationRepository.getOrCreateProjectConversation(
+      input.workspaceId,
+      input.projectId,
+      input.userId,
+    );
+    const [participants, members] = await Promise.all([
+      aiConversationRepository.listParticipants(conversation.id),
+      aiConversationRepository.listWorkspaceMembers(input.workspaceId),
+    ]);
+    const participantIds = new Set(participants.map((row) => row.userId));
+    const invitable = members
+      .filter((member) => !participantIds.has(member.userId))
+      .map((member) => ({ userId: member.userId, name: member.user?.name ?? null, email: member.user?.email ?? null }));
     return {
-      aiConfigured: true,
-      messages: messages.map(mapProjectChatMessage),
+      conversationId: conversation.id,
+      participants: participants.map(mapConversationParticipant),
+      invitable,
     };
+  },
+
+  // Invita un membro del workspace nella conversazione (su invito esplicito). Puo
+  // farlo qualunque partecipante.
+  async addProjectChatParticipant(input: { workspaceId: string; projectId: string; userId: string; body: unknown }) {
+    const schema = z.object({ userId: z.string().min(1) });
+    const parsed = schema.safeParse(input.body ?? {});
+    if (!parsed.success) {
+      throw badRequest('Dati invito non validi.', { issues: parsed.error.flatten() });
+    }
+    const conversation = await aiConversationRepository.getOrCreateProjectConversation(
+      input.workspaceId,
+      input.projectId,
+      input.userId,
+    );
+    const actorIsParticipant = await aiConversationRepository.isParticipant(conversation.id, input.userId);
+    if (!actorIsParticipant) {
+      throw forbidden('Solo un partecipante puo invitare altri.');
+    }
+    const members = await aiConversationRepository.listWorkspaceMembers(input.workspaceId);
+    const target = members.find((member) => member.userId === parsed.data.userId);
+    if (!target) {
+      throw badRequest('Utente non appartenente al workspace.');
+    }
+    await aiConversationRepository.addParticipant({
+      workspaceId: input.workspaceId,
+      conversationId: conversation.id,
+      userId: parsed.data.userId,
+      role: 'member',
+      invitedByUserId: input.userId,
+    });
+    return this.listProjectChatParticipants(input);
+  },
+
+  // Rimuove un partecipante: l'owner puo rimuovere chiunque (tranne se stesso, che
+  // resta proprietario); un membro puo solo uscire da solo.
+  async removeProjectChatParticipant(input: { workspaceId: string; projectId: string; userId: string; targetUserId: string }) {
+    const conversation = await aiConversationRepository.findProjectConversation(input.workspaceId, input.projectId);
+    if (!conversation) {
+      throw notFound('Conversazione non trovata.');
+    }
+    const participants = await aiConversationRepository.listParticipants(conversation.id);
+    const actor = participants.find((row) => row.userId === input.userId);
+    if (!actor) {
+      throw forbidden('Non fai parte di questa conversazione.');
+    }
+    const target = participants.find((row) => row.userId === input.targetUserId);
+    if (target) {
+      if (target.role === 'owner') {
+        throw badRequest('Il proprietario della conversazione non puo essere rimosso.');
+      }
+      const removingSelf = input.targetUserId === input.userId;
+      if (!removingSelf && actor.role !== 'owner') {
+        throw forbidden('Solo il proprietario puo rimuovere altri partecipanti.');
+      }
+      await aiConversationRepository.removeParticipant(conversation.id, input.targetUserId);
+    }
+    return this.listProjectChatParticipants({ workspaceId: input.workspaceId, projectId: input.projectId, userId: input.userId });
   },
 
   async saveAiBudgets(input: { workspaceId: string; body: unknown }) {

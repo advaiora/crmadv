@@ -397,6 +397,51 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
+  // Partecipanti della chat condivisa di progetto (Fase 1 — invito esplicito).
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/chat/participants',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.listProjectChatParticipants({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+      });
+
+      return ok(reply, { participants });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/chat/participants',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.addProjectChatParticipant({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+        body: request.body,
+      });
+
+      return ok(reply, { participants });
+    },
+  );
+
+  app.delete<{ Params: AgencyProjectParams & { memberId: string } }>(
+    '/agency/projects/:projectId/chat/participants/:memberId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.removeProjectChatParticipant({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+        targetUserId: request.params.memberId,
+      });
+
+      return ok(reply, { participants });
+    },
+  );
+
   app.get('/agency/ai/estimates', async (request, reply) => {
     const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const estimates = await agencyService.getWorkspaceAiCostEstimates(workspace.id);

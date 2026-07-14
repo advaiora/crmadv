@@ -217,7 +217,9 @@ model Workspace {
   aiUsageLogs                AiUsageLog[]
   integrations               Integration[]
   projectSources             ProjectSource[]
-  projectChatMessages        ProjectChatMessage[]
+  aiConversations            AiConversation[]
+  aiConversationParticipants AiConversationParticipant[]
+  aiConversationMessages     AiConversationMessage[]
 }
 
 model User {
@@ -264,7 +266,10 @@ model User {
   assignedChecklistItemsBy              ChecklistInstanceItem[]     @relation("ChecklistItemAssignedByUser")
   defaultAssignedChecklistTemplateItems ChecklistTemplateItem[]     @relation("ChecklistTemplateItemDefaultAssignedToUser")
   aiUsageLogs                           AiUsageLog[]
-  projectChatMessages                   ProjectChatMessage[]
+  createdAiConversations                AiConversation[]            @relation("AiConversationCreatedBy")
+  aiConversationParticipations          AiConversationParticipant[] @relation("AiConversationParticipantUser")
+  aiConversationInvitesSent             AiConversationParticipant[] @relation("AiConversationParticipantInvitedBy")
+  authoredAiMessages                    AiConversationMessage[]     @relation("AiConversationMessageAuthor")
 }
 
 model TeamInvite {
@@ -398,7 +403,7 @@ model Project {
   projectOpportunities ProjectOpportunity[]
   projectTasks         ProjectTask[]
   sources              ProjectSource[]
-  chatMessages         ProjectChatMessage[]
+  aiConversations      AiConversation[]
   ownerUser            User?                 @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   departments          ProjectDepartment[]
   access               ProjectAccess[]
@@ -512,25 +517,69 @@ model ProjectSourceChunk {
   @@index([workspaceId, projectId])
 }
 
-// Messaggio della Chat AI di progetto (V4). Una riga per messaggio (utente o
-// assistente). La chat è per-progetto e per-utente: ognuno vede la propria
-// conversazione. Per i messaggi dell'assistente, `citationsJson` conserva gli
-// estratti/fonti citati (RAG) così si rimostrano al ricaricamento.
-model ProjectChatMessage {
-  id            String    @id @default(cuid())
-  workspaceId   String
-  projectId     String
-  userId        String
-  role          String    @db.VarChar(16)
-  content       String    @db.Text
-  citationsJson Json?
-  createdAt     DateTime  @default(now())
-  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+// Conversazione AI collaborativa (post-V4 — Chat AI collaborativa, Fase 1).
+// Evoluzione della vecchia ProjectChatMessage (che era per-utente) verso una
+// chat CONDIVISA con un concetto di "ambito" (scope): per ora solo 'project';
+// in Fase 2 anche 'client'/'general'. Per l'ambito progetto c'e' una sola
+// conversazione per progetto (thread unico), condivisa tra i partecipanti invitati.
+model AiConversation {
+  id              String                      @id @default(cuid())
+  workspaceId     String
+  scope           String                      @default("project") @db.VarChar(16)
+  projectId       String?
+  title           String?                     @db.VarChar(200)
+  createdByUserId String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  workspace       Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project         Project?                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser   User?                       @relation("AiConversationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  participants    AiConversationParticipant[]
+  messages        AiConversationMessage[]
 
-  @@index([workspaceId, projectId, userId, createdAt])
-  @@index([projectId, createdAt])
+  @@unique([projectId])
+  @@index([workspaceId, scope])
+}
+
+// Partecipante a una conversazione (Fase 1 — condivisione su invito esplicito).
+// Una riga per utente ammesso. Il ruolo distingue chi crea/gestisce la chat
+// ('owner') dagli invitati ('member').
+model AiConversationParticipant {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  conversationId  String
+  userId          String
+  role            String         @default("member") @db.VarChar(16)
+  invitedByUserId String?
+  createdAt       DateTime       @default(now())
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation    AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User           @relation("AiConversationParticipantUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedByUser   User?          @relation("AiConversationParticipantInvitedBy", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@index([workspaceId, userId])
+  @@index([userId])
+}
+
+// Messaggio di una conversazione. authorUserId = autore umano (mostrato in UI);
+// null quando il messaggio e' dell'AI (role='assistant'). citationsJson conserva
+// gli estratti/fonti citati (RAG) dei messaggi dell'assistente.
+model AiConversationMessage {
+  id             String         @id @default(cuid())
+  workspaceId    String
+  conversationId String
+  authorUserId   String?
+  role           String         @db.VarChar(16)
+  content        String         @db.Text
+  citationsJson  Json?
+  createdAt      DateTime       @default(now())
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author         User?          @relation("AiConversationMessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([workspaceId])
 }
 
 // Budget di spesa AI giornaliero (V4 — cost control). Limite in USD sulla spesa AI
