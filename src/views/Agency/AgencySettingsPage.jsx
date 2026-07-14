@@ -11,6 +11,7 @@ import {
   AGENCY_PROJECT_TYPE_OPTIONS,
 } from "../../modules/agency-os/projects/agencyProjectsModel";
 import AgencyPageShell from "./AgencyPageShell";
+import AgencyAiUsagePanel from "./AgencyAiUsagePanel";
 import AgencyAiBudgetPanel from "./AgencyAiBudgetPanel";
 
 const TEAM_ROLES = [
@@ -575,6 +576,12 @@ const AgencySettingsPage = () => {
             </Card.Body>
           </Card>
         </Col>
+
+        {canManage && (
+          <Col lg={12}>
+            <AgencyAiUsagePanel />
+          </Col>
+        )}
 
         {canManage && (
           <Col lg={12}>

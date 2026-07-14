@@ -14,9 +14,12 @@ export type AiUsageLogInput = {
 };
 
 // Filtri applicabili alle aggregazioni dei consumi AI. Tutti opzionali:
-// `since` limita al periodo, gli altri restringono per utente/modello/funzione.
+// `since` limita al periodo, gli altri restringono per workspace/utente/modello/funzione.
+// `workspaceId` serve alla vista consumi per-workspace di Agency (la Console
+// piattaforma lo lascia assente per aggregare su tutti i workspace).
 export type AiUsageFilter = {
   since?: Date;
+  workspaceId?: string;
   userId?: string;
   model?: string;
   functionName?: string;
@@ -26,6 +29,9 @@ const buildWhere = (filter: AiUsageFilter): Prisma.AiUsageLogWhereInput => {
   const where: Prisma.AiUsageLogWhereInput = {};
   if (filter.since) {
     where.createdAt = { gte: filter.since };
+  }
+  if (filter.workspaceId) {
+    where.workspaceId = filter.workspaceId;
   }
   if (filter.userId) {
     where.userId = filter.userId;
@@ -59,6 +65,19 @@ export const aiUsageRepository = {
   aggregateByUser(filter: AiUsageFilter = {}) {
     return prisma.aiUsageLog.groupBy({
       by: ['userId'],
+      where: buildWhere(filter),
+      _sum: { costUsd: true, inputTokens: true, outputTokens: true },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+  },
+
+  // Aggregato per funzione AI nel periodo/filtri indicati. Alimenta la vista
+  // consumi per-workspace (rendiconto per funzione) e, in prospettiva, le stime
+  // di costo mostrate sui pulsanti AI.
+  aggregateByFunction(filter: AiUsageFilter = {}) {
+    return prisma.aiUsageLog.groupBy({
+      by: ['functionName'],
       where: buildWhere(filter),
       _sum: { costUsd: true, inputTokens: true, outputTokens: true },
       _count: { _all: true },
@@ -100,6 +119,18 @@ export const aiUsageRepository = {
       }
     }
     return result;
+  },
+
+  // Campioni di token delle ultime chiamate riuscite di una funzione in un
+  // workspace. Alimenta la stima di costo dei pulsanti AI: dai token storici
+  // (stabili a parità di funzione) si ricava il costo col modello corrente.
+  recentSuccessSamples(workspaceId: string, functionName: string, limit: number) {
+    return prisma.aiUsageLog.findMany({
+      where: { workspaceId, functionName, status: 'success' },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { inputTokens: true, outputTokens: true },
+    });
   },
 
   recentLogs(filter: AiUsageFilter, limit: number) {

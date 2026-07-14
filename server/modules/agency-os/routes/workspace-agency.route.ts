@@ -331,6 +331,79 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.get<{
+    Querystring: { days?: string; userId?: string; model?: string; functionName?: string };
+  }>('/agency/settings/ai-usage', async (request, reply) => {
+    const { workspace } = await ensureAgencySuperadminAccess(request);
+    const parseDays = (raw?: string) => {
+      const value = Number(raw);
+      return Number.isFinite(value) && value > 0 ? value : 30;
+    };
+    const parseFilter = (raw?: string) => {
+      const value = typeof raw === 'string' ? raw.trim() : '';
+      return value ? value : undefined;
+    };
+    const usage = await agencyService.getWorkspaceAiUsage({
+      workspaceId: workspace.id,
+      windowDays: parseDays(request.query?.days),
+      userId: parseFilter(request.query?.userId),
+      model: parseFilter(request.query?.model),
+      functionName: parseFilter(request.query?.functionName),
+    });
+
+    return ok(reply, { usage });
+  });
+
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/chat',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const chat = await agencyService.getProjectChat({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+      });
+
+      return ok(reply, { chat });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/chat',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const chat = await agencyService.sendProjectChatMessage({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+        body: request.body,
+      });
+
+      return ok(reply, { chat });
+    },
+  );
+
+  app.delete<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/chat',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const chat = await agencyService.clearProjectChat({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+      });
+
+      return ok(reply, { chat });
+    },
+  );
+
+  app.get('/agency/ai/estimates', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const estimates = await agencyService.getWorkspaceAiCostEstimates(workspace.id);
+
+    return ok(reply, { estimates });
+  });
+
   app.get('/agency/settings/ai-budgets', async (request, reply) => {
     const { workspace } = await ensureAgencySuperadminAccess(request);
     const budgets = await agencyService.getAiBudgets(workspace.id);

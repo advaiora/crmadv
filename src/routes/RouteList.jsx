@@ -12,6 +12,7 @@ import AgencyProjectAssetsPage from "../views/Agency/project/AgencyProjectAssets
 import AgencyProjectBrainPage from "../views/Agency/project/AgencyProjectBrainPage";
 import AgencyProjectClientReportPage from "../views/Agency/project/AgencyProjectClientReportPage";
 import AgencyProjectDiscoveryPage from "../views/Agency/project/AgencyProjectDiscoveryPage";
+import AgencyProjectChatPage from "../views/Agency/project/AgencyProjectChatPage";
 import AgencyProjectDiagnosisPage from "../views/Agency/project/AgencyProjectDiagnosisPage";
 import AgencyProjectMemoryPage from "../views/Agency/project/AgencyProjectMemoryPage";
 import AgencyProjectOpportunitiesPage from "../views/Agency/project/AgencyProjectOpportunitiesPage";
@@ -101,6 +102,7 @@ export const routes = [
     { path: 'agency/projects/:projectId', exact: true, component: AgencyProjectOverviewRedirect },
     { path: 'agency/projects/:projectId/overview', exact: true, component: AgencyProjectOverviewPage },
     { path: 'agency/projects/:projectId/discovery', exact: true, component: AgencyProjectDiscoveryPage },
+    { path: 'agency/projects/:projectId/chat', exact: true, component: AgencyProjectChatPage },
     { path: 'agency/projects/:projectId/diagnosis', exact: true, component: AgencyProjectDiagnosisPage },
     { path: 'agency/projects/:projectId/brain', exact: true, component: AgencyProjectBrainPage },
     { path: 'agency/projects/:projectId/web', exact: true, component: AgencyProjectWebPage },

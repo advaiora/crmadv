@@ -8,6 +8,8 @@ import {
   saveAgencyProjectDiscovery,
 } from "../../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSource";
+import { useAgencyAiEstimates } from "../../../modules/agency-os/hooks/useAgencyAiEstimates";
+import AiCostEstimate from "../AiCostEstimate";
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
 
 const SECTIONS = [
@@ -179,6 +181,7 @@ const getDiscoveryAlerts = (formState) => {
 
 const AgencyProjectDiscoveryPage = () => {
   const { projectId } = useParams();
+  const aiEstimates = useAgencyAiEstimates();
   const [formState, setFormState] = React.useState(() => ({
     businessContext: "",
     projectGoal: "",
@@ -389,7 +392,11 @@ const AgencyProjectDiscoveryPage = () => {
             <span className="d-block">Ultimo aggiornamento: {lastUpdatedAt}</span>
           )}
         </div>
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 align-items-center">
+          <AiCostEstimate
+            estimate={aiEstimates.byFunction["discovery.generateBrief"]}
+            aiConfigured={aiEstimates.aiConfigured}
+          />
           <Button
             type="button"
             size="sm"
@@ -472,7 +479,12 @@ const AgencyProjectDiscoveryPage = () => {
                       )}
                     </div>
                   </div>
-                  <Button
+                  <div className="d-flex flex-column align-items-end gap-1">
+                    <AiCostEstimate
+                      estimate={aiEstimates.byFunction["discovery.generateSection"]}
+                      aiConfigured={aiEstimates.aiConfigured}
+                    />
+                    <Button
                     type="button"
                     size="sm"
                     variant="outline-primary"
@@ -483,6 +495,7 @@ const AgencyProjectDiscoveryPage = () => {
                       ? <><Spinner animation="border" size="sm" className="me-1" />Rigenero...</>
                       : <><i className="bi bi-stars me-1" aria-hidden="true" />AI sezione</>}
                   </Button>
+                  </div>
                 </div>
                 {getSectionClientQuestion(section.key, formState[section.key], missingWarnings) && (
                   <div className="agency-field-question small mb-2">

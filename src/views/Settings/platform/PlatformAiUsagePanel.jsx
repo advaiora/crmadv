@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Badge, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
-import { Cpu, DollarSign, Users, RotateCcw } from 'lucide-react';
+import { Cpu, DollarSign } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { getAiConfig, getAiUsage } from '../../../modules/admin/api/adminApi';
+
+const formatUsd = (value) => `$${Number(value || 0).toFixed(4)}`;
+const formatNum = (value) => Number(value || 0).toLocaleString('it-IT');
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -12,9 +15,6 @@ const formatDateTime = (value) => {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('it-IT');
 };
 
-const formatUsd = (value) => `$${Number(value || 0).toFixed(4)}`;
-const formatNum = (value) => Number(value || 0).toLocaleString('it-IT');
-
 const USAGE_WINDOWS = [
   { days: 7, label: '7 giorni' },
   { days: 30, label: '30 giorni' },
@@ -23,38 +23,24 @@ const USAGE_WINDOWS = [
 
 const getErrorMessage = (error, fallback) => error?.message || fallback;
 
-const EMPTY_FILTERS = { userId: '', model: '', functionName: '' };
-
-// Pannello "Consumi & costi AI" della Console piattaforma: costi aggregati per
-// workspace e per utente, configurazione AI dei workspace, ultime chiamate, con
-// filtri per periodo, utente, modello e funzione.
+// Panoramica cross-workspace dei consumi AI della Console piattaforma: totali
+// complessivi, aggregato per workspace e configurazione AI di ogni workspace.
+// Il DETTAGLIO (per utente, per funzione, ultime chiamate) vive nel rendiconto
+// per-workspace dentro Impostazioni Agency.
 const PlatformAiUsagePanel = () => {
   const [aiUsage, setAiUsage] = useState(null);
   const [aiConfig, setAiConfig] = useState([]);
   const [usageDays, setUsageDays] = useState(30);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
-
-  const fetchUsage = useCallback(
-    async (days, activeFilters) => {
-      return getAiUsage({
-        days,
-        userId: activeFilters.userId || undefined,
-        model: activeFilters.model || undefined,
-        functionName: activeFilters.functionName || undefined,
-      });
-    },
-    [],
-  );
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     setLoadError('');
     try {
       const [usageResult, configResult] = await Promise.all([
-        fetchUsage(usageDays, filters),
+        getAiUsage({ days: usageDays }),
         getAiConfig(),
       ]);
       setAiUsage(usageResult ?? null);
@@ -71,40 +57,18 @@ const PlatformAiUsagePanel = () => {
     void loadAll();
   }, [loadAll]);
 
-  // Ricarica solo i consumi quando cambiano periodo/filtri (la config non cambia).
-  const applyUsageQuery = useCallback(
-    async (days, nextFilters) => {
-      setRefreshing(true);
-      try {
-        const usageResult = await fetchUsage(days, nextFilters);
-        setAiUsage(usageResult ?? null);
-      } catch (error) {
-        toast.error(getErrorMessage(error, 'Errore caricamento consumi AI'));
-      } finally {
-        setRefreshing(false);
-      }
-    },
-    [fetchUsage],
-  );
-
-  const handleChangeDays = (days) => {
+  const handleChangeDays = useCallback(async (days) => {
     setUsageDays(days);
-    void applyUsageQuery(days, filters);
-  };
-
-  const handleChangeFilter = (key, value) => {
-    const nextFilters = { ...filters, [key]: value };
-    setFilters(nextFilters);
-    void applyUsageQuery(usageDays, nextFilters);
-  };
-
-  const handleResetFilters = () => {
-    setFilters(EMPTY_FILTERS);
-    void applyUsageQuery(usageDays, EMPTY_FILTERS);
-  };
-
-  const options = aiUsage?.options ?? { users: [], models: [], functions: [] };
-  const hasActiveFilters = Boolean(filters.userId || filters.model || filters.functionName);
+    setRefreshing(true);
+    try {
+      const usageResult = await getAiUsage({ days });
+      setAiUsage(usageResult ?? null);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Errore caricamento consumi AI'));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -126,7 +90,7 @@ const PlatformAiUsagePanel = () => {
         <Card.Header className="bg-transparent d-flex justify-content-between align-items-center gap-2 flex-wrap">
           <h6 className="mb-0 d-flex align-items-center gap-2">
             <DollarSign size={16} />
-            Costi AI
+            Costi AI — panoramica per workspace
           </h6>
           {refreshing && <Spinner animation="border" size="sm" role="status" />}
         </Card.Header>
@@ -147,70 +111,7 @@ const PlatformAiUsagePanel = () => {
                 ))}
               </Form.Select>
             </Col>
-            <Col md={3}>
-              <Form.Label className="small text-muted mb-1">Utente</Form.Label>
-              <Form.Select
-                size="sm"
-                value={filters.userId}
-                onChange={(event) => handleChangeFilter('userId', event.target.value)}
-                disabled={refreshing}
-              >
-                <option value="">Tutti gli utenti</option>
-                {options.users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                    {user.email ? ` (${user.email})` : ''}
-                  </option>
-                ))}
-              </Form.Select>
-            </Col>
-            <Col md={3}>
-              <Form.Label className="small text-muted mb-1">Modello</Form.Label>
-              <Form.Select
-                size="sm"
-                value={filters.model}
-                onChange={(event) => handleChangeFilter('model', event.target.value)}
-                disabled={refreshing}
-              >
-                <option value="">Tutti i modelli</option>
-                {options.models.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </Form.Select>
-            </Col>
-            <Col md={3}>
-              <Form.Label className="small text-muted mb-1">Funzione</Form.Label>
-              <Form.Select
-                size="sm"
-                value={filters.functionName}
-                onChange={(event) => handleChangeFilter('functionName', event.target.value)}
-                disabled={refreshing}
-              >
-                <option value="">Tutte le funzioni</option>
-                {options.functions.map((fn) => (
-                  <option key={fn} value={fn}>
-                    {fn}
-                  </option>
-                ))}
-              </Form.Select>
-            </Col>
           </Row>
-
-          {hasActiveFilters && (
-            <div className="mb-3">
-              <button
-                type="button"
-                className="btn btn-link btn-sm p-0 d-inline-flex align-items-center gap-1"
-                onClick={handleResetFilters}
-                disabled={refreshing}
-              >
-                <RotateCcw size={14} />
-                Azzera filtri
-              </button>
-            </div>
-          )}
 
           {aiUsage && (
             <Row className="g-3 mb-3">
@@ -235,9 +136,9 @@ const PlatformAiUsagePanel = () => {
 
           <div className="fw-semibold small text-muted mb-2">Per workspace</div>
           {!aiUsage || aiUsage.perWorkspace?.length === 0 ? (
-            <div className="text-muted mb-3">Nessun consumo AI nel periodo/filtri selezionati.</div>
+            <div className="text-muted mb-0">Nessun consumo AI nel periodo selezionato.</div>
           ) : (
-            <Table responsive hover className="mb-4 align-middle">
+            <Table responsive hover className="mb-0 align-middle">
               <thead>
                 <tr>
                   <th>Workspace</th>
@@ -262,77 +163,8 @@ const PlatformAiUsagePanel = () => {
               </tbody>
             </Table>
           )}
-
-          <div className="fw-semibold small text-muted mb-2 d-flex align-items-center gap-2">
-            <Users size={14} />
-            Per utente
-          </div>
-          {!aiUsage || aiUsage.perUser?.length === 0 ? (
-            <div className="text-muted">Nessun consumo AI per utente nel periodo/filtri selezionati.</div>
-          ) : (
-            <Table responsive hover className="mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Utente</th>
-                  <th>Email</th>
-                  <th className="text-end">Chiamate</th>
-                  <th className="text-end">Costo</th>
-                  <th className="text-end">Token in</th>
-                  <th className="text-end">Token out</th>
-                  <th>Ultima chiamata</th>
-                </tr>
-              </thead>
-              <tbody>
-                {aiUsage.perUser.map((row) => (
-                  <tr key={row.userId ?? 'system'}>
-                    <td className="fw-semibold">{row.name}</td>
-                    <td className="text-muted">{row.email || '—'}</td>
-                    <td className="text-end">{formatNum(row.calls)}</td>
-                    <td className="text-end">{formatUsd(row.costUsd)}</td>
-                    <td className="text-end">{formatNum(row.inputTokens)}</td>
-                    <td className="text-end">{formatNum(row.outputTokens)}</td>
-                    <td className="text-muted">{formatDateTime(row.lastCallAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
         </Card.Body>
       </Card>
-
-      {aiUsage?.recent?.length > 0 && (
-        <Card className="card-border mb-4">
-          <Card.Header className="bg-transparent">
-            <h6 className="mb-0">Ultime chiamate</h6>
-          </Card.Header>
-          <Card.Body className="p-0">
-            <Table responsive hover className="mb-0 align-middle">
-              <thead>
-                <tr>
-                  <th>Quando</th>
-                  <th>Utente</th>
-                  <th>Workspace</th>
-                  <th>Funzione</th>
-                  <th>Modello</th>
-                  <th className="text-end">Costo</th>
-                </tr>
-              </thead>
-              <tbody>
-                {aiUsage.recent.map((row) => (
-                  <tr key={row.id}>
-                    <td className="text-muted">{formatDateTime(row.createdAt)}</td>
-                    <td>{row.userName}</td>
-                    <td className="text-muted">{row.name || '—'}</td>
-                    <td className="text-muted">{row.functionName}</td>
-                    <td className="text-muted">{row.model}</td>
-                    <td className="text-end">{formatUsd(row.costUsd)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
-      )}
 
       <Card className="card-border mb-4">
         <Card.Header className="bg-transparent d-flex align-items-center gap-2">

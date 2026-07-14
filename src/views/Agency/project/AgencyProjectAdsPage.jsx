@@ -22,6 +22,8 @@ import {
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
 import AgencySourceReadinessPanel from "./AgencySourceReadinessPanel";
 import { readableValue } from "./agencyProjectUx";
+import { useAgencyAiEstimates } from "../../../modules/agency-os/hooks/useAgencyAiEstimates";
+import AiCostEstimate from "../AiCostEstimate";
 
 const CHANNEL_SCOPE_LABELS = {
   google: "Google Ads",
@@ -183,6 +185,7 @@ const renderRsaIdeas = (items) => {
 
 const AgencyProjectAdsPage = () => {
   const { projectId } = useParams();
+  const aiEstimates = useAgencyAiEstimates();
   const [adsState, setAdsState] = React.useState(null);
   const [project, setProject] = React.useState(null);
   const [webProjects, setWebProjects] = React.useState([]);
@@ -624,6 +627,12 @@ const AgencyProjectAdsPage = () => {
             <summary className="btn btn-sm btn-outline-primary">
               <i className="bi bi-stars me-1" aria-hidden="true" />Rigenera asset AI
             </summary>
+            <div className="mt-2">
+              <AiCostEstimate
+                estimate={aiEstimates.byFunction["ads.generateAsset"]}
+                aiConfigured={aiEstimates.aiConfigured}
+              />
+            </div>
             <div className="d-flex flex-wrap gap-2 mt-2">
               {[
                 ["headlines", "Headline"],

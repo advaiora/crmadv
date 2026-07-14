@@ -338,6 +338,56 @@ export const updateAgencyRuntimeSettings = async (payload, { signal } = {}) => {
   return result?.runtimeSettings || null;
 };
 
+export const fetchAgencyAiUsage = async ({ days = 30, userId, model, functionName, signal } = {}) => {
+  const params = new URLSearchParams({ days: String(days) });
+  if (userId) params.set("userId", userId);
+  if (model) params.set("model", model);
+  if (functionName) params.set("functionName", functionName);
+  const result = await agencyFetch(`/agency/settings/ai-usage?${params.toString()}`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.usage || null;
+};
+
+export const fetchAgencyProjectChat = async (projectId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const sendAgencyProjectChatMessage = async (projectId, message, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
+    method: "POST",
+    body: { message },
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const clearAgencyProjectChat = async (projectId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
+    method: "DELETE",
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const fetchAgencyAiEstimates = async ({ signal } = {}) => {
+  const result = await agencyFetch("/agency/ai/estimates", {
+    method: "GET",
+    signal,
+  });
+
+  return result?.estimates || null;
+};
+
 export const fetchAgencyAiBudgets = async ({ signal } = {}) => {
   const result = await agencyFetch("/agency/settings/ai-budgets", {
     method: "GET",

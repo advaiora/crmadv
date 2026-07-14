@@ -106,14 +106,11 @@ const adminRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get<{
-    Querystring: { days?: string; userId?: string; model?: string; functionName?: string };
+    Querystring: { days?: string };
   }>('/admin/ai-usage', async (request, reply) => {
     await requirePlatformAdmin(request);
     const usage = await platformAdminService.getAiUsage({
       windowDays: platformAdminService.parseWindowDays(request.query?.days),
-      userId: platformAdminService.parseUsageStringFilter(request.query?.userId),
-      model: platformAdminService.parseUsageStringFilter(request.query?.model),
-      functionName: platformAdminService.parseUsageStringFilter(request.query?.functionName),
     });
     return ok(reply, usage);
   });

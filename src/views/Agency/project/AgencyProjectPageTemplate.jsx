@@ -23,6 +23,7 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
     { key: "overview", label: "Overview", path: projectOverviewPath, group: "primary" },
     { key: "assets", label: "Fonti", path: `${projectRootPath}/assets`, group: "primary" },
     { key: "discovery", label: "Discovery", path: `${projectRootPath}/discovery`, group: "primary" },
+    { key: "chat", label: "Chat", path: `${projectRootPath}/chat`, group: "primary" },
     { key: "web", label: "Web", path: `${projectRootPath}/web`, group: "primary" },
     { key: "ads", label: "Ads", path: `${projectRootPath}/ads`, group: "primary" },
     { key: "reports-client", label: "Report", path: `${projectRootPath}/reports/client`, group: "primary" },

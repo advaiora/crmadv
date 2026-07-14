@@ -14,6 +14,7 @@ import { requestContext } from '../../core/request-context.js';
 import { agencyRepository } from './agency.repository.js';
 import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
 import { aiBudgetRepository, AI_BUDGET_DEFAULT_USER } from '../../repositories/ai-budget.repository.js';
+import { projectChatRepository } from '../../repositories/project-chat.repository.js';
 import { teamRepository } from '../team/team.repository.js';
 import { createLoggingOpenAiEmbedder, searchProjectSources } from '../sources/sources.rag.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
@@ -2236,6 +2237,38 @@ const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputToken
   return Number(cost.toFixed(6));
 };
 
+// Stima di costo dei pulsanti AI (V4 — cost control). I pulsanti a funzione
+// predefinita che passano dal motore AI e vengono loggati in AiUsageLog. Per
+// ognuno un token-seed (stima grezza input/output) usato finché non ci sono
+// abbastanza usi reali: da lì in poi la stima si affina sui token storici.
+type AgencyAiEstimatableFunction = {
+  functionName: string;
+  label: string;
+  seedInputTokens: number;
+  seedOutputTokens: number;
+};
+
+const AGENCY_AI_ESTIMATABLE_FUNCTIONS: AgencyAiEstimatableFunction[] = [
+  { functionName: 'discovery.generateBrief', label: 'Brief Discovery completo', seedInputTokens: 4000, seedOutputTokens: 2000 },
+  { functionName: 'discovery.generateSection', label: 'Sezione Discovery', seedInputTokens: 2500, seedOutputTokens: 800 },
+  { functionName: 'web.generateProject', label: 'Struttura sito/landing', seedInputTokens: 3000, seedOutputTokens: 1500 },
+  { functionName: 'web.generateBlock', label: 'Blocco sito', seedInputTokens: 1500, seedOutputTokens: 600 },
+  { functionName: 'ads.generateAsset', label: 'Copy campagna ADV', seedInputTokens: 1500, seedOutputTokens: 500 },
+];
+
+// Numero minimo di usi reali oltre il quale la stima passa dallo "seed" allo
+// storico. Sotto questa soglia il range resta indicativo (basato sul seed).
+const AGENCY_AI_ESTIMATE_MIN_SAMPLES = 4;
+// Quanti campioni recenti considerare per la distribuzione storica.
+const AGENCY_AI_ESTIMATE_SAMPLE_LIMIT = 50;
+
+// Percentile (nearest-rank) su un array già ordinato in modo crescente.
+const percentileSorted = (sorted: number[], p: number): number => {
+  if (sorted.length === 0) return 0;
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.round(p * (sorted.length - 1))));
+  return sorted[idx];
+};
+
 // Errore dedicato al superamento del budget AI giornaliero (V4 — cost control).
 // Distinto dagli altri errori così i chiamanti possono mostrarlo chiaramente
 // invece di trattarlo come un fallback silenzioso.
@@ -2467,6 +2500,103 @@ const retrieveRelevantSourceExcerpts = async (input: {
   }
 };
 
+// Recupero RAG a partire da una domanda esplicita (Chat AI di progetto). Come
+// retrieveRelevantSourceExcerpts ma la query è il messaggio dell'utente invece
+// del profilo del progetto. Best-effort: senza chiave OpenAI / chunk / su errore
+// ritorna [] senza rompere la chat (che risponderà col solo contesto testuale).
+const retrieveSourceExcerptsForQuery = async (input: {
+  workspaceId: string;
+  projectId: string;
+  query: string;
+  topK?: number;
+}): Promise<Array<{ sourceId: string; chunkIndex: number; excerpt: string; score: number }>> => {
+  const query = (input.query ?? '').trim().slice(0, 1000);
+  if (!query) {
+    return [];
+  }
+  try {
+    const apiKey = await resolveAgencyOpenAiApiKey(input.workspaceId);
+    if (!apiKey) {
+      return [];
+    }
+    const hits = await searchProjectSources({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      query,
+      topK: input.topK ?? 6,
+      embedder: createLoggingOpenAiEmbedder({
+        apiKey,
+        workspaceId: input.workspaceId,
+        functionName: 'sources.embed.search',
+      }),
+    });
+    return hits.map((hit) => ({
+      sourceId: hit.sourceId,
+      chunkIndex: hit.chunkIndex,
+      excerpt: clipAgencyAiText(hit.content, 900),
+      score: Math.round(hit.score * 1000) / 1000,
+    }));
+  } catch (error) {
+    logAgencyServiceEvent('RAG chat retrieval saltato (best-effort).', {
+      projectId: input.projectId,
+      reason: (error as Error).message,
+    });
+    return [];
+  }
+};
+
+// Quanti messaggi passati includere nel prompt della chat (ultimi N turni), per
+// dare continuità senza gonfiare troppo l'input.
+const CHAT_HISTORY_CONTEXT_LIMIT = 12;
+
+type ProjectChatCitation = {
+  sourceId: string;
+  sourceTitle: string;
+  excerpt: string;
+  score: number;
+};
+
+// Prompt di sistema "grounded" della Chat AI di progetto: vincola il modello a
+// rispondere SOLO col contesto del progetto (profilo + estratti RAG delle Fonti),
+// a dichiarare quando l'informazione non c'è e a citare le fonti usate.
+const buildProjectChatSystemPrompt = (input: {
+  projectName: string;
+  clientName: string | null;
+  goal: string;
+  citations: ProjectChatCitation[];
+}): string => {
+  const rules = [
+    "Sei l'assistente AI di un progetto di un'agenzia. Rispondi in italiano, in modo chiaro e conciso.",
+    'Usa ESCLUSIVAMENTE le informazioni del contesto qui sotto (profilo del progetto ed estratti delle Fonti).',
+    'Se la risposta non è nel contesto, dillo esplicitamente ("Questa informazione non è presente nelle fonti del progetto") invece di inventare.',
+    'Quando usi un estratto, cita la fonte tra parentesi con il suo numero, es. [1].',
+  ].join(' ');
+  const profile = [
+    'PROFILO PROGETTO:',
+    `- Nome: ${input.projectName || 'n/d'}`,
+    `- Cliente: ${input.clientName || 'n/d'}`,
+    `- Obiettivo: ${input.goal || 'n/d'}`,
+  ].join('\n');
+  const sources = input.citations.length > 0
+    ? ['ESTRATTI DELLE FONTI:', ...input.citations.map((citation, index) => `[${index + 1}] (${citation.sourceTitle}) ${citation.excerpt}`)].join('\n')
+    : 'ESTRATTI DELLE FONTI: nessun estratto pertinente trovato per questa domanda.';
+  return `${rules}\n\n${profile}\n\n${sources}`;
+};
+
+const mapProjectChatMessage = (row: {
+  id: string;
+  role: string;
+  content: string;
+  citationsJson: unknown;
+  createdAt: Date;
+}) => ({
+  id: row.id,
+  role: row.role,
+  content: row.content,
+  citations: Array.isArray(row.citationsJson) ? (row.citationsJson as ProjectChatCitation[]) : [],
+  createdAt: row.createdAt.toISOString(),
+});
+
 const buildAgencyAiDiscoverySnapshot = (sections: DiscoverySections, notes = '') => ({
   sections: Object.fromEntries(DISCOVERY_SECTION_KEYS.map((key) => [
     key,
@@ -2665,6 +2795,154 @@ const runAgencyOpenAiJson = async (input: {
 }) => {
   const result = await runAgencyOpenAiJsonWithMeta(input);
   return result?.payload || null;
+};
+
+// Generazione a TESTO libero (V4 — Chat AI di progetto). Gemello di
+// runAgencyOpenAiJsonWithMeta ma senza forzare il JSON: la chat vuole linguaggio
+// naturale. Condivide provider-branching, enforcement del budget giornaliero e il
+// log costi (AiUsageLog), così la chat rispetta il budget e finisce nel rendiconto
+// consumi. Riceve la conversazione (`messages`) invece di un singolo input. Nessun
+// lock in-flight: ogni turno di chat è unico, non c'è deduplica da fare.
+type AgencyAiTextResult = {
+  text: string;
+  meta: {
+    functionName: string;
+    model: string;
+    estimatedInputTokens: number;
+    estimatedOutputTokens: number;
+    estimatedCostUsd: number;
+    durationMs: number;
+  };
+};
+
+const runAgencyAiTextWithMeta = async (input: {
+  workspaceId?: string;
+  system: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  timeoutMs?: number;
+  functionName?: string;
+}): Promise<AgencyAiTextResult | null> => {
+  const status = await getAgencyAiStatusPayload(input.workspaceId);
+  const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
+  if (!status.configured) {
+    return null;
+  }
+  // Cost control: blocca se l'utente ha esaurito il budget AI giornaliero.
+  await assertWithinAiBudget(input.workspaceId);
+  const functionName = input.functionName || 'chat.project';
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs || runtimeConfig.ai.timeoutMs);
+  try {
+    const provider = status.provider as AgencyAiProvider;
+    const model = resolveAgencyProviderModel(
+      provider,
+      runtimeConfig.ai.functionModels[functionName] || status.model,
+    );
+    const conversation = input.messages.map((message) => ({ role: message.role, content: message.content }));
+
+    let content: string;
+    if (provider === 'anthropic') {
+      const maxTokens = runtimeConfig.ai.maxOutputTokens > 0
+        ? runtimeConfig.ai.maxOutputTokens
+        : DEFAULT_ANTHROPIC_MAX_TOKENS;
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': runtimeConfig.ai.anthropicApiKey ?? '',
+          'anthropic-version': ANTHROPIC_API_VERSION,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          system: input.system,
+          messages: conversation,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Anthropic API error ${response.status}`);
+      }
+      content = extractAnthropicTextContent(await response.json());
+    } else {
+      const requestBody: Record<string, unknown> = {
+        model,
+        input: [{ role: 'system', content: input.system }, ...conversation],
+      };
+      if (runtimeConfig.ai.maxOutputTokens > 0) {
+        requestBody.max_output_tokens = runtimeConfig.ai.maxOutputTokens;
+      }
+      let response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${runtimeConfig.ai.openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      if (!response.ok && response.status !== 401 && response.status !== 403) {
+        const chatRequestBody: Record<string, unknown> = {
+          model,
+          messages: [{ role: 'system', content: input.system }, ...conversation],
+        };
+        if (runtimeConfig.ai.maxOutputTokens > 0) {
+          chatRequestBody.max_completion_tokens = runtimeConfig.ai.maxOutputTokens;
+        }
+        response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${runtimeConfig.ai.openAiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(chatRequestBody),
+          signal: controller.signal,
+        });
+      }
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error ${response.status}`);
+      }
+      content = extractOpenAiTextContent(await response.json());
+    }
+
+    if (!content.trim()) {
+      throw new Error('AI response empty');
+    }
+
+    const promptText = `${input.system}\n${input.messages.map((message) => message.content).join('\n')}`;
+    const estimatedInputTokens = estimateAgencyAiTokens(promptText);
+    const estimatedOutputTokens = estimateAgencyAiTokens(content);
+    const estimatedCostUsd = estimateAgencyAiCostUsd(model, estimatedInputTokens, estimatedOutputTokens);
+    const durationMs = Date.now() - startedAt;
+
+    if (input.workspaceId) {
+      try {
+        await aiUsageRepository.create({
+          workspaceId: input.workspaceId,
+          userId: requestContext.getUserId(),
+          functionName,
+          model,
+          inputTokens: estimatedInputTokens,
+          outputTokens: estimatedOutputTokens,
+          costUsd: estimatedCostUsd,
+          durationMs,
+          status: 'success',
+        });
+      } catch {
+        // accessorio: il log costi non deve mai rompere la risposta AI
+      }
+    }
+
+    return {
+      text: content.trim(),
+      meta: { functionName, model, estimatedInputTokens, estimatedOutputTokens, estimatedCostUsd, durationMs },
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
 };
 
 const competitorSearchResponseSchema = z.object({
@@ -6816,6 +7094,332 @@ export const agencyService = {
           spentTodayUsd: Number((spentByUser[member.userId] ?? 0).toFixed(6)),
         };
       }),
+    };
+  },
+
+  // Rendiconto consumi AI del singolo workspace (V4 — cost control): totali,
+  // dettaglio per utente e per funzione, ultime chiamate e opzioni per i filtri.
+  // È la versione per-workspace del pannello che nella Console piattaforma è
+  // cross-workspace: qui il workspace è forzato dalla guardia della rotta, così
+  // ogni agenzia vede solo i propri dati. Vive in Impostazioni Agency, accanto al
+  // budget (budget = controllo, questo = monitoraggio). Sola lettura di AiUsageLog.
+  async getWorkspaceAiUsage(input: {
+    workspaceId: string;
+    windowDays?: number;
+    userId?: string;
+    model?: string;
+    functionName?: string;
+  }) {
+    const windowDays = Math.min(Math.max(Math.round(input.windowDays ?? 30), 1), 365);
+    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+    const round6 = (value: number | null | undefined) => Number((value ?? 0).toFixed(6));
+
+    // Dati mostrati: rispettano i filtri attivi. Opzioni dei menu: sull'intero
+    // periodo del workspace, così cambiare filtro non fa sparire le scelte.
+    const dataFilter = {
+      since,
+      workspaceId: input.workspaceId,
+      userId: input.userId,
+      model: input.model,
+      functionName: input.functionName,
+    };
+    const periodFilter = { since, workspaceId: input.workspaceId };
+
+    const [groupedUser, groupedFunction, totals, recent, periodUsers, periodModels, periodFunctions] =
+      await Promise.all([
+        aiUsageRepository.aggregateByUser(dataFilter),
+        aiUsageRepository.aggregateByFunction(dataFilter),
+        aiUsageRepository.totals(dataFilter),
+        aiUsageRepository.recentLogs(dataFilter, 50),
+        aiUsageRepository.aggregateByUser(periodFilter),
+        aiUsageRepository.distinctModels(periodFilter),
+        aiUsageRepository.distinctFunctions(periodFilter),
+      ]);
+
+    // Nomi/email degli utenti coinvolti (dati mostrati + opzioni filtro).
+    const userIds = new Set<string>();
+    for (const row of groupedUser) if (row.userId) userIds.add(row.userId);
+    for (const row of periodUsers) if (row.userId) userIds.add(row.userId);
+    const userRows = userIds.size > 0 ? await aiUsageRepository.usersByIds([...userIds]) : [];
+    const userById = new Map(userRows.map((user) => [user.id, user]));
+    const userLabel = (userId: string | null) => {
+      if (!userId) {
+        return { name: 'Sistema / non tracciato', email: '' };
+      }
+      const found = userById.get(userId);
+      return { name: found?.name || '—', email: found?.email || '' };
+    };
+
+    const perUser = groupedUser
+      .map((row) => {
+        const label = userLabel(row.userId);
+        return {
+          userId: row.userId,
+          name: label.name,
+          email: label.email,
+          calls: row._count._all,
+          costUsd: round6(row._sum.costUsd),
+          inputTokens: row._sum.inputTokens ?? 0,
+          outputTokens: row._sum.outputTokens ?? 0,
+          lastCallAt: row._max.createdAt,
+        };
+      })
+      .sort((left, right) => right.costUsd - left.costUsd);
+
+    const perFunction = groupedFunction
+      .map((row) => ({
+        functionName: row.functionName,
+        calls: row._count._all,
+        costUsd: round6(row._sum.costUsd),
+        inputTokens: row._sum.inputTokens ?? 0,
+        outputTokens: row._sum.outputTokens ?? 0,
+        lastCallAt: row._max.createdAt,
+      }))
+      .sort((left, right) => right.costUsd - left.costUsd);
+
+    const userOptions = periodUsers
+      .filter((row) => Boolean(row.userId))
+      .map((row) => {
+        const label = userLabel(row.userId);
+        return { id: row.userId as string, name: label.name, email: label.email };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name, 'it'));
+
+    return {
+      windowDays,
+      filters: {
+        userId: input.userId ?? null,
+        model: input.model ?? null,
+        functionName: input.functionName ?? null,
+      },
+      totals: {
+        calls: totals._count._all,
+        costUsd: round6(totals._sum.costUsd),
+        inputTokens: totals._sum.inputTokens ?? 0,
+        outputTokens: totals._sum.outputTokens ?? 0,
+      },
+      perUser,
+      perFunction,
+      recent: recent.map((log) => ({
+        id: log.id,
+        userId: log.userId,
+        userName: userLabel(log.userId).name,
+        functionName: log.functionName,
+        model: log.model,
+        costUsd: log.costUsd,
+        inputTokens: log.inputTokens,
+        outputTokens: log.outputTokens,
+        durationMs: log.durationMs,
+        createdAt: log.createdAt,
+      })),
+      options: {
+        users: userOptions,
+        models: periodModels.map((row) => row.model),
+        functions: periodFunctions.map((row) => row.functionName),
+      },
+    };
+  },
+
+  // Stime di costo per i pulsanti AI (V4 — cost control). Per ogni funzione
+  // predefinita restituisce un range in USD col modello attualmente configurato:
+  // se ci sono abbastanza usi reali il range viene dai token storici (p25–p75),
+  // altrimenti da un token-seed (range indicativo). I token sono stabili a parità
+  // di funzione, il prezzo dipende dal modello: così cambiare modello aggiorna la
+  // stima senza dover ri-imparare. Sola lettura di AiUsageLog, nessuna scrittura.
+  async getWorkspaceAiCostEstimates(workspaceId: string) {
+    const status = await getAgencyAiStatusPayload(workspaceId);
+    const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
+
+    const estimates = await Promise.all(
+      AGENCY_AI_ESTIMATABLE_FUNCTIONS.map(async (fn) => {
+        const model = resolveAgencyProviderModel(
+          status.provider,
+          runtimeConfig.ai.functionModels[fn.functionName] || status.model,
+        );
+        const samples = await aiUsageRepository.recentSuccessSamples(
+          workspaceId,
+          fn.functionName,
+          AGENCY_AI_ESTIMATE_SAMPLE_LIMIT,
+        );
+
+        let minUsd: number;
+        let maxUsd: number;
+        let basis: 'history' | 'seed';
+
+        if (samples.length >= AGENCY_AI_ESTIMATE_MIN_SAMPLES) {
+          // Ricalcola il costo di ogni uso storico col modello CORRENTE (i token
+          // restano quelli reali), poi prende la banda centrale p25–p75.
+          const costs = samples
+            .map((sample) => estimateAgencyAiCostUsd(model, sample.inputTokens, sample.outputTokens))
+            .sort((left, right) => left - right);
+          minUsd = percentileSorted(costs, 0.25);
+          maxUsd = percentileSorted(costs, 0.75);
+          basis = 'history';
+        } else {
+          // Nessuno/pochi usi: range indicativo attorno al token-seed.
+          const point = estimateAgencyAiCostUsd(model, fn.seedInputTokens, fn.seedOutputTokens);
+          minUsd = Number((point * 0.5).toFixed(6));
+          maxUsd = Number((point * 1.5).toFixed(6));
+          basis = 'seed';
+        }
+
+        return {
+          functionName: fn.functionName,
+          label: fn.label,
+          minUsd,
+          maxUsd,
+          basis,
+          sampleSize: samples.length,
+          model,
+        };
+      }),
+    );
+
+    return {
+      // Se l'AI non è configurata le generazioni sono rule-based (gratis): il
+      // frontend usa questo flag per non mostrare stime fuorvianti.
+      aiConfigured: status.configured,
+      provider: status.provider,
+      estimates,
+    };
+  },
+
+  // Chat AI di progetto (V4). Storico della conversazione dell'utente su un
+  // progetto + stato AI (per far capire alla UI se la chat è utilizzabile).
+  async getProjectChat(input: { workspaceId: string; projectId: string; userId: string }) {
+    const project = await agencyRepository.findAgencyProject(input.workspaceId, input.projectId);
+    if (!project) {
+      throw notFound('Project not found');
+    }
+    const [messages, status] = await Promise.all([
+      projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId),
+      getAgencyAiStatusPayload(input.workspaceId),
+    ]);
+    return {
+      aiConfigured: status.configured,
+      messages: messages.map(mapProjectChatMessage),
+    };
+  },
+
+  async clearProjectChat(input: { workspaceId: string; projectId: string; userId: string }) {
+    const project = await agencyRepository.findAgencyProject(input.workspaceId, input.projectId);
+    if (!project) {
+      throw notFound('Project not found');
+    }
+    await projectChatRepository.deleteForUser(input.workspaceId, input.projectId, input.userId);
+    return { messages: [] as ReturnType<typeof mapProjectChatMessage>[] };
+  },
+
+  // Invia un messaggio: recupera i passaggi pertinenti delle Fonti (RAG), genera
+  // la risposta "grounded" col motore AI (rispettando budget e log costi) e salva
+  // la coppia domanda+risposta. Se l'AI non è configurata non salva nulla e
+  // segnala lo stato, così la UI può guidare alla configurazione.
+  async sendProjectChatMessage(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+    body: unknown;
+  }) {
+    const schema = z.object({ message: z.string().trim().min(1).max(4000) });
+    const parsed = schema.safeParse(input.body ?? {});
+    if (!parsed.success) {
+      throw badRequest('Messaggio non valido.', { issues: parsed.error.flatten() });
+    }
+    const question = parsed.data.message;
+
+    const project = await this.getProject(input.workspaceId, input.projectId);
+    const status = await getAgencyAiStatusPayload(input.workspaceId);
+    if (!status.configured) {
+      const current = await projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId);
+      return {
+        aiConfigured: false,
+        messages: current.map(mapProjectChatMessage),
+      };
+    }
+
+    // Recupero RAG sulla domanda + risoluzione dei titoli delle fonti citate.
+    const [excerpts, indexedSources, history] = await Promise.all([
+      retrieveSourceExcerptsForQuery({
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        query: question,
+        topK: 6,
+      }),
+      agencyRepository.listIndexedProjectSources(input.workspaceId, input.projectId),
+      projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId, CHAT_HISTORY_CONTEXT_LIMIT),
+    ]);
+    const titleById = new Map(indexedSources.map((source) => [source.id, source.title]));
+    const citations: ProjectChatCitation[] = excerpts.map((excerpt) => ({
+      sourceId: excerpt.sourceId,
+      sourceTitle: titleById.get(excerpt.sourceId) || 'Fonte',
+      excerpt: excerpt.excerpt,
+      score: excerpt.score,
+    }));
+
+    const system = buildProjectChatSystemPrompt({
+      projectName: project.name,
+      clientName: project.clientName,
+      goal: project.goal,
+      citations,
+    });
+    const conversation: Array<{ role: 'user' | 'assistant'; content: string }> = [
+      ...history.map((row) => ({
+        role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        content: row.content,
+      })),
+      { role: 'user', content: question },
+    ];
+
+    // Budget esaurito: segnalato esplicitamente (come nella generazione Discovery),
+    // senza salvare nulla, così la UI mostra un avviso invece di un errore generico.
+    let result: AgencyAiTextResult | null;
+    try {
+      result = await runAgencyAiTextWithMeta({
+        workspaceId: input.workspaceId,
+        system,
+        messages: conversation,
+        functionName: 'chat.project',
+      });
+    } catch (error) {
+      if (error instanceof AiBudgetExceededError) {
+        const current = await projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId);
+        return {
+          aiConfigured: true,
+          budgetExceeded: true,
+          budgetMessage: error.message,
+          messages: current.map(mapProjectChatMessage),
+        };
+      }
+      throw error;
+    }
+    if (!result) {
+      throw badRequest('Generazione della risposta non riuscita.');
+    }
+
+    // Salva domanda + risposta solo a generazione riuscita (storico coerente).
+    await projectChatRepository.createMany([
+      {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        userId: input.userId,
+        role: 'user',
+        content: question,
+      },
+      {
+        workspaceId: input.workspaceId,
+        projectId: input.projectId,
+        userId: input.userId,
+        role: 'assistant',
+        content: result.text,
+        citationsJson: citations as unknown as Prisma.InputJsonValue,
+      },
+    ]);
+
+    // Rilegge lo storico aggiornato: modo semplice per restituire gli id/date reali.
+    const messages = await projectChatRepository.listForUser(input.workspaceId, input.projectId, input.userId);
+    return {
+      aiConfigured: true,
+      messages: messages.map(mapProjectChatMessage),
     };
   },
 

@@ -20,6 +20,8 @@ import {
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
 import AgencySourceReadinessPanel from "./AgencySourceReadinessPanel";
 import { getInputQualityTone, readableValue } from "./agencyProjectUx";
+import { useAgencyAiEstimates } from "../../../modules/agency-os/hooks/useAgencyAiEstimates";
+import AiCostEstimate from "../AiCostEstimate";
 
 const PAGE_TYPE_OPTIONS = [
   { value: "landing", label: "Landing" },
@@ -52,6 +54,7 @@ const buildWebMissingInputs = (input, output, sourceReadiness) => {
 
 const AgencyProjectWebPage = () => {
   const { projectId } = useParams();
+  const aiEstimates = useAgencyAiEstimates();
   const [webState, setWebState] = React.useState(null);
   const [project, setProject] = React.useState(null);
   const [dataMeta, setDataMeta] = React.useState(null);
@@ -488,7 +491,11 @@ const AgencyProjectWebPage = () => {
             <span className="d-block">Ultimo salvataggio: {webState.lastUpdatedAt}</span>
           )}
         </div>
-        <div className="d-flex flex-wrap gap-2">
+        <div className="d-flex flex-wrap gap-2 align-items-center">
+          <AiCostEstimate
+            estimate={aiEstimates.byFunction["web.generateProject"]}
+            aiConfigured={aiEstimates.aiConfigured}
+          />
           <Button
             type="button"
             size="sm"

@@ -217,6 +217,7 @@ model Workspace {
   aiUsageLogs                AiUsageLog[]
   integrations               Integration[]
   projectSources             ProjectSource[]
+  projectChatMessages        ProjectChatMessage[]
 }
 
 model User {
@@ -263,6 +264,7 @@ model User {
   assignedChecklistItemsBy              ChecklistInstanceItem[]     @relation("ChecklistItemAssignedByUser")
   defaultAssignedChecklistTemplateItems ChecklistTemplateItem[]     @relation("ChecklistTemplateItemDefaultAssignedToUser")
   aiUsageLogs                           AiUsageLog[]
+  projectChatMessages                   ProjectChatMessage[]
 }
 
 model TeamInvite {
@@ -396,6 +398,7 @@ model Project {
   projectOpportunities ProjectOpportunity[]
   projectTasks         ProjectTask[]
   sources              ProjectSource[]
+  chatMessages         ProjectChatMessage[]
   ownerUser            User?                 @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   departments          ProjectDepartment[]
   access               ProjectAccess[]
@@ -507,6 +510,27 @@ model ProjectSourceChunk {
 
   @@index([sourceId, chunkIndex])
   @@index([workspaceId, projectId])
+}
+
+// Messaggio della Chat AI di progetto (V4). Una riga per messaggio (utente o
+// assistente). La chat è per-progetto e per-utente: ognuno vede la propria
+// conversazione. Per i messaggi dell'assistente, `citationsJson` conserva gli
+// estratti/fonti citati (RAG) così si rimostrano al ricaricamento.
+model ProjectChatMessage {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  projectId     String
+  userId        String
+  role          String    @db.VarChar(16)
+  content       String    @db.Text
+  citationsJson Json?
+  createdAt     DateTime  @default(now())
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, projectId, userId, createdAt])
+  @@index([projectId, createdAt])
 }
 
 // Budget di spesa AI giornaliero (V4 — cost control). Limite in USD sulla spesa AI

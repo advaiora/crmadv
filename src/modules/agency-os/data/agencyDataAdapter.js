@@ -48,6 +48,11 @@ import {
   fetchAgencyAiStatus as fetchAgencyAiStatusApi,
   fetchAgencyRuntimeSettings as fetchAgencyRuntimeSettingsApi,
   updateAgencyRuntimeSettings as updateAgencyRuntimeSettingsApi,
+  fetchAgencyAiUsage as fetchAgencyAiUsageApi,
+  fetchAgencyProjectChat as fetchAgencyProjectChatApi,
+  sendAgencyProjectChatMessage as sendAgencyProjectChatMessageApi,
+  clearAgencyProjectChat as clearAgencyProjectChatApi,
+  fetchAgencyAiEstimates as fetchAgencyAiEstimatesApi,
   fetchAgencyAiBudgets as fetchAgencyAiBudgetsApi,
   updateAgencyAiBudgets as updateAgencyAiBudgetsApi,
 } from "../api/agency.api";
@@ -1594,6 +1599,46 @@ export const getAgencyRuntimeSettings = async () => {
 export const saveAgencyRuntimeSettings = async (payload) => {
   const result = await updateAgencyRuntimeSettingsApi(payload);
   return withDataSource(result || null, AGENCY_DATA_SOURCE.DB);
+};
+
+export const getAgencyAiUsage = async (options = {}) => {
+  const result = await fetchAgencyAiUsageApi(options);
+  return withDataSource(
+    result || {
+      windowDays: options.days ?? 30,
+      totals: { calls: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 },
+      perUser: [],
+      perFunction: [],
+      recent: [],
+      options: { users: [], models: [], functions: [] },
+    },
+    AGENCY_DATA_SOURCE.DB,
+  );
+};
+
+const EMPTY_PROJECT_CHAT = { aiConfigured: false, messages: [] };
+
+export const getAgencyProjectChat = async (projectId) => {
+  const result = await fetchAgencyProjectChatApi(projectId);
+  return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
+};
+
+export const sendAgencyProjectChatMessage = async (projectId, message) => {
+  const result = await sendAgencyProjectChatMessageApi(projectId, message);
+  return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
+};
+
+export const clearAgencyProjectChat = async (projectId) => {
+  const result = await clearAgencyProjectChatApi(projectId);
+  return withDataSource(result || { messages: [] }, AGENCY_DATA_SOURCE.DB);
+};
+
+export const getAgencyAiEstimates = async () => {
+  const result = await fetchAgencyAiEstimatesApi();
+  return withDataSource(
+    result || { aiConfigured: false, provider: "none", estimates: [] },
+    AGENCY_DATA_SOURCE.DB,
+  );
 };
 
 export const getAgencyAiBudgets = async () => {

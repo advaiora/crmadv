@@ -13,7 +13,6 @@ const AI_SETTING_KEYS = {
 
 const DEFAULT_USAGE_WINDOW_DAYS = 30;
 const MAX_USAGE_WINDOW_DAYS = 365;
-const RECENT_USAGE_LIMIT = 50;
 
 const readJsonBoolean = (value: unknown, fallback: boolean): boolean => {
   if (typeof value === 'boolean') return value;
@@ -247,79 +246,21 @@ export const platformAdminService = {
     return Math.min(Math.floor(parsed), MAX_USAGE_WINDOW_DAYS);
   },
 
-  // Normalizza un filtro testuale opzionale (utente/modello/funzione): stringa
-  // vuota o assente => nessun filtro (undefined).
-  parseUsageStringFilter(raw: unknown): string | undefined {
-    if (raw === undefined || raw === null) {
-      return undefined;
-    }
-    if (typeof raw !== 'string') {
-      throw badRequest('Filtro non valido');
-    }
-    const value = raw.trim();
-    return value ? value : undefined;
-  },
-
-  // Costi/consumi AI aggregati per workspace e per utente, con totali, ultime
-  // chiamate e le opzioni disponibili per i filtri. Accetta filtri opzionali
-  // (utente, modello, funzione) oltre alla finestra temporale.
-  async getAiUsage(filter: {
-    windowDays: number;
-    userId?: string;
-    model?: string;
-    functionName?: string;
-  }) {
+  // Panoramica cross-workspace dei consumi AI per la Console piattaforma: totali
+  // complessivi e aggregato per workspace nel periodo. Il DETTAGLIO (per utente,
+  // per funzione, ultime chiamate) vive ora nel rendiconto per-workspace dentro
+  // Impostazioni Agency: qui resta solo la vista d'insieme del gestore piattaforma.
+  async getAiUsage(filter: { windowDays: number }) {
     const since = new Date(Date.now() - filter.windowDays * 24 * 60 * 60 * 1000);
-    // Filtro applicato ai dati mostrati.
-    const dataFilter = {
-      since,
-      userId: filter.userId,
-      model: filter.model,
-      functionName: filter.functionName,
-    };
-    // Le opzioni dei menu a tendina restano quelle dell'intero periodo, così
-    // l'utente può cambiare filtro senza che le scelte spariscano.
     const periodFilter = { since };
 
-    const [
-      groupedWorkspace,
-      groupedUser,
-      totals,
-      workspaces,
-      recent,
-      periodUsers,
-      periodModels,
-      periodFunctions,
-    ] = await Promise.all([
-      aiUsageRepository.aggregateByWorkspace(dataFilter),
-      aiUsageRepository.aggregateByUser(dataFilter),
-      aiUsageRepository.totals(dataFilter),
+    const [groupedWorkspace, totals, workspaces] = await Promise.all([
+      aiUsageRepository.aggregateByWorkspace(periodFilter),
+      aiUsageRepository.totals(periodFilter),
       platformAdminRepository.listWorkspaces(),
-      aiUsageRepository.recentLogs(dataFilter, RECENT_USAGE_LIMIT),
-      aiUsageRepository.aggregateByUser(periodFilter),
-      aiUsageRepository.distinctModels(periodFilter),
-      aiUsageRepository.distinctFunctions(periodFilter),
     ]);
 
     const infoById = new Map(workspaces.map((w) => [w.id, { name: w.name, slug: w.slug }]));
-
-    // Risolve nomi/email degli utenti coinvolti (dati mostrati + opzioni filtro).
-    const userIds = new Set<string>();
-    for (const row of groupedUser) {
-      if (row.userId) userIds.add(row.userId);
-    }
-    for (const row of periodUsers) {
-      if (row.userId) userIds.add(row.userId);
-    }
-    const userRows = userIds.size > 0 ? await aiUsageRepository.usersByIds([...userIds]) : [];
-    const userById = new Map(userRows.map((u) => [u.id, u]));
-    const userLabel = (userId: string | null) => {
-      if (!userId) {
-        return { name: 'Sistema / non tracciato', email: '' };
-      }
-      const found = userById.get(userId);
-      return { name: found?.name || '—', email: found?.email || '' };
-    };
 
     const perWorkspace = groupedWorkspace
       .map((row) => ({
@@ -334,38 +275,8 @@ export const platformAdminService = {
       }))
       .sort((left, right) => right.costUsd - left.costUsd);
 
-    const perUser = groupedUser
-      .map((row) => {
-        const label = userLabel(row.userId);
-        return {
-          userId: row.userId,
-          name: label.name,
-          email: label.email,
-          calls: row._count._all,
-          costUsd: round6(row._sum.costUsd),
-          inputTokens: row._sum.inputTokens ?? 0,
-          outputTokens: row._sum.outputTokens ?? 0,
-          lastCallAt: row._max.createdAt,
-        };
-      })
-      .sort((left, right) => right.costUsd - left.costUsd);
-
-    // Opzioni filtro "utente": solo utenti reali (esclude le righe di sistema).
-    const userOptions = periodUsers
-      .filter((row) => Boolean(row.userId))
-      .map((row) => {
-        const label = userLabel(row.userId);
-        return { id: row.userId as string, name: label.name, email: label.email };
-      })
-      .sort((left, right) => left.name.localeCompare(right.name, 'it'));
-
     return {
       windowDays: filter.windowDays,
-      filters: {
-        userId: filter.userId ?? null,
-        model: filter.model ?? null,
-        functionName: filter.functionName ?? null,
-      },
       totals: {
         calls: totals._count._all,
         costUsd: round6(totals._sum.costUsd),
@@ -373,26 +284,6 @@ export const platformAdminService = {
         outputTokens: totals._sum.outputTokens ?? 0,
       },
       perWorkspace,
-      perUser,
-      recent: recent.map((log) => ({
-        id: log.id,
-        workspaceId: log.workspaceId,
-        name: infoById.get(log.workspaceId)?.name ?? '',
-        userId: log.userId,
-        userName: userLabel(log.userId).name,
-        functionName: log.functionName,
-        model: log.model,
-        costUsd: log.costUsd,
-        inputTokens: log.inputTokens,
-        outputTokens: log.outputTokens,
-        durationMs: log.durationMs,
-        createdAt: log.createdAt,
-      })),
-      options: {
-        users: userOptions,
-        models: periodModels.map((row) => row.model),
-        functions: periodFunctions.map((row) => row.functionName),
-      },
     };
   },
 
