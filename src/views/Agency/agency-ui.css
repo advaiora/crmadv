@@ -1,15 +1,22 @@
+/*
+ * Stili dell'area Agency.
+ * Regola d'oro del progetto (design-system-temi.md): niente colori scritti a mano.
+ * Tutti i valori sono agganciati ai token globali di globals.css, cosi' chiaro e
+ * scuro funzionano da soli. I token --agency-* qui sotto sono solo alias locali
+ * verso i token globali: cambiano da soli tra i due temi.
+ */
 .agency-page-shell {
-  --agency-border: #d8e0ea;
-  --agency-border-soft: #e8edf4;
-  --agency-muted: #526174;
-  --agency-surface: #ffffff;
-  --agency-soft: #f7f9fc;
-  --agency-soft-blue: #eef5ff;
-  --agency-ink: #111827;
-  --agency-primary: #2563eb;
-  --agency-success: #138a55;
-  --agency-warning: #a86600;
-  --agency-danger: #b42318;
+  --agency-border: var(--border);
+  --agency-border-soft: color-mix(in srgb, var(--border) 55%, transparent);
+  --agency-muted: var(--muted-foreground);
+  --agency-surface: var(--card);
+  --agency-soft: var(--muted);
+  --agency-soft-blue: var(--accent);
+  --agency-ink: var(--foreground);
+  --agency-primary: var(--primary);
+  --agency-success: var(--success);
+  --agency-warning: var(--warning);
+  --agency-danger: var(--danger);
 }
 
 .agency-page-shell .card,
@@ -37,9 +44,9 @@
 .agency-page-shell .form-control,
 .agency-page-shell .form-select,
 .agency-page-shell textarea {
-  background-color: #ffffff !important;
-  color: var(--agency-ink) !important;
-  border-color: #cbd5e1 !important;
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--input) !important;
 }
 
 .agency-page-shell .form-control:focus,
@@ -48,8 +55,8 @@
 .agency-page-shell .btn:focus-visible,
 .agency-page-shell a:focus-visible,
 .agency-page-shell summary:focus-visible {
-  border-color: #2563eb !important;
-  box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.18) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--ring) 25%, transparent) !important;
   outline: 2px solid transparent;
 }
 
@@ -61,7 +68,7 @@
 
 .agency-page-shell .accordion .accordion-body,
 .agency-page-shell .accordion .accordion-item {
-  background: #ffffff !important;
+  background: var(--card) !important;
   color: var(--agency-ink) !important;
 }
 
@@ -92,8 +99,8 @@
 
 .agency-action-strip {
   align-items: center;
-  background: #f8fbff;
-  border: 1px solid #dbeafe;
+  background: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
   border-radius: 8px;
   display: flex;
   flex-wrap: wrap;
@@ -103,7 +110,7 @@
 }
 
 .agency-action-strip strong {
-  color: #0f172a;
+  color: var(--foreground);
 }
 
 .agency-workflow-steps {
@@ -143,7 +150,7 @@
 
 .agency-record-row {
   align-items: flex-start;
-  background: #ffffff;
+  background: var(--card);
   border: 1px solid var(--agency-border-soft);
   border-radius: 8px;
   display: flex;
@@ -154,7 +161,7 @@
 }
 
 .agency-record-row:hover {
-  border-color: #bfd0e8;
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
 }
 
 .agency-output-panel {
@@ -168,7 +175,7 @@
 }
 
 .agency-output-feature {
-  background: #f8fafc;
+  background: var(--agency-soft);
   border: 1px solid var(--agency-border-soft);
   border-radius: 8px;
   padding: 12px;
@@ -182,13 +189,13 @@
 }
 
 .agency-output-feature-body {
-  color: #334155;
+  color: var(--muted-foreground);
   font-size: 0.9rem;
   margin-top: 4px;
 }
 
 .agency-mini-metric {
-  background: #ffffff;
+  background: var(--card);
   border: 1px solid var(--agency-border-soft);
   border-radius: 8px;
   height: 100%;
@@ -202,8 +209,8 @@
 }
 
 .agency-empty-state {
-  background: #ffffff;
-  border: 1px dashed #b9c6d8;
+  background: var(--card);
+  border: 1px dashed var(--border);
   border-radius: 8px;
   color: var(--agency-muted);
   padding: 14px;
@@ -241,10 +248,10 @@
 }
 
 .agency-field-question {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--agency-soft);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #334155;
+  color: var(--muted-foreground);
   padding: 8px 10px;
 }
 
@@ -285,7 +292,7 @@
     border-radius: 8px;
     margin-bottom: 10px;
     padding: 10px;
-    background: #ffffff;
+    background: var(--card);
   }
 
   .agency-page-shell .table-responsive td {

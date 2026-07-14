@@ -772,9 +772,9 @@ const AgencyProjectAssetsPage = () => {
               </div>
 
               {(sources.urls || []).length === 0 && (
-                <Alert variant="light" className="border small">
+                <div className="agency-empty-state small">
                   Nessun URL registrato. Aggiungi almeno il sito principale o una landing.
-                </Alert>
+                </div>
               )}
 
               <div className="agency-record-list mb-3">
