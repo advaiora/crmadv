@@ -2,7 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
 import { useHistory } from "react-router-dom";
-import { ChevronLeft, Edit2, ExternalLink, MessageCircle, Paperclip, Plus, RotateCcw, Search, X } from "react-feather";
+import { ExternalLink } from "react-feather";
 import { useSession } from "../../../hooks/useSession";
 import {
   fetchAgencyChatProjects,
@@ -21,9 +21,27 @@ import {
   renameAgencyChatSession,
   resumeAgencyChatSession,
 } from "../../../modules/agency-os/api/agency.api";
+import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission } from "../../../utils/workspaceAccess";
+import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from "../../../modules/messaging/ui/constants";
 import ChatBubble from "./chatBubble";
+import MessagingPanel from "./MessagingPanel";
 import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
-import { ATTACHMENT_FILE_ACCEPT, mentionsAi } from "./chatShared";
+import { ATTACHMENT_FILE_ACCEPT, formatListDate, mentionsAi } from "./chatShared";
+import {
+  IconAi,
+  IconAttach,
+  IconBack,
+  IconChatEntry,
+  IconClose,
+  IconCollapse,
+  IconExpand,
+  IconMessaging,
+  IconNewChat,
+  IconRename,
+  IconResume,
+  IconSearch,
+  IconSessionList,
+} from "./chatIcons";
 import { AI_CHAT_ASK_EVENT } from "./askAi";
 import "./ai-chat-widget.css";
 
@@ -32,17 +50,19 @@ export const AI_CHAT_OPEN_EVENT = "ai-chat:open";
 
 // Trigger da mettere nella topbar: apre/chiude il popup via evento globale, così
 // come CommandPaletteTrigger. Il widget possiede lo stato, il trigger lo commuta.
+// L'icona e' quella dell'INGRESSO (spec 4-ter §6): apre l'aggregato delle chat,
+// non uno dei due mondi — per questo non e' ne' quella dei Messaggi ne' dell'AI.
 export const AiChatTrigger = () => (
   <Button
     variant="flush-dark"
     className="btn-icon btn-rounded flush-soft-hover topnav-action-btn"
-    aria-label="Apri chat AI"
-    title="Chat AI"
+    aria-label="Apri le chat"
+    title="Chat"
     onClick={() => window.dispatchEvent(new CustomEvent(AI_CHAT_TOGGLE_EVENT))}
   >
     <span className="icon">
       <span className="feather-icon">
-        <MessageCircle />
+        <IconChatEntry />
       </span>
     </span>
   </Button>
@@ -63,21 +83,31 @@ const sendScopedChatMessage = (target, message, opts) => {
   return sendAgencyProjectChatMessage(target.id, message, opts);
 };
 
-// Data compatta per l'elenco sessioni: l'ora se e' di oggi, altrimenti il giorno.
-// L'elenco e' denso (§3.2 del design): serve a distinguere le voci, non a datarle.
-const formatSessionDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const today = new Date();
-  const sameDay =
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear();
-  return sameDay
-    ? date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
-};
+// I due mondi sotto lo stesso ingresso (spec 4-ter). Non si mescolano MAI: stesso
+// selettore, due elenchi. Servono a cose diverse — parlare fra persone vs svolgere
+// lavoro con l'AI — e l'icona lo dice prima dell'etichetta.
+const MODES = [
+  { key: "ai", label: "Chat AI", Icon: IconAi },
+  { key: "messaging", label: "Messaggi", Icon: IconMessaging },
+];
+
+const ModeTabs = ({ mode, onMode }) => (
+  <div className="ai-chat-modes" role="tablist" aria-label="Tipo di chat">
+    {MODES.map(({ key, label, Icon }) => (
+      <button
+        key={key}
+        type="button"
+        role="tab"
+        aria-selected={mode === key}
+        className={`ai-chat-mode ${mode === key ? "is-active" : ""}`}
+        onClick={() => onMode(key)}
+      >
+        <Icon size={15} />
+        {label}
+      </button>
+    ))}
+  </div>
+);
 
 // Elenco delle sessioni dell'ambito. Le archiviate (isFrozen) sono quelle da cui si
 // e' usciti o si e' stati rimossi: restano consultabili in sola lettura.
@@ -86,7 +116,7 @@ const SessionList = ({ sessions, activeId, loading, onOpen, onRename, onNew }) =
     <div className="ai-chat-sessions-head">
       <span>Conversazioni</span>
       <button type="button" className="ai-chat-session-new" onClick={onNew}>
-        <Plus size={14} />
+        <IconNewChat size={14} />
         Nuova chat
       </button>
     </div>
@@ -110,7 +140,7 @@ const SessionList = ({ sessions, activeId, loading, onOpen, onRename, onNew }) =
               <span className="ai-chat-session-meta">
                 {session.isFrozen && <Badge bg="secondary">Archiviata</Badge>}
                 {!session.isFrozen && session.isGroup && <Badge bg="light" text="dark">{session.participantCount}</Badge>}
-                <span className="ai-chat-session-date">{formatSessionDate(session.lastMessageAt)}</span>
+                <span className="ai-chat-session-date">{formatListDate(session.lastMessageAt)}</span>
               </span>
             </button>
             {!session.isFrozen && (
@@ -121,7 +151,7 @@ const SessionList = ({ sessions, activeId, loading, onOpen, onRename, onNew }) =
                 title="Rinomina"
                 onClick={() => onRename(session)}
               >
-                <Edit2 size={13} />
+                <IconRename size={13} />
               </button>
             )}
           </li>
@@ -207,7 +237,7 @@ const EntityPicker = ({ items, loading, error, query, onQuery, onSelect, onRetry
         )}
       </div>
       <div className="ai-chat-search">
-        <Search size={16} className="ai-chat-search-icon" />
+        <IconSearch size={16} className="ai-chat-search-icon" />
         <input
           type="text"
           className="ai-chat-search-input"
@@ -263,6 +293,14 @@ const AiChatWidget = () => {
   const currentUserId = session?.userId || null;
 
   const [open, setOpen] = React.useState(false);
+
+  // Quale dei due mondi si sta guardando, e se il popup e' a tutto schermo. Sono
+  // dello SHELL, non dei due mondi: cambiare mondo non deve rimpicciolire la finestra.
+  const [mode, setMode] = React.useState("ai");
+  const [expanded, setExpanded] = React.useState(false);
+  const [access, setAccess] = React.useState(null);
+  const [accessLoaded, setAccessLoaded] = React.useState(false);
+
   const [projects, setProjects] = React.useState([]);
   const [projectsLoaded, setProjectsLoaded] = React.useState(false);
   const [projectsLoading, setProjectsLoading] = React.useState(false);
@@ -351,6 +389,46 @@ const AiChatWidget = () => {
     }
   }, [open, projectsLoaded, projectsLoading, loadProjects]);
 
+  // Il modulo Messaggi puo' essere spento nel workspace o mancare all'utente: in quel
+  // caso il selettore non deve nemmeno comparire. Si legge alla prima apertura, non
+  // all'avvio dell'app: chi non apre mai le chat non paga la chiamata.
+  React.useEffect(() => {
+    if (!open || accessLoaded) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await fetchWorkspaceAccess();
+        if (!cancelled) {
+          setAccess(result);
+        }
+      } catch (_err) {
+        // Senza risposta si resta sulla sola Chat AI: meglio un mondo in meno che un
+        // tab che porta a una schermata di errore.
+      } finally {
+        if (!cancelled) {
+          setAccessLoaded(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, accessLoaded]);
+
+  const canUseMessaging =
+    hasModuleEnabled(access, MESSAGING_MODULE_KEY) && hasPermission(access, MESSAGING_PERMISSIONS.view);
+  const canSendMessages = hasPermission(access, MESSAGING_PERMISSIONS.send);
+
+  // Se i Messaggi non sono disponibili (modulo spento, permesso tolto) si torna alla
+  // Chat AI: senza, si resterebbe su un mondo vuoto e senza tab per uscirne.
+  React.useEffect(() => {
+    if (accessLoaded && !canUseMessaging && mode === "messaging") {
+      setMode("ai");
+    }
+  }, [accessLoaded, canUseMessaging, mode]);
+
   React.useEffect(() => {
     if (!open) {
       return undefined;
@@ -421,6 +499,21 @@ const AiChatWidget = () => {
     [],
   );
 
+  // Apre un ambito: prima la chat, POI l'elenco. L'ordine non e' cosmetico — alla
+  // prima apertura di un ambito e' `loadChat` a creare la sessione dell'utente, e
+  // leggendo l'elenco in parallelo si arriva prima che esista: l'elenco risponde
+  // "nessuna conversazione" mentre la chat aperta accanto c'e' eccome. Il difetto
+  // stava li' da quando esiste l'elenco (15/7), ma si vedeva solo se si apriva la
+  // tendina nel primo istante giusto; con la colonna sempre a video (popup espanso)
+  // si vedrebbe ogni volta.
+  const openTarget = React.useCallback(
+    async (target, wantedConversationId) => {
+      await loadChat(target, wantedConversationId);
+      await loadSessions(target);
+    },
+    [loadChat, loadSessions],
+  );
+
   // --- Sessioni: apri, nuova, rinomina, riprendi ---
 
   const openSession = React.useCallback(
@@ -438,12 +531,11 @@ const AiChatWidget = () => {
     try {
       const id = await createAgencyChatSession(selectedTarget);
       setShowSessions(false);
-      await loadChat(selectedTarget, id);
-      await loadSessions(selectedTarget);
+      await openTarget(selectedTarget, id);
     } catch (err) {
       setError(err?.message || "Non sono riuscito ad aprire una nuova conversazione.");
     }
-  }, [selectedTarget, loadChat, loadSessions]);
+  }, [selectedTarget, openTarget]);
 
   const renameSession = React.useCallback(
     async (session) => {
@@ -468,12 +560,11 @@ const AiChatWidget = () => {
     setError("");
     try {
       const id = await resumeAgencyChatSession(selectedTarget, conversationId);
-      await loadChat(selectedTarget, id);
-      await loadSessions(selectedTarget);
+      await openTarget(selectedTarget, id);
     } catch (err) {
       setError(err?.message || "Non sono riuscito a riprendere la conversazione.");
     }
-  }, [selectedTarget, conversationId, loadChat, loadSessions]);
+  }, [selectedTarget, conversationId, openTarget]);
 
   // --- Allegati (Fase 3a) ---
 
@@ -546,10 +637,9 @@ const AiChatWidget = () => {
       setQuery("");
       setSelectedTarget(target);
       setInput("");
-      void loadChat(target);
-      void loadSessions(target);
+      void openTarget(target);
     },
-    [loadChat, loadSessions],
+    [openTarget],
   );
 
   // "Chiedi all'AI" da una lista (menu ⋯ o tasto destro). Con una conversazione
@@ -562,6 +652,10 @@ const AiChatWidget = () => {
         return;
       }
       setOpen(true);
+      // "Chiedi all'AI" arriva da una lista qualsiasi del CRM: se il popup era aperto
+      // sui Messaggi va riportato sul mondo giusto, altrimenti l'azione non farebbe
+      // niente di visibile.
+      setMode("ai");
       const isCurrentTarget = selectedTarget?.scope === entityType && selectedTarget?.id === entityId;
       if (mode === "open" || !selectedTarget || isCurrentTarget) {
         openChatOnEntity(entityType, entityId, name);
@@ -593,8 +687,7 @@ const AiChatWidget = () => {
     if (nextScope === "general") {
       const target = { scope: "general", name: "Chat generale" };
       setSelectedTarget(target);
-      void loadChat(target);
-      void loadSessions(target);
+      void openTarget(target);
     } else {
       setSelectedTarget(null);
     }
@@ -607,8 +700,7 @@ const AiChatWidget = () => {
     setInput("");
     setSessions([]);
     setConversationId(null);
-    void loadChat(target);
-    void loadSessions(target);
+    void openTarget(target);
   };
 
   const backToPicker = () => {
@@ -692,26 +784,51 @@ const AiChatWidget = () => {
   }
 
   const showPicker = scope !== "general" && !selectedTarget;
+  const isMessaging = mode === "messaging";
+  // A tutto schermo l'elenco delle sessioni e' una colonna fissa, non piu' una
+  // tendina: e' questo che rende la vista ampia utile ovunque (spec 4-ter §2).
+  const sessionsVisible = expanded || showSessions;
 
   return createPortal(
-    <div className="ai-chat-overlay" role="presentation" onMouseDown={() => setOpen(false)}>
+    <div
+      className={`ai-chat-overlay ${expanded ? "is-expanded" : ""}`}
+      role="presentation"
+      onMouseDown={() => !expanded && setOpen(false)}
+    >
       <aside
-        className="ai-chat-panel"
+        className={`ai-chat-panel ${expanded ? "is-expanded" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label="Chat AI"
+        aria-label={isMessaging ? "Messaggi" : "Chat AI"}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="ai-chat-header">
           <div className="ai-chat-title">
-            <MessageCircle size={18} />
-            <span>Chat AI</span>
+            {isMessaging ? <IconMessaging size={18} /> : <IconAi size={18} />}
+            <span>{isMessaging ? "Messaggi" : "Chat AI"}</span>
           </div>
-          <button type="button" className="ai-chat-close" aria-label="Chiudi" onClick={() => setOpen(false)}>
-            <X size={18} />
-          </button>
+          <div className="ai-chat-header-actions">
+            <button
+              type="button"
+              className="ai-chat-close"
+              aria-label={expanded ? "Riduci a finestra" : "Espandi a tutto schermo"}
+              title={expanded ? "Riduci" : "Espandi"}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? <IconCollapse size={17} /> : <IconExpand size={17} />}
+            </button>
+            <button type="button" className="ai-chat-close" aria-label="Chiudi" onClick={() => setOpen(false)}>
+              <IconClose size={18} />
+            </button>
+          </div>
         </header>
 
+        {accessLoaded && canUseMessaging && <ModeTabs mode={mode} onMode={setMode} />}
+
+        {isMessaging ? (
+          <MessagingPanel expanded={expanded} canSend={canSendMessages} />
+        ) : (
+          <>
         <ScopeTabs activeScope={scope} onScope={changeScope} />
 
         {showPicker ? (
@@ -727,25 +844,41 @@ const AiChatWidget = () => {
           />
         ) : (
           <div className="ai-chat-conversation">
+            {sessionsVisible && (
+              <SessionList
+                sessions={sessions}
+                activeId={conversationId}
+                loading={sessionsLoading}
+                onOpen={openSession}
+                onRename={renameSession}
+                onNew={newSession}
+              />
+            )}
+
+            <div className="ai-chat-conv-main">
             <div className="ai-chat-conv-head">
               {scope !== "general" && (
                 <button type="button" className="ai-chat-back" onClick={backToPicker}>
-                  <ChevronLeft size={16} />
+                  <IconBack size={16} />
                   Cambia
                 </button>
               )}
               <span className="ai-chat-conv-name" title={selectedTarget?.name}>
                 {selectedTarget?.name}
               </span>
-              <button
-                type="button"
-                className="ai-chat-openfull"
-                onClick={() => setShowSessions((current) => !current)}
-                aria-expanded={showSessions}
-                title="Le tue conversazioni su questo ambito"
-              >
-                <MessageCircle size={15} />
-              </button>
+              {/* A tutto schermo l'elenco e' gia' una colonna: il tasto che lo apre
+                  sarebbe un doppione senza bersaglio. */}
+              {!expanded && (
+                <button
+                  type="button"
+                  className="ai-chat-openfull"
+                  onClick={() => setShowSessions((current) => !current)}
+                  aria-expanded={showSessions}
+                  title="Le tue conversazioni su questo ambito"
+                >
+                  <IconSessionList size={15} />
+                </button>
+              )}
               {selectedTarget?.scope === "project" && (
                 <button
                   type="button"
@@ -758,23 +891,12 @@ const AiChatWidget = () => {
               )}
             </div>
 
-            {showSessions && (
-              <SessionList
-                sessions={sessions}
-                activeId={conversationId}
-                loading={sessionsLoading}
-                onOpen={openSession}
-                onRename={renameSession}
-                onNew={newSession}
-              />
-            )}
-
             {isFrozen && (
               <div className="ai-chat-notice">
                 <strong>Conversazione archiviata.</strong> Non ne fai più parte: la vedi com&rsquo;era quando ne sei
                 uscito, e non puoi scrivere.
                 <button type="button" className="ai-chat-resume" onClick={resumeSession}>
-                  <RotateCcw size={13} />
+                  <IconResume size={13} />
                   Riprendi in una nuova chat
                 </button>
               </div>
@@ -790,6 +912,7 @@ const AiChatWidget = () => {
             {error && <div className="ai-chat-notice is-error">{error}</div>}
 
             <div className="ai-chat-messages">
+              <div className="ai-chat-messages-inner">
               {chatLoading ? (
                 <div className="ai-chat-centered">
                   <Spinner animation="border" size="sm" role="status" />
@@ -802,8 +925,13 @@ const AiChatWidget = () => {
                 </div>
               ) : messages.length === 0 ? (
                 <div className="ai-chat-empty">
-                  Nessun messaggio. Scrivi e usa <strong>@AI</strong> (o <strong>Chiedi all&rsquo;AI</strong>) per una
-                  risposta dell&rsquo;assistente.
+                  {/* Il testo va dentro UN elemento: .ai-chat-empty e' flex column, quindi
+                      ogni <strong> sciolto diventerebbe una riga a se' e la frase si
+                      spezzerebbe in cinque. */}
+                  <p className="mb-0">
+                    Nessun messaggio. Scrivi e usa <strong>@AI</strong> (o <strong>Chiedi all&rsquo;AI</strong>) per una
+                    risposta dell&rsquo;assistente.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -821,6 +949,7 @@ const AiChatWidget = () => {
                   <div ref={bottomRef} />
                 </>
               )}
+              </div>
             </div>
 
             {isParticipant && (
@@ -874,7 +1003,7 @@ const AiChatWidget = () => {
                     disabled={sending || attachBusy}
                     title="Allega un documento (TXT, CSV, MD, DOCX, PDF)"
                   >
-                    {attachBusy ? <Spinner animation="border" size="sm" /> : <Paperclip size={15} />}
+                    {attachBusy ? <Spinner animation="border" size="sm" /> : <IconAttach size={15} />}
                   </Button>
                   <Button
                     type="button"
@@ -908,7 +1037,10 @@ const AiChatWidget = () => {
                 </div>
               </Form>
             )}
+            </div>
           </div>
+        )}
+          </>
         )}
       </aside>
     </div>,

@@ -1,5 +1,7 @@
-/* Popup di Chat AI globale (Fase 2). Drawer laterale montato via portale nello
-   shell, disponibile su ogni pagina. Solo token del tema: chiaro/scuro da soli. */
+/* Popup delle chat (Fase 2, riorganizzato il 15/7/2026 — spec 4-ter). Drawer
+   laterale montato via portale nello shell, disponibile su ogni pagina: un solo
+   ingresso, due mondi dentro (Chat AI e Messaggi). Solo token del tema: chiaro e
+   scuro funzionano da soli. */
 
 .ai-chat-overlay {
   position: fixed;
@@ -12,6 +14,14 @@
   -webkit-backdrop-filter: blur(2px);
 }
 
+/* A tutto schermo non c'e' un "fuori" da velare: il velo e la sfocatura sarebbero
+   lavoro di disegno per nulla (e il blur su un layer fisso costa a ogni frame). */
+.ai-chat-overlay.is-expanded {
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .ai-chat-panel {
   display: flex;
   flex-direction: column;
@@ -22,6 +32,14 @@
   border-left: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
   animation: ai-chat-slide-in var(--duration-base, 200ms) var(--ease-out, ease-out);
+}
+
+/* Espanso: la finestra prende tutto. E' questo che permette di eliminare la scheda
+   Chat estesa del progetto — la vista ampia si guadagna ovunque, non solo li'. */
+.ai-chat-panel.is-expanded {
+  width: 100vw;
+  border-left: none;
+  box-shadow: none;
 }
 
 @keyframes ai-chat-slide-in {
@@ -51,6 +69,12 @@
   font-size: 1rem;
 }
 
+.ai-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .ai-chat-close,
 .ai-chat-back,
 .ai-chat-openfull {
@@ -70,6 +94,50 @@
 .ai-chat-openfull:hover {
   background: var(--muted);
   color: var(--foreground);
+}
+
+/* --- Selettore dei due mondi (spec 4-ter §1): Chat AI / Messaggi --- */
+/* Un controllo segmentato, non due pillole d'accento: l'accento della vista e' uno
+   solo (design §4.1) ed e' gia' speso dal selettore d'ambito qui sotto. Attenzione:
+   in questo tema --muted e --card risolvono allo stesso colore, quindi la linguetta
+   attiva usa --background (stesso trucco di .ai-chat-session.is-active). */
+.ai-chat-modes {
+  display: flex;
+  gap: 2px;
+  margin: 10px 16px 0;
+  padding: 3px;
+  background: var(--muted);
+  border-radius: var(--radius-md, 10px);
+}
+
+.ai-chat-mode {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ai-chat-mode:hover {
+  color: var(--foreground);
+}
+
+/* L'ombra non e' decorazione: in chiaro --background e --muted distano pochi punti
+   (248,250,252 su 241,245,252) e la linguetta si distinguerebbe solo per il peso del
+   testo. In scuro lo stacco c'e' gia'; l'ombra morbida (design §1.2) regge entrambi. */
+.ai-chat-mode.is-active {
+  background: var(--background);
+  color: var(--foreground);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Selettore d'ambito */
@@ -108,11 +176,49 @@
 
 /* Selettore progetto */
 .ai-chat-picker,
-.ai-chat-conversation {
+.ai-chat-conversation,
+.ai-chat-conv-main,
+.ai-chat-msg-list {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* --- A tutto schermo: elenco a sinistra, conversazione a destra --- */
+/* Nel popup stretto l'elenco e' una tendina sopra i messaggi; espanso diventa una
+   colonna fissa, come nelle interfacce dei chat. Stessa regola per i due mondi: le
+   sessioni dell'AI e le persone si sfogliano uguale (il selettore ha senso proprio
+   perche' cambia il contenuto, non l'impianto). */
+.ai-chat-panel.is-expanded .ai-chat-conversation {
+  flex-direction: row;
+}
+
+.ai-chat-panel.is-expanded .ai-chat-sessions,
+.ai-chat-panel.is-expanded .ai-chat-msg-list {
+  flex: 0 0 300px;
+  width: 300px;
+  max-height: none;
+  border-bottom: none;
+  border-right: 1px solid var(--border);
+}
+
+/* Il contenuto non si stira con la finestra: si legge male e non e' piu' una chat
+   (design §2: larghezza massima e contenuto centrato). */
+.ai-chat-panel.is-expanded .ai-chat-messages-inner,
+.ai-chat-panel.is-expanded .ai-chat-composer,
+.ai-chat-panel.is-expanded .ai-chat-notice {
+  width: 100%;
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ai-chat-panel.is-expanded .ai-chat-picker {
+  width: 100%;
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .ai-chat-onboarding {
@@ -622,6 +728,114 @@
 
 .ai-chat-resume:hover {
   background: var(--muted);
+}
+
+/* --- Mondo MESSAGGI dentro il popup (15/7/2026, spec 4-ter §1) --- */
+/* Le persone del workspace: l'elenco e' la conversazione. Vestito come l'elenco
+   delle sessioni qui sopra — sono due mondi distinti, non due estetiche distinte. */
+.ai-chat-msg-list {
+  background: var(--muted);
+}
+
+.ai-chat-msg-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 6px 6px;
+}
+
+.ai-chat-msg-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 7px 8px;
+}
+
+.ai-chat-msg-row:hover,
+.ai-chat-msg-row.is-active {
+  background: var(--background);
+}
+
+.ai-chat-msg-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ai-chat-msg-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-chat-msg-row.is-active .ai-chat-msg-row-name {
+  font-weight: 600;
+}
+
+.ai-chat-msg-row-preview {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-chat-msg-row-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ai-chat-msg-row-date {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* NON LETTI: un pallino d'accento col numero dentro, non un'icona (spec 4-ter §6:
+   l'alfabeto delle icone si ferma qui, il non letto e' un contatore). */
+.ai-chat-dot {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  min-width: 18px;
+}
+
+.ai-chat-msg-bubble-wrap {
+  max-width: 80%;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* La ricerca delle persone e' un <form>: eredita l'impianto di .ai-chat-search ma
+   senza il display flex del contenitore, che qui sballerebbe l'icona assoluta. */
+.ai-chat-msg-list .ai-chat-search {
+  flex: 0 0 auto;
+}
+
+/* Il 44px e' il minimo per il DITO, non la regola per il mouse (design, elenco
+   degli errori da non fare). Su desktop i controlli restano compatti; su touch si
+   alzano da soli. */
+@media (pointer: coarse) {
+  .ai-chat-mode,
+  .ai-chat-msg-row,
+  .ai-chat-session,
+  .ai-chat-close,
+  .ai-chat-openfull,
+  .ai-chat-back {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

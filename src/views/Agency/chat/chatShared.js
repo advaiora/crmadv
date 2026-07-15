@@ -10,6 +10,28 @@ export const formatTime = (value) => {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("it-IT");
 };
 
+// Data compatta per gli ELENCHI (sessioni AI e conversazioni con le persone):
+// l'ora se e' di oggi, altrimenti il giorno. Gli elenchi sono densi (design §3.2):
+// la data serve a distinguere le voci, non a datarle al secondo. Condivisa dai due
+// mondi di proposito — stanno sotto lo stesso selettore e si sfogliano uguale.
+export const formatListDate = (value) => {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const today = new Date();
+  const sameDay =
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+  return sameDay
+    ? date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+};
+
 // Etichetta autore da mostrare sopra la bolla: nome, email o fallback.
 export const authorLabel = (message) => {
   if (message.role === "assistant") {
