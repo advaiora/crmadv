@@ -149,6 +149,35 @@ Il vincolo `@@unique([projectId])` / `@@unique([clientId])` in `schema.prisma` i
 - **Nuova migrazione** (tracciata, da segnalare in handoff): via i due `@@unique`, ruolo di sola lettura + `frozenAt` su `AiConversationParticipant`. Le conversazioni esistenti diventano semplicemente la prima sessione del loro ambito.
 - La decisione **"AI risponde sempre se sei l'unico partecipante"** (sez. 2, tabella "Turni di gruppo") si applica **per sessione**, non per ambito: in una sessione solitaria l'AI risponde sempre, in una di gruppo serve `@AI`.
 
+## 4-ter. UN SOLO INGRESSO alle chat, due mondi distinti — **DECISO il 15/7/2026 (Jacopo), DA REALIZZARE**
+
+> Riorganizzazione dell'accesso alle chat, decisa dopo la Fase 3a/sessioni. Tocca anche il modulo **Messaggi** (`src/views/Email/index.jsx`, rotta `/apps/email`, voce "Comunicazioni → Messaggi"), che **non è di Jacopo né di Claudio**: l'ha scritto **Davide D'Angelo** (`DngDavide02`), fermo dal **5/3/2026**. Non è un conflitto di staffetta — è codice legacy che nessuno dei due presidia.
+
+### Il principio: aggregare l'ingresso, NON le due nature
+
+Un **solo punto d'ingresso** (il pulsante in topbar dove oggi vive il popup della Chat AI), poi un **selettore** che sdoppia in due mondi che **non si mescolano mai**. Non sono la stessa cosa con due nomi:
+
+| | **Messaggistica standard** | **Chat AI** |
+|---|---|---|
+| A cosa serve | parlare **fra persone** | **svolgere lavoro** con l'AI |
+| Con chi | colleghi (1-a-1, gruppi di reparto o d'agenzia) — *e in futuro i clienti* | l'AI, da solo o in gruppo (strategie, revisioni) |
+| Oggi nel modello | `WorkspaceMessage`: **1-a-1 puro**, nessuna entità thread | `AiConversation`: N partecipanti, sessioni, allegati |
+
+**Anti-regola (errore già commesso in questa discussione):** la casella **non** è un elenco unico che mescola persone e sessioni AI. La separazione netta vale **anche nella superficie di sfoglio**: stesso selettore, due elenchi. Mescolarli rimetterebbe dentro la confusione che il selettore toglie.
+
+### Da fare ORA (dentro V4)
+
+1. **Selettore nel popup**: `Chat AI` / `Messaggi`. La messaggistica entra nel popup **sul suo modello 1-a-1 attuale**, senza riscritture.
+2. **Pulsante "espandi"**: il popup diventa a tutto schermo e torna popup. **È questo che rende possibile il punto 3**: la vista ampia non si perde, si guadagna *ovunque* invece che solo dentro la scheda del progetto.
+3. **Eliminare la chat AI estesa da Agency** (`AgencyProjectChatPage`). ⚠️ **Ordine obbligato:** lì vivono **partecipanti e azzeramento** (e lì doveva andare "Sciogli il gruppo") → **prima si spostano nel popup, poi si cancella la pagina**, altrimenti sparisce la gestione dei gruppi. Il popup ha già l'icona `ExternalLink` che rimanda a quella scheda: va tolta.
+4. **Modulo Messaggi = la casella**, sdoppiata dallo stesso selettore: due elenchi (conversazioni con persone / sessioni AI), con ricerca. Aprirne una lancia **lo stesso componente di chat** a tutto schermo — montato su rotta invece che in overlay, **una sola implementazione**. Eventuale rinomina della voce o due tab (vedi la regola di navigazione: sottosezioni in tab in cima, non in sidebar).
+5. **Non letti / notifiche**: liberi di integrarli nel popup. Nota: `WorkspaceMessage` ha già `readAt`; la **chat AI non ha alcun concetto di "non letto"** — inventarlo è lavoro nuovo, da valutare, non darlo per scontato.
+
+### Rimandato a V8 — *con decisione esplicita del 15/7/2026*
+
+- **Modello a conversazioni per i messaggi** (partecipanti, gruppi di **reparto** e **d'agenzia**). La roadmap lo colloca in **V8** ("Messaggistica potenziata a **thread di progetto**"); tirarlo dentro V4 allungherebbe la V e lascerebbe la chat AI in sospeso. **Nota:** la roadmap dice thread *di progetto*, Jacopo vuole gruppi *di reparto/agenzia* → i due modelli **non coincidono**, va riconciliato a V8. I **reparti esistono già** (`Department`, `DepartmentMember`): la base c'è.
+- **Parlare con i CLIENTI.** ⛔ Oggi **impossibile**: `Client` ha **solo un campo `email` di testo** — nessun utente, nessun accesso, nessuna password — e **non esiste alcun portale clienti** nel codice. Farlo significa un'area di prodotto intera (account, inviti, permessi) con un **confine di sicurezza netto**: il cliente deve vedere la sua conversazione e *nient'altro* del CRM. La roadmap, in V8, assume un cliente **senza account** che interagisce via **link pubblico ed email** ("un cliente prenota da link personale, riceve reminder"). **Deciso: per ora la chat resta interna**, il dialogo coi clienti si affronta come area a sé.
+
 ## 5. Fuori da questa spec (registrato altrove)
 
 - **Estensione dell'onboarding leggero a TUTTO il CRM:** l'approccio "guida in-contesto, non tutorial pesante" andrà esteso all'intero prodotto, ma **a fine sviluppo** (dopo V9 → collocato in V10, rollout). Vedi roadmap.
