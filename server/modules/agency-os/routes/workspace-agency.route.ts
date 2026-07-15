@@ -371,7 +371,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.get<{
-    Querystring: { days?: string; userId?: string; model?: string; functionName?: string };
+    Querystring: { days?: string; userId?: string; model?: string; functionName?: string; projectId?: string };
   }>('/agency/settings/ai-usage', async (request, reply) => {
     const { workspace } = await ensureAgencySuperadminAccess(request);
     const parseDays = (raw?: string) => {
@@ -388,6 +388,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       userId: parseFilter(request.query?.userId),
       model: parseFilter(request.query?.model),
       functionName: parseFilter(request.query?.functionName),
+      projectId: parseFilter(request.query?.projectId),
     });
 
     return ok(reply, { usage });

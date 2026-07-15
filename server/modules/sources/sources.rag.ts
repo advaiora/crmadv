@@ -136,6 +136,7 @@ export const estimateEmbeddingCostUsd = (tokens: number): number =>
 // L'utente è quello del contesto di richiesta (null per job di sistema).
 const recordEmbeddingUsage = async (input: {
   workspaceId: string;
+  projectId?: string | null;
   functionName: string;
   promptTokens: number;
   durationMs: number;
@@ -147,6 +148,7 @@ const recordEmbeddingUsage = async (input: {
     await aiUsageRepository.create({
       workspaceId: input.workspaceId,
       userId: requestContext.getUserId(),
+      projectId: input.projectId ?? null,
       functionName: input.functionName,
       model: EMBEDDING_MODEL,
       inputTokens: input.promptTokens,
@@ -167,6 +169,9 @@ export const createLoggingOpenAiEmbedder = (input: {
   apiKey: string;
   workspaceId: string;
   functionName: string;
+  // Progetto a cui imputare il consumo. Si omette quando la ricerca copre le fonti
+  // di piu' progetti insieme (chat con ambito Cliente): li' il progetto non e' uno.
+  projectId?: string | null;
 }): Embedder => async (texts) => {
   const startedAt = Date.now();
   let promptTokens = 0;
@@ -176,6 +181,7 @@ export const createLoggingOpenAiEmbedder = (input: {
   const vectors = await embedder(texts);
   await recordEmbeddingUsage({
     workspaceId: input.workspaceId,
+    projectId: input.projectId,
     functionName: input.functionName,
     promptTokens,
     durationMs: Date.now() - startedAt,

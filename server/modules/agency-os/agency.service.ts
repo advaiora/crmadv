@@ -2493,6 +2493,7 @@ const retrieveRelevantSourceExcerpts = async (input: {
       embedder: createLoggingOpenAiEmbedder({
         apiKey,
         workspaceId: input.workspaceId,
+        projectId: input.projectId,
         functionName: 'sources.embed.search',
       }),
     });
@@ -2538,6 +2539,7 @@ const retrieveSourceExcerptsForQuery = async (input: {
       embedder: createLoggingOpenAiEmbedder({
         apiKey,
         workspaceId: input.workspaceId,
+        projectId: input.projectId,
         functionName: 'sources.embed.search',
       }),
     });
@@ -2881,6 +2883,9 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
   timeoutMs?: number;
   functionName?: string;
   lockKey?: string;
+  // Progetto a cui imputare il consumo nel registro (tutti i chiamanti ce l'hanno:
+  // lo usano gia' per la chiave di lock).
+  projectId?: string;
 }): Promise<AgencyAiJsonResult | null> => {
   const status = await getAgencyAiStatusPayload(input.workspaceId);
   const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
@@ -3017,6 +3022,7 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
             // Utente che ha avviato l'azione (dal contesto di richiesta). Null per
             // i job di sistema (sync automatiche senza richiesta HTTP).
             userId: requestContext.getUserId(),
+            projectId: input.projectId ?? null,
             functionName,
             model,
             inputTokens: estimatedInputTokens,
@@ -3090,6 +3096,11 @@ const runAgencyAiTextWithMeta = async (input: {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   timeoutMs?: number;
   functionName?: string;
+  // Contesto a cui imputare il consumo nel registro. Per la chat: sempre la
+  // conversazione, e il progetto solo quando l'ambito e' Progetto (con l'ambito
+  // Cliente il progetto non e' uno solo; con Generale non ce n'e' nessuno).
+  projectId?: string;
+  conversationId?: string;
 }): Promise<AgencyAiTextResult | null> => {
   const status = await getAgencyAiStatusPayload(input.workspaceId);
   const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
@@ -3192,6 +3203,8 @@ const runAgencyAiTextWithMeta = async (input: {
         await aiUsageRepository.create({
           workspaceId: input.workspaceId,
           userId: requestContext.getUserId(),
+          projectId: input.projectId ?? null,
+          conversationId: input.conversationId ?? null,
           functionName,
           model,
           inputTokens: estimatedInputTokens,
@@ -5829,6 +5842,7 @@ export const agencyService = {
         : await runAgencyOpenAiJsonWithMeta({
           workspaceId: input.workspaceId,
           functionName: 'web.generateProject',
+          projectId: input.projectId,
           lockKey: `${input.workspaceId}:${input.projectId}:web.generateProject:${input.webProjectId}:${inputHash}`,
           system: systemPrompt,
           user: aiUserPayload,
@@ -6008,6 +6022,7 @@ export const agencyService = {
         : await runAgencyOpenAiJsonWithMeta({
           workspaceId: input.workspaceId,
           functionName: 'web.generateBlock',
+          projectId: input.projectId,
           lockKey: `${input.workspaceId}:${input.projectId}:web.generateBlock:${input.webProjectId}:${parsed.blockKey}:${inputHash}`,
           system: [
             'Sei un conversion copywriter per landing page.',
@@ -6410,6 +6425,7 @@ export const agencyService = {
           : await runAgencyOpenAiJsonWithMeta({
             workspaceId: input.workspaceId,
             functionName: 'ads.generateAsset',
+            projectId: input.projectId,
             lockKey: `${input.workspaceId}:${input.projectId}:ads.generateAsset:${parsed.assetKey}:${inputHash}`,
             system: [
               'Sei un ads strategist per Google Ads e Meta Ads.',
@@ -7378,6 +7394,7 @@ export const agencyService = {
     userId?: string;
     model?: string;
     functionName?: string;
+    projectId?: string;
   }) {
     const windowDays = Math.min(Math.max(Math.round(input.windowDays ?? 30), 1), 365);
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
@@ -7391,19 +7408,31 @@ export const agencyService = {
       userId: input.userId,
       model: input.model,
       functionName: input.functionName,
+      projectId: input.projectId,
     };
     const periodFilter = { since, workspaceId: input.workspaceId };
 
-    const [groupedUser, groupedFunction, totals, recent, periodUsers, periodModels, periodFunctions] =
-      await Promise.all([
-        aiUsageRepository.aggregateByUser(dataFilter),
-        aiUsageRepository.aggregateByFunction(dataFilter),
-        aiUsageRepository.totals(dataFilter),
-        aiUsageRepository.recentLogs(dataFilter, 50),
-        aiUsageRepository.aggregateByUser(periodFilter),
-        aiUsageRepository.distinctModels(periodFilter),
-        aiUsageRepository.distinctFunctions(periodFilter),
-      ]);
+    const [
+      groupedUser,
+      groupedFunction,
+      groupedProject,
+      totals,
+      recent,
+      periodUsers,
+      periodModels,
+      periodFunctions,
+      periodProjects,
+    ] = await Promise.all([
+      aiUsageRepository.aggregateByUser(dataFilter),
+      aiUsageRepository.aggregateByFunction(dataFilter),
+      aiUsageRepository.aggregateByProject(dataFilter),
+      aiUsageRepository.totals(dataFilter),
+      aiUsageRepository.recentLogs(dataFilter, 50),
+      aiUsageRepository.aggregateByUser(periodFilter),
+      aiUsageRepository.distinctModels(periodFilter),
+      aiUsageRepository.distinctFunctions(periodFilter),
+      aiUsageRepository.aggregateByProject(periodFilter),
+    ]);
 
     // Nomi/email degli utenti coinvolti (dati mostrati + opzioni filtro).
     const userIds = new Set<string>();
@@ -7446,6 +7475,39 @@ export const agencyService = {
       }))
       .sort((left, right) => right.costUsd - left.costUsd);
 
+    // Nomi dei progetti coinvolti (dati mostrati + opzioni filtro + ultime chiamate).
+    // Un progetto cancellato lascia il suo costo storico con projectId nullo (il
+    // registro e' contabilita': sopravvive a cio' che descrive).
+    const projectIds = new Set<string>();
+    for (const row of groupedProject) if (row.projectId) projectIds.add(row.projectId);
+    for (const row of periodProjects) if (row.projectId) projectIds.add(row.projectId);
+    for (const log of recent) if (log.projectId) projectIds.add(log.projectId);
+    const projectRows = projectIds.size > 0 ? await aiUsageRepository.projectsByIds([...projectIds]) : [];
+    const projectNameById = new Map(projectRows.map((project) => [project.id, project.name]));
+    const projectLabel = (projectId: string | null) => {
+      if (!projectId) {
+        return 'Senza progetto';
+      }
+      return projectNameById.get(projectId) || 'Progetto eliminato';
+    };
+
+    const perProject = groupedProject
+      .map((row) => ({
+        projectId: row.projectId,
+        name: projectLabel(row.projectId),
+        calls: row._count._all,
+        costUsd: round6(row._sum.costUsd),
+        inputTokens: row._sum.inputTokens ?? 0,
+        outputTokens: row._sum.outputTokens ?? 0,
+        lastCallAt: row._max.createdAt,
+      }))
+      .sort((left, right) => right.costUsd - left.costUsd);
+
+    const projectOptions = periodProjects
+      .filter((row) => Boolean(row.projectId))
+      .map((row) => ({ id: row.projectId as string, name: projectLabel(row.projectId) }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'it'));
+
     const userOptions = periodUsers
       .filter((row) => Boolean(row.userId))
       .map((row) => {
@@ -7460,6 +7522,7 @@ export const agencyService = {
         userId: input.userId ?? null,
         model: input.model ?? null,
         functionName: input.functionName ?? null,
+        projectId: input.projectId ?? null,
       },
       totals: {
         calls: totals._count._all,
@@ -7469,10 +7532,17 @@ export const agencyService = {
       },
       perUser,
       perFunction,
+      perProject,
       recent: recent.map((log) => ({
         id: log.id,
         userId: log.userId,
         userName: userLabel(log.userId).name,
+        projectId: log.projectId,
+        projectName: log.projectId ? projectLabel(log.projectId) : null,
+        // Il registro sa distinguere anche la singola conversazione di chat: qui
+        // basta dire SE la chiamata veniva da una chat (il nome della conversazione
+        // e' quello del suo ambito, gia' leggibile dalla colonna Progetto/Funzione).
+        fromConversation: Boolean(log.conversationId),
         functionName: log.functionName,
         model: log.model,
         costUsd: log.costUsd,
@@ -7485,6 +7555,7 @@ export const agencyService = {
         users: userOptions,
         models: periodModels.map((row) => row.model),
         functions: periodFunctions.map((row) => row.functionName),
+        projects: projectOptions,
       },
     };
   },
@@ -7885,6 +7956,8 @@ export const agencyService = {
         system: context.system,
         messages: contextMessages,
         functionName: `chat.${input.target.scope}`,
+        conversationId: conversation.id,
+        projectId: input.target.scope === 'project' ? input.target.projectId : undefined,
       });
     } catch (error) {
       if (error instanceof AiBudgetExceededError) {
@@ -8559,6 +8632,7 @@ export const agencyService = {
         : await runAgencyOpenAiJsonWithMeta({
           workspaceId,
           functionName: 'discovery.generateBrief',
+          projectId,
           lockKey: `${workspaceId}:${projectId}:discovery.generateBrief:${inputHash}`,
           system: systemPrompt,
           user: aiUserPayload,
@@ -8862,6 +8936,7 @@ export const agencyService = {
         : await runAgencyOpenAiJsonWithMeta({
           workspaceId: input.workspaceId,
           functionName: 'discovery.generateSection',
+          projectId: input.projectId,
           lockKey: `${input.workspaceId}:${input.projectId}:discovery.generateSection:${parsed.sectionKey}:${inputHash}`,
           system: systemPrompt,
           user: aiUserPayload,

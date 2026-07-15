@@ -338,11 +338,12 @@ export const updateAgencyRuntimeSettings = async (payload, { signal } = {}) => {
   return result?.runtimeSettings || null;
 };
 
-export const fetchAgencyAiUsage = async ({ days = 30, userId, model, functionName, signal } = {}) => {
+export const fetchAgencyAiUsage = async ({ days = 30, userId, model, functionName, projectId, signal } = {}) => {
   const params = new URLSearchParams({ days: String(days) });
   if (userId) params.set("userId", userId);
   if (model) params.set("model", model);
   if (functionName) params.set("functionName", functionName);
+  if (projectId) params.set("projectId", projectId);
   const result = await agencyFetch(`/agency/settings/ai-usage?${params.toString()}`, {
     method: "GET",
     signal,

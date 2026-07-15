@@ -1,9 +1,16 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../prisma.js';
 
+// projectId/conversationId sono opzionali: molte chiamate AI non hanno quel
+// contesto (chat generale, ricerca sulle fonti di piu' progetti insieme,
+// operazioni di workspace). Vanno valorizzati quando il contesto c'e', cosi' il
+// rendiconto sa dire "quanto e' costato il progetto X" e non solo "quanto ha
+// speso Marco in chat di progetto".
 export type AiUsageLogInput = {
   workspaceId: string;
   userId?: string | null;
+  projectId?: string | null;
+  conversationId?: string | null;
   functionName: string;
   model: string;
   inputTokens: number;
@@ -14,15 +21,16 @@ export type AiUsageLogInput = {
 };
 
 // Filtri applicabili alle aggregazioni dei consumi AI. Tutti opzionali:
-// `since` limita al periodo, gli altri restringono per workspace/utente/modello/funzione.
-// `workspaceId` serve alla vista consumi per-workspace di Agency (la Console
-// piattaforma lo lascia assente per aggregare su tutti i workspace).
+// `since` limita al periodo, gli altri restringono per workspace/utente/modello/
+// funzione/progetto. `workspaceId` serve alla vista consumi per-workspace di Agency
+// (la Console piattaforma lo lascia assente per aggregare su tutti i workspace).
 export type AiUsageFilter = {
   since?: Date;
   workspaceId?: string;
   userId?: string;
   model?: string;
   functionName?: string;
+  projectId?: string;
 };
 
 const buildWhere = (filter: AiUsageFilter): Prisma.AiUsageLogWhereInput => {
@@ -41,6 +49,9 @@ const buildWhere = (filter: AiUsageFilter): Prisma.AiUsageLogWhereInput => {
   }
   if (filter.functionName) {
     where.functionName = filter.functionName;
+  }
+  if (filter.projectId) {
+    where.projectId = filter.projectId;
   }
   return where;
 };
@@ -82,6 +93,30 @@ export const aiUsageRepository = {
       _sum: { costUsd: true, inputTokens: true, outputTokens: true },
       _count: { _all: true },
       _max: { createdAt: true },
+    });
+  },
+
+  // Aggregato per progetto nel periodo/filtri indicati. projectId e' null per le
+  // chiamate senza contesto di progetto (chat generale, ecc.): quelle finiscono
+  // tutte in un unico gruppo, che la vista mostra come "Senza progetto".
+  aggregateByProject(filter: AiUsageFilter = {}) {
+    return prisma.aiUsageLog.groupBy({
+      by: ['projectId'],
+      where: buildWhere(filter),
+      _sum: { costUsd: true, inputTokens: true, outputTokens: true },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+  },
+
+  // Nomi dei progetti citati dal registro, per etichettare gli aggregati.
+  projectsByIds(ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([] as Array<{ id: string; name: string }>);
+    }
+    return prisma.project.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true },
     });
   },
 

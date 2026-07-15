@@ -1617,8 +1617,9 @@ export const getAgencyAiUsage = async (options = {}) => {
       totals: { calls: 0, costUsd: 0, inputTokens: 0, outputTokens: 0 },
       perUser: [],
       perFunction: [],
+      perProject: [],
       recent: [],
-      options: { users: [], models: [], functions: [] },
+      options: { users: [], models: [], functions: [], projects: [] },
     },
     AGENCY_DATA_SOURCE.DB,
   );

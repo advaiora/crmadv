@@ -407,6 +407,7 @@ model Project {
   projectTasks         ProjectTask[]
   sources              ProjectSource[]
   aiConversations      AiConversation[]
+  aiUsageLogs          AiUsageLog[]
   ownerUser            User?                 @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   departments          ProjectDepartment[]
   access               ProjectAccess[]
@@ -545,6 +546,7 @@ model AiConversation {
   participants    AiConversationParticipant[]
   messages        AiConversationMessage[]
   attachments     AiConversationAttachment[]
+  aiUsageLogs     AiUsageLog[]
 
   @@unique([projectId])
   @@unique([clientId])
@@ -762,24 +764,39 @@ model Integration {
 
 // Log dei costi/consumi delle chiamate AI, una riga per chiamata effettiva.
 // Usato dalla Console piattaforma (Fase 4b) per aggregare i costi per workspace.
+// Registro dei consumi AI: una riga per chiamata riuscita, con costo e token
+// stimati. Le dimensioni di analisi sono workspace, utente (chi ha premuto),
+// funzione, e — dal 15/7/2026 — progetto e conversazione, per poter dire "quanto
+// e' costato il progetto X" e non solo "quanto ha speso Marco in chat di progetto".
+// projectId/conversationId sono nulli quando la chiamata non ha quel contesto
+// (es. chat generale, o ricerca sulle fonti di piu' progetti insieme).
+// Tutte le relazioni sono SetNull, non Cascade: il registro e' contabilita' e deve
+// sopravvivere alla cancellazione di cio' che descrive, altrimenti cancellare un
+// progetto falserebbe la spesa storica gia' consuntivata.
 model AiUsageLog {
-  id           String    @id @default(cuid())
-  workspaceId  String
-  userId       String?
-  functionName String    @db.VarChar(120)
-  model        String    @db.VarChar(120)
-  inputTokens  Int       @default(0)
-  outputTokens Int       @default(0)
-  costUsd      Float     @default(0)
-  durationMs   Int       @default(0)
-  status       String    @db.VarChar(30)
-  createdAt    DateTime  @default(now())
-  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id             String          @id @default(cuid())
+  workspaceId    String
+  userId         String?
+  projectId      String?
+  conversationId String?
+  functionName   String          @db.VarChar(120)
+  model          String          @db.VarChar(120)
+  inputTokens    Int             @default(0)
+  outputTokens   Int             @default(0)
+  costUsd        Float           @default(0)
+  durationMs     Int             @default(0)
+  status         String          @db.VarChar(30)
+  createdAt      DateTime        @default(now())
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  conversation   AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, createdAt])
   @@index([userId, createdAt])
   @@index([createdAt])
+  @@index([projectId, createdAt])
+  @@index([conversationId, createdAt])
 }
 
 model ProjectClient {

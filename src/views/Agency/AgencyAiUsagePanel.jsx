@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Card, Col, Form, Row, Spinner, Table } from "react-bootstrap";
+import { Alert, Badge, Card, Col, Form, Row, Spinner, Table } from "react-bootstrap";
 import { getAgencyAiUsage } from "../../modules/agency-os/data/agencyDataAdapter";
 
 // Rendiconto consumi AI del workspace (V4 — cost control): totali, dettaglio per
-// dipendente e per funzione, ultime chiamate, con filtri periodo/utente/modello/
-// funzione. È la versione per-workspace della panoramica cross-workspace della
-// Console piattaforma. Vive in Impostazioni Agency, accanto al Budget AI (budget
-// = controllo, questo = monitoraggio). Accesso super-admin di workspace.
+// dipendente, per funzione e per progetto, ultime chiamate, con filtri periodo/
+// utente/modello/funzione/progetto. È la versione per-workspace della panoramica
+// cross-workspace della Console piattaforma. Vive in Impostazioni Agency, accanto
+// al Budget AI (budget = controllo, questo = monitoraggio). Accesso super-admin
+// di workspace.
 
 const formatUsd = (value) => `$${Number(value || 0).toFixed(4)}`;
 const formatNum = (value) => Number(value || 0).toLocaleString("it-IT");
@@ -25,7 +26,7 @@ const USAGE_WINDOWS = [
   { days: 90, label: "90 giorni" },
 ];
 
-const EMPTY_FILTERS = { userId: "", model: "", functionName: "" };
+const EMPTY_FILTERS = { userId: "", model: "", functionName: "", projectId: "" };
 
 const AgencyAiUsagePanel = () => {
   const [usage, setUsage] = useState(null);
@@ -42,6 +43,7 @@ const AgencyAiUsagePanel = () => {
         userId: nextFilters.userId || undefined,
         model: nextFilters.model || undefined,
         functionName: nextFilters.functionName || undefined,
+        projectId: nextFilters.projectId || undefined,
       }),
     [],
   );
@@ -96,8 +98,10 @@ const AgencyAiUsagePanel = () => {
     void applyQuery(days, EMPTY_FILTERS);
   };
 
-  const options = usage?.options ?? { users: [], models: [], functions: [] };
-  const hasActiveFilters = Boolean(filters.userId || filters.model || filters.functionName);
+  const options = usage?.options ?? { users: [], models: [], functions: [], projects: [] };
+  const hasActiveFilters = Boolean(
+    filters.userId || filters.model || filters.functionName || filters.projectId,
+  );
 
   return (
     <Card className="card-border">
@@ -106,9 +110,9 @@ const AgencyAiUsagePanel = () => {
           <div>
             <h6 className="mb-1">Consumi &amp; costi AI</h6>
             <p className="small text-muted mb-0">
-              Rendiconto della spesa AI del workspace: per dipendente, per funzione e
-              ultime chiamate. Complementare al budget qui sotto (qui vedi quanto è
-              stato speso, lì imposti quanto si può spendere).
+              Rendiconto della spesa AI del workspace: per dipendente, per funzione, per
+              progetto e ultime chiamate. Complementare al budget qui sotto (qui vedi
+              quanto è stato speso, lì imposti quanto si può spendere).
             </p>
           </div>
           {refreshing && <Spinner animation="border" size="sm" role="status" />}
@@ -126,8 +130,9 @@ const AgencyAiUsagePanel = () => {
           </div>
         ) : (
           <>
+            {/* Cinque filtri in una riga sola su desktop: 2+3+2+2+3 = 12 colonne. */}
             <Row className="g-2 align-items-end mb-3">
-              <Col md={3}>
+              <Col md={2}>
                 <Form.Label className="small text-muted mb-1">Periodo</Form.Label>
                 <Form.Select
                   size="sm"
@@ -159,7 +164,7 @@ const AgencyAiUsagePanel = () => {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={3}>
+              <Col md={2}>
                 <Form.Label className="small text-muted mb-1">Modello</Form.Label>
                 <Form.Select
                   size="sm"
@@ -175,7 +180,7 @@ const AgencyAiUsagePanel = () => {
                   ))}
                 </Form.Select>
               </Col>
-              <Col md={3}>
+              <Col md={2}>
                 <Form.Label className="small text-muted mb-1">Funzione</Form.Label>
                 <Form.Select
                   size="sm"
@@ -187,6 +192,22 @@ const AgencyAiUsagePanel = () => {
                   {options.functions.map((fn) => (
                     <option key={fn} value={fn}>
                       {fn}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={3}>
+                <Form.Label className="small text-muted mb-1">Progetto</Form.Label>
+                <Form.Select
+                  size="sm"
+                  value={filters.projectId}
+                  onChange={(event) => handleChangeFilter("projectId", event.target.value)}
+                  disabled={refreshing}
+                >
+                  <option value="">Tutti</option>
+                  {options.projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
                     </option>
                   ))}
                 </Form.Select>
@@ -292,6 +313,41 @@ const AgencyAiUsagePanel = () => {
               </div>
             )}
 
+            {/* Per progetto: risponde a "quanto è costato il progetto X". Le chiamate
+                senza progetto (chat generale, ricerche su più progetti) finiscono
+                nella riga "Senza progetto". */}
+            <div className="fw-semibold small text-muted mb-2">Per progetto</div>
+            {!usage || usage.perProject?.length === 0 ? (
+              <div className="text-muted mb-4">Nessun consumo AI nel periodo/filtri selezionati.</div>
+            ) : (
+              <div className="table-responsive mb-4">
+                <Table size="sm" hover className="align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Progetto</th>
+                      <th className="text-end">Chiamate</th>
+                      <th className="text-end">Costo</th>
+                      <th className="text-end">Token in</th>
+                      <th className="text-end">Token out</th>
+                      <th>Ultima chiamata</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usage.perProject.map((row) => (
+                      <tr key={row.projectId || "senza-progetto"}>
+                        <td className={row.projectId ? "fw-semibold small" : "small text-muted"}>{row.name}</td>
+                        <td className="text-end">{formatNum(row.calls)}</td>
+                        <td className="text-end">{formatUsd(row.costUsd)}</td>
+                        <td className="text-end">{formatNum(row.inputTokens)}</td>
+                        <td className="text-end">{formatNum(row.outputTokens)}</td>
+                        <td className="text-muted">{formatDateTime(row.lastCallAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            )}
+
             <div className="fw-semibold small text-muted mb-2">Ultime chiamate</div>
             {!usage || usage.recent?.length === 0 ? (
               <div className="text-muted mb-0">Nessuna chiamata AI recente.</div>
@@ -302,6 +358,7 @@ const AgencyAiUsagePanel = () => {
                     <tr>
                       <th>Quando</th>
                       <th>Dipendente</th>
+                      <th>Progetto</th>
                       <th>Funzione</th>
                       <th>Modello</th>
                       <th className="text-end">Costo</th>
@@ -312,7 +369,15 @@ const AgencyAiUsagePanel = () => {
                       <tr key={row.id}>
                         <td className="text-muted">{formatDateTime(row.createdAt)}</td>
                         <td>{row.userName}</td>
-                        <td className="text-muted">{row.functionName}</td>
+                        <td className={row.projectName ? "" : "text-muted"}>{row.projectName || "—"}</td>
+                        <td className="text-muted">
+                          {row.functionName}
+                          {row.fromConversation && (
+                            <Badge bg="secondary" className="ms-2 fw-normal">
+                              chat
+                            </Badge>
+                          )}
+                        </td>
                         <td className="text-muted">{row.model}</td>
                         <td className="text-end">{formatUsd(row.costUsd)}</td>
                       </tr>

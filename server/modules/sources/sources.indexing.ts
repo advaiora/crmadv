@@ -18,12 +18,13 @@ import {
 
 // Risolutore dell'embedder di produzione: OpenAI con la chiave del workspace.
 // Ritorna null se non c'è chiave configurata (indicizzazione rimandata, non è un errore).
-const defaultEmbedderResolver = async (workspaceId: string): Promise<Embedder | null> => {
+// `projectId` serve solo a imputare il consumo al progetto nel registro costi.
+const defaultEmbedderResolver = async (workspaceId: string, projectId?: string): Promise<Embedder | null> => {
   const apiKey = await resolveAgencyOpenAiApiKey(workspaceId);
   if (!apiKey) {
     return null;
   }
-  return createLoggingOpenAiEmbedder({ apiKey, workspaceId, functionName: 'sources.embed.index' });
+  return createLoggingOpenAiEmbedder({ apiKey, workspaceId, projectId, functionName: 'sources.embed.index' });
 };
 
 type IndexableSource = {
@@ -36,7 +37,9 @@ type IndexableSource = {
 
 type IndexOptions = {
   // Iniettabile nei test per non dipendere da OpenAI/DB delle impostazioni.
-  embedderResolver?: (workspaceId: string) => Promise<Embedder | null>;
+  // `projectId` e' opzionale per non rompere i test che iniettano un resolver
+  // a un solo argomento.
+  embedderResolver?: (workspaceId: string, projectId?: string) => Promise<Embedder | null>;
   logger?: { warn: (msg: string) => void };
 };
 
@@ -65,7 +68,7 @@ export const indexSourceBestEffort = async (
   const resolver = options?.embedderResolver ?? defaultEmbedderResolver;
   let embedder: Embedder | null = null;
   try {
-    embedder = await resolver(source.workspaceId);
+    embedder = await resolver(source.workspaceId, source.projectId);
   } catch (error) {
     options?.logger?.warn?.(`Risoluzione embedder fallita per fonte ${source.id}: ${(error as Error).message}`);
     return { indexed: false, reason: 'error' };
