@@ -8015,7 +8015,15 @@ export const agencyService = {
   },
 
   // Bozze dell'utente sulla conversazione (i chip mostrati nel composer).
-  async listScopedChatAttachments(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
+  // conversationId: la SESSIONE su cui si carica la bozza. Va indicato dalla UI,
+  // altrimenti la bozza finisce sull'ultima sessione dell'utente mentre lui sta
+  // scrivendo in un'altra, e all'invio il controllo qui sotto la rifiuta.
+  async listScopedChatAttachments(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+  }) {
     const conversation = await this.resolveConversationForUser(input);
     const drafts = await aiConversationRepository.listAttachmentDrafts(conversation.id, input.userId);
     return {
@@ -8031,6 +8039,7 @@ export const agencyService = {
     workspaceId: string;
     userId: string;
     target: ChatScopeTarget;
+    conversationId?: string | null;
     file: { buffer: Buffer; fileName: string; mimeType: string };
   }) {
     const conversation = await this.resolveConversationForUser(input);
@@ -8056,6 +8065,7 @@ export const agencyService = {
     workspaceId: string;
     userId: string;
     target: ChatScopeTarget;
+    conversationId?: string | null;
     body: unknown;
   }) {
     const schema = z.object({

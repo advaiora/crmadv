@@ -741,49 +741,66 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.get<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments', async (request, reply) => {
-    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
-    const attachments = await agencyService.listScopedChatAttachments({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: parseChatScopeTarget(request.query.scope, request.query.targetId),
-    });
-    return ok(reply, { attachments });
-  });
+  // conversationId: la sessione su cui vive la bozza. Deve seguire l'allegato per
+  // tutto il giro (elenco, caricamento, invio): la bozza si carica su una sessione e
+  // l'invio accetta solo le bozze di QUELLA sessione. Senza, la bozza finirebbe
+  // sull'ultima sessione dell'utente mentre lui scrive in un'altra, e l'invio la
+  // rifiuterebbe con "Allegato non valido o gia inviato".
+  app.get<{ Querystring: AgencyChatScopeQuery & AgencyChatSessionQuery }>(
+    '/agency/chat/attachments',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
+      const attachments = await agencyService.listScopedChatAttachments({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: parseChatScopeTarget(request.query.scope, request.query.targetId),
+        conversationId: request.query.conversationId,
+      });
+      return ok(reply, { attachments });
+    },
+  );
 
   // Multipart: l'ambito viaggia in querystring perche' il corpo e' il file.
-  app.post<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments/file', async (request, reply) => {
-    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
-    const target = parseChatScopeTarget(request.query.scope, request.query.targetId);
-    const file = await request.file();
-    if (!file) {
-      throw badRequest('Nessun file caricato.');
-    }
-    const buffer = await file.toBuffer();
-    const attachment = await agencyService.addScopedChatFileAttachment({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target,
-      file: {
-        buffer,
-        fileName: file.filename || 'allegato',
-        mimeType: file.mimetype || '',
-      },
-    });
-    return ok(reply, { attachment });
-  });
+  app.post<{ Querystring: AgencyChatScopeQuery & AgencyChatSessionQuery }>(
+    '/agency/chat/attachments/file',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
+      const target = parseChatScopeTarget(request.query.scope, request.query.targetId);
+      const file = await request.file();
+      if (!file) {
+        throw badRequest('Nessun file caricato.');
+      }
+      const buffer = await file.toBuffer();
+      const attachment = await agencyService.addScopedChatFileAttachment({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target,
+        conversationId: request.query.conversationId,
+        file: {
+          buffer,
+          fileName: file.filename || 'allegato',
+          mimeType: file.mimetype || '',
+        },
+      });
+      return ok(reply, { attachment });
+    },
+  );
 
-  app.post<{ Body: { scope?: string; targetId?: string } }>('/agency/chat/attachments/entity', async (request, reply) => {
-    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
-    const body = request.body ?? {};
-    const attachment = await agencyService.addScopedChatEntityAttachment({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: parseChatScopeTarget(body.scope, body.targetId),
-      body,
-    });
-    return ok(reply, { attachment });
-  });
+  app.post<{ Body: AgencyChatScopeQuery & AgencyChatSessionQuery }>(
+    '/agency/chat/attachments/entity',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
+      const body = request.body ?? {};
+      const attachment = await agencyService.addScopedChatEntityAttachment({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: parseChatScopeTarget(body.scope, body.targetId),
+        conversationId: body.conversationId,
+        body,
+      });
+      return ok(reply, { attachment });
+    },
+  );
 
   app.delete<{ Params: { attachmentId: string } }>('/agency/chat/attachments/:attachmentId', async (request, reply) => {
     const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
