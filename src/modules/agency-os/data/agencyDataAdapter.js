@@ -55,6 +55,11 @@ import {
   fetchAgencyProjectChatParticipants as fetchAgencyProjectChatParticipantsApi,
   addAgencyProjectChatParticipant as addAgencyProjectChatParticipantApi,
   removeAgencyProjectChatParticipant as removeAgencyProjectChatParticipantApi,
+  fetchAgencyChatAttachments as fetchAgencyChatAttachmentsApi,
+  uploadAgencyChatFileAttachment as uploadAgencyChatFileAttachmentApi,
+  addAgencyChatEntityAttachment as addAgencyChatEntityAttachmentApi,
+  removeAgencyChatAttachment as removeAgencyChatAttachmentApi,
+  fetchAgencyChatProjects as fetchAgencyChatProjectsApi,
   fetchAgencyAiEstimates as fetchAgencyAiEstimatesApi,
   fetchAgencyAiBudgets as fetchAgencyAiBudgetsApi,
   updateAgencyAiBudgets as updateAgencyAiBudgetsApi,
@@ -1626,10 +1631,27 @@ export const getAgencyProjectChat = async (projectId) => {
   return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
 };
 
-export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false } = {}) => {
-  const result = await sendAgencyProjectChatMessageApi(projectId, message, { askAi });
+export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false, attachmentIds = [] } = {}) => {
+  const result = await sendAgencyProjectChatMessageApi(projectId, message, { askAi, attachmentIds });
   return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
 };
+
+// --- Allegati della chat (Fase 3a). Passano dal bersaglio d'ambito: dalla scheda
+// di progetto e' sempre { scope: 'project', id: projectId }. ---
+
+export const getAgencyChatAttachments = async (target) => fetchAgencyChatAttachmentsApi(target);
+
+export const uploadAgencyChatFileAttachment = async (target, file) =>
+  uploadAgencyChatFileAttachmentApi(target, file);
+
+export const addAgencyChatEntityAttachment = async (target, entity) =>
+  addAgencyChatEntityAttachmentApi(target, entity);
+
+export const removeAgencyChatAttachment = async (attachmentId) => removeAgencyChatAttachmentApi(attachmentId);
+
+// Progetti/clienti selezionabili come allegato: stessa lista (gia' filtrata per
+// visibilita') del selettore d'ambito della chat globale.
+export const getAgencyChatProjects = async () => fetchAgencyChatProjectsApi();
 
 export const clearAgencyProjectChat = async (projectId) => {
   const result = await clearAgencyProjectChatApi(projectId);

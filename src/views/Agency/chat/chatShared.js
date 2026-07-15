@@ -21,3 +21,39 @@ export const authorLabel = (message) => {
 
 // Rileva se l'AI e' interpellata via menzione @AI (stessa regola del server).
 export const mentionsAi = (text) => /(^|\s)@ai\b/i.test(text || "");
+
+// --- Allegati (Fase 3a) ---
+
+const ENTITY_LABELS = {
+  project: "Progetto",
+  client: "Cliente",
+  source: "Fonte",
+  quote: "Preventivo",
+};
+
+// Chiave dell'icona: i documenti hanno la loro, gli elementi CRM quella del tipo.
+export const attachmentIconKey = (attachment) =>
+  attachment?.kind === "entity" ? attachment.entityType || "project" : "file";
+
+// Etichetta del tipo, per tooltip e lettori di schermo.
+export const attachmentTypeLabel = (attachment) =>
+  attachment?.kind === "entity" ? ENTITY_LABELS[attachment.entityType] || "Elemento" : "Documento";
+
+// Peso del file, solo per i documenti (gli elementi CRM non ne hanno uno).
+export const formatAttachmentSize = (attachment) => {
+  const bytes = attachment?.fileSize;
+  if (typeof bytes !== "number" || bytes <= 0) {
+    return "";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.round(bytes / 1024)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Formati di documento che il server sa leggere (stessa lista dell'estrattore
+// delle Fonti). Usata per l'attributo accept del selettore file.
+export const ATTACHMENT_FILE_ACCEPT = ".txt,.csv,.md,.docx,.pdf";

@@ -6,6 +6,7 @@ import { readAgencyDataMeta } from "../../modules/agency-os/data/agencyDataSourc
 import AgencyPageShell from "./AgencyPageShell";
 import AgencyDataSourceBadge from "./AgencyDataSourceBadge";
 import { rowActivationProps } from "../../utils/rowActivation";
+import { askAiRowProps } from "./chat/askAi";
 
 const PROJECT_TYPE_LABEL_FALLBACK = "Non definito";
 
@@ -182,6 +183,7 @@ const AgencyProjectsListPage = () => {
                     key={project.id}
                     className="row-clickable"
                     aria-label={`Apri progetto ${project.name || ""}`}
+                    {...askAiRowProps("project", project)}
                     {...rowActivationProps(() =>
                       history.push(`/agency/projects/${encodeURIComponent(project.id)}/overview`),
                       { role: "row" },

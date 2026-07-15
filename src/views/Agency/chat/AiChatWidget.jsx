@@ -2,7 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
 import { useHistory } from "react-router-dom";
-import { ChevronLeft, ExternalLink, MessageCircle, Search, X } from "react-feather";
+import { ChevronLeft, ExternalLink, MessageCircle, Paperclip, Search, X } from "react-feather";
 import { useSession } from "../../../hooks/useSession";
 import {
   fetchAgencyChatProjects,
@@ -12,9 +12,15 @@ import {
   sendAgencyClientChatMessage,
   fetchAgencyGeneralChat,
   sendAgencyGeneralChatMessage,
+  fetchAgencyChatAttachments,
+  uploadAgencyChatFileAttachment,
+  addAgencyChatEntityAttachment,
+  removeAgencyChatAttachment,
 } from "../../../modules/agency-os/api/agency.api";
 import ChatBubble from "./chatBubble";
-import { mentionsAi } from "./chatShared";
+import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
+import { ATTACHMENT_FILE_ACCEPT, mentionsAi } from "./chatShared";
+import { AI_CHAT_ASK_EVENT } from "./askAi";
 import "./ai-chat-widget.css";
 
 export const AI_CHAT_TOGGLE_EVENT = "ai-chat:toggle";
@@ -201,7 +207,13 @@ const AiChatWidget = () => {
   const [error, setError] = React.useState("");
   const [budgetNotice, setBudgetNotice] = React.useState("");
 
+  // Allegati in composizione (bozze lato server) e stato del selettore elementi.
+  const [attachments, setAttachments] = React.useState([]);
+  const [attachBusy, setAttachBusy] = React.useState(false);
+  const [showAttachPanel, setShowAttachPanel] = React.useState(false);
+
   const bottomRef = React.useRef(null);
+  const fileInputRef = React.useRef(null);
 
   // I clienti selezionabili derivano dai progetti visibili all'utente (il modello
   // V2 non ha un'assegnazione diretta utente<->cliente): un cliente e' "assegnato a
@@ -282,17 +294,126 @@ const AiChatWidget = () => {
     setChatLoading(true);
     setError("");
     setBudgetNotice("");
+    setAttachments([]);
+    setShowAttachPanel(false);
     try {
       const chat = await fetchScopedChat(target);
       setAiConfigured(chat?.aiConfigured !== false);
       setIsParticipant(chat?.isParticipant !== false);
       setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
+      // Bozze rimaste da una sessione precedente (il composer non le perde).
+      if (chat?.isParticipant !== false) {
+        try {
+          setAttachments(await fetchAgencyChatAttachments(target));
+        } catch (_err) {
+          // Gli allegati pendenti sono un di piu': se non arrivano, la chat resta usabile.
+          setAttachments([]);
+        }
+      }
     } catch (err) {
       setError(err?.message || "Impossibile caricare la conversazione.");
     } finally {
       setChatLoading(false);
     }
   }, []);
+
+  // --- Allegati (Fase 3a) ---
+
+  const attachFile = React.useCallback(
+    async (file) => {
+      if (!file || !selectedTarget) {
+        return;
+      }
+      setAttachBusy(true);
+      setError("");
+      try {
+        const attachment = await uploadAgencyChatFileAttachment(selectedTarget, file);
+        if (attachment) {
+          setAttachments((current) => [...current, attachment]);
+        }
+      } catch (err) {
+        setError(err?.message || "Non sono riuscito ad allegare il documento.");
+      } finally {
+        setAttachBusy(false);
+      }
+    },
+    [selectedTarget],
+  );
+
+  const attachEntity = React.useCallback(
+    async ({ entityType, entityId }) => {
+      if (!selectedTarget) {
+        return;
+      }
+      setAttachBusy(true);
+      setError("");
+      try {
+        const attachment = await addAgencyChatEntityAttachment(selectedTarget, { entityType, entityId });
+        if (attachment) {
+          setAttachments((current) => [...current, attachment]);
+          setShowAttachPanel(false);
+        }
+      } catch (err) {
+        setError(err?.message || "Non sono riuscito ad allegare l'elemento.");
+      } finally {
+        setAttachBusy(false);
+      }
+    },
+    [selectedTarget],
+  );
+
+  const detachAttachment = React.useCallback(async (attachment) => {
+    setAttachBusy(true);
+    try {
+      await removeAgencyChatAttachment(attachment.id);
+      setAttachments((current) => current.filter((row) => row.id !== attachment.id));
+    } catch (err) {
+      setError(err?.message || "Non sono riuscito a togliere l'allegato.");
+    } finally {
+      setAttachBusy(false);
+    }
+  }, []);
+
+  // Apre la chat DELL'elemento: un progetto porta all'ambito Progetto, un cliente
+  // all'ambito Cliente.
+  const openChatOnEntity = React.useCallback(
+    (entityType, entityId, name) => {
+      const nextScope = entityType === "client" ? "client" : "project";
+      const target = { scope: nextScope, id: entityId, name: name || "" };
+      setScope(nextScope);
+      setQuery("");
+      setSelectedTarget(target);
+      setInput("");
+      void loadChat(target);
+    },
+    [loadChat],
+  );
+
+  // "Chiedi all'AI" da una lista (menu ⋯ o tasto destro). Con una conversazione
+  // gia' aperta l'elemento diventa un allegato di quella; altrimenti si apre la
+  // chat dell'elemento (che e' gia' il suo contesto: allegarlo sarebbe inutile).
+  const handleAsk = React.useCallback(
+    async (detail) => {
+      const { mode, entityType, entityId, name } = detail || {};
+      if (!entityType || !entityId) {
+        return;
+      }
+      setOpen(true);
+      const isCurrentTarget = selectedTarget?.scope === entityType && selectedTarget?.id === entityId;
+      if (mode === "open" || !selectedTarget || isCurrentTarget) {
+        openChatOnEntity(entityType, entityId, name);
+        return;
+      }
+      await attachEntity({ entityType, entityId });
+    },
+    [selectedTarget, openChatOnEntity, attachEntity],
+  );
+
+  React.useEffect(() => {
+    const onAsk = (event) => void handleAsk(event.detail);
+    window.addEventListener(AI_CHAT_ASK_EVENT, onAsk);
+    return () => window.removeEventListener(AI_CHAT_ASK_EVENT, onAsk);
+  }, [handleAsk]);
 
   // Cambio ambito: azzero selezione e conversazione. L'ambito Generale non ha un
   // elenco da scegliere, quindi apre subito la sua conversazione condivisa.
@@ -324,6 +445,8 @@ const AiChatWidget = () => {
     setMessages([]);
     setError("");
     setBudgetNotice("");
+    setAttachments([]);
+    setShowAttachPanel(false);
   };
 
   const submit = async (askAi) => {
@@ -336,18 +459,25 @@ const AiChatWidget = () => {
     setAiThinking(willInvokeAi);
     setError("");
     setBudgetNotice("");
+    const sentAttachments = attachments;
     const optimistic = {
       id: `optimistic-${messages.length}`,
       role: "user",
       content: question,
       citations: [],
+      attachments: sentAttachments,
       createdAt: new Date().toISOString(),
       author: { id: currentUserId, name: null, email: session?.userEmail || null },
     };
     setMessages((current) => [...current, optimistic]);
     setInput("");
+    setAttachments([]);
+    setShowAttachPanel(false);
     try {
-      const chat = await sendScopedChatMessage(selectedTarget, question, { askAi });
+      const chat = await sendScopedChatMessage(selectedTarget, question, {
+        askAi,
+        attachmentIds: sentAttachments.map((attachment) => attachment.id),
+      });
       setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
       if (chat?.aiConfigured === false) {
         setAiConfigured(false);
@@ -358,6 +488,8 @@ const AiChatWidget = () => {
     } catch (err) {
       setError(err?.message || "Invio del messaggio non riuscito.");
       setInput(question);
+      // Gli allegati non sono stati legati: restano bozze, quindi tornano nel composer.
+      setAttachments(sentAttachments);
       setMessages((current) => current.filter((message) => message.id !== optimistic.id));
     } finally {
       setSending(false);
@@ -491,6 +623,18 @@ const AiChatWidget = () => {
                   void submit(false);
                 }}
               >
+                {showAttachPanel && (
+                  <AttachEntityPanel
+                    projects={projects}
+                    clients={clients}
+                    busy={attachBusy}
+                    onPick={attachEntity}
+                    onClose={() => setShowAttachPanel(false)}
+                  />
+                )}
+
+                <AttachmentChips attachments={attachments} onRemove={detachAttachment} busy={attachBusy} />
+
                 <Form.Control
                   as="textarea"
                   rows={2}
@@ -501,6 +645,40 @@ const AiChatWidget = () => {
                   disabled={sending}
                 />
                 <div className="ai-chat-composer-actions">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ATTACHMENT_FILE_ACCEPT}
+                    className="d-none"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      // Azzero il campo: cosi' si puo' ricaricare lo stesso file due volte.
+                      event.target.value = "";
+                      void attachFile(file);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-secondary"
+                    className="ai-chat-attach-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending || attachBusy}
+                    title="Allega un documento (TXT, CSV, MD, DOCX, PDF)"
+                  >
+                    {attachBusy ? <Spinner animation="border" size="sm" /> : <Paperclip size={15} />}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-secondary"
+                    onClick={() => setShowAttachPanel((current) => !current)}
+                    disabled={sending || attachBusy}
+                    title="Allega un elemento del CRM (progetto o cliente)"
+                  >
+                    Elemento
+                  </Button>
+                  <span className="ai-chat-composer-spacer" />
                   <Button
                     type="submit"
                     size="sm"

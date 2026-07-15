@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Dropdown, Modal } from 'react-bootstrap';
-import { Eye, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Eye, MessageCircle, MoreVertical, Paperclip, Pencil, Trash2 } from 'lucide-react';
+import { ASK_AI_LABELS, askAiWithEntity, openAiChatOnEntity } from '../../../../views/Agency/chat/askAi';
 
 const CLIENTS_ACTIONS_POPPER_CONFIG = {
     strategy: 'fixed',
@@ -79,14 +80,33 @@ const ClientActionsMenu = ({
                             <span>Modifica</span>
                         </Dropdown.Item>
                     )}
+                    <Dropdown.Divider />
+                    {/* "Chiedi all'AI" (Fase 3a): stesse due voci del tasto destro. */}
+                    <Dropdown.Item
+                        onClick={() => askAiWithEntity('client', client)}
+                        className="d-flex align-items-center gap-2"
+                    >
+                        <Paperclip size={15} />
+                        <span>{ASK_AI_LABELS.attach}</span>
+                    </Dropdown.Item>
+                    <Dropdown.Item
+                        onClick={() => openAiChatOnEntity('client', client)}
+                        className="d-flex align-items-center gap-2"
+                    >
+                        <MessageCircle size={15} />
+                        <span>{ASK_AI_LABELS.open}</span>
+                    </Dropdown.Item>
                     {canDelete && (
-                        <Dropdown.Item
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="d-flex align-items-center gap-2 text-danger"
-                        >
-                            <Trash2 size={15} />
-                            <span>Elimina</span>
-                        </Dropdown.Item>
+                        <>
+                            <Dropdown.Divider />
+                            <Dropdown.Item
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="d-flex align-items-center gap-2 text-danger"
+                            >
+                                <Trash2 size={15} />
+                                <span>Elimina</span>
+                            </Dropdown.Item>
+                        </>
                     )}
                 </Dropdown.Menu>
             </Dropdown>

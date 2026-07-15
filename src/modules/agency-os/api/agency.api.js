@@ -360,6 +360,58 @@ export const fetchAgencyChatProjects = async ({ signal } = {}) => {
   return Array.isArray(result?.projects) ? result.projects : [];
 };
 
+// --- Allegati della chat (Fase 3a) ---
+// L'ambito viaggia come parametro (scope + targetId): le rotte degli allegati sono
+// le stesse per progetto, cliente e generale.
+const chatScopeQuery = (target) => {
+  const params = new URLSearchParams({ scope: target.scope });
+  if (target.id) {
+    params.set("targetId", target.id);
+  }
+  return params.toString();
+};
+
+export const fetchAgencyChatAttachments = async (target, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/attachments?${chatScopeQuery(target)}`, {
+    method: "GET",
+    signal,
+  });
+
+  const list = result?.attachments?.attachments;
+  return Array.isArray(list) ? list : [];
+};
+
+export const uploadAgencyChatFileAttachment = async (target, file, { signal } = {}) => {
+  const form = new FormData();
+  form.append("file", file);
+  const result = await agencyFetch(`/agency/chat/attachments/file?${chatScopeQuery(target)}`, {
+    method: "POST",
+    body: form,
+    signal,
+  });
+
+  return result?.attachment || null;
+};
+
+export const addAgencyChatEntityAttachment = async (target, { entityType, entityId }, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/attachments/entity`, {
+    method: "POST",
+    body: { scope: target.scope, targetId: target.id, entityType, entityId },
+    signal,
+  });
+
+  return result?.attachment || null;
+};
+
+export const removeAgencyChatAttachment = async (attachmentId, { signal } = {}) => {
+  await agencyFetch(`/agency/chat/attachments/${encodeURIComponent(attachmentId)}`, {
+    method: "DELETE",
+    signal,
+  });
+
+  return true;
+};
+
 // --- Chat AI ambito CLIENTE e GENERALE (Fase 2) ---
 export const fetchAgencyClientChat = async (clientId, { signal } = {}) => {
   const result = await agencyFetch(`/agency/chat/client/${encodeURIComponent(clientId)}`, {
@@ -370,10 +422,10 @@ export const fetchAgencyClientChat = async (clientId, { signal } = {}) => {
   return result?.chat || null;
 };
 
-export const sendAgencyClientChatMessage = async (clientId, message, { askAi = false, signal } = {}) => {
+export const sendAgencyClientChatMessage = async (clientId, message, { askAi = false, attachmentIds = [], signal } = {}) => {
   const result = await agencyFetch(`/agency/chat/client/${encodeURIComponent(clientId)}`, {
     method: "POST",
-    body: { message, askAi },
+    body: { message, askAi, attachmentIds },
     signal,
   });
 
@@ -389,10 +441,10 @@ export const fetchAgencyGeneralChat = async ({ signal } = {}) => {
   return result?.chat || null;
 };
 
-export const sendAgencyGeneralChatMessage = async (message, { askAi = false, signal } = {}) => {
+export const sendAgencyGeneralChatMessage = async (message, { askAi = false, attachmentIds = [], signal } = {}) => {
   const result = await agencyFetch(`/agency/chat/general`, {
     method: "POST",
-    body: { message, askAi },
+    body: { message, askAi, attachmentIds },
     signal,
   });
 
@@ -408,10 +460,10 @@ export const fetchAgencyProjectChat = async (projectId, { signal } = {}) => {
   return result?.chat || null;
 };
 
-export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false, signal } = {}) => {
+export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false, attachmentIds = [], signal } = {}) => {
   const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
     method: "POST",
-    body: { message, askAi },
+    body: { message, askAi, attachmentIds },
     signal,
   });
 

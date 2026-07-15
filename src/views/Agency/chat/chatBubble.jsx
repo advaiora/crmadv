@@ -1,18 +1,21 @@
 import React from "react";
 import { Badge } from "react-bootstrap";
 import { authorLabel, formatTime } from "./chatShared";
+import { AttachmentChips } from "./chatAttachments";
 
 // Bolla di conversazione condivisa (Fase 1/2), riusata sia dalla scheda Chat del
 // progetto sia dal popup di Chat globale, cosi' le bolle restano identiche ovunque.
 // Le utility (formatTime, authorLabel, mentionsAi) stanno in ./chatShared.
 
 // Una bolla di conversazione. I messaggi propri a destra; quelli degli altri
-// (utenti o AI) a sinistra, con l'autore mostrato sopra. Le fonti citate (RAG)
-// dell'assistente sono in un dettaglio richiudibile sotto la risposta.
+// (utenti o AI) a sinistra, con l'autore mostrato sopra. Gli allegati (Fase 3a)
+// stanno sotto al testo, dentro la bolla. Le fonti citate (RAG) dell'assistente
+// sono in un dettaglio richiudibile sotto la risposta.
 const ChatBubble = ({ message, currentUserId }) => {
   const isAssistant = message.role === "assistant";
   const isMine = !isAssistant && Boolean(message.author?.id) && message.author.id === currentUserId;
   const citations = Array.isArray(message.citations) ? message.citations : [];
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
   const label = isMine ? "Tu" : authorLabel(message);
 
   return (
@@ -27,6 +30,9 @@ const ChatBubble = ({ message, currentUserId }) => {
           style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
         >
           {message.content}
+          {attachments.length > 0 && (
+            <AttachmentChips attachments={attachments} className={isMine ? "is-on-primary" : ""} />
+          )}
         </div>
         <div className={`small text-muted mt-1 ${isMine ? "text-end" : ""}`}>{formatTime(message.createdAt)}</div>
         {isAssistant && citations.length > 0 && (

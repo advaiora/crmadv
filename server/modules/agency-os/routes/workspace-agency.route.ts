@@ -22,6 +22,31 @@ type AgencySourceFileQuery = {
   download?: string;
 };
 
+// Ambito della chat passato come parametro (rotte allegati, Fase 3a).
+type AgencyChatScopeQuery = {
+  scope?: string;
+  targetId?: string;
+};
+
+// Bersaglio d'ambito della chat a partire da scope + id. Le rotte degli allegati
+// (Fase 3a) sono uniche per tutti e tre gli ambiti — l'ambito viaggia come
+// parametro invece che nel percorso, per non triplicare le rotte.
+const parseChatScopeTarget = (scope: unknown, targetId: unknown) => {
+  if (scope === 'general') {
+    return { scope: 'general' as const };
+  }
+  if (typeof targetId !== 'string' || targetId.trim() === '') {
+    throw badRequest('Id del bersaglio mancante per questo ambito.');
+  }
+  if (scope === 'project') {
+    return { scope: 'project' as const, projectId: targetId };
+  }
+  if (scope === 'client') {
+    return { scope: 'client' as const, clientId: targetId };
+  }
+  throw badRequest('Ambito chat non valido.');
+};
+
 const isAgencySuperadmin = async (workspaceId: string, userId: string) => {
   const roleName = await getUserWorkspaceSystemRoleName({
     tx: prisma,
@@ -585,6 +610,63 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       targetUserId: request.params.memberId,
     });
     return ok(reply, { participants });
+  });
+
+  // --- Allegati della chat (Fase 3a): documenti ed elementi CRM, validi per tutti
+  // e tre gli ambiti (ambito passato come scope + targetId). ---
+
+  app.get<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const attachments = await agencyService.listScopedChatAttachments({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: parseChatScopeTarget(request.query.scope, request.query.targetId),
+    });
+    return ok(reply, { attachments });
+  });
+
+  // Multipart: l'ambito viaggia in querystring perche' il corpo e' il file.
+  app.post<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments/file', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const target = parseChatScopeTarget(request.query.scope, request.query.targetId);
+    const file = await request.file();
+    if (!file) {
+      throw badRequest('Nessun file caricato.');
+    }
+    const buffer = await file.toBuffer();
+    const attachment = await agencyService.addScopedChatFileAttachment({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target,
+      file: {
+        buffer,
+        fileName: file.filename || 'allegato',
+        mimeType: file.mimetype || '',
+      },
+    });
+    return ok(reply, { attachment });
+  });
+
+  app.post<{ Body: { scope?: string; targetId?: string } }>('/agency/chat/attachments/entity', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const body = request.body ?? {};
+    const attachment = await agencyService.addScopedChatEntityAttachment({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: parseChatScopeTarget(body.scope, body.targetId),
+      body,
+    });
+    return ok(reply, { attachment });
+  });
+
+  app.delete<{ Params: { attachmentId: string } }>('/agency/chat/attachments/:attachmentId', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const result = await agencyService.removeScopedChatAttachment({
+      workspaceId: workspace.id,
+      userId: user.id,
+      attachmentId: request.params.attachmentId,
+    });
+    return ok(reply, result);
   });
 
   app.get('/agency/ai/estimates', async (request, reply) => {

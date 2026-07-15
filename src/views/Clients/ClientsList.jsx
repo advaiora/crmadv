@@ -11,6 +11,7 @@ import CollapsibleSection from "../../components/ui/CollapsibleSection";
 import "../../modules/clients/ui/clients-ui.css";
 import { hasPermission } from "../../utils/workspaceAccess";
 import { rowActivationProps } from "../../utils/rowActivation";
+import { askAiRowProps } from "../Agency/chat/askAi";
 
 const parsePositiveInt = (value, fallback) => {
   const parsed = Number(value);
@@ -86,6 +87,7 @@ const ClientGridRow = React.memo(function ClientGridRow({
       <div
         className={`clients-grid-row clients-row-clickable ${isExpanded ? "clients-row-expanded" : ""}`.trim()}
         aria-label={`Apri scheda di ${client.name}`}
+        {...askAiRowProps("client", client)}
         {...rowActivationProps(() => onOpen(client), { role: "row" })}
       >
         <div className="clients-grid-cell clients-col-disclosure" role="cell">
@@ -155,6 +157,7 @@ const ClientMobileCard = React.memo(function ClientMobileCard({
     <div
       className="clients-mobile-card clients-row-clickable"
       aria-label={`Apri scheda di ${client.name}`}
+      {...askAiRowProps("client", client)}
       {...rowActivationProps(() => onOpen(client))}
     >
       <div className="d-flex justify-content-between align-items-start gap-2">

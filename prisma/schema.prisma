@@ -220,6 +220,7 @@ model Workspace {
   aiConversations            AiConversation[]
   aiConversationParticipants AiConversationParticipant[]
   aiConversationMessages     AiConversationMessage[]
+  aiConversationAttachments  AiConversationAttachment[]
 }
 
 model User {
@@ -270,6 +271,7 @@ model User {
   aiConversationParticipations          AiConversationParticipant[] @relation("AiConversationParticipantUser")
   aiConversationInvitesSent             AiConversationParticipant[] @relation("AiConversationParticipantInvitedBy")
   authoredAiMessages                    AiConversationMessage[]     @relation("AiConversationMessageAuthor")
+  createdAiAttachments                  AiConversationAttachment[]  @relation("AiConversationAttachmentCreatedBy")
 }
 
 model TeamInvite {
@@ -542,6 +544,7 @@ model AiConversation {
   createdByUser   User?                       @relation("AiConversationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
   participants    AiConversationParticipant[]
   messages        AiConversationMessage[]
+  attachments     AiConversationAttachment[]
 
   @@unique([projectId])
   @@unique([clientId])
@@ -585,8 +588,44 @@ model AiConversationMessage {
   workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   author         User?          @relation("AiConversationMessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  attachments    AiConversationAttachment[]
 
   @@index([conversationId, createdAt])
+  @@index([workspaceId])
+}
+
+// Allegato di un messaggio della chat (Fase 3a — allegati documenti + entità CRM).
+// Porta contesto SPECIFICO dentro la conversazione, sopra il contesto d'ambito:
+//   kind='file'   -> documento caricato (TXT/CSV/MD/DOCX/PDF). Come per le Fonti,
+//                    il binario NON viene conservato: si salva solo il testo estratto.
+//   kind='entity' -> elemento del CRM (progetto/cliente/fonte/preventivo), di cui si
+//                    salva uno SNAPSHOT testuale al momento dell'allegato, così il
+//                    contesto resta quello che l'utente vedeva quando ha allegato.
+// messageId è null finché l'allegato è una BOZZA (caricato nel composer ma non ancora
+// inviato); l'invio del messaggio lo lega e lo rende immutabile. Le bozze appartengono
+// a chi le ha caricate (createdByUserId), gli allegati inviati a tutta la conversazione.
+model AiConversationAttachment {
+  id              String                 @id @default(cuid())
+  workspaceId     String
+  conversationId  String
+  messageId       String?
+  createdByUserId String?
+  kind            String                 @db.VarChar(16)
+  entityType      String?                @db.VarChar(24)
+  entityId        String?
+  label           String                 @db.VarChar(200)
+  mimeType        String?                @db.VarChar(120)
+  fileSize        Int?
+  content         String                 @db.Text
+  contentChars    Int                    @default(0)
+  createdAt       DateTime               @default(now())
+  workspace       Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation    AiConversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message         AiConversationMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdByUser   User?                  @relation("AiConversationAttachmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([messageId])
+  @@index([conversationId, createdByUserId, messageId])
   @@index([workspaceId])
 }
 
