@@ -2,7 +2,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
 import { useHistory } from "react-router-dom";
-import { ChevronLeft, ExternalLink, MessageCircle, Paperclip, Search, X } from "react-feather";
+import { ChevronLeft, Edit2, ExternalLink, MessageCircle, Paperclip, Plus, RotateCcw, Search, X } from "react-feather";
 import { useSession } from "../../../hooks/useSession";
 import {
   fetchAgencyChatProjects,
@@ -16,6 +16,10 @@ import {
   uploadAgencyChatFileAttachment,
   addAgencyChatEntityAttachment,
   removeAgencyChatAttachment,
+  fetchAgencyChatSessions,
+  createAgencyChatSession,
+  renameAgencyChatSession,
+  resumeAgencyChatSession,
 } from "../../../modules/agency-os/api/agency.api";
 import ChatBubble from "./chatBubble";
 import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
@@ -45,6 +49,8 @@ export const AiChatTrigger = () => (
 );
 
 // Instrada la chiamata all'endpoint giusto in base all'ambito del bersaglio.
+// `opts.conversationId` dice su quale SESSIONE dell'ambito si lavora. Omesso solo
+// alla prima apertura: il server allora riporta l'utente sull'ultima che usava.
 const fetchScopedChat = (target, opts) => {
   if (target.scope === "general") return fetchAgencyGeneralChat(opts);
   if (target.scope === "client") return fetchAgencyClientChat(target.id, opts);
@@ -56,6 +62,74 @@ const sendScopedChatMessage = (target, message, opts) => {
   if (target.scope === "client") return sendAgencyClientChatMessage(target.id, message, opts);
   return sendAgencyProjectChatMessage(target.id, message, opts);
 };
+
+// Data compatta per l'elenco sessioni: l'ora se e' di oggi, altrimenti il giorno.
+// L'elenco e' denso (§3.2 del design): serve a distinguere le voci, non a datarle.
+const formatSessionDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const today = new Date();
+  const sameDay =
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+  return sameDay
+    ? date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+};
+
+// Elenco delle sessioni dell'ambito. Le archiviate (isFrozen) sono quelle da cui si
+// e' usciti o si e' stati rimossi: restano consultabili in sola lettura.
+const SessionList = ({ sessions, activeId, loading, onOpen, onRename, onNew }) => (
+  <div className="ai-chat-sessions">
+    <div className="ai-chat-sessions-head">
+      <span>Conversazioni</span>
+      <button type="button" className="ai-chat-session-new" onClick={onNew}>
+        <Plus size={14} />
+        Nuova chat
+      </button>
+    </div>
+    {loading ? (
+      <div className="ai-chat-centered">
+        <Spinner animation="border" size="sm" role="status" />
+      </div>
+    ) : sessions.length === 0 ? (
+      <div className="ai-chat-empty">Nessuna conversazione. Premi &ldquo;Nuova chat&rdquo; per iniziare.</div>
+    ) : (
+      <ul className="ai-chat-session-list">
+        {sessions.map((session) => (
+          <li key={session.id}>
+            <button
+              type="button"
+              className={`ai-chat-session ${session.id === activeId ? "is-active" : ""}`}
+              onClick={() => onOpen(session.id)}
+              aria-current={session.id === activeId ? "true" : undefined}
+            >
+              <span className="ai-chat-session-title">{session.title || "Senza titolo"}</span>
+              <span className="ai-chat-session-meta">
+                {session.isFrozen && <Badge bg="secondary">Archiviata</Badge>}
+                {!session.isFrozen && session.isGroup && <Badge bg="light" text="dark">{session.participantCount}</Badge>}
+                <span className="ai-chat-session-date">{formatSessionDate(session.lastMessageAt)}</span>
+              </span>
+            </button>
+            {!session.isFrozen && (
+              <button
+                type="button"
+                className="ai-chat-session-rename"
+                aria-label={`Rinomina ${session.title || "conversazione"}`}
+                title="Rinomina"
+                onClick={() => onRename(session)}
+              >
+                <Edit2 size={13} />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    )}
+  </div>
+);
 
 // Normalizza per la ricerca: minuscolo, senza accenti.
 const normalize = (value) =>
@@ -197,6 +271,14 @@ const AiChatWidget = () => {
   const [scope, setScope] = React.useState("project");
   const [selectedTarget, setSelectedTarget] = React.useState(null);
 
+  // Sessione aperta e elenco delle sessioni dell'ambito. `isFrozen` = ci sei uscito
+  // (o ti hanno rimosso, o il gruppo si e' sciolto): la vedi ma non ci scrivi piu'.
+  const [conversationId, setConversationId] = React.useState(null);
+  const [isFrozen, setIsFrozen] = React.useState(false);
+  const [sessions, setSessions] = React.useState([]);
+  const [sessionsLoading, setSessionsLoading] = React.useState(false);
+  const [showSessions, setShowSessions] = React.useState(false);
+
   const [messages, setMessages] = React.useState([]);
   const [aiConfigured, setAiConfigured] = React.useState(true);
   const [isParticipant, setIsParticipant] = React.useState(true);
@@ -290,32 +372,108 @@ const AiChatWidget = () => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const loadChat = React.useCallback(async (target) => {
-    setChatLoading(true);
-    setError("");
-    setBudgetNotice("");
-    setAttachments([]);
-    setShowAttachPanel(false);
+  // Elenco delle sessioni dell'ambito. Silenzioso di proposito: se non arriva, la
+  // conversazione aperta resta usabile lo stesso.
+  const loadSessions = React.useCallback(async (target) => {
+    setSessionsLoading(true);
     try {
-      const chat = await fetchScopedChat(target);
-      setAiConfigured(chat?.aiConfigured !== false);
-      setIsParticipant(chat?.isParticipant !== false);
-      setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
-      // Bozze rimaste da una sessione precedente (il composer non le perde).
-      if (chat?.isParticipant !== false) {
-        try {
-          setAttachments(await fetchAgencyChatAttachments(target));
-        } catch (_err) {
-          // Gli allegati pendenti sono un di piu': se non arrivano, la chat resta usabile.
-          setAttachments([]);
-        }
-      }
-    } catch (err) {
-      setError(err?.message || "Impossibile caricare la conversazione.");
+      setSessions(await fetchAgencyChatSessions(target));
+    } catch (_err) {
+      setSessions([]);
     } finally {
-      setChatLoading(false);
+      setSessionsLoading(false);
     }
   }, []);
+
+  // `wantedConversationId` omesso = "portami dove ero": il server sceglie l'ultima
+  // sessione dell'utente su quell'ambito, o ne crea una sua se non ne ha.
+  const loadChat = React.useCallback(
+    async (target, wantedConversationId) => {
+      setChatLoading(true);
+      setError("");
+      setBudgetNotice("");
+      setAttachments([]);
+      setShowAttachPanel(false);
+      try {
+        const chat = await fetchScopedChat(target, { conversationId: wantedConversationId });
+        const openId = chat?.conversationId || null;
+        setConversationId(openId);
+        setIsFrozen(chat?.isFrozen === true);
+        setAiConfigured(chat?.aiConfigured !== false);
+        setIsParticipant(chat?.isParticipant !== false);
+        setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
+        // Bozze rimaste nel composer: appartengono a QUESTA sessione, quindi l'id va
+        // passato — senza, tornerebbero quelle dell'ultima sessione usata.
+        if (chat?.isParticipant !== false) {
+          try {
+            setAttachments(await fetchAgencyChatAttachments(target, { conversationId: openId }));
+          } catch (_err) {
+            // Gli allegati pendenti sono un di piu': se non arrivano, la chat resta usabile.
+            setAttachments([]);
+          }
+        }
+      } catch (err) {
+        setError(err?.message || "Impossibile caricare la conversazione.");
+      } finally {
+        setChatLoading(false);
+      }
+    },
+    [],
+  );
+
+  // --- Sessioni: apri, nuova, rinomina, riprendi ---
+
+  const openSession = React.useCallback(
+    async (id) => {
+      if (!selectedTarget) return;
+      setShowSessions(false);
+      await loadChat(selectedTarget, id);
+    },
+    [selectedTarget, loadChat],
+  );
+
+  const newSession = React.useCallback(async () => {
+    if (!selectedTarget) return;
+    setError("");
+    try {
+      const id = await createAgencyChatSession(selectedTarget);
+      setShowSessions(false);
+      await loadChat(selectedTarget, id);
+      await loadSessions(selectedTarget);
+    } catch (err) {
+      setError(err?.message || "Non sono riuscito ad aprire una nuova conversazione.");
+    }
+  }, [selectedTarget, loadChat, loadSessions]);
+
+  const renameSession = React.useCallback(
+    async (session) => {
+      if (!selectedTarget) return;
+      // eslint-disable-next-line no-alert
+      const next = window.prompt("Nome della conversazione", session.title || "");
+      if (next === null || !next.trim()) return;
+      try {
+        await renameAgencyChatSession(selectedTarget, session.id, next.trim());
+        await loadSessions(selectedTarget);
+      } catch (err) {
+        setError(err?.message || "Non sono riuscito a rinominare la conversazione.");
+      }
+    },
+    [selectedTarget, loadSessions],
+  );
+
+  // Copia la sessione archiviata in una tutta propria, con lo storico fino al momento
+  // in cui se ne era usciti. E' qui che si paga la copia: chi non riprende non duplica.
+  const resumeSession = React.useCallback(async () => {
+    if (!selectedTarget || !conversationId) return;
+    setError("");
+    try {
+      const id = await resumeAgencyChatSession(selectedTarget, conversationId);
+      await loadChat(selectedTarget, id);
+      await loadSessions(selectedTarget);
+    } catch (err) {
+      setError(err?.message || "Non sono riuscito a riprendere la conversazione.");
+    }
+  }, [selectedTarget, conversationId, loadChat, loadSessions]);
 
   // --- Allegati (Fase 3a) ---
 
@@ -327,7 +485,7 @@ const AiChatWidget = () => {
       setAttachBusy(true);
       setError("");
       try {
-        const attachment = await uploadAgencyChatFileAttachment(selectedTarget, file);
+        const attachment = await uploadAgencyChatFileAttachment(selectedTarget, file, { conversationId });
         if (attachment) {
           setAttachments((current) => [...current, attachment]);
         }
@@ -337,7 +495,7 @@ const AiChatWidget = () => {
         setAttachBusy(false);
       }
     },
-    [selectedTarget],
+    [selectedTarget, conversationId],
   );
 
   const attachEntity = React.useCallback(
@@ -348,7 +506,11 @@ const AiChatWidget = () => {
       setAttachBusy(true);
       setError("");
       try {
-        const attachment = await addAgencyChatEntityAttachment(selectedTarget, { entityType, entityId });
+        const attachment = await addAgencyChatEntityAttachment(
+          selectedTarget,
+          { entityType, entityId },
+          { conversationId },
+        );
         if (attachment) {
           setAttachments((current) => [...current, attachment]);
           setShowAttachPanel(false);
@@ -359,7 +521,7 @@ const AiChatWidget = () => {
         setAttachBusy(false);
       }
     },
-    [selectedTarget],
+    [selectedTarget, conversationId],
   );
 
   const detachAttachment = React.useCallback(async (attachment) => {
@@ -385,8 +547,9 @@ const AiChatWidget = () => {
       setSelectedTarget(target);
       setInput("");
       void loadChat(target);
+      void loadSessions(target);
     },
-    [loadChat],
+    [loadChat, loadSessions],
   );
 
   // "Chiedi all'AI" da una lista (menu ⋯ o tasto destro). Con una conversazione
@@ -415,18 +578,23 @@ const AiChatWidget = () => {
     return () => window.removeEventListener(AI_CHAT_ASK_EVENT, onAsk);
   }, [handleAsk]);
 
-  // Cambio ambito: azzero selezione e conversazione. L'ambito Generale non ha un
-  // elenco da scegliere, quindi apre subito la sua conversazione condivisa.
+  // Cambio ambito: azzero selezione, conversazione ed elenco sessioni (che e' per
+  // ambito). L'ambito Generale non ha un elenco di bersagli da scegliere, quindi
+  // apre subito le proprie sessioni.
   const changeScope = (nextScope) => {
     setScope(nextScope);
     setQuery("");
     setError("");
     setBudgetNotice("");
     setMessages([]);
+    setSessions([]);
+    setConversationId(null);
+    setShowSessions(false);
     if (nextScope === "general") {
       const target = { scope: "general", name: "Chat generale" };
       setSelectedTarget(target);
       void loadChat(target);
+      void loadSessions(target);
     } else {
       setSelectedTarget(null);
     }
@@ -437,7 +605,10 @@ const AiChatWidget = () => {
     setSelectedTarget(target);
     setMessages([]);
     setInput("");
+    setSessions([]);
+    setConversationId(null);
     void loadChat(target);
+    void loadSessions(target);
   };
 
   const backToPicker = () => {
@@ -477,8 +648,12 @@ const AiChatWidget = () => {
       const chat = await sendScopedChatMessage(selectedTarget, question, {
         askAi,
         attachmentIds: sentAttachments.map((attachment) => attachment.id),
+        conversationId,
       });
       setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
+      // Il primo messaggio battezza la sessione (titolo automatico) e la porta in
+      // cima all'elenco: si rilegge, cosi' la lista non resta indietro.
+      void loadSessions(selectedTarget);
       if (chat?.aiConfigured === false) {
         setAiConfigured(false);
       }
@@ -562,6 +737,15 @@ const AiChatWidget = () => {
               <span className="ai-chat-conv-name" title={selectedTarget?.name}>
                 {selectedTarget?.name}
               </span>
+              <button
+                type="button"
+                className="ai-chat-openfull"
+                onClick={() => setShowSessions((current) => !current)}
+                aria-expanded={showSessions}
+                title="Le tue conversazioni su questo ambito"
+              >
+                <MessageCircle size={15} />
+              </button>
               {selectedTarget?.scope === "project" && (
                 <button
                   type="button"
@@ -573,6 +757,28 @@ const AiChatWidget = () => {
                 </button>
               )}
             </div>
+
+            {showSessions && (
+              <SessionList
+                sessions={sessions}
+                activeId={conversationId}
+                loading={sessionsLoading}
+                onOpen={openSession}
+                onRename={renameSession}
+                onNew={newSession}
+              />
+            )}
+
+            {isFrozen && (
+              <div className="ai-chat-notice">
+                <strong>Conversazione archiviata.</strong> Non ne fai più parte: la vedi com&rsquo;era quando ne sei
+                uscito, e non puoi scrivere.
+                <button type="button" className="ai-chat-resume" onClick={resumeSession}>
+                  <RotateCcw size={13} />
+                  Riprendi in una nuova chat
+                </button>
+              </div>
+            )}
 
             {!aiConfigured && (
               <div className="ai-chat-notice">
@@ -588,7 +794,9 @@ const AiChatWidget = () => {
                 <div className="ai-chat-centered">
                   <Spinner animation="border" size="sm" role="status" />
                 </div>
-              ) : !isParticipant ? (
+              ) : /* Il congelato ha isParticipant=false ma DEVE vedere lo storico che
+                    ha vissuto: il "non fai parte" vale solo per chi non c'e' mai stato. */
+              !isParticipant && !isFrozen ? (
                 <div className="ai-chat-empty">
                   Non fai parte di questa conversazione. Chiedi a un partecipante di invitarti.
                 </div>

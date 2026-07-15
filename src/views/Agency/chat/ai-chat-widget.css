@@ -484,3 +484,148 @@
 .ai-chat-ctxmenu-item:hover {
   background: var(--muted);
 }
+
+/* --- Elenco delle sessioni (15/7/2026) --- */
+/* Un ambito ha N conversazioni: questo e' l'elenco, come nelle UI dei chat LLM.
+   Denso di proposito (design §3.2: aria tra i blocchi, densita' dentro le liste)
+   e senza contenitori aggiuntivi — separa lo spazio, non le cornici (§3.3). */
+.ai-chat-sessions {
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ai-chat-sessions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.ai-chat-session-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 6px;
+}
+
+.ai-chat-session-new:hover {
+  background: var(--background);
+}
+
+.ai-chat-session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 6px;
+}
+
+.ai-chat-session-list li {
+  display: flex;
+  align-items: center;
+}
+
+.ai-chat-session {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px 8px;
+  color: var(--foreground);
+}
+
+.ai-chat-session:hover {
+  background: var(--background);
+}
+
+/* La sessione aperta: un solo accento per vista (design §4.1), niente riquadro. */
+.ai-chat-session.is-active {
+  background: var(--background);
+  font-weight: 600;
+}
+
+.ai-chat-session-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.ai-chat-session-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ai-chat-session-date {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.ai-chat-session-rename {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Il rinomina compare all'avvicinarsi: non compete col titolo (design §1.2). */
+.ai-chat-session-list li:hover .ai-chat-session-rename,
+.ai-chat-session-rename:focus-visible {
+  opacity: 1;
+}
+
+.ai-chat-session-rename:hover {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* "Riprendi in una nuova chat" dentro l'avviso di conversazione archiviata. */
+.ai-chat-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 8px;
+}
+
+.ai-chat-resume:hover {
+  background: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-chat-session-rename {
+    transition: none;
+  }
+}
