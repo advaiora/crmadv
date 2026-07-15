@@ -149,7 +149,7 @@ Il vincolo `@@unique([projectId])` / `@@unique([clientId])` in `schema.prisma` i
 - **Nuova migrazione** (tracciata, da segnalare in handoff): via i due `@@unique`, ruolo di sola lettura + `frozenAt` su `AiConversationParticipant`. Le conversazioni esistenti diventano semplicemente la prima sessione del loro ambito.
 - La decisione **"AI risponde sempre se sei l'unico partecipante"** (sez. 2, tabella "Turni di gruppo") si applica **per sessione**, non per ambito: in una sessione solitaria l'AI risponde sempre, in una di gruppo serve `@AI`.
 
-## 4-ter. UN SOLO INGRESSO alle chat, due mondi distinti — **DECISO il 15/7/2026 (Jacopo), DA REALIZZARE**
+## 4-ter. UN SOLO INGRESSO alle chat, due mondi distinti — **DECISO il 15/7/2026 (Jacopo)** · punti 1-2-6 ✅ **FATTI**, punti 3-4-5 da fare
 
 > Riorganizzazione dell'accesso alle chat, decisa dopo la Fase 3a/sessioni. Tocca anche il modulo **Messaggi** (`src/views/Email/index.jsx`, rotta `/apps/email`, voce "Comunicazioni → Messaggi"), che **non è di Jacopo né di Claudio**: l'ha scritto **Davide D'Angelo** (`DngDavide02`), fermo dal **5/3/2026**. Non è un conflitto di staffetta — è codice legacy che nessuno dei due presidia.
 
@@ -167,12 +167,29 @@ Un **solo punto d'ingresso** (il pulsante in topbar dove oggi vive il popup dell
 
 ### Da fare ORA (dentro V4)
 
-1. **Selettore nel popup**: `Chat AI` / `Messaggi`. La messaggistica entra nel popup **sul suo modello 1-a-1 attuale**, senza riscritture.
-2. **Pulsante "espandi"**: il popup diventa a tutto schermo e torna popup. **È questo che rende possibile il punto 3**: la vista ampia non si perde, si guadagna *ovunque* invece che solo dentro la scheda del progetto.
+1. ✅ **FATTO (15/7)** — **Selettore nel popup**: `Chat AI` / `Messaggi`. La messaggistica entra nel popup **sul suo modello 1-a-1 attuale**, senza riscritture. *Reso in `src/views/Agency/chat/MessagingPanel.jsx`, che riusa il layer API già in casa (`src/modules/messaging/api/messagingApi.js`): nessuna logica di server duplicata, nessuna entità conversazione inventata.* Il selettore **compare solo** se il modulo `messages` è acceso e l'utente ha `messages.view` (letti da `/auth/me` alla prima apertura); se manca l'accesso resta la sola Chat AI. **Smentita utile alla riga sopra:** `src/views/Email/index.jsx` **non** è costruito sulla metafora della casella Jampack — è già una chat 1-a-1 pura a due colonne; del template restano solo il nome, la rotta `/apps/email` e l'icona in sidebar. Il punto 4 è quindi più semplice del previsto.
+2. ✅ **FATTO (15/7)** — **Pulsante "espandi"**: il popup diventa a tutto schermo e torna popup. **È questo che rende possibile il punto 3**: la vista ampia non si perde, si guadagna *ovunque* invece che solo dentro la scheda del progetto. *A tutto schermo l'elenco (sessioni AI o persone) diventa una **colonna fissa da 300px** invece di una tendina, e il contenuto si ferma a 860px centrati: la finestra si allarga, la chat no.*
 3. **Eliminare la chat AI estesa da Agency** (`AgencyProjectChatPage`). ⚠️ **Ordine obbligato:** lì vivono **partecipanti e azzeramento** (e lì doveva andare "Sciogli il gruppo") → **prima si spostano nel popup, poi si cancella la pagina**, altrimenti sparisce la gestione dei gruppi. Il popup ha già l'icona `ExternalLink` che rimanda a quella scheda: va tolta.
 4. **Modulo Messaggi = la casella**, sdoppiata dallo stesso selettore: due elenchi (conversazioni con persone / sessioni AI), con ricerca. Aprirne una lancia **lo stesso componente di chat** a tutto schermo — montato su rotta invece che in overlay, **una sola implementazione**. Eventuale rinomina della voce o due tab (vedi la regola di navigazione: sottosezioni in tab in cima, non in sidebar).
 5. **Non letti / notifiche**: liberi di integrarli nel popup. Nota: `WorkspaceMessage` ha già `readAt`; la **chat AI non ha alcun concetto di "non letto"** — inventarlo è lavoro nuovo, da valutare, non darlo per scontato.
-6. **Revisione delle icone di tutto il sistema chat** *(richiesta esplicita di Jacopo, 15/7/2026)*. Oggi c'è **un solo fumetto (`MessageCircle`) usato ovunque senza logica**, e con l'aggregazione dei due mondi diventa insostenibile: se tutto è un fumetto, l'icona non dice più niente. **Peggiorato il 15/7 dall'elenco sessioni** (commit `c59d0c3`): ora lo stesso `MessageCircle` è **tre volte** — il trigger in topbar, il titolo del popup e il pulsante che apre l'elenco sessioni — per tre significati diversi. Serve un piccolo alfabeto coerente: **un'icona per concetto**, non una per contesto. I concetti da distinguere: ingresso alle chat · Messaggistica · Chat AI · elenco conversazioni · nuova conversazione · espandi/riduci · partecipanti · allega · archiviata · non letti. Vincoli: si usa `react-feather` (già in casa), **icone lineari coerenti** e nessun ornamento (design §1.1); il touch target resta ≥44px (§3.1). Da fare **contestualmente** al selettore e al pulsante espandi, non dopo: sono gli stessi punti di codice.
+6. ✅ **FATTO (15/7)** — **Revisione delle icone di tutto il sistema chat** *(richiesta esplicita di Jacopo, 15/7/2026)*. Il problema era: **un solo fumetto (`MessageCircle`) usato ovunque senza logica**, tre volte per tre significati diversi (trigger in topbar, titolo del popup, elenco sessioni). **Reso in `src/views/Agency/chat/chatIcons.js`**: un file solo, un'icona per concetto, con scritto il *perché* di ognuna. Chi aggiunge un pezzo di chat prende l'icona da lì; se il concetto manca si aggiunge una voce, non si pesca a caso (è così che nascono i tre fumetti).
+
+   | Concetto | Icona | Perché |
+   |---|---|---|
+   | ingresso alle chat | `MessageSquare` | la **porta** sull'aggregato: è l'unico fumetto rimasto, e va bene proprio perché non dice *quale* dei due mondi |
+   | Messaggistica | `Users` | il mondo delle **persone** — non un fumetto, così non compete con l'ingresso |
+   | Chat AI | `Cpu` | il mondo della **macchina**: mai un fumetto, è la differenza che il selettore esiste per rendere visibile |
+   | elenco conversazioni | `List` | |
+   | nuova conversazione | `Plus` | |
+   | espandi / riduci | `Maximize2` / `Minimize2` | |
+   | partecipanti | `UserPlus` | gestire **chi c'è** in una sessione — distinto da `Users` (il mondo persone) |
+   | allega | `Paperclip` | |
+   | archiviata | `Archive` | |
+   | non letti | *pallino d'accento* | non un'icona: un contatore (`.ai-chat-dot`) |
+
+   **Due precisazioni emerse realizzandolo, da sapere:**
+   - **`react-feather` o Lucide?** Questa spec dice react-feather (già in casa, ed è ciò che usa tutto il popup); il documento di design dice invece *«usiamo **Lucide**»* (§ icone), ed è la libreria che usa il modulo Messaggi (`src/views/Email/index.jsx`). **Ho seguito questa spec** (più recente e specifica) e sono rimasto su react-feather, che è coerente col resto del popup. Lucide è un fork di Feather, quindi la resa è omogenea e non si nota. **Va riconciliato**: due librerie di icone in casa sono un debito, ma la scelta è di prodotto, non da fare di straforo.
+   - **Il 44px non è la regola per il mouse.** Il design lo elenca fra gli *errori da non fare*: «il 44px resta il **minimo per il touch/mobile**, non la regola per il mouse». Reso quindi con `@media (pointer: coarse)`: compatto col mouse, ≥44px sul dito.
 
 ### Rimandato a V8 — *con decisione esplicita del 15/7/2026*
 
