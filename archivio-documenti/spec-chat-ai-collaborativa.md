@@ -18,7 +18,7 @@ Una **sola Chat AI** con un concetto di **ambito** (Generale / Cliente / Progett
 | Architettura | **Una chat con ambiti**, non due feature separate. Riusa un solo motore/persistenza/UI. |
 | Ambiti | **Generale** (nessun dato) · **Cliente** · **Progetto**. Progetto = stessa entità del CRM (una sola tabella `Project`); nel selettore si mostrano i progetti con **Fonti indicizzate**. |
 | Selettore ambito | Nel popup; in cima gli elementi **assegnati all'utente**. |
-| Popup ↔ scheda progetto | Il popup con ambito "Progetto X" apre **la stessa conversazione** della scheda Chat di quel progetto (un thread per ambito). |
+| Popup ↔ scheda progetto | Il popup con ambito "Progetto X" apre **le stesse conversazioni** della scheda Chat di quel progetto. ⚠️ **Rivisto il 15/7/2026:** la formulazione originale era "un thread per ambito" — **superata** dalla decisione sulle **sessioni multiple** (sez. 4-bis): un ambito ha **N sessioni**, e popup e scheda mostrano lo stesso elenco. |
 | Condivisione | **Su invito esplicito** → serve un livello "**partecipanti alla conversazione**". |
 | Turni di gruppo | L'AI risponde **solo se interpellata**, via **menzione @AI** *e* **pulsante**. Quando risponde legge l'intero thread come contesto. **Precisazione del 15/7/2026 (decisa, DA FARE):** questa regola vale **solo in gruppo**. Se sei l'**unico partecipante**, ogni messaggio interpella l'AI: da soli non c'è nessun altro a cui parlare, e chiedere `@AI` è un effetto collaterale di una regola nata per il gruppo. Appena si invita qualcuno, la regola torna. Effetto accettato: da soli ogni messaggio è una chiamata a pagamento. |
 | Allegati | Pulsante **"Allega"** nel popup: **file** (doc → estrattore testo; immagini → modello con "vista") **ed elementi CRM** (progetto/cliente/fonte/preventivo/**thread messaggistica**). |
@@ -92,29 +92,50 @@ La Fase 3 è stata **divisa in due**: 3a (documenti ed elementi CRM) e **3b** (i
 - **Costi/budget:** ogni chiamata AI della chat passa già dal motore che applica **budget giornaliero** e **log costi** — quindi la chat collaborativa entra automaticamente nel rendiconto consumi. Il consumo è attribuito a **chi preme invia** (non all'owner della conversazione né a quello del progetto): in un gruppo ognuno paga i propri turni sul proprio budget.
 - **Dimensioni del registro consumi (15/7/2026):** oltre a workspace/utente/funzione, il registro distingue ora anche **progetto** e **conversazione** (migrazione `20260715120831`). Serve a rispondere a "quanto è costato il progetto X", non solo "quanto ha speso Marco in chat di progetto". Le chiamate senza contesto di progetto (chat generale, ricerca sulle fonti di più progetti insieme) restano senza progetto e confluiscono in "Senza progetto". Il registro è **contabilità**: le relazioni sono `SetNull`, così cancellare un progetto non falsa la spesa storica.
 
-## 4-bis. Punti aperti sulla PROPRIETÀ della chat di gruppo (da discutere — 15/7/2026)
+## 4-bis. SESSIONI MULTIPLE e governo dei gruppi — **DECISO il 15/7/2026 (Jacopo), DA REALIZZARE**
 
-> Emersi da un'analisi del codice richiesta da Jacopo il 15/7/2026. **Sono fatti verificati, non impressioni.** La discussione era in corso quando la sessione si è chiusa: **nessuna decisione presa, niente ancora modificato.** Vanno decisi prima di toccare il codice.
+> Discussione aperta il 15/7 su un'analisi del codice, chiusa con decisione il 15/7. Sostituisce l'impianto "una chat per ambito, con proprietario" della Fase 1. **Sotto: prima i difetti accertati che l'hanno motivata, poi il disegno deciso.**
 
-**Com'è oggi (Fase 1, mai più rivisto):**
-- **Owner = chi apre per primo** la chat di quell'ambito. Basta **aprirla**, anche solo per guardarla: la conversazione viene creata in quel momento e chi l'ha aperta ne resta proprietario.
-- L'owner può fare **solo due cose** in più di un membro: **azzerare** i messaggi e **rimuovere** gli altri. Per il resto sono pari: *qualsiasi* partecipante può invitare (sempre e solo come `member`), scrivere e interpellare l'AI.
-- Un membro può solo **uscire da solo**.
+### Perché (difetti accertati sul codice, non impressioni)
 
-**Le tre lacune (sono difetti, non scelte):**
-1. **L'owner non può uscire né essere rimosso.** Il controllo che protegge il proprietario (`removeScopedChatParticipant`) scatta **prima** di quello che permette l'uscita autonoma → il proprietario è legato alla conversazione per sempre.
-2. **Nessun passaggio di proprietà.** Se chi ha aperto la chat lascia l'azienda, quella conversazione resta senza nessuno che possa azzerarla o gestire i membri. `addParticipant` è un upsert con `update: {}`: re-invitare non cambia il ruolo. A DB, cancellare lo `User` lascia la conversazione **senza owner** (nessun fallback su `createdByUserId`).
-3. **Non esiste "sciogli il gruppo"** né tornare da soli: `clearScopedChat` azzera **solo i messaggi**; la conversazione non si cancella mai e i membri vanno tolti **uno per chiamata**.
+Il vincolo `@@unique([projectId])` / `@@unique([clientId])` in `schema.prisma` impone **una sola chat per progetto e per cliente in tutto il workspace**; la chat **generale** è **una sola per l'intera azienda** (`findGeneralConversation` = `findFirst` per workspace+scope). Incrociandolo con il controllo di scrittura (`resolveConversationForUser`: *"Non fai parte di questa conversazione"*) emerge il difetto grosso:
 
-**Nessun legame con i ruoli RBAC del CRM.** Sono due sistemi ortogonali:
-- un **superadmin** non invitato **non vede i messaggi** e non può moderare né azzerare;
-- chi ha il solo `projects.view`, se apre per primo, è **owner a vita** e nessun ruolo può scavalcarlo.
-
-**Due difetti collaterali trovati strada facendo:**
-- **`getScopedChat` non applica la visibilità V2**: basta `projects.view` + un `projectId` esistente per aprire — e quindi **possedere** — la chat di *qualsiasi* progetto del workspace, anche uno che non comparirebbe nel proprio selettore. (Gli **allegati** quel controllo ce l'hanno, aggiunto in Fase 3a; la chat no.)
+- 🔴 **La chat non parte per chiunque non arrivi per primo.** Il secondo dipendente che apre la chat generale trova quella del primo, non ne è partecipante → **zero messaggi e non può scrivere**, finché il primo non lo invita. Idem su ogni progetto già aperto da un collega. Non è un problema dei gruppi: è la chat che non funziona per il secondo utente in poi.
+- **Owner = chi apre per primo**, anche solo per guardare: la conversazione nasce in quel momento e chi l'ha aperta ne è proprietario **a vita**.
+- **L'owner non può uscire né essere rimosso** (il controllo che lo protegge in `removeScopedChatParticipant` scatta prima di quello che permette l'uscita autonoma) e **non esiste passaggio di proprietà**: se lascia l'azienda, la chat resta ingestibile. `addParticipant` è un upsert con `update: {}` → re-invitare non cambia il ruolo. A DB, cancellare lo `User` lascia la conversazione **senza owner**.
+- **Non esiste "sciogli il gruppo"**: `clearScopedChat` azzera solo i messaggi, la conversazione non si cancella mai, i membri si tolgono uno per chiamata.
+- **I ruoli RBAC del CRM non contano nulla**: un superadmin non invitato non vede né modera; chi ha il solo `projects.view`, se apre per primo, è owner a vita.
+- **`getScopedChat` non applica la visibilità V2**: basta `projects.view` + un `projectId` esistente per aprire — e possedere — la chat di *qualsiasi* progetto. (Gli allegati quel controllo ce l'hanno dalla Fase 3a; la chat no.)
 - **`clearScopedChat` fa get-or-create prima del controllo owner**: una `DELETE` su una chat mai aperta la **crea** col chiamante come owner, poi passa il controllo.
+- **Tutte le rotte chat richiedono solo `projects.view`**: inviare un messaggio (che *spende soldi*), azzerare, invitare e allegare chiedono lo stesso permesso della sola lettura.
 
-**Tutte le rotte chat richiedono solo `projects.view`**: inviare un messaggio (che *spende soldi*), azzerare, invitare e allegare chiedono lo stesso permesso della sola lettura. Non c'è distinzione view/edit.
+### Il disegno deciso
+
+**1) Un ambito ha N sessioni, non una chat.** Cade `@@unique([projectId])` / `@@unique([clientId])`. Apri un progetto (o cliente, o la generale) e vedi **l'elenco delle tue sessioni** su quell'ambito — le tue e quelle in cui sei stato invitato — più **"Nuova chat"**. Popup e scheda progetto mostrano lo stesso elenco. **Vale per tutti e tre gli ambiti** (Progetto/Cliente/Generale): una regola sola, e il difetto 🔴 sparisce alla radice perché ognuno apre una **propria** sessione invece di sbattere contro quella di un altro.
+
+**2) Niente proprietario dell'ambito, solo un creatore della sessione.** La sessione ricorda chi l'ha aperta (`createdByUserId`, **già nel modello**). Tutti i partecipanti sono pari su **scrivere, allegare, invitare**; **rimuovere** un membro e **sciogliere** il gruppo li fa il **creatore** — oppure un **admin del CRM** (vedi 3). Nessuno "possiede il progetto": possiede una sessione tra le tante. Il creatore **può uscire** come chiunque altro; la sessione passa a chi resta (più anziano per `createdAt` del partecipante).
+
+**3) I ruoli del CRM contano, ma non sui contenuti.** Un **admin/superadmin** del workspace può sempre **gestire i membri, subentrare come creatore e sciogliere** un gruppo, anche senza esserne partecipante — così una sessione non resta mai orfana. **Non vede però i messaggi** finché non entra come partecipante: moderazione sì, lettura no.
+
+**4) Lasciare un gruppo = congelamento, MAI cancellazione. Regola unica per tutti e tre i modi.** Che tu **esca da solo**, che ti **rimuova il creatore/admin**, o che il gruppo si **sciolga**: la riga di `AiConversationParticipant` **non si cancella**, si **marchia** (ruolo di sola lettura + `frozenAt`). Da lì discende tutto:
+- la sessione resta nel tuo elenco, contrassegnata **archiviata**;
+- vedi **solo i messaggi precedenti a `frozenAt`** (una condizione sola);
+- non compari tra i partecipanti attivi → **chi resta a scrivere sa esattamente chi lo legge**;
+- **"Riprendi in una nuova chat"** duplica lo storico **fino a `frozenAt`**, non oltre.
+
+**Perché congelato e non "in diretta"** (valutata e **scartata** l'alternativa): se un rimosso continuasse a vedere i messaggi nuovi, "rimuovere" non significherebbe nulla e la persona resterebbe un **lettore invisibile** — non comparendo tra i partecipanti, chi scrive **non saprebbe di avere un pubblico**. Regola in una riga: *vedi ciò che hai vissuto, non ciò che è successo dopo che sei uscito di scena.*
+
+**Perché la stessa regola anche per chi è rimosso** (valutata e scartata la distinzione "chi esce si tiene lo storico, chi è rimosso lo perde"): quella persona i messaggi **li ha già letti** — toglierglieli dalla vista non li fa dimenticare. In cambio si complicherebbe la regola e si perderebbe il caso legittimo di chi ha lavorato settimane sul progetto e a cui resta la traccia del proprio lavoro.
+
+**5) Scioglimento: copia a richiesta (lazy), non copia immediata.** Sciogliendo, la sessione resta **una**: attiva per chi ha sciolto (che torna solitario), **congelata in sola lettura** per gli ex membri (punto 4). Chi vuole continuare preme **"Riprendi in una nuova chat"** e *solo allora* si duplica. **Perché non la copia eager** (N sessioni con storico duplicato subito, una per ex membro): oltre a moltiplicare i dati per chi su quella chat non tornerà mai, farebbe **divergere N copie senza più un originale**; con la lazy c'è un originale e delle riprese esplicite, volute. La contabilità (`AiUsageLog.conversationId`) resta agganciata dov'era.
+
+**6) Titoli delle sessioni:** generati dalle **prime parole del primo messaggio** (nessuna chiamata AI → gratis, funziona anche senza chiavi configurate), **rinominabili a mano**. Il campo `title` **esiste già** nel modello.
+
+**7) Permessi: separare lettura da scrittura.** Oggi tutto chiede `projects.view`. Va introdotta la distinzione, così inviare (che *spende soldi*), invitare, allegare, azzerare e sciogliere non chiedono lo stesso permesso della sola lettura. **Da fare anche** i due controlli mancanti: visibilità V2 su `getScopedChat` e niente get-or-create prima del controllo in `clearScopedChat`.
+
+### Conseguenze da tenere a mente
+- **Nuova migrazione** (tracciata, da segnalare in handoff): via i due `@@unique`, ruolo di sola lettura + `frozenAt` su `AiConversationParticipant`. Le conversazioni esistenti diventano semplicemente la prima sessione del loro ambito.
+- La decisione **"AI risponde sempre se sei l'unico partecipante"** (sez. 2, tabella "Turni di gruppo") si applica **per sessione**, non per ambito: in una sessione solitaria l'AI risponde sempre, in una di gruppo serve `@AI`.
 
 ## 5. Fuori da questa spec (registrato altrove)
 
