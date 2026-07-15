@@ -361,19 +361,88 @@ export const fetchAgencyChatProjects = async ({ signal } = {}) => {
   return Array.isArray(result?.projects) ? result.projects : [];
 };
 
-// --- Allegati della chat (Fase 3a) ---
-// L'ambito viaggia come parametro (scope + targetId): le rotte degli allegati sono
-// le stesse per progetto, cliente e generale.
-const chatScopeQuery = (target) => {
+// --- SESSIONI della chat (15/7/2026) ---
+// Un ambito (progetto/cliente/generale) ha N sessioni. `conversationId` dice su
+// QUALE si sta lavorando: va passato a ogni chiamata della sessione aperta —
+// lettura, invio, partecipanti e allegati. Se si omette, il server ripiega
+// sull'ultima sessione dell'utente: comodo all'apertura ("portami dove ero"),
+// sbagliato per tutto il resto (si finirebbe per allegare o scrivere altrove).
+const chatScopeQuery = (target, conversationId) => {
   const params = new URLSearchParams({ scope: target.scope });
   if (target.id) {
     params.set("targetId", target.id);
   }
+  if (conversationId) {
+    params.set("conversationId", conversationId);
+  }
   return params.toString();
 };
 
-export const fetchAgencyChatAttachments = async (target, { signal } = {}) => {
-  const result = await agencyFetch(`/agency/chat/attachments?${chatScopeQuery(target)}`, {
+// Solo la sessione, per le rotte che hanno gia' l'ambito nel percorso.
+const chatSessionQuery = (conversationId) =>
+  conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : "";
+
+// Elenco delle sessioni dell'utente su un ambito, dalla piu' recente. Include le
+// sessioni archiviate (isFrozen): quelle da cui e' uscito, restano in sola lettura.
+export const fetchAgencyChatSessions = async (target, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/sessions?${chatScopeQuery(target)}`, {
+    method: "GET",
+    signal,
+  });
+
+  const list = result?.sessions?.sessions;
+  return Array.isArray(list) ? list : [];
+};
+
+export const createAgencyChatSession = async (target, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/sessions`, {
+    method: "POST",
+    body: { scope: target.scope, targetId: target.id },
+    signal,
+  });
+
+  return result?.session?.conversationId || null;
+};
+
+export const renameAgencyChatSession = async (target, conversationId, title, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/sessions/${encodeURIComponent(conversationId)}`, {
+    method: "PATCH",
+    body: { scope: target.scope, targetId: target.id, title },
+    signal,
+  });
+
+  return result?.session || null;
+};
+
+// Scioglie il gruppo: la sessione torna solitaria per chi esegue, gli altri se la
+// ritrovano archiviata in sola lettura.
+export const disbandAgencyChatSession = async (target, conversationId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/sessions/${encodeURIComponent(conversationId)}/disband`, {
+    method: "POST",
+    body: { scope: target.scope, targetId: target.id },
+    signal,
+  });
+
+  return result?.participants || null;
+};
+
+// "Riprendi in una nuova chat": duplica una sessione archiviata in una tutta propria,
+// copiando lo storico fino al momento dell'uscita. Torna l'id della nuova sessione.
+export const resumeAgencyChatSession = async (target, conversationId, { signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/sessions/${encodeURIComponent(conversationId)}/resume`, {
+    method: "POST",
+    body: { scope: target.scope, targetId: target.id },
+    signal,
+  });
+
+  return result?.session?.conversationId || null;
+};
+
+// --- Allegati della chat (Fase 3a) ---
+// L'ambito viaggia come parametro (scope + targetId): le rotte degli allegati sono
+// le stesse per progetto, cliente e generale.
+export const fetchAgencyChatAttachments = async (target, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/attachments?${chatScopeQuery(target, conversationId)}`, {
     method: "GET",
     signal,
   });
@@ -382,10 +451,10 @@ export const fetchAgencyChatAttachments = async (target, { signal } = {}) => {
   return Array.isArray(list) ? list : [];
 };
 
-export const uploadAgencyChatFileAttachment = async (target, file, { signal } = {}) => {
+export const uploadAgencyChatFileAttachment = async (target, file, { conversationId, signal } = {}) => {
   const form = new FormData();
   form.append("file", file);
-  const result = await agencyFetch(`/agency/chat/attachments/file?${chatScopeQuery(target)}`, {
+  const result = await agencyFetch(`/agency/chat/attachments/file?${chatScopeQuery(target, conversationId)}`, {
     method: "POST",
     body: form,
     signal,
@@ -394,10 +463,14 @@ export const uploadAgencyChatFileAttachment = async (target, file, { signal } = 
   return result?.attachment || null;
 };
 
-export const addAgencyChatEntityAttachment = async (target, { entityType, entityId }, { signal } = {}) => {
+export const addAgencyChatEntityAttachment = async (
+  target,
+  { entityType, entityId },
+  { conversationId, signal } = {},
+) => {
   const result = await agencyFetch(`/agency/chat/attachments/entity`, {
     method: "POST",
-    body: { scope: target.scope, targetId: target.id, entityType, entityId },
+    body: { scope: target.scope, targetId: target.id, entityType, entityId, conversationId },
     signal,
   });
 
@@ -414,98 +487,110 @@ export const removeAgencyChatAttachment = async (attachmentId, { signal } = {}) 
 };
 
 // --- Chat AI ambito CLIENTE e GENERALE (Fase 2) ---
-export const fetchAgencyClientChat = async (clientId, { signal } = {}) => {
-  const result = await agencyFetch(`/agency/chat/client/${encodeURIComponent(clientId)}`, {
-    method: "GET",
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const sendAgencyClientChatMessage = async (clientId, message, { askAi = false, attachmentIds = [], signal } = {}) => {
-  const result = await agencyFetch(`/agency/chat/client/${encodeURIComponent(clientId)}`, {
-    method: "POST",
-    body: { message, askAi, attachmentIds },
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const fetchAgencyGeneralChat = async ({ signal } = {}) => {
-  const result = await agencyFetch(`/agency/chat/general`, {
-    method: "GET",
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const sendAgencyGeneralChatMessage = async (message, { askAi = false, attachmentIds = [], signal } = {}) => {
-  const result = await agencyFetch(`/agency/chat/general`, {
-    method: "POST",
-    body: { message, askAi, attachmentIds },
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const fetchAgencyProjectChat = async (projectId, { signal } = {}) => {
-  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
-    method: "GET",
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false, attachmentIds = [], signal } = {}) => {
-  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
-    method: "POST",
-    body: { message, askAi, attachmentIds },
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const clearAgencyProjectChat = async (projectId, { signal } = {}) => {
-  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat`, {
-    method: "DELETE",
-    signal,
-  });
-
-  return result?.chat || null;
-};
-
-export const fetchAgencyProjectChatParticipants = async (projectId, { signal } = {}) => {
-  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat/participants`, {
-    method: "GET",
-    signal,
-  });
-
-  return result?.participants || null;
-};
-
-export const addAgencyProjectChatParticipant = async (projectId, userId, { signal } = {}) => {
-  const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/chat/participants`, {
-    method: "POST",
-    body: { userId },
-    signal,
-  });
-
-  return result?.participants || null;
-};
-
-export const removeAgencyProjectChatParticipant = async (projectId, memberId, { signal } = {}) => {
+// conversationId: quale sessione. Omesso solo alla prima apertura, per atterrare
+// sull'ultima usata (o farne creare una nuova al server se non se ne ha nessuna).
+export const fetchAgencyClientChat = async (clientId, { conversationId, signal } = {}) => {
   const result = await agencyFetch(
-    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants/${encodeURIComponent(memberId)}`,
-    {
-      method: "DELETE",
-      signal,
-    },
+    `/agency/chat/client/${encodeURIComponent(clientId)}${chatSessionQuery(conversationId)}`,
+    { method: "GET", signal },
+  );
+
+  return result?.chat || null;
+};
+
+export const sendAgencyClientChatMessage = async (
+  clientId,
+  message,
+  { askAi = false, attachmentIds = [], conversationId, signal } = {},
+) => {
+  const result = await agencyFetch(
+    `/agency/chat/client/${encodeURIComponent(clientId)}${chatSessionQuery(conversationId)}`,
+    { method: "POST", body: { message, askAi, attachmentIds }, signal },
+  );
+
+  return result?.chat || null;
+};
+
+export const fetchAgencyGeneralChat = async ({ conversationId, signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/general${chatSessionQuery(conversationId)}`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const sendAgencyGeneralChatMessage = async (
+  message,
+  { askAi = false, attachmentIds = [], conversationId, signal } = {},
+) => {
+  const result = await agencyFetch(`/agency/chat/general${chatSessionQuery(conversationId)}`, {
+    method: "POST",
+    body: { message, askAi, attachmentIds },
+    signal,
+  });
+
+  return result?.chat || null;
+};
+
+export const fetchAgencyProjectChat = async (projectId, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat${chatSessionQuery(conversationId)}`,
+    { method: "GET", signal },
+  );
+
+  return result?.chat || null;
+};
+
+export const sendAgencyProjectChatMessage = async (
+  projectId,
+  message,
+  { askAi = false, attachmentIds = [], conversationId, signal } = {},
+) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat${chatSessionQuery(conversationId)}`,
+    { method: "POST", body: { message, askAi, attachmentIds }, signal },
+  );
+
+  return result?.chat || null;
+};
+
+export const clearAgencyProjectChat = async (projectId, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat${chatSessionQuery(conversationId)}`,
+    { method: "DELETE", signal },
+  );
+
+  return result?.chat || null;
+};
+
+export const fetchAgencyProjectChatParticipants = async (projectId, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants${chatSessionQuery(conversationId)}`,
+    { method: "GET", signal },
+  );
+
+  return result?.participants || null;
+};
+
+export const addAgencyProjectChatParticipant = async (projectId, userId, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants${chatSessionQuery(conversationId)}`,
+    { method: "POST", body: { userId }, signal },
+  );
+
+  return result?.participants || null;
+};
+
+// Rimuove un partecipante — oppure esci tu, passando il tuo stesso id. In entrambi
+// i casi il server CONGELA la riga invece di cancellarla: la sessione resta a chi
+// esce, in sola lettura e ferma al momento dell'uscita.
+export const removeAgencyProjectChatParticipant = async (projectId, memberId, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants/${encodeURIComponent(
+      memberId,
+    )}${chatSessionQuery(conversationId)}`,
+    { method: "DELETE", signal },
   );
 
   return result?.participants || null;
