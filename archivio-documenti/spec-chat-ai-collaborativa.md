@@ -20,7 +20,7 @@ Una **sola Chat AI** con un concetto di **ambito** (Generale / Cliente / Progett
 | Selettore ambito | Nel popup; in cima gli elementi **assegnati all'utente**. |
 | Popup ↔ scheda progetto | Il popup con ambito "Progetto X" apre **la stessa conversazione** della scheda Chat di quel progetto (un thread per ambito). |
 | Condivisione | **Su invito esplicito** → serve un livello "**partecipanti alla conversazione**". |
-| Turni di gruppo | L'AI risponde **solo se interpellata**, via **menzione @AI** *e* **pulsante**. Quando risponde legge l'intero thread come contesto. |
+| Turni di gruppo | L'AI risponde **solo se interpellata**, via **menzione @AI** *e* **pulsante**. Quando risponde legge l'intero thread come contesto. **Precisazione del 15/7/2026 (decisa, DA FARE):** questa regola vale **solo in gruppo**. Se sei l'**unico partecipante**, ogni messaggio interpella l'AI: da soli non c'è nessun altro a cui parlare, e chiedere `@AI` è un effetto collaterale di una regola nata per il gruppo. Appena si invita qualcuno, la regola torna. Effetto accettato: da soli ogni messaggio è una chiamata a pagamento. |
 | Allegati | Pulsante **"Allega"** nel popup: **file** (doc → estrattore testo; immagini → modello con "vista") **ed elementi CRM** (progetto/cliente/fonte/preventivo/**thread messaggistica**). |
 | "Chiedi all'AI" sugli elementi | Via **menu azioni ⋯** *e* **tasto destro** (niente pulsanti fissi ovunque). Doppio senso: *aggiungi alla chat aperta* / *apri chat su questo*. |
 | Tempo reale | **Websocket** (istantaneo). Richiede infrastruttura realtime nuova. |
@@ -64,7 +64,8 @@ La Fase 3 è stata **divisa in due**: 3a (documenti ed elementi CRM) e **3b** (i
 ### Fase 3b — Immagini "con vista" + thread di messaggistica (da fare)
 - **Immagini**: richiede (a) **storage dei binari** (oggi le Fonti scartano il buffer; il precedente è `uploads/agency-sources/` del vecchio codice Agency, ma con una tabella dedicata invece del JSON in `ProjectMemory`), e (b) un **motore AI multimodale** — `runAgencyAiTextWithMeta` accetta `content: string`, va esteso a blocchi su **tutti e tre** i rami (Anthropic `/v1/messages`, OpenAI `/v1/responses`, fallback `chat/completions`).
 - **Thread di messaggistica**: `WorkspaceMessage` è 1-a-1 **senza entità thread** — va identificato dalla coppia (mittente, destinatario), non da un id. Nota privacy: solo i thread di cui l'utente fa parte.
-- **Menu ⋯ per Progetti/Fonti/Preventivi**: oggi solo i Clienti hanno un menu azioni; il tasto destro invece copre già Clienti e Progetti.
+- **Menu ⋯ per Progetti/Fonti/Preventivi**: oggi solo i Clienti hanno un menu azioni; il tasto destro invece copre già Clienti e Progetti (sia la lista Agency sia la board di Operatività — sono la stessa entità, una sola tabella `Project`).
+- **Widget "I miei progetti" della Dashboard** (`src/modules/dashboard/ui/MyProjectsWidget.jsx`): unico posto dove i progetti si vedono ma il tasto destro non c'è. **Deciso il 15/7/2026, DA FARE.** Basta aggiungere `askAiRowProps('project', project)` alla riga: il menu è globale. Escluso di proposito il selettore progetti dei Preventivi (`ProjectPicker.jsx`): lì scegli un progetto per il preventivo, non ci ragioni sopra.
 
 ### Fase 4 — Tempo reale (websocket)
 - Infrastruttura **websocket** + push istantaneo dei nuovi messaggi e delle risposte AI ai partecipanti.
@@ -90,6 +91,30 @@ La Fase 3 è stata **divisa in due**: 3a (documenti ed elementi CRM) e **3b** (i
 - **Chiavi AI reali:** le parti AI (turni, RAG cliente, compressione, navigazione) si **collaudano davvero** quando saranno configurate le chiavi OpenAI/Anthropic (fine V). Le parti non-AI (modello dati, partecipanti, popup, allegati UI, websocket) si costruiscono e testano prima.
 - **Costi/budget:** ogni chiamata AI della chat passa già dal motore che applica **budget giornaliero** e **log costi** — quindi la chat collaborativa entra automaticamente nel rendiconto consumi. Il consumo è attribuito a **chi preme invia** (non all'owner della conversazione né a quello del progetto): in un gruppo ognuno paga i propri turni sul proprio budget.
 - **Dimensioni del registro consumi (15/7/2026):** oltre a workspace/utente/funzione, il registro distingue ora anche **progetto** e **conversazione** (migrazione `20260715120831`). Serve a rispondere a "quanto è costato il progetto X", non solo "quanto ha speso Marco in chat di progetto". Le chiamate senza contesto di progetto (chat generale, ricerca sulle fonti di più progetti insieme) restano senza progetto e confluiscono in "Senza progetto". Il registro è **contabilità**: le relazioni sono `SetNull`, così cancellare un progetto non falsa la spesa storica.
+
+## 4-bis. Punti aperti sulla PROPRIETÀ della chat di gruppo (da discutere — 15/7/2026)
+
+> Emersi da un'analisi del codice richiesta da Jacopo il 15/7/2026. **Sono fatti verificati, non impressioni.** La discussione era in corso quando la sessione si è chiusa: **nessuna decisione presa, niente ancora modificato.** Vanno decisi prima di toccare il codice.
+
+**Com'è oggi (Fase 1, mai più rivisto):**
+- **Owner = chi apre per primo** la chat di quell'ambito. Basta **aprirla**, anche solo per guardarla: la conversazione viene creata in quel momento e chi l'ha aperta ne resta proprietario.
+- L'owner può fare **solo due cose** in più di un membro: **azzerare** i messaggi e **rimuovere** gli altri. Per il resto sono pari: *qualsiasi* partecipante può invitare (sempre e solo come `member`), scrivere e interpellare l'AI.
+- Un membro può solo **uscire da solo**.
+
+**Le tre lacune (sono difetti, non scelte):**
+1. **L'owner non può uscire né essere rimosso.** Il controllo che protegge il proprietario (`removeScopedChatParticipant`) scatta **prima** di quello che permette l'uscita autonoma → il proprietario è legato alla conversazione per sempre.
+2. **Nessun passaggio di proprietà.** Se chi ha aperto la chat lascia l'azienda, quella conversazione resta senza nessuno che possa azzerarla o gestire i membri. `addParticipant` è un upsert con `update: {}`: re-invitare non cambia il ruolo. A DB, cancellare lo `User` lascia la conversazione **senza owner** (nessun fallback su `createdByUserId`).
+3. **Non esiste "sciogli il gruppo"** né tornare da soli: `clearScopedChat` azzera **solo i messaggi**; la conversazione non si cancella mai e i membri vanno tolti **uno per chiamata**.
+
+**Nessun legame con i ruoli RBAC del CRM.** Sono due sistemi ortogonali:
+- un **superadmin** non invitato **non vede i messaggi** e non può moderare né azzerare;
+- chi ha il solo `projects.view`, se apre per primo, è **owner a vita** e nessun ruolo può scavalcarlo.
+
+**Due difetti collaterali trovati strada facendo:**
+- **`getScopedChat` non applica la visibilità V2**: basta `projects.view` + un `projectId` esistente per aprire — e quindi **possedere** — la chat di *qualsiasi* progetto del workspace, anche uno che non comparirebbe nel proprio selettore. (Gli **allegati** quel controllo ce l'hanno, aggiunto in Fase 3a; la chat no.)
+- **`clearScopedChat` fa get-or-create prima del controllo owner**: una `DELETE` su una chat mai aperta la **crea** col chiamante come owner, poi passa il controllo.
+
+**Tutte le rotte chat richiedono solo `projects.view`**: inviare un messaggio (che *spende soldi*), azzerare, invitare e allegare chiedono lo stesso permesso della sola lettura. Non c'è distinzione view/edit.
 
 ## 5. Fuori da questa spec (registrato altrove)
 
