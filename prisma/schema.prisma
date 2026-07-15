@@ -529,6 +529,12 @@ model ProjectSourceChunk {
 // e per cliente e' garantita dai vincoli sotto (i NULL non collidono in Postgres);
 // per 'general' (projectId e clientId entrambi null) l'unicita' per workspace e'
 // gestita a livello applicativo nel repository (get-or-create con findFirst).
+// Conversazione ("sessione") della Chat AI. Un AMBITO (progetto/cliente/generale)
+// ha N sessioni, non una sola: l'elenco e' quello che l'utente sceglie all'apertura
+// della chat, come nelle UI dei chat LLM. Fino al 15/7/2026 valevano @@unique([projectId])
+// e @@unique([clientId]) — una chat sola per ambito — con l'effetto che chi non apriva
+// per primo restava fuori (non partecipante => zero messaggi e scrittura negata).
+// Vedi spec-chat-ai-collaborativa.md sez. 4-bis.
 model AiConversation {
   id              String                      @id @default(cuid())
   workspaceId     String
@@ -537,26 +543,44 @@ model AiConversation {
   clientId        String?
   title           String?                     @db.VarChar(200)
   createdByUserId String?
+  // Ultimo messaggio: ordina l'elenco delle sessioni. Denormalizzato di proposito
+  // (aggiornato all'invio) per non fare un max(createdAt) sui messaggi per riga.
+  lastMessageAt   DateTime?
+  // Valorizzato quando la sessione nasce da "Riprendi in una nuova chat" su una
+  // sessione congelata: tiene la traccia dell'originale da cui e' stata copiata.
+  resumedFromConversationId String?
   createdAt       DateTime                    @default(now())
   updatedAt       DateTime                    @updatedAt
   workspace       Workspace                   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project         Project?                    @relation(fields: [projectId], references: [id], onDelete: Cascade)
   client          Client?                     @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdByUser   User?                       @relation("AiConversationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  resumedFrom     AiConversation?             @relation("AiConversationResumedFrom", fields: [resumedFromConversationId], references: [id], onDelete: SetNull)
+  resumedBy       AiConversation[]            @relation("AiConversationResumedFrom")
   participants    AiConversationParticipant[]
   messages        AiConversationMessage[]
   attachments     AiConversationAttachment[]
   aiUsageLogs     AiUsageLog[]
 
-  @@unique([projectId])
-  @@unique([clientId])
   @@index([workspaceId, scope])
+  @@index([workspaceId, projectId])
   @@index([workspaceId, clientId])
+  @@index([resumedFromConversationId])
 }
 
 // Partecipante a una conversazione (Fase 1 — condivisione su invito esplicito).
-// Una riga per utente ammesso. Il ruolo distingue chi crea/gestisce la chat
-// ('owner') dagli invitati ('member').
+// Una riga per utente ammesso. Il ruolo distingue chi gestisce la SESSIONE
+// ('owner': rimuove i membri e scioglie il gruppo) dagli invitati ('member').
+// L'owner e' relativo alla singola sessione, non all'ambito: non "possiede" il
+// progetto, e puo' uscire come chiunque altro (la gestione passa a chi resta).
+//
+// frozenAt (15/7/2026) — chi lascia un gruppo NON viene cancellato, viene CONGELATO:
+// che esca da solo, che lo rimuova l'owner/un admin, o che il gruppo si sciolga, la
+// riga resta con frozenAt valorizzato. Effetti: la sessione resta nel suo elenco
+// contrassegnata "archiviata"; vede SOLO i messaggi precedenti a frozenAt; non
+// compare tra i partecipanti attivi, cosi' chi resta a scrivere sa chi lo legge.
+// Regola: "vedi cio' che hai vissuto, non cio' che e' successo dopo che sei uscito".
+// Vedi spec-chat-ai-collaborativa.md sez. 4-bis.
 model AiConversationParticipant {
   id              String         @id @default(cuid())
   workspaceId     String
@@ -564,6 +588,7 @@ model AiConversationParticipant {
   userId          String
   role            String         @default("member") @db.VarChar(16)
   invitedByUserId String?
+  frozenAt        DateTime?
   createdAt       DateTime       @default(now())
   workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   conversation    AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
