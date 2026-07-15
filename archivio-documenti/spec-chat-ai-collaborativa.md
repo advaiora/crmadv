@@ -131,7 +131,19 @@ Il vincolo `@@unique([projectId])` / `@@unique([clientId])` in `schema.prisma` i
 
 **6) Titoli delle sessioni:** generati dalle **prime parole del primo messaggio** (nessuna chiamata AI → gratis, funziona anche senza chiavi configurate), **rinominabili a mano**. Il campo `title` **esiste già** nel modello.
 
-**7) Permessi: separare lettura da scrittura.** Oggi tutto chiede `projects.view`. Va introdotta la distinzione, così inviare (che *spende soldi*), invitare, allegare, azzerare e sciogliere non chiedono lo stesso permesso della sola lettura. **Da fare anche** i due controlli mancanti: visibilità V2 su `getScopedChat` e niente get-or-create prima del controllo in `clearScopedChat`.
+**7) Permessi: separare lettura da scrittura.** ✅ **FATTO (15/7/2026).** Prima tutto chiedeva `projects.view`: inviare — che *spende soldi* — chiedeva lo stesso permesso della sola lettura. Tre permessi nuovi, modellati sul precedente di `messages` (view/send), sotto il modulo `projects` (è quello che le rotte della chat già richiedono; l'area Agency non ha un modulo suo):
+
+| Permesso | Cosa dà | Superadmin | Admin | Manager | Operativo | Viewer |
+|---|---|:--:|:--:|:--:|:--:|:--:|
+| `chat.view` | consultare le sessioni di cui si fa parte | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `chat.use` | inviare (spende), invitare, allegare, azzerare, sciogliere | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `chat.moderate` | gestire i gruppi altrui **senza leggerli** | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+**Migrazione `20260715141500_chat_permissions`.** Serve una migrazione *oltre* al catalogo perché il bootstrap (`ensureWorkspaceSystemRoles`, eseguito a ogni login) risincronizza **solo i ruoli di sistema**: i ruoli **personalizzati** (`isSystem: false`) non li tocca nessuno e perderebbero la chat in silenzio nel momento in cui le rotte chiedono `chat.use`. La migrazione quindi **eredita** `chat.view` + `chat.use` a *ogni* ruolo che ha già `projects.view` (nessuno perde ciò che aveva), poi riporta il **Viewer di sistema** alla sola lettura e dà `chat.moderate` ad Admin/Superadmin.
+
+**Moderazione senza lettura — come è reso:** `resolveConversationForModeration` e `listScopedChatParticipants` ammettono chi ha `chat.moderate` anche se non partecipa; `getScopedChat` **no**. L'admin quindi vede e gestisce i membri, rimuove, subentra e scioglie, ma i **messaggi** gli restano preclusi finché non entra come partecipante. Sciogliendo da esterno non si autoinvita: congela tutti. Verificato dal vivo.
+
+**Fatti anche i due controlli mancanti:** visibilità V2 su `getScopedChat` (`assertScopeVisible`) e niente get-or-create prima del controllo in `clearScopedChat`.
 
 ### Conseguenze da tenere a mente
 - **Nuova migrazione** (tracciata, da segnalare in handoff): via i due `@@unique`, ruolo di sola lettura + `frozenAt` su `AiConversationParticipant`. Le conversazioni esistenti diventano semplicemente la prima sessione del loro ambito.

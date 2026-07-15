@@ -33,6 +33,20 @@ export const TEAM_MODULE_KEY = 'team';
 export const DASHBOARD_MODULE_KEY = 'dashboard';
 export const MESSAGES_MODULE_KEY = 'messages';
 
+// Permessi della Chat AI (15/7/2026). Prima la chat girava tutta su 'projects.view':
+// inviare un messaggio — che SPENDE SOLDI — chiedeva lo stesso permesso della sola
+// lettura, e nessun ruolo poteva moderare un gruppo altrui. Modellati sul precedente
+// di 'messages' (view/send), che e' lo stesso problema: consultare != scrivere.
+// Stanno sotto il modulo 'projects' perche' e' quello che le rotte della chat
+// richiedono gia' (l'area Agency non ha un modulo suo).
+export const CHAT_PERMISSIONS = {
+  view: 'chat.view',
+  use: 'chat.use',
+  moderate: 'chat.moderate',
+} as const;
+
+export type ChatPermissionKey = (typeof CHAT_PERMISSIONS)[keyof typeof CHAT_PERMISSIONS];
+
 export const TEAM_PERMISSIONS = {
   view: 'team.view',
   invite: 'team.invite',
@@ -152,6 +166,10 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Manage SEO settings' },
   { key: 'messages.view', moduleKey: MESSAGES_MODULE_KEY, description: 'View internal messages' },
   { key: 'messages.send', moduleKey: MESSAGES_MODULE_KEY, description: 'Send internal messages' },
+
+  { key: CHAT_PERMISSIONS.view, moduleKey: 'projects', description: 'View AI chat sessions and their history' },
+  { key: CHAT_PERMISSIONS.use, moduleKey: 'projects', description: 'Write in the AI chat: send messages (spends AI budget), invite, attach, clear' },
+  { key: CHAT_PERMISSIONS.moderate, moduleKey: 'projects', description: "Moderate AI chat groups: remove members, take over and disband, without reading the messages" },
 ] as const;
 
 export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
@@ -223,6 +241,10 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'web.version.rollback',
       'messages.view',
       'messages.send',
+      // Il manager usa la chat, ma non modera i gruppi altrui: quella resta
+      // ad Admin/Superadmin (che la prendono da 'all'/'all_except').
+      CHAT_PERMISSIONS.view,
+      CHAT_PERMISSIONS.use,
     ],
   },
   {
@@ -247,6 +269,8 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'web.view',
       'messages.view',
       'messages.send',
+      CHAT_PERMISSIONS.view,
+      CHAT_PERMISSIONS.use,
     ],
   },
   {
@@ -266,6 +290,9 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'web.view',
       'audit.view',
       'messages.view',
+      // Il Viewer e' in sola lettura: consulta le chat di cui fa parte ma non
+      // scrive e non spende (niente chat.use). E' il punto della separazione.
+      CHAT_PERMISSIONS.view,
     ],
   },
 ] as const;

@@ -4,6 +4,7 @@ import { ok } from '../../../core/response.js';
 import { getUserWorkspaceSystemRoleName, SYSTEM_ROLE_NAME } from '../../../auth/workspace-bootstrap.js';
 import { prisma } from '../../../prisma.js';
 import { PROJECTS_PERMISSIONS, ensureProjectsAccess } from '../../projects/projects.policies.js';
+import { CHAT_PERMISSIONS, ensureChatAccess } from '../chat.policies.js';
 import { agencyService } from '../agency.service.js';
 
 type AgencyProjectParams = {
@@ -98,7 +99,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   // Progetti per il selettore della Chat globale (Fase 2): filtrati per la
   // visibilita' dell'utente, con flag "assegnato a me" e "ha Fonti indicizzate".
   app.get('/agency/chat/projects', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
     const projects = await agencyService.listChatProjects({
       workspaceId: workspace.id,
       userId: user.id,
@@ -403,7 +404,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
       const chat = await agencyService.getProjectChat({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -418,7 +419,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery; Body: unknown }>(
     '/agency/projects/:projectId/chat',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const chat = await agencyService.sendProjectChatMessage({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -434,7 +435,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const chat = await agencyService.clearProjectChat({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -450,7 +451,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat/participants',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
       const participants = await agencyService.listProjectChatParticipants({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -465,7 +466,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery; Body: unknown }>(
     '/agency/projects/:projectId/chat/participants',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const participants = await agencyService.addProjectChatParticipant({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -481,7 +482,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: AgencyProjectParams & { memberId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat/participants/:memberId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const participants = await agencyService.removeProjectChatParticipant({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -500,7 +501,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/chat/client/:clientId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
       const chat = await agencyService.getScopedChat({
         workspaceId: workspace.id,
         userId: user.id,
@@ -514,7 +515,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery; Body: unknown }>(
     '/agency/chat/client/:clientId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const chat = await agencyService.sendScopedChatMessage({
         workspaceId: workspace.id,
         userId: user.id,
@@ -529,7 +530,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/chat/client/:clientId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const chat = await agencyService.clearScopedChat({
         workspaceId: workspace.id,
         userId: user.id,
@@ -543,7 +544,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/chat/client/:clientId/participants',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
       const participants = await agencyService.listScopedChatParticipants({
         workspaceId: workspace.id,
         userId: user.id,
@@ -557,7 +558,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery; Body: unknown }>(
     '/agency/chat/client/:clientId/participants',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const participants = await agencyService.addScopedChatParticipant({
         workspaceId: workspace.id,
         userId: user.id,
@@ -572,7 +573,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: { clientId: string; memberId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/chat/client/:clientId/participants/:memberId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const participants = await agencyService.removeScopedChatParticipant({
         workspaceId: workspace.id,
         userId: user.id,
@@ -589,7 +590,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   // partecipante e restava senza messaggi e senza poter scrivere. Ora ognuno ha le
   // proprie sessioni. ---
   app.get<{ Querystring: AgencyChatSessionQuery }>('/agency/chat/general', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
     const chat = await agencyService.getScopedChat({
       workspaceId: workspace.id,
       userId: user.id,
@@ -600,7 +601,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Querystring: AgencyChatSessionQuery; Body: unknown }>('/agency/chat/general', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const chat = await agencyService.sendScopedChatMessage({
       workspaceId: workspace.id,
       userId: user.id,
@@ -612,7 +613,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.delete<{ Querystring: AgencyChatSessionQuery }>('/agency/chat/general', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const chat = await agencyService.clearScopedChat({
       workspaceId: workspace.id,
       userId: user.id,
@@ -623,7 +624,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.get<{ Querystring: AgencyChatSessionQuery }>('/agency/chat/general/participants', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
     const participants = await agencyService.listScopedChatParticipants({
       workspaceId: workspace.id,
       userId: user.id,
@@ -634,7 +635,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Querystring: AgencyChatSessionQuery; Body: unknown }>('/agency/chat/general/participants', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const participants = await agencyService.addScopedChatParticipant({
       workspaceId: workspace.id,
       userId: user.id,
@@ -648,7 +649,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: { memberId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/chat/general/participants/:memberId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const participants = await agencyService.removeScopedChatParticipant({
         workspaceId: workspace.id,
         userId: user.id,
@@ -669,7 +670,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
 
   // Elenco delle sessioni dell'utente sull'ambito (la "lista chat" della UI).
   app.get<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/sessions', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
     const sessions = await agencyService.listScopedChatSessions({
       workspaceId: workspace.id,
       userId: user.id,
@@ -680,7 +681,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
 
   // Nuova sessione sull'ambito ("Nuova chat").
   app.post<{ Body: AgencyChatScopeQuery }>('/agency/chat/sessions', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const body = request.body ?? {};
     const session = await agencyService.createScopedChatSession({
       workspaceId: workspace.id,
@@ -694,7 +695,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.patch<{ Params: { conversationId: string }; Body: AgencyChatScopeQuery & { title?: string } }>(
     '/agency/chat/sessions/:conversationId',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const body = request.body ?? {};
       const session = await agencyService.renameScopedChatSession({
         workspaceId: workspace.id,
@@ -712,7 +713,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { conversationId: string }; Body: AgencyChatScopeQuery }>(
     '/agency/chat/sessions/:conversationId/disband',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const body = request.body ?? {};
       const participants = await agencyService.disbandScopedChat({
         workspaceId: workspace.id,
@@ -728,7 +729,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { conversationId: string }; Body: AgencyChatScopeQuery }>(
     '/agency/chat/sessions/:conversationId/resume',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
       const body = request.body ?? {};
       const session = await agencyService.resumeScopedChatSession({
         workspaceId: workspace.id,
@@ -741,7 +742,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
     const attachments = await agencyService.listScopedChatAttachments({
       workspaceId: workspace.id,
       userId: user.id,
@@ -752,7 +753,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
 
   // Multipart: l'ambito viaggia in querystring perche' il corpo e' il file.
   app.post<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments/file', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const target = parseChatScopeTarget(request.query.scope, request.query.targetId);
     const file = await request.file();
     if (!file) {
@@ -773,7 +774,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Body: { scope?: string; targetId?: string } }>('/agency/chat/attachments/entity', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const body = request.body ?? {};
     const attachment = await agencyService.addScopedChatEntityAttachment({
       workspaceId: workspace.id,
@@ -785,7 +786,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.delete<{ Params: { attachmentId: string } }>('/agency/chat/attachments/:attachmentId', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.use);
     const result = await agencyService.removeScopedChatAttachment({
       workspaceId: workspace.id,
       userId: user.id,

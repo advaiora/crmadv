@@ -25,6 +25,7 @@ import {
   type AttachableEntityType,
 } from './chat-attachments.js';
 import { rbacRepository } from '../../repositories/rbac.repository.js';
+import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
 import { createLoggingOpenAiEmbedder, searchProjectSources, searchClientSources } from '../sources/sources.rag.js';
@@ -2773,12 +2774,16 @@ const buildSessionTitle = (firstMessage: string): string | null => {
 //    non ne ha nessuna se ne crea una SUA. E' qui che si ripara il difetto storico:
 //    prima si atterrava sull'unica conversazione dell'ambito, e chi non l'aveva
 //    aperta per primo restava fuori (zero messaggi, scrittura negata).
+// `moderatorOk`: ammette anche chi non partecipa ma ha chat.moderate, restituendo
+// participant = null. Si usa per le operazioni di GESTIONE (membri, scioglimento),
+// mai per leggere i messaggi.
 const resolveScopedSession = async (input: {
   workspaceId: string;
   userId: string;
   target: ChatScopeTarget;
   conversationId?: string | null;
   createIfMissing?: boolean;
+  moderatorOk?: boolean;
 }) => {
   if (input.conversationId) {
     const conversation = await aiConversationRepository.findSessionById(input.workspaceId, input.conversationId);
@@ -2787,6 +2792,9 @@ const resolveScopedSession = async (input: {
     }
     const participant = await aiConversationRepository.findParticipant(conversation.id, input.userId);
     if (!participant) {
+      if (input.moderatorOk && (await canModerateChat(input.workspaceId, input.userId))) {
+        return { conversation, participant: null };
+      }
       throw forbidden('Non fai parte di questa conversazione. Chiedi a un partecipante di invitarti.');
     }
     return { conversation, participant };
@@ -2826,6 +2834,13 @@ const matchesScope = (
   }
   return true;
 };
+
+// Chi ha chat.moderate (Admin/Superadmin) puo' GESTIRE una sessione altrui — togliere
+// membri, subentrare, sciogliere — anche senza esserne partecipante, cosi' un gruppo
+// non resta mai ingestibile. NON e' un lasciapassare sui contenuti: i messaggi restano
+// visibili ai soli partecipanti, moderare non vuol dire leggere (spec sez. 4-bis).
+const canModerateChat = (workspaceId: string, userId: string) =>
+  rbacRepository.hasPermission(userId, workspaceId, CHAT_PERMISSIONS.moderate);
 
 // L'ambito e' accessibile all'utente? Applica la visibilita' V2 (la stessa del
 // selettore d'ambito e degli allegati): senza, basterebbe conoscere l'id di un
@@ -7982,6 +7997,23 @@ export const agencyService = {
     return conversation!;
   },
 
+  // Come resolveConversationForUser ma ammette il MODERATORE (chat.moderate) che non
+  // partecipa: gli serve per gestire i membri di un gruppo altrui — non per leggerlo.
+  async resolveConversationForModeration(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+  }) {
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const { conversation, participant } = await resolveScopedSession({ ...input, moderatorOk: true });
+    if (participant?.frozenAt) {
+      throw forbidden('Questa conversazione e archiviata: puoi solo consultarla.');
+    }
+    return conversation!;
+  },
+
   // Bozze dell'utente sulla conversazione (i chip mostrati nel composer).
   async listScopedChatAttachments(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
     const conversation = await this.resolveConversationForUser(input);
@@ -8216,7 +8248,9 @@ export const agencyService = {
   }) {
     await this.assertScopeTargetExists(input.workspaceId, input.target);
     await assertScopeVisible(input.workspaceId, input.userId, input.target);
-    const { conversation } = await resolveScopedSession(input);
+    // moderatorOk: l'elenco dei membri e' gestione, non contenuto — un moderatore
+    // deve poterlo vedere per intervenire su un gruppo di cui non fa parte.
+    const { conversation } = await resolveScopedSession({ ...input, moderatorOk: true });
     const [participants, members] = await Promise.all([
       aiConversationRepository.listParticipants(conversation!.id),
       aiConversationRepository.listWorkspaceMembers(input.workspaceId),
@@ -8275,15 +8309,18 @@ export const agencyService = {
     conversationId?: string | null;
     targetUserId: string;
   }) {
-    const conversation = await this.resolveConversationForUser(input);
+    const conversation = await this.resolveConversationForModeration(input);
     const actor = await aiConversationRepository.findParticipant(conversation.id, input.userId);
     const targetMember = await aiConversationRepository.findParticipant(conversation.id, input.targetUserId);
     if (targetMember && !targetMember.frozenAt) {
       const removingSelf = input.targetUserId === input.userId;
-      if (!removingSelf && actor?.role !== 'owner') {
+      const isModerator = !actor && (await canModerateChat(input.workspaceId, input.userId));
+      if (!removingSelf && actor?.role !== 'owner' && !isModerator) {
         throw forbidden('Solo il proprietario puo rimuovere altri partecipanti.');
       }
-      if (!removingSelf && targetMember.role === 'owner') {
+      // L'owner non lo si sfila da sotto: puo' uscirne da solo, oppure lo sostituisce
+      // un moderatore (il caso "chi ha aperto la chat non c'e' piu'").
+      if (!removingSelf && targetMember.role === 'owner' && !isModerator) {
         throw badRequest('Il proprietario della conversazione non puo essere rimosso: puo solo uscirne da solo.');
       }
       await this.freezeAndHandOver(conversation.id, input.targetUserId, targetMember.role === 'owner');
@@ -8315,12 +8352,14 @@ export const agencyService = {
     target: ChatScopeTarget;
     conversationId?: string | null;
   }) {
-    const conversation = await this.resolveConversationForUser(input);
+    const conversation = await this.resolveConversationForModeration(input);
     const actor = await aiConversationRepository.findParticipant(conversation.id, input.userId);
-    if (actor?.role !== 'owner') {
+    if (actor?.role !== 'owner' && !(await canModerateChat(input.workspaceId, input.userId))) {
       throw forbidden('Solo il proprietario della conversazione puo sciogliere il gruppo.');
     }
-    await aiConversationRepository.freezeOtherParticipants(conversation.id, input.userId, new Date());
+    // Sciogliendo da moderatore esterno non ci si autoinvita dentro: si congelano
+    // TUTTI, e la sessione resta consultabile a chi c'e' passato.
+    await aiConversationRepository.freezeOtherParticipants(conversation.id, actor ? input.userId : '', new Date());
     return this.listScopedChatParticipants({ ...input, conversationId: conversation.id });
   },
 
