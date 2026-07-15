@@ -10,6 +10,7 @@ import {
     rgbaFromHex,
     resolveStageTextColor,
 } from './stageColor.utils';
+import { askAiRowProps } from '../../../../views/Agency/chat/askAi';
 
 const formatCurrencyValue = (value) => {
     if (value === null || value === undefined || value === '') {
@@ -98,6 +99,9 @@ const ProjectCard = ({
         history.push(`/projects/${project.id}`);
     };
 
+    // "Chiedi all'AI" al tasto destro. E' lo stesso progetto della lista Agency (una
+    // sola tabella Project), quindi apre la stessa conversazione. Le schede appena
+    // create hanno un id provvisorio e vanno escluse: non c'e' ancora nulla da allegare.
     return (
         <Draggable
             draggableId={String(project?.id || '')}
@@ -118,6 +122,7 @@ const ProjectCard = ({
                         'is-moving': isMoving,
                     })}
                     title={!canMove ? moveDisabledReason : undefined}
+                    {...(isTemporary ? {} : askAiRowProps('project', project))}
                 >
                     <div className="projects-board-card-accent" aria-hidden="true" />
                     <Card
