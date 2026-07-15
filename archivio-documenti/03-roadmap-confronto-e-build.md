@@ -136,14 +136,18 @@ La sezione 10 del Brief chiede esattamente l'output che segue: **Feature Gap Ana
 - Dipendenze UI ridondanti del template (da valutare in fase di slimming).
 
 ### Schema DB — estensioni previste (nuove tabelle/colonne)
+> **Numerazione aggiornata al 15/7/2026** (nuova V4 = Chat AI & Messaggistica, tutto il resto slittato di uno).
+
 - `Department` (+ relazione utente/progetto/reparto) → **V2**
 - `CustomFieldDefinition` + `CustomFieldValue` (per workspace) → **V3**
-- `ProjectSource` + `SourceChunk`/`Embedding` (pgvector) → **V4**
-- `AiUsageLog` + `AiBudget` (per utente/die) → **V4**
-- `Integration`/`IntegrationCredential` (Brevo, Fatture in Cloud, Zoom…) → **V3/V9**
-- `LabJob` + `LabValidation` → **V6**
-- `TimeEntry` (time-tracking) + viste redditività → **V9**
-- `BookingLink`/`Availability` (Calendly-style) → **V8**
+- `ProjectSource` + `ProjectSourceChunk` (pgvector) → **V5** — ✅ fatti (migrazioni `20260710081730`, `20260713074114`)
+- `AiUsageLog` + `AiBudget` (per utente/die) → **V5** — ✅ fatti
+- `AiConversation` + `AiConversationParticipant`/`Message`/`Attachment` → **V4** — ✅ fatti (chat collaborativa, sessioni multiple, allegati)
+- `Integration`/`IntegrationCredential` (Brevo, Fatture in Cloud, Zoom…) → **V3/V10**
+- `LabJob` + `LabValidation` → **V7**
+- `TimeEntry` (time-tracking) + viste redditività → **V10**
+- `BookingLink`/`Availability` (Calendly-style) → **V9**
+- Modello a **conversazioni per la messaggistica** (gruppi di reparto/agenzia, oltre l'1-a-1 di `WorkspaceMessage`) → **V9**
 
 ---
 
@@ -190,10 +194,59 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - **Layer integrazioni a plugin** + primo connettore **Brevo** (sync contatti). **FATTO (9 luglio 2026).** Modulo dedicato e indipendente da agency-os: `server/modules/integrations/` (repository, service, connettore `connectors/brevo.ts`, rotte `/integrations` protette da `clients.view`/`clients.edit`). Modello Prisma **`Integration`** per workspace (migrazione `20260709143726_integrations_layer`) con chiave API **cifrata a riposo** riusando la DEK di workspace del vault (AES-256-GCM, `integrations.crypto.ts`); config non segreta (id lista) in `configJson`. Il connettore Brevo usa l'API v3 (`/account` per il test, `/contacts` con `updateEnabled` per l'upsert). La sync invia i clienti **con email** come contatti (nome/cognome/telefono→SMS, lista opzionale), errori isolati per contatto, esito registrato su `lastSync*`. Frontend: scheda **Integrazioni** sotto Clienti (`/apps/clients/integrations`, `src/modules/integrations/ui/IntegrationsPage.jsx`) per salvare la chiave (mascherata), testare, abilitare e sincronizzare. **Nota progettuale:** scelto un modello dedicato invece di riusare `AgencyRuntimeSetting` (di Claudio) per non avere due scrittori sulla sua tabella; riusata solo la crittografia condivisa del vault. Verificato end-to-end (round-trip cifratura con DEK reale + chiamata Brevo) e nel browser. Test: `server/modules/integrations/**/*.test.ts`.
 **Done quando:** si importano contatti in massa, si aggiungono campi custom usati in tutto il workspace, Brevo sincronizza. → **V3 COMPLETA.**
 
-### 🟦 V4 — Motore AI Context-Aware *(il cuore)*
+### 🟦 V4 — Chat AI & Messaggistica *(in corso)*
+
+> **Da dove esce questa V (15 luglio 2026).** Non era in roadmap. È nata dentro la V4 originale (ora **V5**) come implementazione minore — "una chat di progetto context-aware" — e strada facendo si è ingigantita: multi-utente, ambiti, popup globale, allegati, sessioni multiple, permessi dedicati, e infine l'aggregazione con la messaggistica fra persone. Il 15/7 si è preso atto che **è una V a tutti gli effetti** e le si è dato il numero 4: è quella che si sta facendo ora, quindi il numero segue il lavoro. La V4 originale slitta a V5 e resta **spezzata** (il suo residuo si completa dopo questa V); tutte le successive slittano di uno.
+
+**Obiettivo:** un solo posto dove si parla — con l'AI per lavorare, con le persone per coordinarsi — senza mai confondere le due cose.
+
+**Fonte di verità:** `archivio-documenti/spec-chat-ai-collaborativa.md` (decisioni, piano a fasi, sez. 4-bis sessioni/gruppi, sez. 4-ter ingressi).
+
+**Il principio** (sez. 4-ter): si aggrega **l'ingresso**, non le due nature. Un solo pulsante in topbar → popup → **selettore** `Chat AI` / `Messaggi`. Due mondi che **non si mescolano mai**, nemmeno negli elenchi: la messaggistica è *parlare fra persone*, la chat AI è *svolgere lavoro con l'AI*.
+
+#### ✅ Fatto
+- **Fase 1 — Modello conversazioni + chat di progetto condivisa** (14/7): multi-utente su invito, `AiConversation`/`AiConversationParticipant`/`AiConversationMessage`.
+- **Fase 2 — Ambiti + popup globale + selettore** (14/7): Generale/Cliente/Progetto, stessa conversazione da scheda e da popup.
+- **Fase 3a — Allegati + "Chiedi all'AI"** (15/7): documenti (riusa l'estrattore delle Fonti) ed elementi CRM, da menu ⋯ e tasto destro. Registro consumi per progetto/conversazione.
+- **Sez. 4-bis — Sessioni multiple e governo dei gruppi** (15/7): un ambito ha **N sessioni**, non una sola; creatore che può uscire, congelamento invece della cancellazione, "riprendi in una nuova chat"; **permessi dedicati** `chat.view`/`chat.use`/`chat.moderate` (prima inviare un messaggio — che costa soldi — chiedeva lo stesso permesso della sola lettura); l'admin **modera senza leggere**. *Qui è emerso che la chat era di fatto rotta per chiunque non arrivasse per primo su un ambito.*
+- **Sez. 4-ter punti 1, 2, 6** (15/7, commit `528fa59`): **selettore Chat AI/Messaggi** nel popup (la messaggistica entra sul suo modello 1-a-1 attuale, riusando il layer API già in casa); **pulsante espandi** a tutto schermo (l'elenco diventa colonna, il contenuto resta a 860px centrati); **alfabeto delle icone** (`chatIcons.js`, un'icona per concetto).
+
+#### ⏭️ Da fare
+- **Sez. 4-ter punto 3 — Eliminare la chat AI estesa di Agency** (`AgencyProjectChatPage`). ⚠️ **Ordine obbligato:** lì vivono **partecipanti e azzeramento** → vanno **prima** spostati nel popup (insieme a **"Sciogli il gruppo"**, che non esiste ancora nell'interfaccia benché l'API `disbandAgencyChatSession` ci sia già), **poi** si cancella la pagina. Invertire i due passi = perdere la gestione dei gruppi. Togliere anche l'icona `ExternalLink` dal popup.
+- **Sez. 4-ter punto 4 — Modulo Messaggi = la casella:** due elenchi separati dallo stesso selettore, con ricerca; aprire una conversazione lancia **lo stesso componente di chat** a tutto schermo, montato su rotta invece che in sovrimpressione — **una sola implementazione, non una copia**. *Più semplice del previsto: `src/views/Email/index.jsx` non è costruito sulla metafora della casella Jampack come si credeva, è già una chat 1-a-1 pura.*
+- **Sez. 4-ter punto 5 — Non letti / notifiche nel popup** *(opzionale)*. ⚠️ `WorkspaceMessage` ha già `readAt`, ma la **chat AI non ha alcun concetto di "non letto"**: inventarlo è lavoro nuovo, da valutare, non da dare per scontato.
+- **Fase 3b — Immagini "con vista" + thread di messaggistica come allegato.** ⚠️ Richiede due cose che **oggi non esistono**: storage dei binari e un motore AI **multimodale**. È il motivo per cui la Fase 3 è stata divisa.
+- **Fase 4 — Tempo reale (websocket).** Oggi la chat AI non si aggiorna da sola; la messaggistica va a polling.
+- **Fase 5 — Compressione del contesto** (~45–50% della finestra del modello): qualità e costo delle sessioni lunghe.
+- **Fase 6 — AI azionabile: navigazione suggerita** con conferma.
+- **L'AI risponde sempre se sei l'unico partecipante** (sez. 2, deciso 15/7): la regola "@AI o pulsante" è nata per il **gruppo**; da soli non c'è nessun altro a cui parlare. Vale **per sessione**, non per ambito. Effetto accettato: da soli ogni messaggio è una chiamata a pagamento.
+- **Tasto destro sul widget "I miei progetti" della Dashboard** (`MyProjectsWidget.jsx`): unico posto dove i progetti si vedono ma il menu non c'è. Basta `askAiRowProps('project', project)`.
+- **Collaudo con le chiavi reali** OpenAI/Anthropic: provare le risposte dell'AI **in tutti gli ambiti**, allegati compresi, verificando che il **registro consumi si scriva davvero** (senza chiavi la chiamata non parte e non c'è nulla da registrare). *Le chiavi si configurano una volta sola: servono anche al residuo della V5.*
+- **Onboarding leggero** della chat (guida in-contesto, non tutorial pesante). L'estensione a **tutto** il CRM resta in V11.
+
+#### ⛔ Fuori perimetro — rimandato alla V9 *(deciso il 15/7/2026, riconfermato il 15/7 alla nascita di questa V)*
+- **Modello a conversazioni per i messaggi** (partecipanti, gruppi di **reparto** e **d'agenzia**). I **reparti esistono già** (`Department`, `DepartmentMember`): la base c'è. ⚠️ **Nodo da riconciliare in V9:** la roadmap prevede thread **di progetto**, la richiesta è gruppi **di reparto/agenzia** — **non coincidono**.
+- **Parlare con i CLIENTI.** ⛔ Oggi **impossibile**: `Client` ha **solo un campo `email` di testo** — nessun account, nessun accesso — e **non esiste alcun portale clienti** in nessuna riga di questo codice. Sarebbe un'area di prodotto intera con un **confine di sicurezza netto** (un cliente non deve vedere i dati di un altro). La V9 assume clienti **senza account**, che interagiscono via **link pubblico ed email**. **Per ora la chat resta interna.**
+
+**Done quando:** dal pulsante in topbar si raggiungono entrambi i mondi senza mai confonderli; la chat AI vive **solo** nel popup (espandibile a tutto schermo) e nella casella, con partecipanti e gruppi governabili da lì; la scheda Chat estesa del progetto **non esiste più**; e con le chiavi reali l'AI risponde in tutti gli ambiti con i consumi tracciati.
+
+### 🟦 V5 — Motore AI Context-Aware *(il cuore)* — ⚠️ **V SPEZZATA: iniziata, interrotta, si completa dopo la V4**
+
+> **Perché questa V ha un numero più alto di quella che la interrompe (15 luglio 2026).** Era la V4. Durante il suo sviluppo la chat AI è nata come implementazione minore, si è ingigantita ed è **maturata in una V a sé** — quella che si sta facendo ora, e che ha preso il numero 4. Questa slitta quindi a **V5**, e con lei tutte le successive.
+>
+> **Conseguenza da accettare, non da correggere:** a livello di lavoro svolto questa V risulta **spezzata**. Il suo blocco *già fatto* (Fonti + vettorizzazione/RAG, multi-provider OpenAI+Claude, budget giornaliero, cost control) è **il presupposto su cui la V4 gira**: numericamente la V4 dipende dalla V5, cronologicamente no. Il **residuo** elencato qui sotto si completa **dopo la chiusura della V4**.
+
 **Obiettivo:** memoria di progetto vera + AI economicamente controllata.
+
+**Residuo da completare dopo la V4:**
+- **Discovery consolidata su RAG reale** (Business Recap, Obiettivi/Target, Offerta/Competitor) — le fondamenta (chunk + embeddings + `sources.rag.ts`) ci sono dal 13/7.
+- **Audit grafico dell'area Agency** (chiaro/scuro) — vedi nota di rifinitura più sotto. Era segnato *"da fare prima di aprire la Chat collaborativa"*: **è in ritardo**, la chat è stata aperta lo stesso.
+- **Badge `AiCostEstimate` sui pulsanti AI secondari** (`web.generateBlock` ecc.) — vedi nota più sotto.
+- *(opzionale)* migrare URL/file **legacy** del blob `ProjectMemory.sourcesJson` dentro `ProjectSource`, per avere un'unica fonte di verità.
+- **Collaudo con le chiavi reali** OpenAI/Anthropic su Discovery e verticali *(la V4 fa il proprio collaudo per la chat: le chiavi si configurano una volta, servono a entrambe)*.
+
 **Contenuto:**
-- **Modulo Fonti** completo: URL/social + Word/PDF + asset brand → **vettorizzazione (embeddings + pgvector)** → memoria persistente. **FONDAMENTA FATTE (10 luglio 2026):** modulo isolato `server/modules/sources/` — modello `ProjectSource` (una riga per fonte, `content` estratto già pronto per il chunking/embedding; migrazione `20260710081730_project_sources`), estrattore testo per **URL** (strip HTML) e **testo incollato**, CRUD + `refresh`, rotte `/projects/:id/sources` e `/sources/:id` protette da `projects.view`/`projects.edit`. Verificato end-to-end + test. **UI FATTA (10 luglio 2026):** pannello **"Fonti indicizzabili per l'AI"** (`src/modules/sources/ui/ProjectAiSourcesPanel.jsx` + `api/sourcesApi.js`) integrato **dentro** la pagina Agency "Fonti e Materiali" (`AgencyProjectAssetsPage.jsx`) — aggiunta URL/testo con estrazione, lista con stato/anteprima, refresh/elimina. Verificato nel browser. Scelta di **riconciliazione sulla pagina esistente**: il pannello convive con le sezioni URL/file/competitor esistenti (blob `ProjectMemory.sourcesJson`) senza romperle. **MERGE con la pipeline Agency FATTO (10 luglio 2026):** i record `ProjectSource` vengono iniettati come "materiali" sintetici in lettura, così **readiness** (badge su tutte le pagine progetto via `getProject`) e **Discovery** (rule-based + AI, via `buildAgencyAiSourceSnapshot`) li usano come le altre fonti — senza modificare la logica esistente e **senza persisterli** nel blob dell'editor "Fonti e Materiali" (nessun inquinamento del salvataggio). File: `agency.repository.listIndexedProjectSources` (guardia try/catch per DB non migrati) + `agency.service.augmentSourcesWithIndexedRecords` iniettato in `getProject`/`regenerateProjectDiscoveryFromSources`/`generateProjectDiscoveryFromSourcesWithAi`. Verificato end-to-end (readiness `missing`→`partial`, contenuto minato nella Discovery, editor non inquinato). **Caricamento file FATTO (10 luglio 2026):** upload **PDF/Word(.docx)/TXT/CSV/MD** come `ProjectSource` — estrattore `sourceExtractor.fromFile` (riusa `mammoth`/`pdf-parse` come Agency, import on-demand), service `createFileSource` (file illeggibile → stato `error` con messaggio, non blocca), rotta multipart `POST /projects/:id/sources/files` (limite 20MB), UI: terzo tipo "File" nel pannello con input file (`accept=.pdf,.docx,.txt,.csv,.md`). Nessuna migrazione (colonne `fileName/mimeType/fileSize/content` già presenti); il binario NON viene conservato, si indicizza solo il testo. Verificato end-to-end (curl: ready + error path) + test unità. **Ancora da fare:** (b) **vettorizzazione** — ⚠️ **`pgvector` NON è installato sul Postgres**: va abilitato lato server prima di embeddings/RAG; (c) (opz.) migrare anche le URL/file *legacy* del blob dentro `ProjectSource` per avere un'unica fonte di verità.
+- **Modulo Fonti** completo: URL/social + Word/PDF + asset brand → **vettorizzazione (embeddings + pgvector)** → memoria persistente. **FONDAMENTA FATTE (10 luglio 2026):** modulo isolato `server/modules/sources/` — modello `ProjectSource` (una riga per fonte, `content` estratto già pronto per il chunking/embedding; migrazione `20260710081730_project_sources`), estrattore testo per **URL** (strip HTML) e **testo incollato**, CRUD + `refresh`, rotte `/projects/:id/sources` e `/sources/:id` protette da `projects.view`/`projects.edit`. Verificato end-to-end + test. **UI FATTA (10 luglio 2026):** pannello **"Fonti indicizzabili per l'AI"** (`src/modules/sources/ui/ProjectAiSourcesPanel.jsx` + `api/sourcesApi.js`) integrato **dentro** la pagina Agency "Fonti e Materiali" (`AgencyProjectAssetsPage.jsx`) — aggiunta URL/testo con estrazione, lista con stato/anteprima, refresh/elimina. Verificato nel browser. Scelta di **riconciliazione sulla pagina esistente**: il pannello convive con le sezioni URL/file/competitor esistenti (blob `ProjectMemory.sourcesJson`) senza romperle. **MERGE con la pipeline Agency FATTO (10 luglio 2026):** i record `ProjectSource` vengono iniettati come "materiali" sintetici in lettura, così **readiness** (badge su tutte le pagine progetto via `getProject`) e **Discovery** (rule-based + AI, via `buildAgencyAiSourceSnapshot`) li usano come le altre fonti — senza modificare la logica esistente e **senza persisterli** nel blob dell'editor "Fonti e Materiali" (nessun inquinamento del salvataggio). File: `agency.repository.listIndexedProjectSources` (guardia try/catch per DB non migrati) + `agency.service.augmentSourcesWithIndexedRecords` iniettato in `getProject`/`regenerateProjectDiscoveryFromSources`/`generateProjectDiscoveryFromSourcesWithAi`. Verificato end-to-end (readiness `missing`→`partial`, contenuto minato nella Discovery, editor non inquinato). **Caricamento file FATTO (10 luglio 2026):** upload **PDF/Word(.docx)/TXT/CSV/MD** come `ProjectSource` — estrattore `sourceExtractor.fromFile` (riusa `mammoth`/`pdf-parse` come Agency, import on-demand), service `createFileSource` (file illeggibile → stato `error` con messaggio, non blocca), rotta multipart `POST /projects/:id/sources/files` (limite 20MB), UI: terzo tipo "File" nel pannello con input file (`accept=.pdf,.docx,.txt,.csv,.md`). Nessuna migrazione (colonne `fileName/mimeType/fileSize/content` già presenti); il binario NON viene conservato, si indicizza solo il testo. Verificato end-to-end (curl: ready + error path) + test unità. **(b) VETTORIZZAZIONE FATTA (13 luglio 2026)** — *questa riga diceva ancora "ancora da fare", corretta il 15/7:* `pgvector` **è installato e attivo** (versione 0.8.0, abilitato dall'utente come amministratore il 10/7 con `scripts/install-pgvector-win.ps1`); modello **`ProjectSourceChunk`** con colonna `embedding vector(1536)` (migrazione `20260713074114_project_source_chunks`), chunking + embeddings in `server/modules/sources/sources.indexing.ts`, ricerca per similarità in `sources.rag.ts`. **Ancora da fare:** (c) (opz.) migrare anche le URL/file *legacy* del blob dentro `ProjectSource` per avere un'unica fonte di verità.
 - **Discovery** consolidata su RAG reale (Business Recap, Obiettivi/Target, Offerta/Competitor).
 - **Chat AI di progetto** context-aware. **BASE FATTA (13 luglio 2026):** chat **per-utente** sul progetto — motore di generazione a testo (`runAgencyAiTextWithMeta`), RAG sulla domanda, risposte "grounded" con citazioni delle fonti, persistenza (`ProjectChatMessage`, migrazione `20260713144744_project_chat`), scheda "Chat" nel progetto, integrazione budget+log costi. **Evoluzione collaborativa PIANIFICATA** (multi-utente su invito, ambiti, popup globale, allegati, websocket, compressione contesto, navigazione assistita): spec e piano a fasi in `spec-chat-ai-collaborativa.md` — non iniziata, parte dopo le rifiniture V4 e con le chiavi AI reali.
 - **Multi-provider**: aggiunta **Claude/Anthropic** (prompt architect) accanto a OpenAI; mapping modello-per-funzione (economico vs premium). **FATTO (10 luglio 2026):** il motore AI (`server/modules/agency-os/agency.service.ts`) ora supporta il provider `anthropic` accanto a `openai`. Nuova chiave `anthropic_api_key` **cifrata a riposo** (stessa DEK del vault, con fallback `ANTHROPIC_API_KEY` da `.env`); `runAgencyOpenAiJsonWithMeta` ramifica per provider e chiama la **Anthropic Messages API** (`/v1/messages`, header `x-api-key` + `anthropic-version`, `max_tokens` obbligatorio, JSON via system prompt con strip del code-fence in parse); modello di default Claude `claude-opus-4-8` risolto in automatico se il provider è Anthropic ma il modello configurato è ancora un `gpt-*` (`resolveAgencyProviderModel`); mapping modello-per-funzione (`functionModels`) valido per entrambi i provider. Modello **costi** esteso ai prezzi Claude (opus/sonnet/haiku/fable) → il log `AiUsageLog` traccia i consumi Claude come per OpenAI. UI: **Impostazioni Agency** ora ha `Anthropic (Claude)` tra i provider e un campo API key dedicato (write-only). Verificato end-to-end (config→status provider-aware→modello default→storage cifrato); **nessun nuovo errore TypeScript** (agency-os invariato 52=52). **Nota:** nessuna migrazione (la chiave riusa la tabella `AgencyRuntimeSetting` esistente).
@@ -204,9 +257,9 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 > **Rifinitura UI di fine V4 (segnalato 14 luglio 2026):** **audit grafico dell'area Agency** (schede progetto: Discovery e sorelle). Ci sono imperfezioni tema **chiaro/scuro** — box che restano bianchi in dark (uso di `bg="light"` ereditato dal template Jampack, incluso il badge `AiCostEstimate`) e scritte poco leggibili su alcuni pulsanti AI. Passata dedicata contro `design-linguaggio-apple-web.md` + `npm run lint:colors`, da fare **prima** di aprire la Chat collaborativa.
 
-> **Estensione AI PIANIFICATA — Chat collaborativa (14 luglio 2026):** evoluzione della chat di progetto in una **Chat AI collaborativa** unica e multi-ambito. Spec completa e **piano a fasi** in **`spec-chat-ai-collaborativa.md`**. In sintesi: una sola chat con **ambiti** (Generale/Cliente/Progetto), esposta come **scheda progetto** e **popup globale** (stessa conversazione), **condivisa su invito** (partecipanti), AI **solo se interpellata** (@AI + pulsante), **allegati** (file/entità CRM/messaggistica), **tempo reale via websocket**, **compressione del contesto** (~45–50% della finestra del modello), **navigazione assistita con conferma**, onboarding leggero. **Stato (15 luglio 2026): Fasi 1, 2 e 3a fatte** (chat condivisa su invito; ambiti + popup globale; allegati documenti/entità CRM + "Chiedi all'AI" da menu e tasto destro). **Restano:** 3b (immagini con "vista" + thread di messaggistica), 4 (websocket), 5 (compressione contesto), 6 (navigazione suggerita). Le risposte dell'AI si collaudano davvero **con le chiavi reali** (fine V). La visibilità "assegnati a me" si appoggia a **V2** (fatta da Jacopo: nessun coordinamento necessario con Claudio).
+> **Nota storica:** fino al 15 luglio 2026 la Chat collaborativa era annotata qui come *"estensione AI pianificata"* dentro questa V. È cresciuta al punto da diventare una **V a sé** — vedi la **V4** qui sotto, che è quella in corso.
 
-### 🟦 V5 — Verticali AI: Web & ADV + Audit/Report
+### 🟦 V6 — Verticali AI: Web & ADV + Audit/Report
 **Obiettivo:** produzione asset guidata dal contesto.
 **Contenuto:**
 - **Web & ADV**: generazione strutture HTML/landing + copy campagne **Meta/Google/TikTok** per sotto-progetto.
@@ -215,14 +268,14 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - **Report PDF brandizzato Apple-style** con import dati (es. conversioni Google Ads).
 **Done quando:** da un progetto si generano landing+copy coerenti col brand e un report cliente brandizzato.
 
-### 🟦 V6 — Laboratorio & Zero Error Protocol
+### 🟦 V7 — Laboratorio & Zero Error Protocol
 **Obiettivo:** azzerare gli errori di stampa.
 **Contenuto:**
 - Modulo **Laboratorio (Stampa)**: schede materiali/misure, ruolo **Reparto Lab**.
 - **Validazione AI obbligatoria** pre-stampa: confronto dati tecnici ↔ Fonti del progetto, con segnalazione discrepanze in tempo reale.
 **Done quando:** nessun job va in stampa senza esito di validazione AI.
 
-### 🟦 V7 — Preventivatore Pro & Strumenti di Vendita
+### 🟦 V8 — Preventivatore Pro & Strumenti di Vendita
 **Obiettivo:** vendita rapida e d'impatto.
 **Contenuto:**
 - **Builder drag-and-drop** su pacchetti predefiniti.
@@ -230,7 +283,7 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - **Validità 72h** automatica + notifica account manager alla scadenza.
 **Done quando:** in pochi click si genera sia il documento tecnico sia la proposta visuale, con scadenza gestita.
 
-### 🟦 V8 — Calendario & Comunicazione Avanzata
+### 🟦 V9 — Calendario & Comunicazione Avanzata
 **Obiettivo:** appuntamenti e comunicazioni centralizzati.
 **Contenuto:**
 - Integrazione **Meet/Zoom**.
@@ -239,7 +292,7 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - Messaggistica potenziata a **thread di progetto**.
 **Done quando:** un cliente prenota da link personale, riceve reminder, e la conversazione resta legata al progetto.
 
-### 🟦 V9 — Contabilità, Redditività & Integrazioni Business
+### 🟦 V10 — Contabilità, Redditività & Integrazioni Business
 **Obiettivo:** controllo di gestione data-driven.
 **Contenuto:**
 - Connettore **Fatture in Cloud** (fatturati/flussi nel CRM, riservato Admin).
@@ -248,13 +301,13 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - Completamento **API framework** a plugin per integrazioni future.
 **Done quando:** l'Admin vede la redditività effettiva per cliente/reparto in tempo reale.
 
-### 🟦 V10 — Finale: Migrazione Legacy, Hardening & Rollout
+### 🟦 V11 — Finale: Migrazione Legacy, Hardening & Rollout
 **Obiettivo:** transizione completa senza interruzioni.
 **Contenuto:**
 - **Schema mapping & migrazione dati** dal sistema legacy (continuità clienti/storico).
 - **Hardening** sicurezza/performance, audit completo, test end-to-end.
 - Rollout progressivo + QA finale, dismissione definitiva del legacy.
-- **Onboarding leggero esteso a tutto il CRM (deciso 14 luglio 2026):** portare l'approccio "guida in-contesto" (empty state, tooltip, card dismissibili — **non** un tutorial/wizard pesante) a **tutte** le aree del prodotto, non solo alla Chat AI. Collocato qui perché ha senso solo a prodotto sostanzialmente completo (dopo V9).
+- **Onboarding leggero esteso a tutto il CRM (deciso 14 luglio 2026):** portare l'approccio "guida in-contesto" (empty state, tooltip, card dismissibili — **non** un tutorial/wizard pesante) a **tutte** le aree del prodotto, non solo alla Chat AI. Collocato qui perché ha senso solo a prodotto sostanzialmente completo (dopo la V10 — *era "dopo V9" nella numerazione precedente al 15/7*). L'onboarding **della sola chat** si fa invece dentro la V4.
 **Done quando:** tutti gli utenti operano sulla nuova piattaforma Apple-style, dati migrati e verificati.
 
 ---
@@ -263,7 +316,13 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 Voci non legate a una singola versione: si pianificano quando conviene, non fanno parte del "done" di nessuna tappa.
 
-- **Migrazione ESLint a "flat config".** Il lint JavaScript del progetto (`npm run lint`) al momento **non parte**: ESLint 9 richiede il nuovo formato `eslint.config.js`, mentre il progetto usa ancora `.eslintrc.cjs` con flag legacy. Va migrato, aggiornando lo script in `package.json`. **Attenzione:** a lint funzionante emergeranno molti errori pre-esistenti `react-hooks/set-state-in-effect` (e alcuni `no-useless-escape`) da valutare caso per caso — correggere il codice o declassare consapevolmente la regola; concordare l'approccio prima di modifiche di massa ai moduli. Non tocca il guard colori dedicato (`npm run lint:colors`), che è autonomo e già funzionante. **Quando:** idealmente presto (durante o subito dopo la V1), così i moduli successivi si sviluppano con il lint attivo.
+- **Migrazione ESLint a "flat config".** Il lint JavaScript del progetto (`npm run lint`) al momento **non parte**: ESLint 9 richiede il nuovo formato `eslint.config.js`, mentre il progetto usa ancora `.eslintrc.cjs` con flag legacy. Va migrato, aggiornando lo script in `package.json`. **Attenzione:** a lint funzionante emergeranno molti errori pre-esistenti `react-hooks/set-state-in-effect` (e alcuni `no-useless-escape`) da valutare caso per caso — correggere il codice o declassare consapevolmente la regola; concordare l'approccio prima di modifiche di massa ai moduli. Non tocca il guard colori dedicato (`npm run lint:colors`), che è autonomo e già funzionante. **Quando:** idealmente presto (durante o subito dopo la V1), così i moduli successivi si sviluppano con il lint attivo. **Misurato il 15/7/2026:** convertendo la config escono **96 problemi, ma 65 dei 78 errori non sono codice da correggere — sono configurazione mancante** (globali di Node per gli script, test di una libreria di terze parti). Restano ~13 errori veri e banali su 8 file. **Stima: un'ora e mezza**, in una sessione dedicata. ⚠️ C'è `--max-warnings 0`: finché non si azzerano anche i 18 avvisi il comando continuerà a fallire.
+
+- **Due librerie di icone in casa** *(emerso il 15/7/2026)*. La spec della chat prescrive **`react-feather`** (ed è ciò che usa tutto il popup); il documento di design prescrive **Lucide** (ed è ciò che usa il modulo Messaggi, `src/views/Email/index.jsx`). Lucide è un fork di Feather, quindi la resa è omogenea e a occhio non si nota — ma sono due dipendenze per lo stesso scopo, e due regole in contraddizione fra due documenti fondativi. **Va deciso quale vince e allineati i documenti**: è una scelta di prodotto, non da fare di straforo dentro un'altra attività.
+
+- **Il test `server/integration/auth-login.smoke.ts` fallisce** per una chiave mancante nell'ambiente di test. **Preesistente e verificato** (mettendo da parte le modifiche in corso, falliva già). Funzionano `npm run test:unit` (192/192), `lint:css` e `lint:colors`.
+
+- **233 errori TypeScript preesistenti** (`npx tsc --noEmit`). È la **baseline** con cui si convive: il metro di giudizio è *"nessun errore nuovo"*, non *"zero errori"*. Da azzerare, se si decide di farlo, in una passata dedicata — plausibilmente dentro l'hardening della **V11**.
 
 ---
 
@@ -274,19 +333,24 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 | **V1** | Shell | Apple UX + Command-K + cleanup |
 | **V2** | Governance | Super Admin console + ruoli Discord-style + reparti |
 | **V3** | Dato | Custom Fields + import/export + Brevo |
-| **V4** | **AI core** | Fonti vettorizzate + Discovery RAG + chat + multi-model + budgeting |
-| **V5** | Produzione AI | Web&ADV + Higgsfield + SEO audit + report Apple-style |
-| **V6** | Lab | Zero Error Protocol (validazione stampa) |
-| **V7** | Vendita | Preventivatore DnD + proposta Apple-style + 72h |
-| **V8** | Agenda | Meet/Zoom + Calendly + reminder + thread progetto |
-| **V9** | Finance | Fatture in Cloud + time-tracking + redditività |
-| **V10** | Go-live | Migrazione legacy + hardening + rollout |
+| **V4** | **Conversazione** *(in corso)* | Chat AI collaborativa + messaggistica sotto un solo ingresso |
+| **V5** | **AI core** *(spezzata: si completa dopo la V4)* | Fonti vettorizzate + Discovery RAG + multi-model + budgeting |
+| **V6** | Produzione AI | Web&ADV + Higgsfield + SEO audit + report Apple-style |
+| **V7** | Lab | Zero Error Protocol (validazione stampa) |
+| **V8** | Vendita | Preventivatore DnD + proposta Apple-style + 72h |
+| **V9** | Agenda | Meet/Zoom + Calendly + reminder + thread progetto + gruppi reparto + clienti |
+| **V10** | Finance | Fatture in Cloud + time-tracking + redditività |
+| **V11** | Go-live | Migrazione legacy + hardening + rollout |
+
+> **Rinumerazione del 15 luglio 2026.** La **V4 è nuova** (Chat AI & Messaggistica): è nata dentro la vecchia V4 come implementazione minore e si è ingigantita fino a diventare una V a sé. Tutto ciò che seguiva **slitta di uno** (vecchia V4 → V5 … vecchia V10 → V11): si passa da 10 a **11 V**. Se in un documento o in un commit precedente al 15/7 leggi "V5", "V8", "V10", riferisciti alla **numerazione vecchia** e aggiungi uno.
 
 ### Note di sequenziamento
-- **V4 è la priorità di valore** (il differenziatore AI) e può essere parzialmente parallelizzata a V2/V3 perché lo scaffold OpenAI esiste già.
+- **La V4 (chat) e la V5 (AI core) sono intrecciate, ed è voluto.** La V4 gira sul motore già costruito nella V5 (RAG, budget, multi-provider): **numericamente la V4 dipende dalla V5, cronologicamente no**. Il residuo della V5 si completa **dopo** la chiusura della V4.
+- **La V5 resta la priorità di valore** (il differenziatore AI) ed era parzialmente parallelizzabile a V2/V3 perché lo scaffold OpenAI esisteva già.
 - V1–V3 sono prerequisiti UX/dato che rendono "vendibile" e ordinata ogni feature successiva.
-- V6 dipende da V4 (la validazione Lab usa le Fonti vettorizzate).
-- V9 richiede il time-tracking introdotto qui come prerequisito della redditività.
+- V7 (Lab) dipende dalla V5 (la validazione Lab usa le Fonti vettorizzate).
+- V9 eredita dalla V4 i due pezzi di messaggistica rimandati: **gruppi di reparto/agenzia** (da riconciliare col "thread di progetto" già previsto lì) e **parlare con i clienti** (che richiede un portale clienti oggi inesistente).
+- V10 richiede il time-tracking introdotto lì come prerequisito della redditività.
 
 ---
 

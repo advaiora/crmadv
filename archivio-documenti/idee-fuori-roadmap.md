@@ -1,6 +1,6 @@
 # Idee fuori roadmap (parcheggio)
 
-> Questo file **non è la roadmap** e **non impegna nessuna versione programmata** (V1…V9).
+> Questo file **non è la roadmap** e **non impegna nessuna versione programmata** (V1…V11).
 > È un parcheggio di idee potenziali, da valutare/concordare in futuro tra Jacopo e Claudio
 > prima di eventualmente promuoverle a lavoro pianificato. Aggiungere in fondo, con data.
 

@@ -8,7 +8,7 @@ Questo archivio raccoglie i documenti strategici e di analisi del progetto, per 
 |---|-----------|-------|--------|
 | 01 | [01-brief-stato-attuale-pre-revisione-apple-style.md](01-brief-stato-attuale-pre-revisione-apple-style.md) | Brief integrale dello **stato attuale** del codice (stack, architettura, moduli, DB, sicurezza, gap), **fotografato prima della revisione Apple-style** dettata dalla bibbia | Analisi del codice |
 | 02 | [02-brief-operativo-definitivo-bibbia.md](02-brief-operativo-definitivo-bibbia.md) | **Brief Operativo Definitivo** — la "bibbia": la visione target stabilita in riunione operativa (UX Apple-style, moduli, funzioni, integrazioni) | Riunione operativa |
-| 03 | [03-roadmap-confronto-e-build.md](03-roadmap-confronto-e-build.md) | **Gap Analysis + Roadmap versionata** (V1→V10): confronto stato attuale vs bibbia e piano di build incrementali | Confronto 01 vs 02 |
+| 03 | [03-roadmap-confronto-e-build.md](03-roadmap-confronto-e-build.md) | **Gap Analysis + Roadmap versionata** (V1→V11): confronto stato attuale vs bibbia e piano di build incrementali | Confronto 01 vs 02 |
 | — | [handoff/](handoff/) | **Staffetta** tra Jacopo (lun-ven) e Claudio (weekend): punto di ripresa del lavoro. Leggi sempre il file più recente. Si tengono solo le ultime 3 versioni. Genera un nuovo handoff con il comando `/handoff` | Sessione di lavoro |
 
 ## Note

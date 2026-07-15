@@ -1,4 +1,8 @@
-# Spec — Chat AI collaborativa (estensione AI, post-V4)
+# Spec — Chat AI collaborativa — **fonte di verità della V4**
+
+> **Cambio di stato del 15/7/2026.** Questa spec nasceva come *"estensione AI, post-V4"*: un'implementazione minore dentro la V4. È cresciuta al punto che il 15/7 si è preso atto che **è una V a sé** — e le è stato dato il numero **4**, perché è quella che si sta facendo. La vecchia V4 (Motore AI Context-Aware) slitta a **V5** e resta **spezzata**: il suo residuo si completa dopo questa V. Tutte le V successive slittano di uno (si passa a 11). Il perimetro completo sta nella roadmap, sezione **V4 — Chat AI & Messaggistica**; qui restano decisioni e piano a fasi.
+>
+> ⚠️ **Attenzione ai numeri:** in questo documento e nei commit **precedenti al 15/7** i rimandi usano la **numerazione vecchia**. Dove trovi "V8" leggi **V9**, dove trovi "V10" leggi **V11**.
 
 > Fonte di verità di questa feature. Concordata a staffetta il **14 luglio 2026** (Jacopo).
 > **Stato: Fasi 1, 2 e 3a FATTE (14–15/7/2026, Jacopo). Restano 3b, 4, 5, 6.** Le parti AI (turni, RAG cliente, allegati nel prompt) si **collaudano davvero** quando saranno configurate le **chiavi reali OpenAI/Anthropic** (a fine V, come da decisione): finora provate a fondo lato dati/UI con AI "non configurata".
@@ -165,7 +169,7 @@ Un **solo punto d'ingresso** (il pulsante in topbar dove oggi vive il popup dell
 
 **Anti-regola (errore già commesso in questa discussione):** la casella **non** è un elenco unico che mescola persone e sessioni AI. La separazione netta vale **anche nella superficie di sfoglio**: stesso selettore, due elenchi. Mescolarli rimetterebbe dentro la confusione che il selettore toglie.
 
-### Da fare ORA (dentro V4)
+### Da fare ORA (dentro la V4 — che dal 15/7 *è* questa spec, non più un'appendice)
 
 1. ✅ **FATTO (15/7)** — **Selettore nel popup**: `Chat AI` / `Messaggi`. La messaggistica entra nel popup **sul suo modello 1-a-1 attuale**, senza riscritture. *Reso in `src/views/Agency/chat/MessagingPanel.jsx`, che riusa il layer API già in casa (`src/modules/messaging/api/messagingApi.js`): nessuna logica di server duplicata, nessuna entità conversazione inventata.* Il selettore **compare solo** se il modulo `messages` è acceso e l'utente ha `messages.view` (letti da `/auth/me` alla prima apertura); se manca l'accesso resta la sola Chat AI. **Smentita utile alla riga sopra:** `src/views/Email/index.jsx` **non** è costruito sulla metafora della casella Jampack — è già una chat 1-a-1 pura a due colonne; del template restano solo il nome, la rotta `/apps/email` e l'icona in sidebar. Il punto 4 è quindi più semplice del previsto.
 2. ✅ **FATTO (15/7)** — **Pulsante "espandi"**: il popup diventa a tutto schermo e torna popup. **È questo che rende possibile il punto 3**: la vista ampia non si perde, si guadagna *ovunque* invece che solo dentro la scheda del progetto. *A tutto schermo l'elenco (sessioni AI o persone) diventa una **colonna fissa da 300px** invece di una tendina, e il contenuto si ferma a 860px centrati: la finestra si allarga, la chat no.*
@@ -191,11 +195,13 @@ Un **solo punto d'ingresso** (il pulsante in topbar dove oggi vive il popup dell
    - **`react-feather` o Lucide?** Questa spec dice react-feather (già in casa, ed è ciò che usa tutto il popup); il documento di design dice invece *«usiamo **Lucide**»* (§ icone), ed è la libreria che usa il modulo Messaggi (`src/views/Email/index.jsx`). **Ho seguito questa spec** (più recente e specifica) e sono rimasto su react-feather, che è coerente col resto del popup. Lucide è un fork di Feather, quindi la resa è omogenea e non si nota. **Va riconciliato**: due librerie di icone in casa sono un debito, ma la scelta è di prodotto, non da fare di straforo.
    - **Il 44px non è la regola per il mouse.** Il design lo elenca fra gli *errori da non fare*: «il 44px resta il **minimo per il touch/mobile**, non la regola per il mouse». Reso quindi con `@media (pointer: coarse)`: compatto col mouse, ≥44px sul dito.
 
-### Rimandato a V8 — *con decisione esplicita del 15/7/2026*
+### Rimandato alla V9 *(ex V8)* — *decisione esplicita del 15/7/2026, **riconfermata** il 15/7 alla nascita della V4*
 
-- **Modello a conversazioni per i messaggi** (partecipanti, gruppi di **reparto** e **d'agenzia**). La roadmap lo colloca in **V8** ("Messaggistica potenziata a **thread di progetto**"); tirarlo dentro V4 allungherebbe la V e lascerebbe la chat AI in sospeso. **Nota:** la roadmap dice thread *di progetto*, Jacopo vuole gruppi *di reparto/agenzia* → i due modelli **non coincidono**, va riconciliato a V8. I **reparti esistono già** (`Department`, `DepartmentMember`): la base c'è.
-- **Parlare con i CLIENTI.** ⛔ Oggi **impossibile**: `Client` ha **solo un campo `email` di testo** — nessun utente, nessun accesso, nessuna password — e **non esiste alcun portale clienti** nel codice. Farlo significa un'area di prodotto intera (account, inviti, permessi) con un **confine di sicurezza netto**: il cliente deve vedere la sua conversazione e *nient'altro* del CRM. La roadmap, in V8, assume un cliente **senza account** che interagisce via **link pubblico ed email** ("un cliente prenota da link personale, riceve reminder"). **Deciso: per ora la chat resta interna**, il dialogo coi clienti si affronta come area a sé.
+> **Riconfermato apposta.** L'argomento che li escludeva era *"allungherebbero la V4 e lascerebbero la chat AI in sospeso"*. Ora che la chat **è** una V a sé quell'argomento cade, quindi la scelta è stata rimessa in discussione — e confermata: restano fuori. Il portale clienti in particolare è un'area di prodotto intera, tirarla dentro rigonfierebbe la V che si sta cercando di chiudere.
+
+- **Modello a conversazioni per i messaggi** (partecipanti, gruppi di **reparto** e **d'agenzia**). La roadmap lo colloca nella **V9** — *"Messaggistica potenziata a **thread di progetto**"*. ⚠️ **Nota:** la roadmap dice thread *di progetto*, Jacopo vuole gruppi *di reparto/agenzia* → i due modelli **non coincidono**, va riconciliato lì. I **reparti esistono già** (`Department`, `DepartmentMember`): la base c'è.
+- **Parlare con i CLIENTI.** ⛔ Oggi **impossibile**: `Client` ha **solo un campo `email` di testo** — nessun utente, nessun accesso, nessuna password — e **non esiste alcun portale clienti** nel codice. Farlo significa un'area di prodotto intera (account, inviti, permessi) con un **confine di sicurezza netto**: il cliente deve vedere la sua conversazione e *nient'altro* del CRM. La **V9** assume un cliente **senza account** che interagisce via **link pubblico ed email** ("un cliente prenota da link personale, riceve reminder"). **Deciso: per ora la chat resta interna**, il dialogo coi clienti si affronta come area a sé.
 
 ## 5. Fuori da questa spec (registrato altrove)
 
-- **Estensione dell'onboarding leggero a TUTTO il CRM:** l'approccio "guida in-contesto, non tutorial pesante" andrà esteso all'intero prodotto, ma **a fine sviluppo** (dopo V9 → collocato in V10, rollout). Vedi roadmap.
+- **Estensione dell'onboarding leggero a TUTTO il CRM:** l'approccio "guida in-contesto, non tutorial pesante" andrà esteso all'intero prodotto, ma **a fine sviluppo** → collocato nella **V11** (rollout; *era V10 prima della rinumerazione del 15/7*). L'onboarding **della sola chat** resta invece dentro questa V. Vedi roadmap.
