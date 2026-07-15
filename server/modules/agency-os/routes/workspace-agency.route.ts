@@ -22,10 +22,16 @@ type AgencySourceFileQuery = {
   download?: string;
 };
 
-// Ambito della chat passato come parametro (rotte allegati, Fase 3a).
+// Ambito della chat passato come parametro (rotte allegati, Fase 3a; rotte sessioni).
 type AgencyChatScopeQuery = {
   scope?: string;
   targetId?: string;
+};
+
+// Sessione precisa da aprire. Opzionale: senza, si atterra sull'ultima dell'utente
+// per quell'ambito (e se non ne ha nessuna se ne crea una sua).
+type AgencyChatSessionQuery = {
+  conversationId?: string;
 };
 
 // Bersaglio d'ambito della chat a partire da scope + id. Le rotte degli allegati
@@ -394,7 +400,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     return ok(reply, { usage });
   });
 
-  app.get<{ Params: AgencyProjectParams }>(
+  app.get<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -402,13 +408,14 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         projectId: request.params.projectId,
         userId: user.id,
+        conversationId: request.query.conversationId,
       });
 
       return ok(reply, { chat });
     },
   );
 
-  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+  app.post<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery; Body: unknown }>(
     '/agency/projects/:projectId/chat',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -416,6 +423,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         projectId: request.params.projectId,
         userId: user.id,
+        conversationId: request.query.conversationId,
         body: request.body,
       });
 
@@ -423,7 +431,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.delete<{ Params: AgencyProjectParams }>(
+  app.delete<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -431,6 +439,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         projectId: request.params.projectId,
         userId: user.id,
+        conversationId: request.query.conversationId,
       });
 
       return ok(reply, { chat });
@@ -438,7 +447,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   // Partecipanti della chat condivisa di progetto (Fase 1 — invito esplicito).
-  app.get<{ Params: AgencyProjectParams }>(
+  app.get<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat/participants',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -446,13 +455,14 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         projectId: request.params.projectId,
         userId: user.id,
+        conversationId: request.query.conversationId,
       });
 
       return ok(reply, { participants });
     },
   );
 
-  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+  app.post<{ Params: AgencyProjectParams; Querystring: AgencyChatSessionQuery; Body: unknown }>(
     '/agency/projects/:projectId/chat/participants',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -460,6 +470,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         projectId: request.params.projectId,
         userId: user.id,
+        conversationId: request.query.conversationId,
         body: request.body,
       });
 
@@ -467,7 +478,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.delete<{ Params: AgencyProjectParams & { memberId: string } }>(
+  app.delete<{ Params: AgencyProjectParams & { memberId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/projects/:projectId/chat/participants/:memberId',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -475,6 +486,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         projectId: request.params.projectId,
         userId: user.id,
+        conversationId: request.query.conversationId,
         targetUserId: request.params.memberId,
       });
 
@@ -483,59 +495,81 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   // --- Chat AI ambito CLIENTE (Fase 2): RAG su tutti i progetti del cliente. ---
-  app.get<{ Params: { clientId: string } }>('/agency/chat/client/:clientId', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const chat = await agencyService.getScopedChat({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: { scope: 'client', clientId: request.params.clientId },
-    });
-    return ok(reply, { chat });
-  });
+  // conversationId (opzionale) apre una SESSIONE precisa; senza, si atterra
+  // sull'ultima dell'utente (o se ne crea una sua). Vale per tutti e tre gli ambiti.
+  app.get<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery }>(
+    '/agency/chat/client/:clientId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const chat = await agencyService.getScopedChat({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'client', clientId: request.params.clientId },
+        conversationId: request.query.conversationId,
+      });
+      return ok(reply, { chat });
+    },
+  );
 
-  app.post<{ Params: { clientId: string }; Body: unknown }>('/agency/chat/client/:clientId', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const chat = await agencyService.sendScopedChatMessage({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: { scope: 'client', clientId: request.params.clientId },
-      body: request.body,
-    });
-    return ok(reply, { chat });
-  });
+  app.post<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery; Body: unknown }>(
+    '/agency/chat/client/:clientId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const chat = await agencyService.sendScopedChatMessage({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'client', clientId: request.params.clientId },
+        conversationId: request.query.conversationId,
+        body: request.body,
+      });
+      return ok(reply, { chat });
+    },
+  );
 
-  app.delete<{ Params: { clientId: string } }>('/agency/chat/client/:clientId', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const chat = await agencyService.clearScopedChat({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: { scope: 'client', clientId: request.params.clientId },
-    });
-    return ok(reply, { chat });
-  });
+  app.delete<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery }>(
+    '/agency/chat/client/:clientId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const chat = await agencyService.clearScopedChat({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'client', clientId: request.params.clientId },
+        conversationId: request.query.conversationId,
+      });
+      return ok(reply, { chat });
+    },
+  );
 
-  app.get<{ Params: { clientId: string } }>('/agency/chat/client/:clientId/participants', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const participants = await agencyService.listScopedChatParticipants({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: { scope: 'client', clientId: request.params.clientId },
-    });
-    return ok(reply, { participants });
-  });
+  app.get<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery }>(
+    '/agency/chat/client/:clientId/participants',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.listScopedChatParticipants({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'client', clientId: request.params.clientId },
+        conversationId: request.query.conversationId,
+      });
+      return ok(reply, { participants });
+    },
+  );
 
-  app.post<{ Params: { clientId: string }; Body: unknown }>('/agency/chat/client/:clientId/participants', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const participants = await agencyService.addScopedChatParticipant({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: { scope: 'client', clientId: request.params.clientId },
-      body: request.body,
-    });
-    return ok(reply, { participants });
-  });
+  app.post<{ Params: { clientId: string }; Querystring: AgencyChatSessionQuery; Body: unknown }>(
+    '/agency/chat/client/:clientId/participants',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.addScopedChatParticipant({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'client', clientId: request.params.clientId },
+        conversationId: request.query.conversationId,
+        body: request.body,
+      });
+      return ok(reply, { participants });
+    },
+  );
 
-  app.delete<{ Params: { clientId: string; memberId: string } }>(
+  app.delete<{ Params: { clientId: string; memberId: string }; Querystring: AgencyChatSessionQuery }>(
     '/agency/chat/client/:clientId/participants/:memberId',
     async (request, reply) => {
       const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
@@ -543,78 +577,168 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         workspaceId: workspace.id,
         userId: user.id,
         target: { scope: 'client', clientId: request.params.clientId },
+        conversationId: request.query.conversationId,
         targetUserId: request.params.memberId,
       });
       return ok(reply, { participants });
     },
   );
 
-  // --- Chat AI ambito GENERALE (Fase 2): una conversazione per workspace, no CRM. ---
-  app.get('/agency/chat/general', async (request, reply) => {
+  // --- Chat AI ambito GENERALE (Fase 2): niente contesto CRM. Fino al 15/7/2026 era
+  // UNA conversazione per l'intero workspace: chi non la apriva per primo non ne era
+  // partecipante e restava senza messaggi e senza poter scrivere. Ora ognuno ha le
+  // proprie sessioni. ---
+  app.get<{ Querystring: AgencyChatSessionQuery }>('/agency/chat/general', async (request, reply) => {
     const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const chat = await agencyService.getScopedChat({
       workspaceId: workspace.id,
       userId: user.id,
       target: { scope: 'general' },
+      conversationId: request.query.conversationId,
     });
     return ok(reply, { chat });
   });
 
-  app.post<{ Body: unknown }>('/agency/chat/general', async (request, reply) => {
+  app.post<{ Querystring: AgencyChatSessionQuery; Body: unknown }>('/agency/chat/general', async (request, reply) => {
     const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const chat = await agencyService.sendScopedChatMessage({
       workspaceId: workspace.id,
       userId: user.id,
       target: { scope: 'general' },
+      conversationId: request.query.conversationId,
       body: request.body,
     });
     return ok(reply, { chat });
   });
 
-  app.delete('/agency/chat/general', async (request, reply) => {
+  app.delete<{ Querystring: AgencyChatSessionQuery }>('/agency/chat/general', async (request, reply) => {
     const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const chat = await agencyService.clearScopedChat({
       workspaceId: workspace.id,
       userId: user.id,
       target: { scope: 'general' },
+      conversationId: request.query.conversationId,
     });
     return ok(reply, { chat });
   });
 
-  app.get('/agency/chat/general/participants', async (request, reply) => {
+  app.get<{ Querystring: AgencyChatSessionQuery }>('/agency/chat/general/participants', async (request, reply) => {
     const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const participants = await agencyService.listScopedChatParticipants({
       workspaceId: workspace.id,
       userId: user.id,
       target: { scope: 'general' },
+      conversationId: request.query.conversationId,
     });
     return ok(reply, { participants });
   });
 
-  app.post<{ Body: unknown }>('/agency/chat/general/participants', async (request, reply) => {
+  app.post<{ Querystring: AgencyChatSessionQuery; Body: unknown }>('/agency/chat/general/participants', async (request, reply) => {
     const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const participants = await agencyService.addScopedChatParticipant({
       workspaceId: workspace.id,
       userId: user.id,
       target: { scope: 'general' },
+      conversationId: request.query.conversationId,
       body: request.body,
     });
     return ok(reply, { participants });
   });
 
-  app.delete<{ Params: { memberId: string } }>('/agency/chat/general/participants/:memberId', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const participants = await agencyService.removeScopedChatParticipant({
-      workspaceId: workspace.id,
-      userId: user.id,
-      target: { scope: 'general' },
-      targetUserId: request.params.memberId,
-    });
-    return ok(reply, { participants });
-  });
+  app.delete<{ Params: { memberId: string }; Querystring: AgencyChatSessionQuery }>(
+    '/agency/chat/general/participants/:memberId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const participants = await agencyService.removeScopedChatParticipant({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: { scope: 'general' },
+        conversationId: request.query.conversationId,
+        targetUserId: request.params.memberId,
+      });
+      return ok(reply, { participants });
+    },
+  );
 
   // --- Allegati della chat (Fase 3a): documenti ed elementi CRM, validi per tutti
   // e tre gli ambiti (ambito passato come scope + targetId). ---
+
+  // --- SESSIONI della chat (15/7/2026, spec sez. 4-bis). Un ambito ha N sessioni:
+  // queste rotte sono l'elenco e il ciclo di vita. Uniche per tutti e tre gli ambiti,
+  // come le rotte allegati. ---
+
+  // Elenco delle sessioni dell'utente sull'ambito (la "lista chat" della UI).
+  app.get<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/sessions', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const sessions = await agencyService.listScopedChatSessions({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: parseChatScopeTarget(request.query.scope, request.query.targetId),
+    });
+    return ok(reply, { sessions });
+  });
+
+  // Nuova sessione sull'ambito ("Nuova chat").
+  app.post<{ Body: AgencyChatScopeQuery }>('/agency/chat/sessions', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const body = request.body ?? {};
+    const session = await agencyService.createScopedChatSession({
+      workspaceId: workspace.id,
+      userId: user.id,
+      target: parseChatScopeTarget(body.scope, body.targetId),
+    });
+    return ok(reply, { session });
+  });
+
+  // Rinomina: il titolo automatico (prime parole del primo messaggio) si sovrascrive.
+  app.patch<{ Params: { conversationId: string }; Body: AgencyChatScopeQuery & { title?: string } }>(
+    '/agency/chat/sessions/:conversationId',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const body = request.body ?? {};
+      const session = await agencyService.renameScopedChatSession({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: parseChatScopeTarget(body.scope, body.targetId),
+        conversationId: request.params.conversationId,
+        title: String(body.title ?? ''),
+      });
+      return ok(reply, { session });
+    },
+  );
+
+  // Sciogli il gruppo: la sessione torna solitaria per chi esegue, gli altri la
+  // ritrovano congelata in sola lettura.
+  app.post<{ Params: { conversationId: string }; Body: AgencyChatScopeQuery }>(
+    '/agency/chat/sessions/:conversationId/disband',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const body = request.body ?? {};
+      const participants = await agencyService.disbandScopedChat({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: parseChatScopeTarget(body.scope, body.targetId),
+        conversationId: request.params.conversationId,
+      });
+      return ok(reply, { participants });
+    },
+  );
+
+  // "Riprendi in una nuova chat": duplica una sessione congelata (fino a frozenAt).
+  app.post<{ Params: { conversationId: string }; Body: AgencyChatScopeQuery }>(
+    '/agency/chat/sessions/:conversationId/resume',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const body = request.body ?? {};
+      const session = await agencyService.resumeScopedChatSession({
+        workspaceId: workspace.id,
+        userId: user.id,
+        target: parseChatScopeTarget(body.scope, body.targetId),
+        conversationId: request.params.conversationId,
+      });
+      return ok(reply, { session });
+    },
+  );
 
   app.get<{ Querystring: AgencyChatScopeQuery }>('/agency/chat/attachments', async (request, reply) => {
     const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);

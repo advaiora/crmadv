@@ -2664,6 +2664,34 @@ const mapConversationParticipant = (row: {
   joinedAt: row.createdAt.toISOString(),
 });
 
+// Riga dell'elenco sessioni. `frozenAt` valorizzato = sessione ARCHIVIATA per chi
+// guarda (ne e' uscito, o l'hanno rimosso, o il gruppo si e' sciolto): resta
+// consultabile in sola lettura fino a quella data.
+const mapConversationSession = (row: {
+  id: string;
+  title: string | null;
+  lastMessageAt: Date | null;
+  createdAt: Date;
+  resumedFromConversationId: string | null;
+  participants: { role: string; frozenAt: Date | null }[];
+  _count: { messages: number; participants: number };
+}) => {
+  const me = row.participants[0];
+  return {
+    id: row.id,
+    title: row.title,
+    lastMessageAt: (row.lastMessageAt ?? row.createdAt).toISOString(),
+    createdAt: row.createdAt.toISOString(),
+    messageCount: row._count.messages,
+    participantCount: row._count.participants,
+    isGroup: row._count.participants > 1,
+    isFrozen: Boolean(me?.frozenAt),
+    frozenAt: me?.frozenAt ? me.frozenAt.toISOString() : null,
+    canManage: me?.role === 'owner' && !me?.frozenAt,
+    resumedFrom: row.resumedFromConversationId,
+  };
+};
+
 // --- Chat AI con AMBITI (Fase 2): oltre a 'project', anche 'client' e 'general'. ---
 
 // Bersaglio d'ambito di una conversazione: identifica quale conversazione (e quale
@@ -2719,15 +2747,103 @@ const assertEntityAttachable = async (input: {
   throw denied;
 };
 
-// Trova/crea la conversazione condivisa giusta per l'ambito.
-const resolveScopedConversation = (workspaceId: string, target: ChatScopeTarget, userId: string) => {
+// Titolo automatico di una sessione: le prime parole del primo messaggio, senza
+// chiamare l'AI (gratis, e funziona anche senza chiavi configurate). Rinominabile
+// a mano dall'utente.
+const SESSION_TITLE_MAX = 60;
+const buildSessionTitle = (firstMessage: string): string | null => {
+  const clean = firstMessage.replace(/\s+/g, ' ').trim();
+  if (!clean) {
+    return null;
+  }
+  if (clean.length <= SESSION_TITLE_MAX) {
+    return clean;
+  }
+  // Taglia sull'ultimo spazio utile, cosi' non si spezzano le parole a meta'.
+  const cut = clean.slice(0, SESSION_TITLE_MAX);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+};
+
+// La SESSIONE su cui lavora la richiesta, con i diritti dell'utente su di essa.
+// Regole (spec sez. 4-bis):
+//  - conversationId indicato -> quella sessione, se e' dell'ambito giusto e l'utente
+//    vi partecipa (anche da congelato: la vede in sola lettura);
+//  - conversationId assente -> l'ultima sessione dell'utente su quell'ambito, e se
+//    non ne ha nessuna se ne crea una SUA. E' qui che si ripara il difetto storico:
+//    prima si atterrava sull'unica conversazione dell'ambito, e chi non l'aveva
+//    aperta per primo restava fuori (zero messaggi, scrittura negata).
+const resolveScopedSession = async (input: {
+  workspaceId: string;
+  userId: string;
+  target: ChatScopeTarget;
+  conversationId?: string | null;
+  createIfMissing?: boolean;
+}) => {
+  if (input.conversationId) {
+    const conversation = await aiConversationRepository.findSessionById(input.workspaceId, input.conversationId);
+    if (!conversation || !matchesScope(conversation, input.target)) {
+      throw notFound('Conversazione non trovata.');
+    }
+    const participant = await aiConversationRepository.findParticipant(conversation.id, input.userId);
+    if (!participant) {
+      throw forbidden('Non fai parte di questa conversazione. Chiedi a un partecipante di invitarti.');
+    }
+    return { conversation, participant };
+  }
+
+  const latest = await aiConversationRepository.findLatestUserSession(input.workspaceId, input.userId, input.target);
+  if (latest) {
+    const participant = await aiConversationRepository.findParticipant(latest.id, input.userId);
+    return { conversation: latest, participant };
+  }
+  if (input.createIfMissing === false) {
+    return { conversation: null, participant: null };
+  }
+  const created = await aiConversationRepository.createSession({
+    workspaceId: input.workspaceId,
+    target: input.target,
+    creatorUserId: input.userId,
+  });
+  const participant = await aiConversationRepository.findParticipant(created.id, input.userId);
+  return { conversation: created, participant };
+};
+
+// La sessione appartiene davvero all'ambito richiesto? Evita che un id di
+// conversazione di un altro progetto venga letto passando dalla rotta sbagliata.
+const matchesScope = (
+  conversation: { scope: string; projectId: string | null; clientId: string | null },
+  target: ChatScopeTarget,
+) => {
+  if (conversation.scope !== target.scope) {
+    return false;
+  }
   if (target.scope === 'project') {
-    return aiConversationRepository.getOrCreateProjectConversation(workspaceId, target.projectId, userId);
+    return conversation.projectId === target.projectId;
   }
   if (target.scope === 'client') {
-    return aiConversationRepository.getOrCreateClientConversation(workspaceId, target.clientId, userId);
+    return conversation.clientId === target.clientId;
   }
-  return aiConversationRepository.getOrCreateGeneralConversation(workspaceId, userId);
+  return true;
+};
+
+// L'ambito e' accessibile all'utente? Applica la visibilita' V2 (la stessa del
+// selettore d'ambito e degli allegati): senza, basterebbe conoscere l'id di un
+// progetto per aprirne la chat, anche di un progetto che non compare nel proprio
+// selettore. Gli ambiti Cliente/Generale seguono la stessa regola dei progetti
+// visibili (in V2 non esiste assegnazione diretta utente-cliente).
+const assertScopeVisible = async (workspaceId: string, userId: string, target: ChatScopeTarget) => {
+  if (target.scope === 'general') {
+    return;
+  }
+  const projects = await resolveVisibleChatProjects(workspaceId, userId);
+  const visible =
+    target.scope === 'project'
+      ? projects.some((project) => project.id === target.projectId)
+      : projects.some((project) => project.clientId === target.clientId);
+  if (!visible) {
+    throw forbidden('Non hai accesso alla chat di questo elemento.');
+  }
 };
 
 // Prompt di sistema per l'ambito Cliente: come quello di progetto ma il contesto
@@ -7648,53 +7764,82 @@ export const agencyService = {
   // esistevano solo nella versione scoped, quindi non funzionavano sul progetto —
   // proprio l'ambito principale). Qui si delega e basta. ---
 
-  getProjectChat(input: { workspaceId: string; projectId: string; userId: string }) {
+  getProjectChat(input: { workspaceId: string; projectId: string; userId: string; conversationId?: string | null }) {
     return this.getScopedChat({
       workspaceId: input.workspaceId,
       userId: input.userId,
       target: { scope: 'project', projectId: input.projectId },
+      conversationId: input.conversationId,
     });
   },
 
-  clearProjectChat(input: { workspaceId: string; projectId: string; userId: string }) {
+  clearProjectChat(input: { workspaceId: string; projectId: string; userId: string; conversationId?: string | null }) {
     return this.clearScopedChat({
       workspaceId: input.workspaceId,
       userId: input.userId,
       target: { scope: 'project', projectId: input.projectId },
+      conversationId: input.conversationId,
     });
   },
 
-  sendProjectChatMessage(input: { workspaceId: string; projectId: string; userId: string; body: unknown }) {
+  sendProjectChatMessage(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+    conversationId?: string | null;
+    body: unknown;
+  }) {
     return this.sendScopedChatMessage({
       workspaceId: input.workspaceId,
       userId: input.userId,
       target: { scope: 'project', projectId: input.projectId },
+      conversationId: input.conversationId,
       body: input.body,
     });
   },
 
-  listProjectChatParticipants(input: { workspaceId: string; projectId: string; userId: string }) {
+  listProjectChatParticipants(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+    conversationId?: string | null;
+  }) {
     return this.listScopedChatParticipants({
       workspaceId: input.workspaceId,
       userId: input.userId,
       target: { scope: 'project', projectId: input.projectId },
+      conversationId: input.conversationId,
     });
   },
 
-  addProjectChatParticipant(input: { workspaceId: string; projectId: string; userId: string; body: unknown }) {
+  addProjectChatParticipant(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+    conversationId?: string | null;
+    body: unknown;
+  }) {
     return this.addScopedChatParticipant({
       workspaceId: input.workspaceId,
       userId: input.userId,
       target: { scope: 'project', projectId: input.projectId },
+      conversationId: input.conversationId,
       body: input.body,
     });
   },
 
-  removeProjectChatParticipant(input: { workspaceId: string; projectId: string; userId: string; targetUserId: string }) {
+  removeProjectChatParticipant(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string;
+    conversationId?: string | null;
+    targetUserId: string;
+  }) {
     return this.removeScopedChatParticipant({
       workspaceId: input.workspaceId,
       userId: input.userId,
       target: { scope: 'project', projectId: input.projectId },
+      conversationId: input.conversationId,
       targetUserId: input.targetUserId,
     });
   },
@@ -7718,32 +7863,93 @@ export const agencyService = {
     }
   },
 
-  async getScopedChat(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
+  // Elenco delle sessioni dell'utente su un ambito (la "lista chat" della UI).
+  async listScopedChatSessions(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
     await this.assertScopeTargetExists(input.workspaceId, input.target);
-    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const rows = await aiConversationRepository.listUserSessions(input.workspaceId, input.userId, input.target);
+    return { scope: input.target.scope, sessions: rows.map(mapConversationSession) };
+  },
+
+  // Apre una sessione nuova sull'ambito, anche se l'utente ne ha gia' altre.
+  async createScopedChatSession(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const conversation = await aiConversationRepository.createSession({
+      workspaceId: input.workspaceId,
+      target: input.target,
+      creatorUserId: input.userId,
+    });
+    return { conversationId: conversation.id };
+  },
+
+  async renameScopedChatSession(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId: string;
+    title: string;
+  }) {
+    const title = input.title.trim().slice(0, 200);
+    if (!title) {
+      throw badRequest('Il titolo non puo essere vuoto.');
+    }
+    const { participant } = await resolveScopedSession({ ...input, conversationId: input.conversationId });
+    if (participant?.frozenAt) {
+      throw forbidden('Questa conversazione e archiviata: non si puo rinominare.');
+    }
+    await aiConversationRepository.setSessionTitle(input.conversationId, title);
+    return { conversationId: input.conversationId, title };
+  },
+
+  async getScopedChat(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+  }) {
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const { conversation, participant } = await resolveScopedSession(input);
     const [participants, status] = await Promise.all([
-      aiConversationRepository.listParticipants(conversation.id),
+      aiConversationRepository.listParticipants(conversation!.id),
       getAgencyAiStatusPayload(input.workspaceId),
     ]);
-    const isParticipant = participants.some((row) => row.userId === input.userId);
-    const messages = isParticipant
-      ? (await aiConversationRepository.listMessages(conversation.id)).map(mapConversationMessage)
+    // Il congelato (uscito/rimosso/sciolto) vede la sessione in sola lettura, e solo
+    // fino al momento in cui ne e' uscito.
+    const isFrozen = Boolean(participant?.frozenAt);
+    const messages = participant
+      ? (await aiConversationRepository.listMessages(conversation!.id, 200, participant.frozenAt)).map(
+          mapConversationMessage,
+        )
       : [];
     return {
       aiConfigured: status.configured,
       scope: input.target.scope,
-      conversationId: conversation.id,
-      isParticipant,
+      conversationId: conversation!.id,
+      title: conversation!.title,
+      isParticipant: Boolean(participant) && !isFrozen,
+      isFrozen,
+      frozenAt: participant?.frozenAt ?? null,
+      canManage: participant?.role === 'owner' && !isFrozen,
       participants: participants.map(mapConversationParticipant),
       messages,
     };
   },
 
-  async clearScopedChat(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
-    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
-    const participants = await aiConversationRepository.listParticipants(conversation.id);
-    const me = participants.find((row) => row.userId === input.userId);
-    if (!me || me.role !== 'owner') {
+  async clearScopedChat(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+  }) {
+    // Niente get-or-create qui: prima una DELETE su una chat mai aperta la CREAVA
+    // col chiamante come owner, e solo dopo passava il controllo.
+    const { conversation, participant } = await resolveScopedSession({ ...input, createIfMissing: false });
+    if (!conversation) {
+      throw notFound('Conversazione non trovata.');
+    }
+    if (!participant || participant.frozenAt || participant.role !== 'owner') {
       throw forbidden('Solo il proprietario della conversazione puo azzerarla.');
     }
     await aiConversationRepository.clearMessages(conversation.id);
@@ -7754,20 +7960,26 @@ export const agencyService = {
   // dell'ambito (visibili solo a chi le carica), poi l'invio del messaggio le lega e
   // le rende parte della conversazione per tutti i partecipanti. ---
 
-  // Conversazione dell'ambito, con i controlli comuni a ogni scrittura: il bersaglio
-  // esiste e l'utente e' partecipante.
+  // Sessione dell'ambito, con i controlli comuni a ogni SCRITTURA: il bersaglio
+  // esiste, l'ambito e' visibile all'utente, e l'utente vi partecipa da ATTIVO.
+  // Un congelato passa il controllo di partecipazione ma non deve poter scrivere:
+  // la sua e' sola lettura.
   async resolveConversationForUser(input: {
     workspaceId: string;
     userId: string;
     target: ChatScopeTarget;
+    conversationId?: string | null;
   }) {
     await this.assertScopeTargetExists(input.workspaceId, input.target);
-    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
-    const isParticipant = await aiConversationRepository.isParticipant(conversation.id, input.userId);
-    if (!isParticipant) {
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const { conversation, participant } = await resolveScopedSession(input);
+    if (!participant) {
       throw forbidden('Non fai parte di questa conversazione. Chiedi a un partecipante di invitarti.');
     }
-    return conversation;
+    if (participant.frozenAt) {
+      throw forbidden('Questa conversazione e archiviata: puoi solo consultarla. Riprendila in una nuova chat.');
+    }
+    return conversation!;
   },
 
   // Bozze dell'utente sulla conversazione (i chip mostrati nel composer).
@@ -7862,7 +8074,13 @@ export const agencyService = {
     return { removed: true };
   },
 
-  async sendScopedChatMessage(input: { workspaceId: string; userId: string; target: ChatScopeTarget; body: unknown }) {
+  async sendScopedChatMessage(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+    body: unknown;
+  }) {
     const schema = z.object({
       message: z.string().trim().min(1).max(4000),
       askAi: z.boolean().optional(),
@@ -7902,6 +8120,13 @@ export const agencyService = {
       userId: input.userId,
       attachmentIds,
       messageId: createdMessage.id,
+    });
+
+    // Ordina l'elenco delle sessioni e, al primo messaggio, battezza la sessione con
+    // le prime parole di quel messaggio (l'utente puo' rinominarla).
+    await aiConversationRepository.touchSession(conversation.id, {
+      lastMessageAt: createdMessage.createdAt,
+      titleIfEmpty: conversation.title ? null : buildSessionTitle(message),
     });
 
     const buildResult = async (extra: Record<string, unknown> = {}) => {
@@ -7983,10 +8208,17 @@ export const agencyService = {
     return buildResult({ aiInvoked: true });
   },
 
-  async listScopedChatParticipants(input: { workspaceId: string; userId: string; target: ChatScopeTarget }) {
-    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
+  async listScopedChatParticipants(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+  }) {
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const { conversation } = await resolveScopedSession(input);
     const [participants, members] = await Promise.all([
-      aiConversationRepository.listParticipants(conversation.id),
+      aiConversationRepository.listParticipants(conversation!.id),
       aiConversationRepository.listWorkspaceMembers(input.workspaceId),
     ]);
     const participantIds = new Set(participants.map((row) => row.userId));
@@ -7994,24 +8226,27 @@ export const agencyService = {
       .filter((member) => !participantIds.has(member.userId))
       .map((member) => ({ userId: member.userId, name: member.user?.name ?? null, email: member.user?.email ?? null }));
     return {
-      conversationId: conversation.id,
+      conversationId: conversation!.id,
       scope: input.target.scope,
       participants: participants.map(mapConversationParticipant),
       invitable,
     };
   },
 
-  async addScopedChatParticipant(input: { workspaceId: string; userId: string; target: ChatScopeTarget; body: unknown }) {
+  async addScopedChatParticipant(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+    body: unknown;
+  }) {
     const schema = z.object({ userId: z.string().min(1) });
     const parsed = schema.safeParse(input.body ?? {});
     if (!parsed.success) {
       throw badRequest('Dati invito non validi.', { issues: parsed.error.flatten() });
     }
-    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
-    const actorIsParticipant = await aiConversationRepository.isParticipant(conversation.id, input.userId);
-    if (!actorIsParticipant) {
-      throw forbidden('Solo un partecipante puo invitare altri.');
-    }
+    // Invitare e' una scrittura: il congelato non puo' farlo (lo blocca qui dentro).
+    const conversation = await this.resolveConversationForUser(input);
     const members = await aiConversationRepository.listWorkspaceMembers(input.workspaceId);
     const invited = members.find((member) => member.userId === parsed.data.userId);
     if (!invited) {
@@ -8024,32 +8259,109 @@ export const agencyService = {
       role: 'member',
       invitedByUserId: input.userId,
     });
-    return this.listScopedChatParticipants(input);
+    return this.listScopedChatParticipants({ ...input, conversationId: conversation.id });
   },
 
-  async removeScopedChatParticipant(input: { workspaceId: string; userId: string; target: ChatScopeTarget; targetUserId: string }) {
-    const conversation = await resolveScopedConversation(input.workspaceId, input.target, input.userId);
-    const participants = await aiConversationRepository.listParticipants(conversation.id);
-    const actor = participants.find((row) => row.userId === input.userId);
-    if (!actor) {
-      throw forbidden('Non fai parte di questa conversazione.');
-    }
-    const targetMember = participants.find((row) => row.userId === input.targetUserId);
-    if (targetMember) {
-      if (targetMember.role === 'owner') {
-        throw badRequest('Il proprietario della conversazione non puo essere rimosso.');
-      }
+  // Uscire o essere rimossi CONGELA il partecipante, non lo cancella (spec 4-bis):
+  // la sessione gli resta in sola lettura fino al momento dell'uscita.
+  // Chiunque puo' uscire da solo, owner compreso: se esce l'owner la sessione passa
+  // al partecipante attivo piu' anziano, cosi' non resta mai ingestibile. Prima
+  // l'owner era legato alla conversazione per sempre (il controllo che lo proteggeva
+  // scattava prima di quello che permetteva l'uscita autonoma).
+  async removeScopedChatParticipant(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+    targetUserId: string;
+  }) {
+    const conversation = await this.resolveConversationForUser(input);
+    const actor = await aiConversationRepository.findParticipant(conversation.id, input.userId);
+    const targetMember = await aiConversationRepository.findParticipant(conversation.id, input.targetUserId);
+    if (targetMember && !targetMember.frozenAt) {
       const removingSelf = input.targetUserId === input.userId;
-      if (!removingSelf && actor.role !== 'owner') {
+      if (!removingSelf && actor?.role !== 'owner') {
         throw forbidden('Solo il proprietario puo rimuovere altri partecipanti.');
       }
-      await aiConversationRepository.removeParticipant(conversation.id, input.targetUserId);
+      if (!removingSelf && targetMember.role === 'owner') {
+        throw badRequest('Il proprietario della conversazione non puo essere rimosso: puo solo uscirne da solo.');
+      }
+      await this.freezeAndHandOver(conversation.id, input.targetUserId, targetMember.role === 'owner');
     }
-    return this.listScopedChatParticipants({
+    return this.listScopedChatParticipants({ ...input, conversationId: conversation.id });
+  },
+
+  // Congela un partecipante e, se era l'owner, passa la sessione al piu' anziano tra
+  // gli attivi. Se non resta nessuno la sessione non muore: torna semplicemente una
+  // conversazione senza attivi, consultabile in sola lettura da chi c'e' passato.
+  async freezeAndHandOver(conversationId: string, userId: string, wasOwner: boolean) {
+    const heirs = wasOwner
+      ? await aiConversationRepository.listOtherActiveParticipants(conversationId, userId)
+      : [];
+    await aiConversationRepository.freezeParticipant(conversationId, userId, new Date());
+    if (wasOwner && heirs.length > 0) {
+      await aiConversationRepository.promoteToOwner(conversationId, heirs[0].userId);
+    }
+  },
+
+  // Sciogli il gruppo: la sessione torna SOLITARIA per chi esegue l'azione, che
+  // continua a scriverci. Gli altri vengono congelati (punto 4 della spec): se la
+  // ritrovano in sola lettura, ferma al momento dello scioglimento, e possono
+  // riprenderla in una chat propria se e quando vogliono.
+  // Copia "a richiesta", non subito: sciogliendo non si duplica nulla.
+  async disbandScopedChat(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId?: string | null;
+  }) {
+    const conversation = await this.resolveConversationForUser(input);
+    const actor = await aiConversationRepository.findParticipant(conversation.id, input.userId);
+    if (actor?.role !== 'owner') {
+      throw forbidden('Solo il proprietario della conversazione puo sciogliere il gruppo.');
+    }
+    await aiConversationRepository.freezeOtherParticipants(conversation.id, input.userId, new Date());
+    return this.listScopedChatParticipants({ ...input, conversationId: conversation.id });
+  },
+
+  // "Riprendi in una nuova chat": duplica una sessione congelata in una sessione
+  // nuova, tutta di chi la riprende, copiando lo storico SOLO fino a frozenAt (non
+  // si portano dietro messaggi scritti dopo l'uscita). E' il momento in cui si paga
+  // la copia: chi non riprende non duplica niente.
+  async resumeScopedChatSession(input: {
+    workspaceId: string;
+    userId: string;
+    target: ChatScopeTarget;
+    conversationId: string;
+  }) {
+    await this.assertScopeTargetExists(input.workspaceId, input.target);
+    await assertScopeVisible(input.workspaceId, input.userId, input.target);
+    const { conversation, participant } = await resolveScopedSession(input);
+    if (!participant?.frozenAt) {
+      throw badRequest('Questa conversazione e ancora attiva: non c\'e nulla da riprendere.');
+    }
+    const source = await aiConversationRepository.listMessages(conversation!.id, 200, participant.frozenAt);
+    const created = await aiConversationRepository.createSession({
       workspaceId: input.workspaceId,
-      userId: input.userId,
       target: input.target,
+      creatorUserId: input.userId,
+      title: conversation!.title,
+      resumedFromConversationId: conversation!.id,
     });
+    if (source.length > 0) {
+      await aiConversationRepository.createMessages(
+        source.map((row) => ({
+          workspaceId: input.workspaceId,
+          conversationId: created.id,
+          authorUserId: row.authorUserId,
+          // In DB role e' una stringa; i soli valori scritti sono 'user'/'assistant'.
+          role: row.role as 'user' | 'assistant',
+          content: row.content,
+          citationsJson: (row.citationsJson ?? undefined) as Prisma.InputJsonValue | undefined,
+        })),
+      );
+    }
+    return { conversationId: created.id };
   },
 
   async saveAiBudgets(input: { workspaceId: string; body: unknown }) {

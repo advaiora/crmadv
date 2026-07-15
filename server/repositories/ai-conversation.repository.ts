@@ -1,14 +1,33 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../prisma.js';
 
-// Persistenza della Chat AI collaborativa (post-V4, Fase 1). Evoluzione della
-// vecchia project-chat.repository (che era per-utente): ora la conversazione e'
-// CONDIVISA per ambito. In Fase 1 l'unico ambito e' 'project' (una conversazione
-// per progetto), con partecipanti su invito esplicito e autore su ogni messaggio.
-// In Fase 2 si aggiungono gli ambiti 'client' e 'general', in Fase 3a gli allegati.
+// Persistenza della Chat AI collaborativa (post-V4). Evoluzione della vecchia
+// project-chat.repository (che era per-utente): la conversazione e' CONDIVISA su
+// invito esplicito, con autore su ogni messaggio. Ambiti 'project'/'client'/
+// 'general' (Fase 2), allegati (Fase 3a).
 // Sola gestione storage; RAG e generazione stanno nel service del motore AI.
+//
+// SESSIONI (15/7/2026, spec sez. 4-bis): un ambito ha N sessioni, non una chat
+// sola. L'ambito e' un FILTRO (scope + progetto/cliente), la sessione e' la
+// conversazione vera e propria. Chi lascia un gruppo viene congelato (frozenAt
+// sul partecipante), mai cancellato.
 
 const AUTHOR_SELECT = { id: true, name: true, email: true } as const;
+
+// Ambito di una sessione: dice su quale contesto CRM ragiona la chat.
+export type ChatScopeFilter =
+  | { scope: 'project'; projectId: string }
+  | { scope: 'client'; clientId: string }
+  | { scope: 'general' };
+
+// Filtro/valori dell'ambito. Gli id non pertinenti sono esplicitamente null (non
+// undefined): serve sia a filtrare con precisione sia a creare righe coerenti.
+const scopeWhere = (workspaceId: string, target: ChatScopeFilter) => ({
+  workspaceId,
+  scope: target.scope,
+  projectId: target.scope === 'project' ? target.projectId : null,
+  clientId: target.scope === 'client' ? target.clientId : null,
+});
 
 export type ConversationMessageInput = {
   workspaceId: string;
@@ -47,113 +66,91 @@ const ATTACHMENT_SELECT = {
 } as const;
 
 export const aiConversationRepository = {
-  // Conversazione dell'ambito progetto (thread unico condiviso). Null se non
-  // ancora creata (nessuno ha ancora aperto la chat di quel progetto).
-  findProjectConversation(workspaceId: string, projectId: string) {
-    return prisma.aiConversation.findFirst({
-      where: { workspaceId, scope: 'project', projectId },
+  // --- SESSIONI (15/7/2026). Un ambito ha N sessioni, non una chat sola. Prima
+  // c'erano tre trii find/create/getOrCreate (uno per ambito) che restituivano
+  // SEMPRE la stessa conversazione condivisa: chi non l'apriva per primo restava
+  // fuori. Ora l'ambito e' solo un filtro e le sessioni sono per utente. ---
+
+  // Elenco delle sessioni dell'utente su un ambito, dalla piu' recente. Include
+  // le sessioni CONGELATE (ci si e' usciti/rimossi): restano nell'elenco in sola
+  // lettura, per questo si filtra sul partecipante e non su frozenAt.
+  listUserSessions(workspaceId: string, userId: string, target: ChatScopeFilter) {
+    return prisma.aiConversation.findMany({
+      where: {
+        ...scopeWhere(workspaceId, target),
+        participants: { some: { userId } },
+      },
+      orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        participants: {
+          where: { userId },
+          select: { role: true, frozenAt: true },
+        },
+        _count: { select: { messages: true, participants: true } },
+      },
     });
   },
 
-  // Crea la conversazione dell'ambito progetto e iscrive il creatore come 'owner'
-  // in un'unica transazione, cosi' chi apre per primo la chat la "possiede".
-  async createProjectConversation(workspaceId: string, projectId: string, creatorUserId: string) {
+  // Sessione piu' recente dell'utente su un ambito. E' quella su cui si atterra
+  // aprendo la chat senza chiederne una precisa.
+  findLatestUserSession(workspaceId: string, userId: string, target: ChatScopeFilter) {
+    return prisma.aiConversation.findFirst({
+      where: {
+        ...scopeWhere(workspaceId, target),
+        participants: { some: { userId } },
+      },
+      orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
+    });
+  },
+
+  // Sessione per id, senza controlli di accesso (li fa il service).
+  findSessionById(workspaceId: string, conversationId: string) {
+    return prisma.aiConversation.findFirst({ where: { id: conversationId, workspaceId } });
+  },
+
+  // Crea una sessione sull'ambito e iscrive il creatore come 'owner' in un'unica
+  // transazione. 'owner' e' relativo a QUESTA sessione (rimuove i membri, scioglie
+  // il gruppo): non rende proprietari dell'ambito, e si puo' uscire.
+  createSession(input: {
+    workspaceId: string;
+    target: ChatScopeFilter;
+    creatorUserId: string;
+    title?: string | null;
+    resumedFromConversationId?: string | null;
+  }) {
     return prisma.aiConversation.create({
       data: {
-        workspaceId,
-        scope: 'project',
-        projectId,
-        createdByUserId: creatorUserId,
+        ...scopeWhere(input.workspaceId, input.target),
+        createdByUserId: input.creatorUserId,
+        title: input.title ?? null,
+        resumedFromConversationId: input.resumedFromConversationId ?? null,
+        lastMessageAt: new Date(),
         participants: {
           create: {
-            workspaceId,
-            userId: creatorUserId,
+            workspaceId: input.workspaceId,
+            userId: input.creatorUserId,
             role: 'owner',
-            invitedByUserId: creatorUserId,
+            invitedByUserId: input.creatorUserId,
           },
         },
       },
     });
   },
 
-  // Trova o crea la conversazione del progetto. Usato all'apertura della chat.
-  async getOrCreateProjectConversation(workspaceId: string, projectId: string, creatorUserId: string) {
-    const existing = await this.findProjectConversation(workspaceId, projectId);
-    if (existing) {
-      return existing;
-    }
-    return this.createProjectConversation(workspaceId, projectId, creatorUserId);
-  },
-
-  // --- Ambito CLIENTE (Fase 2): una conversazione condivisa per cliente. Stessa
-  // logica dell'ambito progetto ma agganciata a un clientId. ---
-  findClientConversation(workspaceId: string, clientId: string) {
-    return prisma.aiConversation.findFirst({
-      where: { workspaceId, scope: 'client', clientId },
-    });
-  },
-
-  async createClientConversation(workspaceId: string, clientId: string, creatorUserId: string) {
-    return prisma.aiConversation.create({
+  // Aggiorna la data dell'ultimo messaggio (ordina l'elenco) e, se la sessione non
+  // ha ancora un titolo, glielo assegna. Chiamata a ogni invio.
+  touchSession(conversationId: string, input: { lastMessageAt: Date; titleIfEmpty?: string | null }) {
+    return prisma.aiConversation.update({
+      where: { id: conversationId },
       data: {
-        workspaceId,
-        scope: 'client',
-        clientId,
-        createdByUserId: creatorUserId,
-        participants: {
-          create: {
-            workspaceId,
-            userId: creatorUserId,
-            role: 'owner',
-            invitedByUserId: creatorUserId,
-          },
-        },
+        lastMessageAt: input.lastMessageAt,
+        ...(input.titleIfEmpty ? { title: input.titleIfEmpty } : {}),
       },
     });
   },
 
-  async getOrCreateClientConversation(workspaceId: string, clientId: string, creatorUserId: string) {
-    const existing = await this.findClientConversation(workspaceId, clientId);
-    if (existing) {
-      return existing;
-    }
-    return this.createClientConversation(workspaceId, clientId, creatorUserId);
-  },
-
-  // --- Ambito GENERALE (Fase 2): una sola conversazione condivisa per workspace,
-  // senza contesto CRM. Non c'e' un vincolo DB (projectId e clientId sono entrambi
-  // null): l'unicita' e' garantita qui dal findFirst nel get-or-create. ---
-  findGeneralConversation(workspaceId: string) {
-    return prisma.aiConversation.findFirst({
-      where: { workspaceId, scope: 'general' },
-      orderBy: { createdAt: 'asc' },
-    });
-  },
-
-  async createGeneralConversation(workspaceId: string, creatorUserId: string) {
-    return prisma.aiConversation.create({
-      data: {
-        workspaceId,
-        scope: 'general',
-        createdByUserId: creatorUserId,
-        participants: {
-          create: {
-            workspaceId,
-            userId: creatorUserId,
-            role: 'owner',
-            invitedByUserId: creatorUserId,
-          },
-        },
-      },
-    });
-  },
-
-  async getOrCreateGeneralConversation(workspaceId: string, creatorUserId: string) {
-    const existing = await this.findGeneralConversation(workspaceId);
-    if (existing) {
-      return existing;
-    }
-    return this.createGeneralConversation(workspaceId, creatorUserId);
+  setSessionTitle(conversationId: string, title: string) {
+    return prisma.aiConversation.update({ where: { id: conversationId }, data: { title } });
   },
 
   // Id dei progetti di un cliente, unendo il legame diretto (Project.clientId) e
@@ -176,9 +173,11 @@ export const aiConversationRepository = {
   // Messaggi della conversazione dal piu' vecchio al piu' recente (ordine di
   // lettura). Include l'autore (per mostrarlo nella UI). `limit` tiene solo gli
   // ultimi N quando serve limitare il contesto passato all'AI.
-  async listMessages(conversationId: string, limit = 200) {
+  // `until` (= frozenAt del partecipante) taglia i messaggi successivi all'uscita:
+  // chi ha lasciato il gruppo vede cio' che ha vissuto, non cio' che e' successo dopo.
+  async listMessages(conversationId: string, limit = 200, until?: Date | null) {
     const rows = await prisma.aiConversationMessage.findMany({
-      where: { conversationId },
+      where: { conversationId, ...(until ? { createdAt: { lte: until } } : {}) },
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
@@ -221,23 +220,40 @@ export const aiConversationRepository = {
     return prisma.aiConversationMessage.deleteMany({ where: { conversationId } });
   },
 
-  // Partecipanti della conversazione, con i dati utente per la UI (chi puo' vedere
-  // e scrivere). Owner in cima, poi per data di ingresso.
+  // Partecipanti ATTIVI della conversazione, con i dati utente per la UI (chi puo'
+  // vedere e scrivere). Owner in cima, poi per data di ingresso. I congelati sono
+  // esclusi di proposito: chi resta a scrivere deve sapere esattamente chi lo legge.
   listParticipants(conversationId: string) {
     return prisma.aiConversationParticipant.findMany({
-      where: { conversationId },
+      where: { conversationId, frozenAt: null },
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
       include: { user: { select: AUTHOR_SELECT } },
     });
   },
 
-  isParticipant(conversationId: string, userId: string) {
-    return prisma.aiConversationParticipant
-      .findUnique({ where: { conversationId_userId: { conversationId, userId } } })
-      .then((row) => Boolean(row));
+  // Riga del partecipante, congelati compresi: il service ne legge role e frozenAt
+  // per decidere tra accesso pieno, sola lettura e diniego.
+  findParticipant(conversationId: string, userId: string) {
+    return prisma.aiConversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId } },
+    });
   },
 
-  // Invita (o riattiva) un partecipante. Idempotente sull'unicita' (conversationId, userId).
+  isParticipant(conversationId: string, userId: string) {
+    return this.findParticipant(conversationId, userId).then((row) => Boolean(row) && !row?.frozenAt);
+  },
+
+  // Chi resta ATTIVO oltre a un utente, dal piu' anziano: e' l'ordine di successione
+  // quando l'owner esce (la sessione passa a chi resta, non muore).
+  listOtherActiveParticipants(conversationId: string, exceptUserId: string) {
+    return prisma.aiConversationParticipant.findMany({
+      where: { conversationId, frozenAt: null, userId: { not: exceptUserId } },
+      orderBy: { createdAt: 'asc' },
+    });
+  },
+
+  // Invita un partecipante. Idempotente sull'unicita' (conversationId, userId):
+  // re-invitare un CONGELATO lo scongela e gli ridiventa visibile tutto lo storico.
   addParticipant(input: {
     workspaceId: string;
     conversationId: string;
@@ -247,7 +263,7 @@ export const aiConversationRepository = {
   }) {
     return prisma.aiConversationParticipant.upsert({
       where: { conversationId_userId: { conversationId: input.conversationId, userId: input.userId } },
-      update: {},
+      update: { frozenAt: null },
       create: {
         workspaceId: input.workspaceId,
         conversationId: input.conversationId,
@@ -258,8 +274,30 @@ export const aiConversationRepository = {
     });
   },
 
-  removeParticipant(conversationId: string, userId: string) {
-    return prisma.aiConversationParticipant.deleteMany({ where: { conversationId, userId } });
+  // Congela un partecipante: NON lo cancella. Vale per l'uscita autonoma, la
+  // rimozione da parte dell'owner/admin e lo scioglimento del gruppo - regola unica.
+  // Se era owner torna 'member': la gestione della sessione passa a chi resta.
+  freezeParticipant(conversationId: string, userId: string, frozenAt: Date) {
+    return prisma.aiConversationParticipant.updateMany({
+      where: { conversationId, userId, frozenAt: null },
+      data: { frozenAt, role: 'member' },
+    });
+  },
+
+  // Congela in blocco tutti gli attivi tranne uno: e' lo scioglimento del gruppo,
+  // che riporta la sessione a chi lo esegue senza toccare i messaggi.
+  freezeOtherParticipants(conversationId: string, exceptUserId: string, frozenAt: Date) {
+    return prisma.aiConversationParticipant.updateMany({
+      where: { conversationId, frozenAt: null, userId: { not: exceptUserId } },
+      data: { frozenAt, role: 'member' },
+    });
+  },
+
+  promoteToOwner(conversationId: string, userId: string) {
+    return prisma.aiConversationParticipant.updateMany({
+      where: { conversationId, userId },
+      data: { role: 'owner' },
+    });
   },
 
   // --- Allegati (Fase 3a): documenti caricati ed elementi CRM allegati a un
