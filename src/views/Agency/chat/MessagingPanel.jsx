@@ -108,16 +108,21 @@ const ContactList = ({ contacts, loading, error, activePeerId, draft, onDraft, o
   </div>
 );
 
-const MessagingPanel = ({ expanded, canSend }) => {
+// `peer` e `onPeerChange` arrivano dal padre (AiChatWidget): la persona selezionata
+// vive un livello piu' su, come gia' la sessione della Chat AI. Serve perche' il
+// pannello si SMONTA cambiando mondo ({isMessaging ? <MessagingPanel/> : …}); se il
+// peer stesse qui dentro, tornando ai Messaggi la conversazione aperta sarebbe persa
+// (QoL segnalato il 16/7, spec 4-ter §5). Tenendolo nel padre la casella la ricorda.
+const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
   const [contacts, setContacts] = React.useState([]);
   const [contactsLoading, setContactsLoading] = React.useState(true);
   const [contactsError, setContactsError] = React.useState("");
   const [draftSearch, setDraftSearch] = React.useState("");
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Si tiene il contatto INTERO, non solo l'id: la ricerca filtra l'elenco e con il
-  // solo id il nome dell'intestazione sparirebbe appena il peer esce dai risultati.
-  const [peer, setPeer] = React.useState(null);
+  // Il contatto INTERO (non solo l'id) sta nel padre: la ricerca filtra l'elenco e con
+  // il solo id il nome dell'intestazione sparirebbe appena il peer esce dai risultati.
+  const setPeer = onPeerChange;
   const [messages, setMessages] = React.useState([]);
   const [messagesLoading, setMessagesLoading] = React.useState(false);
   const [messagesError, setMessagesError] = React.useState("");

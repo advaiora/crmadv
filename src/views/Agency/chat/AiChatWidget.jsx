@@ -302,6 +302,12 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   // dello SHELL, non dei due mondi: cambiare mondo non deve rimpicciolire la finestra.
   const [mode, setMode] = React.useState(initialMode);
   const [expanded, setExpanded] = React.useState(false);
+
+  // Persona selezionata nel mondo Messaggi. Vive QUI, nel padre, e non dentro
+  // MessagingPanel: quel pannello si smonta cambiando mondo, e con lo stato interno
+  // la conversazione aperta andrebbe persa. Tenendolo qui la casella la ricorda,
+  // esattamente come gia' fa la Chat AI con la sua sessione (spec 4-ter §5, QoL).
+  const [messagingPeer, setMessagingPeer] = React.useState(null);
   const [access, setAccess] = React.useState(null);
   const [accessLoaded, setAccessLoaded] = React.useState(false);
 
@@ -816,7 +822,12 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
       {accessLoaded && canUseMessaging && <ModeTabs mode={mode} onMode={setMode} />}
 
       {isMessaging ? (
-        <MessagingPanel expanded={expandedView} canSend={canSendMessages} />
+        <MessagingPanel
+          expanded={expandedView}
+          canSend={canSendMessages}
+          peer={messagingPeer}
+          onPeerChange={setMessagingPeer}
+        />
       ) : (
         <>
         <ScopeTabs activeScope={scope} onScope={changeScope} />

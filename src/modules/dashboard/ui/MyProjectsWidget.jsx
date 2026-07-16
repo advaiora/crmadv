@@ -6,6 +6,7 @@ import { Skeleton } from '../../../components/ui/skeleton';
 import WidgetCard, { WidgetEmptyState } from './WidgetCard';
 import { formatDateTime } from './formatters';
 import { rowActivationProps } from '../../../utils/rowActivation';
+import { askAiRowProps } from '../../../views/Agency/chat/askAi';
 
 const RowSkeleton = () => (
   <div className="space-y-2 rounded-xl border border-cardBorder px-3 py-3">
@@ -47,6 +48,7 @@ const MyProjectsWidget = ({ title = 'My projects', data, loading = false }) => {
               className={`rounded-xl px-3 py-3 transition-colors hover:bg-hover${item.href ? ' row-clickable' : ''}`}
               aria-label={item.href ? `Apri ${item.name}` : undefined}
               {...(item.href ? rowActivationProps(() => window.location.assign(item.href)) : {})}
+              {...askAiRowProps('project', item)}
             >
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">{item.name}</span>
