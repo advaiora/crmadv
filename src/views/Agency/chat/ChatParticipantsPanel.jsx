@@ -27,7 +27,15 @@ import { IconClose } from "./chatIcons";
 
 const participantLabel = (entry) => entry?.name || entry?.email || "Utente";
 
-const ChatParticipantsPanel = ({ target, conversationId, currentUserId, onClose, onFrozen, onCleared }) => {
+const ChatParticipantsPanel = ({
+  target,
+  conversationId,
+  currentUserId,
+  onClose,
+  onFrozen,
+  onCleared,
+  onSoloChange,
+}) => {
   const [participants, setParticipants] = React.useState([]);
   const [invitable, setInvitable] = React.useState([]);
   const [selected, setSelected] = React.useState("");
@@ -38,6 +46,17 @@ const ChatParticipantsPanel = ({ target, conversationId, currentUserId, onClose,
   const me = participants.find((entry) => entry.userId === currentUserId);
   const isCreator = me?.role === "owner";
   const isGroup = participants.length > 1;
+
+  // Invitare o rimuovere qualcuno cambia il numero di partecipanti attivi, e con esso la
+  // regola dei turni: da solo l'AI risponde a ogni messaggio, in gruppo serve @AI
+  // (spec sez. 2). Il padre tiene `isSolo` per la UI del composer; glielo aggiorniamo
+  // da qui — senza ricaricare la chat (che chiuderebbe questo pannello). Gated su
+  // !loading per non spingere lo stato transitorio a lista vuota.
+  React.useEffect(() => {
+    if (!loading) {
+      onSoloChange?.(participants.length <= 1);
+    }
+  }, [participants.length, loading, onSoloChange]);
 
   const apply = (result) => {
     if (!result) return;

@@ -243,6 +243,16 @@ export const aiConversationRepository = {
     return this.findParticipant(conversationId, userId).then((row) => Boolean(row) && !row?.frozenAt);
   },
 
+  // Quanti partecipanti ATTIVI (non congelati) ha la sessione. Serve alla regola
+  // "da solo l'AI risponde sempre" (spec sez. 2): in una sessione solitaria ogni
+  // messaggio interpella l'AI, in una di gruppo serve @AI o il pulsante. E' per
+  // SESSIONE, non per ambito, quindi si conta sulla conversazione.
+  countActiveParticipants(conversationId: string) {
+    return prisma.aiConversationParticipant.count({
+      where: { conversationId, frozenAt: null },
+    });
+  },
+
   // Chi resta ATTIVO oltre a un utente, dal piu' anziano: e' l'ordine di successione
   // quando l'owner esce (la sessione passa a chi resta, non muore).
   listOtherActiveParticipants(conversationId: string, exceptUserId: string) {

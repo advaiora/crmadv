@@ -323,6 +323,9 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   // (o ti hanno rimosso, o il gruppo si e' sciolto): la vedi ma non ci scrivi piu'.
   const [conversationId, setConversationId] = React.useState(null);
   const [isFrozen, setIsFrozen] = React.useState(false);
+  // Sei l'unico partecipante attivo: l'AI risponde a ogni messaggio, senza @AI
+  // (spec sez. 2). La UI lo usa per un solo tasto "Invia" e l'indicatore di attesa.
+  const [isSolo, setIsSolo] = React.useState(false);
   const [sessions, setSessions] = React.useState([]);
   const [sessionsLoading, setSessionsLoading] = React.useState(false);
   const [showSessions, setShowSessions] = React.useState(false);
@@ -503,6 +506,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
         const openId = chat?.conversationId || null;
         setConversationId(openId);
         setIsFrozen(chat?.isFrozen === true);
+        setIsSolo(chat?.isSolo === true);
         setAiConfigured(chat?.aiConfigured !== false);
         setIsParticipant(chat?.isParticipant !== false);
         setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
@@ -748,7 +752,9 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
     if (!question || sending || !selectedTarget) {
       return;
     }
-    const willInvokeAi = askAi || mentionsAi(question);
+    // Da solo l'AI risponde comunque (isSolo): lo rispecchio qui cosi' l'indicatore
+    // "sta pensando" compare anche premendo il semplice "Invia", non solo "Chiedi all'AI".
+    const willInvokeAi = askAi || isSolo || mentionsAi(question);
     setSending(true);
     setAiThinking(willInvokeAi);
     setError("");
@@ -902,6 +908,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
                 target={selectedTarget}
                 conversationId={conversationId}
                 currentUserId={currentUserId}
+                onSoloChange={setIsSolo}
                 onClose={() => setShowParticipants(false)}
                 onFrozen={() => {
                   // Uscito o sciolto: da qui in poi la sessione e' in sola lettura.
@@ -955,8 +962,17 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
                       ogni <strong> sciolto diventerebbe una riga a se' e la frase si
                       spezzerebbe in cinque. */}
                   <p className="mb-0">
-                    Nessun messaggio. Scrivi e usa <strong>@AI</strong> (o <strong>Chiedi all&rsquo;AI</strong>) per una
-                    risposta dell&rsquo;assistente.
+                    {isSolo ? (
+                      <>
+                        Nessun messaggio. Sei da solo qui: l&rsquo;assistente risponde a <strong>ogni</strong> messaggio
+                        che scrivi. Invita qualcuno e servirà di nuovo <strong>@AI</strong>.
+                      </>
+                    ) : (
+                      <>
+                        Nessun messaggio. Scrivi e usa <strong>@AI</strong> (o <strong>Chiedi all&rsquo;AI</strong>) per
+                        una risposta dell&rsquo;assistente.
+                      </>
+                    )}
                   </p>
                 </div>
               ) : (
@@ -1042,24 +1058,45 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
                     Elemento
                   </Button>
                   <span className="ai-chat-composer-spacer" />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant="outline-primary"
-                    disabled={sending || input.trim().length === 0}
-                  >
-                    {sending && !aiThinking ? <Spinner animation="border" size="sm" /> : "Invia"}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="primary"
-                    onClick={() => void submit(true)}
-                    disabled={sending || !aiConfigured || input.trim().length === 0}
-                    title={aiConfigured ? "Invia e chiedi una risposta all'AI" : "AI non configurata"}
-                  >
-                    {aiThinking ? <Spinner animation="border" size="sm" /> : "Chiedi all'AI"}
-                  </Button>
+                  {/* Da solo i due tasti direbbero la stessa cosa (l'AI risponde
+                      comunque): se ne mostra uno solo. In gruppo tornano distinti —
+                      "Invia" parla alle persone, "Chiedi all'AI" interpella l'assistente. */}
+                  {isSolo ? (
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="primary"
+                      disabled={sending || input.trim().length === 0}
+                      title={
+                        aiConfigured
+                          ? "Sei da solo: l'assistente risponde a ogni messaggio"
+                          : "AI non configurata"
+                      }
+                    >
+                      {sending ? <Spinner animation="border" size="sm" /> : "Invia"}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="outline-primary"
+                        disabled={sending || input.trim().length === 0}
+                      >
+                        {sending && !aiThinking ? <Spinner animation="border" size="sm" /> : "Invia"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="primary"
+                        onClick={() => void submit(true)}
+                        disabled={sending || !aiConfigured || input.trim().length === 0}
+                        title={aiConfigured ? "Invia e chiedi una risposta all'AI" : "AI non configurata"}
+                      >
+                        {aiThinking ? <Spinner animation="border" size="sm" /> : "Chiedi all'AI"}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </Form>
             )}

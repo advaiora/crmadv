@@ -7947,6 +7947,9 @@ export const agencyService = {
       isFrozen,
       frozenAt: participant?.frozenAt ?? null,
       canManage: participant?.role === 'owner' && !isFrozen,
+      // Da solo (un solo partecipante attivo) l'AI risponde a ogni messaggio: la UI
+      // lo usa per mostrare un solo tasto "Invia" e l'indicatore di attesa (spec sez. 2).
+      isSolo: participants.length <= 1,
       participants: participants.map(mapConversationParticipant),
       messages,
     };
@@ -8181,7 +8184,15 @@ export const agencyService = {
       };
     };
 
-    const invokeAi = parsed.data.askAi === true || /(^|\s)@ai\b/i.test(message);
+    // Turni (spec sez. 2 + 4-bis). L'AI risponde solo se interpellata — @AI o
+    // pulsante — MA questa e' una regola nata per il GRUPPO: se sei l'unico
+    // partecipante attivo non c'e' nessun altro a cui parlare, quindi ogni messaggio
+    // la interpella. Vale per SESSIONE, non per ambito: appena inviti qualcuno la
+    // sessione diventa di gruppo e torna la regola @AI. Il mittente e' sempre attivo
+    // (resolveConversationForUser blocca i congelati), quindi count === 1 = da solo.
+    const mentioned = parsed.data.askAi === true || /(^|\s)@ai\b/i.test(message);
+    const activeParticipantCount = await aiConversationRepository.countActiveParticipants(conversation.id);
+    const invokeAi = mentioned || activeParticipantCount === 1;
     if (!invokeAi) {
       return buildResult({ aiInvoked: false });
     }
