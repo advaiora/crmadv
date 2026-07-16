@@ -29,6 +29,7 @@
     "@amcharts/amcharts5-geodata": "^5.1.5",
     "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
+    "@fastify/websocket": "^11.3.0",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",

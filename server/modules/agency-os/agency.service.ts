@@ -15,6 +15,7 @@ import { agencyRepository } from './agency.repository.js';
 import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
 import { aiBudgetRepository, AI_BUDGET_DEFAULT_USER } from '../../repositories/ai-budget.repository.js';
 import { aiConversationRepository, type ConversationMessageInput } from '../../repositories/ai-conversation.repository.js';
+import { broadcastToConversation } from '../realtime/hub.js';
 import {
   ENTITY_TYPE_LABEL,
   buildEntitySnapshot,
@@ -8202,6 +8203,16 @@ export const agencyService = {
           ? { ...row, suggestions: suggestionAttach.suggestions }
           : row,
       );
+      // Tempo reale (Fase 4): ogni ramo di uscita passa di qui dopo aver persistito i
+      // messaggi del turno (utente e, se invocata, risposta AI). Un solo segnale
+      // leggero "la conversazione e' cambiata" agli altri partecipanti connessi, che
+      // ricaricano dal loro endpoint autorizzato. Best-effort, niente contenuto nel
+      // canale; se nessuno e' iscritto non fa nulla.
+      broadcastToConversation(conversation.id, {
+        type: 'chat.changed',
+        conversationId: conversation.id,
+        scope: input.target.scope,
+      });
       return {
         conversationId: conversation.id,
         scope: input.target.scope,

@@ -4,6 +4,7 @@ import {
   messagingRepository,
   type WorkspaceMember,
 } from './repository.js';
+import { broadcastToUser } from '../realtime/hub.js';
 
 const DEFAULT_CONTACTS_LIMIT = 50;
 const DEFAULT_MESSAGES_LIMIT = 100;
@@ -248,6 +249,14 @@ export const messagingService = {
       recipientUserId: peer.userId,
       body: payload.body,
     });
+
+    // Tempo reale (Fase 4): segnale leggero "hai un nuovo messaggio", niente contenuto.
+    // Chi lo riceve ricarica dal proprio endpoint autorizzato. `withUserId` e' l'altro
+    // capo della conversazione toccata, dal punto di vista di chi riceve il segnale:
+    // per il destinatario e' il mittente, per gli altri tab del mittente e' il peer.
+    // Best-effort: se nessuno e' connesso non fa nulla, e non deve mai far fallire l'invio.
+    broadcastToUser(peer.userId, { type: 'message.new', withUserId: input.userId });
+    broadcastToUser(input.userId, { type: 'message.new', withUserId: peer.userId });
 
     return {
       peer,

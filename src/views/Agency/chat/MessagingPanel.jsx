@@ -8,6 +8,7 @@ import {
 } from "../../../modules/messaging/api/messagingApi";
 import { formatListDate, formatTime } from "./chatShared";
 import { IconBack, IconSearch } from "./chatIcons";
+import { subscribeMessaging, subscribeStatus } from "../../../realtime/realtimeClient";
 
 // Il mondo MESSAGGISTICA dentro il popup delle chat (spec 4-ter §1).
 //
@@ -21,9 +22,14 @@ import { IconBack, IconSearch } from "./chatIcons";
 // dove la si guarda.
 
 // Stessi ritmi della pagina Messaggi: i contatti cambiano piano, la conversazione
-// aperta e' quella che si guarda mentre l'altro scrive.
+// aperta e' quella che si guarda mentre l'altro scrive. Questi valori sono la RETE DI
+// SICUREZZA: quando il tempo reale (websocket) e' connesso il polling rallenta ai
+// valori "SLOW" (l'aggiornamento istantaneo arriva dal websocket); se il websocket
+// cade, si torna ai ritmi rapidi.
 const CONTACTS_POLL_INTERVAL_MS = 2500;
 const CONVERSATION_POLL_INTERVAL_MS = 1500;
+const CONTACTS_POLL_SLOW_MS = 20000;
+const CONVERSATION_POLL_SLOW_MS = 12000;
 
 const getErrorMessage = (error, fallback) => {
   const status = Number(error?.status);
@@ -131,6 +137,7 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
 
   const bottomRef = React.useRef(null);
   const peerId = peer?.userId || "";
+  const [realtimeConnected, setRealtimeConnected] = React.useState(false);
 
   // A tutto schermo le due colonne stanno insieme; nel popup si mostra una cosa
   // alla volta, come su un telefono.
@@ -204,6 +211,22 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Tempo reale (Fase 4): sappiamo se il websocket e' connesso (per rallentare il
+  // polling) e ascoltiamo il segnale "nuovo messaggio". Ricevuto il segnale, si
+  // ricarica dall'endpoint autorizzato: l'elenco contatti sempre (badge non letti,
+  // anteprime) e la conversazione aperta solo se e' quella toccata.
+  React.useEffect(() => subscribeStatus(setRealtimeConnected), []);
+
+  React.useEffect(() => {
+    const onMessagingEvent = (event) => {
+      void loadContacts({ silent: true });
+      if (event?.withUserId && event.withUserId === peerId) {
+        void loadConversation(peerId, { silent: true });
+      }
+    };
+    return subscribeMessaging(onMessagingEvent);
+  }, [loadContacts, loadConversation, peerId]);
+
   // Due poller separati, ognuno acceso solo quando la sua colonna e' a video: nel
   // popup stretto ne gira sempre uno solo. Il componente esiste solo a popup aperto,
   // quindi a popup chiuso non resta niente acceso.
@@ -213,6 +236,7 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
     }
     let timeoutId;
     let cancelled = false;
+    const delay = realtimeConnected ? CONTACTS_POLL_SLOW_MS : CONTACTS_POLL_INTERVAL_MS;
 
     const run = async () => {
       if (cancelled) return;
@@ -220,15 +244,15 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
         await loadContacts({ silent: true });
       }
       if (cancelled) return;
-      timeoutId = window.setTimeout(run, CONTACTS_POLL_INTERVAL_MS);
+      timeoutId = window.setTimeout(run, delay);
     };
 
-    timeoutId = window.setTimeout(run, CONTACTS_POLL_INTERVAL_MS);
+    timeoutId = window.setTimeout(run, delay);
     return () => {
       cancelled = true;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [loadContacts, showList]);
+  }, [loadContacts, showList, realtimeConnected]);
 
   React.useEffect(() => {
     if (!peerId) {
@@ -236,6 +260,7 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
     }
     let timeoutId;
     let cancelled = false;
+    const delay = realtimeConnected ? CONVERSATION_POLL_SLOW_MS : CONVERSATION_POLL_INTERVAL_MS;
 
     const run = async () => {
       if (cancelled) return;
@@ -243,15 +268,15 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
         await loadConversation(peerId, { silent: true });
       }
       if (cancelled) return;
-      timeoutId = window.setTimeout(run, CONVERSATION_POLL_INTERVAL_MS);
+      timeoutId = window.setTimeout(run, delay);
     };
 
-    timeoutId = window.setTimeout(run, CONVERSATION_POLL_INTERVAL_MS);
+    timeoutId = window.setTimeout(run, delay);
     return () => {
       cancelled = true;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [loadConversation, peerId]);
+  }, [loadConversation, peerId, realtimeConnected]);
 
   const submitSearch = (event) => {
     event.preventDefault();

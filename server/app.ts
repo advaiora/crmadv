@@ -7,6 +7,7 @@ import { readHeaderValue } from "./auth/devAuth.js";
 import { isHttpError } from "./core/errors.js";
 import { requestContext } from "./core/request-context.js";
 import { fail, ok } from "./core/response.js";
+import { buildCorsDecision, parseAllowedOrigins } from "./core/cors-origins.js";
 import { requireAuth } from "./guards/requireAuth.js";
 import { requireModuleEnabled } from "./guards/requireModule.js";
 import { requirePermission } from "./guards/requirePermission.js";
@@ -33,13 +34,12 @@ import workspaceAuditRoute from "./modules/audit/routes/workspace-audit.route.js
 import workspaceTeamRoute from "./modules/team/routes/workspace-team.route.js";
 import workspaceVaultRoute from "./modules/vault/routes/workspace-vault.route.js";
 import workspaceAgencyRoute from "./modules/agency-os/routes/workspace-agency.route.js";
+import realtimeRoute from "./modules/realtime/realtime.route.js";
 import workspaceWebAssetsRoute from "./routes/workspace-web-assets.route.js";
 import adminRoute from "./routes/admin.route.js";
 
 const DB_UNAVAILABLE_CODES = new Set(["P1001", "P1002", "P1017"]);
-const DEV_DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
 const DEV_EXPECTED_FRONTEND_ORIGIN = "http://localhost:5173";
-const DEV_ALLOWED_LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
 const CORS_ALLOW_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const CORS_ALLOW_HEADERS = "Content-Type, Authorization, X-Workspace-Id, X-Workspace-Slug, X-Google-Client-Id-Debug";
 
@@ -54,73 +54,12 @@ const isFastifyClientError = (error: unknown): error is { statusCode: number; co
   return typeof maybeStatusCode === "number" && maybeStatusCode >= 400 && maybeStatusCode < 500;
 };
 
-const normalizeOrigin = (value: string): string | null => {
-  const normalized = value.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  try {
-    return new URL(normalized).origin;
-  } catch {
-    return null;
-  }
-};
-
-const parseAllowedOrigins = () => {
-  const rawValue = process.env.ALLOWED_ORIGINS;
-  const isProduction = process.env.NODE_ENV === "production";
-  const candidates = rawValue
-    ? rawValue.split(",")
-    : isProduction
-      ? []
-      : DEV_DEFAULT_ALLOWED_ORIGINS;
-
-  const normalizedOrigins = new Set<string>();
-  for (const candidate of candidates) {
-    const normalized = normalizeOrigin(candidate);
-    if (normalized) {
-      normalizedOrigins.add(normalized);
-    }
-  }
-
-  return [...normalizedOrigins];
-};
-
 const setCorsHeaders = (reply: { header: (name: string, value: string) => void }, origin: string) => {
   reply.header("Access-Control-Allow-Origin", origin);
   reply.header("Access-Control-Allow-Credentials", "true");
   reply.header("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
   reply.header("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
   reply.header("Vary", "Origin");
-};
-
-const isDevLoopbackOrigin = (origin: string) => {
-  if (process.env.NODE_ENV === "production") {
-    return false;
-  }
-
-  try {
-    const parsedOrigin = new URL(origin);
-    return parsedOrigin.protocol === "http:" && DEV_ALLOWED_LOCALHOST_HOSTNAMES.has(parsedOrigin.hostname);
-  } catch {
-    return false;
-  }
-};
-
-const buildCorsDecision = (requestOriginRaw: string | null, corsAllowedOriginsSet: Set<string>) => {
-  const requestOriginNormalized = requestOriginRaw ? normalizeOrigin(requestOriginRaw) : null;
-  const allowedByList = requestOriginNormalized ? corsAllowedOriginsSet.has(requestOriginNormalized) : false;
-  const allowedByDevLoopback = requestOriginNormalized ? isDevLoopbackOrigin(requestOriginNormalized) : false;
-  const isAllowed = requestOriginNormalized ? (allowedByList || allowedByDevLoopback) : false;
-
-  return {
-    requestOriginRaw,
-    requestOriginNormalized,
-    allowedByList,
-    allowedByDevLoopback,
-    isAllowed,
-  };
 };
 
 const isDatabaseUnavailableError = (error: unknown) => {
@@ -353,6 +292,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceTeamRoute);
   void app.register(workspaceVaultRoute);
   void app.register(workspaceAgencyRoute);
+  void app.register(realtimeRoute);
   void app.register(workspaceWebAssetsRoute);
   void app.register(workspaceRolesRoute);
   void app.register(workspaceDepartmentsRoute);

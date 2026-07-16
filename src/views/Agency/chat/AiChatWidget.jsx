@@ -21,6 +21,7 @@ import {
   resumeAgencyChatSession,
 } from "../../../modules/agency-os/api/agency.api";
 import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission } from "../../../utils/workspaceAccess";
+import { subscribeConversation } from "../../../realtime/realtimeClient";
 import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from "../../../modules/messaging/ui/constants";
 import ChatBubble from "./chatBubble";
 import MessagingPanel from "./MessagingPanel";
@@ -531,6 +532,43 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
     },
     [],
   );
+
+  // Refresh SILENZIOSO dei soli messaggi (tempo reale, Fase 4): niente spinner, non
+  // tocca le bozze del composer ne' i pannelli aperti. Preserva i bottoni di
+  // navigazione (Fase 6): non sono persistiti (listMessages non li ha), vivono solo
+  // in memoria agganciati al loro messaggio — quindi al refetch si ri-agganciano per
+  // id, cosi' un aggiornamento arrivato dal websocket non li cancella dalla vista di
+  // chi li aveva appena ricevuti.
+  const refreshMessages = React.useCallback(async (target, id) => {
+    if (!target || !id) return;
+    try {
+      const chat = await fetchScopedChat(target, { conversationId: id });
+      if (!chat || chat.conversationId !== id) return; // la sessione e' cambiata nel frattempo
+      setIsFrozen(chat.isFrozen === true);
+      setIsSolo(chat.isSolo === true);
+      setIsParticipant(chat.isParticipant !== false);
+      setMessages((prev) => {
+        const keptSuggestions = new Map(
+          prev.filter((m) => Array.isArray(m.suggestions) && m.suggestions.length > 0).map((m) => [m.id, m.suggestions]),
+        );
+        const incoming = Array.isArray(chat.messages) ? chat.messages : [];
+        return incoming.map((m) => (keptSuggestions.has(m.id) ? { ...m, suggestions: keptSuggestions.get(m.id) } : m));
+      });
+    } catch {
+      // silenzioso: se il refresh non riesce, resta a video quello che c'e' gia'.
+    }
+  }, []);
+
+  // Tempo reale (Fase 4): si ascolta la conversazione APERTA. Quando un altro
+  // partecipante scrive (o l'AI risponde per lui), il server manda il segnale e qui si
+  // ricarica in silenzio. L'iscrizione segue la sessione aperta: cambiando sessione ci
+  // si sposta sul canale giusto.
+  React.useEffect(() => {
+    if (!selectedTarget || !conversationId) return undefined;
+    return subscribeConversation(conversationId, () => {
+      void refreshMessages(selectedTarget, conversationId);
+    });
+  }, [selectedTarget, conversationId, refreshMessages]);
 
   // Apre un ambito: prima la chat, POI l'elenco. L'ordine non e' cosmetico — alla
   // prima apertura di un ambito e' `loadChat` a creare la sessione dell'utente, e
