@@ -379,3 +379,15 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Distinguere loop da pane in un colpo:** leggere la console (`read_console_messages`). Se e' pulita (niente `Maximum update depth exceeded`, niente `RangeError: Maximum call stack`), **non c'e' loop di render**: il problema e' ambientale.
 - **Verificare comunque, per altri canali:** `curl` sul transform Vite del file (`http://localhost:<porta>/src/.../File.jsx` → 200 = compila, nota #11); `lint`; `tsc --noEmit`; `npm run test:unit`; `npm run build`. Se sono tutti verdi e la console non ha errori, il codice e' sano: la **resa visiva** resta l'unica cosa non verificata, da guardare quando la pane torna (o dalla persona in staffetta).
 - **Progettare per non dipendere dal pixel:** se un layout ha un valore stimato (es. `height: calc(100dvh - 116px)` per togliere topbar+tab), mettere `overflow: hidden` sul contenitore, cosi' una stima imperfetta non produce mai una doppia barra di scroll — al massimo un filo di spazio in piu' o in meno, cosmetico.
+
+---
+
+## 28. Un'altra sessione tiene API+Vite attivi: niente `prisma generate`, e build in contesa
+
+**Contesto:** lavorare mentre **un'altra sessione** (altra chat/finestra) ha gia' avviato `npm run dev:api` (porta 4000) e `npm run dev` (porta 5173) sulla stessa cartella. Un hook lo segnala ("Another chat's dev server is running").
+
+**Due conseguenze da mettere in conto:**
+- **`prisma generate` va in EPERM (lock DLL, nota #15) e NON si puo' risolvere** fermando "il proprio" server: il processo che tiene il lock e' dell'**altra sessione**, e **non va ucciso** (romperebbe il suo lavoro). Quindi in questa condizione **qualsiasi cambiamento di schema Prisma e' di fatto bloccato** (la migrazione SQL si applicherebbe con `migrate deploy` senza toccare la DLL, ma il client non si rigenera → tsc e runtime non vedono i campi nuovi). **Conseguenza di metodo:** se serve una feature che vorrebbe una colonna nuova, **progettarla senza toccare lo schema** finche' l'altra sessione e' attiva (es. dati effimeri restituiti nella risposta invece che persistiti; snapshot testuali su colonne gia' esistenti). Verificato il 16/7 su piu' fasi della V4 (navigazione suggerita, compressione contesto): costruite tutte schema-free.
+- **`npm run build` va in contesa** e puo' sforare i 5 minuti (exit 143 = SIGTERM del timeout) con Vite+API dell'altra sessione + eventuali `tsc`/test in parallelo. **Modo corretto:** lanciarlo in **background** (`run_in_background`) e leggere il log a fine corsa, invece di tenerlo in primo piano con timeout stretto; evitare di far girare build **e** tsc **e** test insieme (thrash). A macchina meno carica il build riesce (~4 min, "6961 modules transformed").
+
+**Come capire chi tiene le porte senza uccidere il processo sbagliato:** `netstat -ano | grep LISTENING | grep :4000` (e `:5173`) da' il PID; **non** matchare per command-line (nota #17) e comunque **non terminare** processi che non si sono avviati in questa sessione.
