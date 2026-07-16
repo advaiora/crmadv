@@ -29,7 +29,7 @@ import CustomFieldsPage from "../modules/customFields/ui/CustomFieldsPage";
 import IntegrationsPage from "../modules/integrations/ui/IntegrationsPage";
 import Dashboard from "../views/Dashboard";
 import Team from "../views/Team";
-import Email from "../views/Email";
+import MessagingInboxPage from "../views/Messaging/MessagingInboxPage";
 import QuoteDetail from "../views/Quotes/QuoteDetail";
 import QuoteFormPage from "../views/Quotes/QuoteFormPage";
 import QuoteNotificationsSettings from "../views/Quotes/QuoteNotificationsSettings";
@@ -75,7 +75,7 @@ export const routes = [
     { path: 'dashboard', exact: true, component: Dashboard },
     //Apps
     { path: 'apps/calendar', exact: true, component: Calendar },
-    { path: 'apps/email', exact: true, component: Email },
+    { path: 'apps/email', exact: true, component: MessagingInboxPage },
     { path: 'apps/clients', exact: true, component: ClientsList },
     { path: 'apps/clients/new', exact: true, component: ClientNew },
     { path: 'apps/clients/custom-fields', exact: true, component: CustomFieldsPage },

@@ -287,7 +287,12 @@ const EntityPicker = ({ items, loading, error, query, onQuery, onSelect, onRetry
   );
 };
 
-const AiChatWidget = () => {
+// `inline` monta la chat DENTRO una pagina (la casella, spec 4-ter §4) invece che in
+// overlay: sempre a tutto schermo, senza pulsanti apri/chiudi/espandi, e sordo agli
+// eventi globali del popup. `initialMode` sceglie il mondo di partenza (la casella
+// parte dai Messaggi, il popup dalla Chat AI). Stesso identico componente nei due
+// casi: "una sola implementazione, non una copia".
+const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   const { session } = useSession();
   const currentUserId = session?.userId || null;
 
@@ -295,7 +300,7 @@ const AiChatWidget = () => {
 
   // Quale dei due mondi si sta guardando, e se il popup e' a tutto schermo. Sono
   // dello SHELL, non dei due mondi: cambiare mondo non deve rimpicciolire la finestra.
-  const [mode, setMode] = React.useState("ai");
+  const [mode, setMode] = React.useState(initialMode);
   const [expanded, setExpanded] = React.useState(false);
   const [access, setAccess] = React.useState(null);
   const [accessLoaded, setAccessLoaded] = React.useState(false);
@@ -335,6 +340,10 @@ const AiChatWidget = () => {
   const bottomRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
 
+  // "Aperto" = l'overlay e' stato aperto, oppure e' la casella inline (che vive
+  // sempre sulla pagina). I caricamenti alla prima apertura si agganciano a questo.
+  const panelOpen = inline || open;
+
   // I clienti selezionabili derivano dai progetti visibili all'utente (il modello
   // V2 non ha un'assegnazione diretta utente<->cliente): un cliente e' "assegnato a
   // me" se ho almeno un suo progetto assegnato, e "ha Fonti" se ne ha almeno uno.
@@ -371,7 +380,12 @@ const AiChatWidget = () => {
     }
   }, []);
 
+  // Gli eventi globali (apri/commuta il popup) sono roba dell'overlay: la casella
+  // inline non deve reagirci, altrimenti il pulsante in topbar aprirebbe DUE chat.
   React.useEffect(() => {
+    if (inline) {
+      return undefined;
+    }
     const onToggle = () => setOpen((current) => !current);
     const onOpen = () => setOpen(true);
     window.addEventListener(AI_CHAT_TOGGLE_EVENT, onToggle);
@@ -380,20 +394,20 @@ const AiChatWidget = () => {
       window.removeEventListener(AI_CHAT_TOGGLE_EVENT, onToggle);
       window.removeEventListener(AI_CHAT_OPEN_EVENT, onOpen);
     };
-  }, []);
+  }, [inline]);
 
   // Progetti (base anche per la lista clienti) caricati alla prima apertura.
   React.useEffect(() => {
-    if (open && !projectsLoaded && !projectsLoading) {
+    if (panelOpen && !projectsLoaded && !projectsLoading) {
       void loadProjects();
     }
-  }, [open, projectsLoaded, projectsLoading, loadProjects]);
+  }, [panelOpen, projectsLoaded, projectsLoading, loadProjects]);
 
   // Il modulo Messaggi puo' essere spento nel workspace o mancare all'utente: in quel
   // caso il selettore non deve nemmeno comparire. Si legge alla prima apertura, non
   // all'avvio dell'app: chi non apre mai le chat non paga la chiamata.
   React.useEffect(() => {
-    if (!open || accessLoaded) {
+    if (!panelOpen || accessLoaded) {
       return;
     }
     let cancelled = false;
@@ -415,7 +429,7 @@ const AiChatWidget = () => {
     return () => {
       cancelled = true;
     };
-  }, [open, accessLoaded]);
+  }, [panelOpen, accessLoaded]);
 
   const canUseMessaging =
     hasModuleEnabled(access, MESSAGING_MODULE_KEY) && hasPermission(access, MESSAGING_PERMISSIONS.view);
@@ -429,8 +443,10 @@ const AiChatWidget = () => {
     }
   }, [accessLoaded, canUseMessaging, mode]);
 
+  // Esc per chiudere e blocco dello scroll del corpo sono cose dell'overlay: la
+  // casella e' una pagina come le altre, non deve rubare Esc ne' bloccare lo scroll.
   React.useEffect(() => {
-    if (!open) {
+    if (inline || !open) {
       return undefined;
     }
     const onKey = (event) => {
@@ -444,7 +460,7 @@ const AiChatWidget = () => {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [inline, open]);
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -671,10 +687,15 @@ const AiChatWidget = () => {
   );
 
   React.useEffect(() => {
+    // "Chiedi all'AI" dalle liste apre l'OVERLAY: la casella inline lo ignora, se
+    // no un click aprirebbe insieme la casella e il popup sopra.
+    if (inline) {
+      return undefined;
+    }
     const onAsk = (event) => void handleAsk(event.detail);
     window.addEventListener(AI_CHAT_ASK_EVENT, onAsk);
     return () => window.removeEventListener(AI_CHAT_ASK_EVENT, onAsk);
-  }, [handleAsk]);
+  }, [inline, handleAsk]);
 
   // Cambio ambito: azzero selezione, conversazione ed elenco sessioni (che e' per
   // ambito). L'ambito Generale non ha un elenco di bersagli da scegliere, quindi
@@ -775,56 +796,29 @@ const AiChatWidget = () => {
     }
   };
 
-  if (!open) {
+  if (!inline && !open) {
     return null;
   }
 
   const showPicker = scope !== "general" && !selectedTarget;
   const isMessaging = mode === "messaging";
+  // La casella e' a tutto schermo per definizione (non ha il pulsante riduci).
+  const expandedView = inline || expanded;
   // A tutto schermo l'elenco delle sessioni e' una colonna fissa, non piu' una
   // tendina: e' questo che rende la vista ampia utile ovunque (spec 4-ter §2).
-  const sessionsVisible = expanded || showSessions;
+  const sessionsVisible = expandedView || showSessions;
 
-  return createPortal(
-    <div
-      className={`ai-chat-overlay ${expanded ? "is-expanded" : ""}`}
-      role="presentation"
-      onMouseDown={() => !expanded && setOpen(false)}
-    >
-      <aside
-        className={`ai-chat-panel ${expanded ? "is-expanded" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={isMessaging ? "Messaggi" : "Chat AI"}
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <header className="ai-chat-header">
-          <div className="ai-chat-title">
-            {isMessaging ? <IconMessaging size={18} /> : <IconAi size={18} />}
-            <span>{isMessaging ? "Messaggi" : "Chat AI"}</span>
-          </div>
-          <div className="ai-chat-header-actions">
-            <button
-              type="button"
-              className="ai-chat-close"
-              aria-label={expanded ? "Riduci a finestra" : "Espandi a tutto schermo"}
-              title={expanded ? "Riduci" : "Espandi"}
-              onClick={() => setExpanded((current) => !current)}
-            >
-              {expanded ? <IconCollapse size={17} /> : <IconExpand size={17} />}
-            </button>
-            <button type="button" className="ai-chat-close" aria-label="Chiudi" onClick={() => setOpen(false)}>
-              <IconClose size={18} />
-            </button>
-          </div>
-        </header>
+  // Il CORPO condiviso: selettore dei due mondi + contenuto. Identico nel popup
+  // (overlay) e nella casella (montata su rotta). "Una sola implementazione" (spec
+  // 4-ter §4): la casella non e' una copia della chat, e' questo stesso componente.
+  const surface = (
+    <>
+      {accessLoaded && canUseMessaging && <ModeTabs mode={mode} onMode={setMode} />}
 
-        {accessLoaded && canUseMessaging && <ModeTabs mode={mode} onMode={setMode} />}
-
-        {isMessaging ? (
-          <MessagingPanel expanded={expanded} canSend={canSendMessages} />
-        ) : (
-          <>
+      {isMessaging ? (
+        <MessagingPanel expanded={expandedView} canSend={canSendMessages} />
+      ) : (
+        <>
         <ScopeTabs activeScope={scope} onScope={changeScope} />
 
         {showPicker ? (
@@ -864,7 +858,7 @@ const AiChatWidget = () => {
               </span>
               {/* A tutto schermo l'elenco e' gia' una colonna: il tasto che lo apre
                   sarebbe un doppione senza bersaglio. */}
-              {!expanded && (
+              {!expandedView && (
                 <button
                   type="button"
                   className="ai-chat-openfull"
@@ -1063,6 +1057,53 @@ const AiChatWidget = () => {
         )}
           </>
         )}
+    </>
+  );
+
+  // La casella (spec 4-ter §4): stessa superficie, dentro il flusso della pagina
+  // invece che in overlay. Sempre a tutto schermo, senza pulsanti apri/chiudi.
+  if (inline) {
+    return (
+      <section className="ai-chat-inline" aria-label={isMessaging ? "Messaggi" : "Chat AI"}>
+        {surface}
+      </section>
+    );
+  }
+
+  return createPortal(
+    <div
+      className={`ai-chat-overlay ${expandedView ? "is-expanded" : ""}`}
+      role="presentation"
+      onMouseDown={() => !expandedView && setOpen(false)}
+    >
+      <aside
+        className={`ai-chat-panel ${expandedView ? "is-expanded" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isMessaging ? "Messaggi" : "Chat AI"}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="ai-chat-header">
+          <div className="ai-chat-title">
+            {isMessaging ? <IconMessaging size={18} /> : <IconAi size={18} />}
+            <span>{isMessaging ? "Messaggi" : "Chat AI"}</span>
+          </div>
+          <div className="ai-chat-header-actions">
+            <button
+              type="button"
+              className="ai-chat-close"
+              aria-label={expandedView ? "Riduci a finestra" : "Espandi a tutto schermo"}
+              title={expandedView ? "Riduci" : "Espandi"}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expandedView ? <IconCollapse size={17} /> : <IconExpand size={17} />}
+            </button>
+            <button type="button" className="ai-chat-close" aria-label="Chiudi" onClick={() => setOpen(false)}>
+              <IconClose size={18} />
+            </button>
+          </div>
+        </header>
+        {surface}
       </aside>
     </div>,
     document.body,

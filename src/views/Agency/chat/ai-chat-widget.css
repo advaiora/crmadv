@@ -185,17 +185,48 @@
   min-height: 0;
 }
 
+/* --- La CASELLA: la chat montata su rotta, non in overlay (spec 4-ter §4) --- */
+/* Riempie la pagina come il pannello riempie il drawer: e' il contesto flex-column
+   che la superficie condivisa si aspetta dal suo contenitore. La casella e' sempre
+   "espansa" (due colonne), quindi eredita sotto le stesse regole del popup a tutto
+   schermo. L'altezza scala col viewport togliendo topbar + tab di modulo. */
+.messaging-inbox-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 116px);
+  min-height: 480px;
+  padding: 0;
+  /* overflow nascosto: l'offset 116px (topbar + tab di modulo) e' una stima; se non
+     e' esatta al pixel lo scroll resta DENTRO la chat (.ai-chat-messages), non sulla
+     pagina — cosi' niente doppia barra di scorrimento in nessun caso. */
+  overflow: hidden;
+}
+
+.ai-chat-inline {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 14px);
+  overflow: hidden;
+}
+
 /* --- A tutto schermo: elenco a sinistra, conversazione a destra --- */
-/* Nel popup stretto l'elenco e' una tendina sopra i messaggi; espanso diventa una
-   colonna fissa, come nelle interfacce dei chat. Stessa regola per i due mondi: le
-   sessioni dell'AI e le persone si sfogliano uguale (il selettore ha senso proprio
-   perche' cambia il contenuto, non l'impianto). */
-.ai-chat-panel.is-expanded .ai-chat-conversation {
+/* Nel popup stretto l'elenco e' una tendina sopra i messaggi; espanso (o nella
+   casella, che e' sempre espansa) diventa una colonna fissa, come nelle interfacce
+   dei chat. Stessa regola per i due mondi: le sessioni dell'AI e le persone si
+   sfogliano uguale (il selettore ha senso perche' cambia il contenuto, non l'impianto). */
+.ai-chat-panel.is-expanded .ai-chat-conversation,
+.ai-chat-inline .ai-chat-conversation {
   flex-direction: row;
 }
 
 .ai-chat-panel.is-expanded .ai-chat-sessions,
-.ai-chat-panel.is-expanded .ai-chat-msg-list {
+.ai-chat-panel.is-expanded .ai-chat-msg-list,
+.ai-chat-inline .ai-chat-sessions,
+.ai-chat-inline .ai-chat-msg-list {
   flex: 0 0 300px;
   width: 300px;
   max-height: none;
@@ -207,14 +238,18 @@
    (design §2: larghezza massima e contenuto centrato). */
 .ai-chat-panel.is-expanded .ai-chat-messages-inner,
 .ai-chat-panel.is-expanded .ai-chat-composer,
-.ai-chat-panel.is-expanded .ai-chat-notice {
+.ai-chat-panel.is-expanded .ai-chat-notice,
+.ai-chat-inline .ai-chat-messages-inner,
+.ai-chat-inline .ai-chat-composer,
+.ai-chat-inline .ai-chat-notice {
   width: 100%;
   max-width: 860px;
   margin-left: auto;
   margin-right: auto;
 }
 
-.ai-chat-panel.is-expanded .ai-chat-picker {
+.ai-chat-panel.is-expanded .ai-chat-picker,
+.ai-chat-inline .ai-chat-picker {
   width: 100%;
   max-width: 760px;
   margin-left: auto;

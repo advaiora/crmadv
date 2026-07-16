@@ -361,3 +361,21 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 **Perche':** la cattura restituisce l'immagine dell'**intera pagina scrollabile** (e scalata: viewport 1000x640 → immagine 800x512). Un overlay `position: fixed` copre solo la viewport, quindi tutto il contenuto della pagina sotto compare **oltre** il pannello e sembra spazio vuoto o roba duplicata.
 
 **Modo corretto:** lo screenshot serve a mostrare il risultato all'utente, **non a misurare**. Per le dimensioni usare sempre `getBoundingClientRect()` confrontato con `window.innerHeight/innerWidth`. Se una misura "a occhio" sullo screenshot contraddice il CSS, misurare col DOM prima di toccare il codice (vale anche al contrario, vedi #7).
+
+---
+
+## 27. La pane dell'anteprima si blocca (CDP wedged): `navigate` va, ma DOM/evaluate no
+
+**Contesto:** verifica dal vivo di una pagina; a un certo punto **ogni** ispezione del DOM va in timeout a 30s (`javascript_tool`, `read_page`, `get_page_text`, `computer{screenshot}`), mentre `navigate` continua a rispondere.
+
+**Errore (di interpretazione):** dare la colpa al proprio codice — sospettare un **loop di render** che pianta il thread. Ho perso molti tentativi (5+ riavvii del preview, tab nuove, `about:blank`) prima di riconoscere che era la pane. **Indizi che NON e' il codice:**
+- il blocco si presenta **anche su una tab `about:blank`** (che non esegue l'app) e **anche su `/dashboard`** (che non monta il componente nuovo);
+- **la console non ha errori** — in particolare **manca `Maximum update depth exceeded`**, che React logga *sempre* per un loop di `setState`. Nessun errore = nessun loop;
+- `navigate` funziona ma `evaluate`/`get_page_text`/`screenshot`/`read_page` no: e' il **canale Runtime/DOM del CDP** a essersi piantato, non il main thread della pagina;
+- sopravvive ai riavvii del server di preview (il canale resta wedged).
+
+**Modo corretto:**
+- Al **secondo** timeout consecutivo di ispezione DOM con `navigate` ancora vivo, **fermarsi**: e' la pane, non il codice. Non riavviare il preview a raffica (ogni cold start di Vite qui e' 30-70s e il canale si ri-pianta).
+- **Distinguere loop da pane in un colpo:** leggere la console (`read_console_messages`). Se e' pulita (niente `Maximum update depth exceeded`, niente `RangeError: Maximum call stack`), **non c'e' loop di render**: il problema e' ambientale.
+- **Verificare comunque, per altri canali:** `curl` sul transform Vite del file (`http://localhost:<porta>/src/.../File.jsx` → 200 = compila, nota #11); `lint`; `tsc --noEmit`; `npm run test:unit`; `npm run build`. Se sono tutti verdi e la console non ha errori, il codice e' sano: la **resa visiva** resta l'unica cosa non verificata, da guardare quando la pane torna (o dalla persona in staffetta).
+- **Progettare per non dipendere dal pixel:** se un layout ha un valore stimato (es. `height: calc(100dvh - 116px)` per togliere topbar+tab), mettere `overflow: hidden` sul contenitore, cosi' una stima imperfetta non produce mai una doppia barra di scroll — al massimo un filo di spazio in piu' o in meno, cosmetico.
