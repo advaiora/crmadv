@@ -51,6 +51,10 @@ export type ConversationAttachmentDraftInput = {
   mimeType?: string | null;
   fileSize?: number | null;
   content: string;
+  // Byte VERI del file (documenti e immagini). Salvati in una tabella a parte, senza
+  // buttare piu' il binario. Assente per gli elementi CRM (kind 'entity') e per i
+  // vecchi allegati text-only.
+  binaryData?: Buffer | null;
 };
 
 const ATTACHMENT_SELECT = {
@@ -63,6 +67,9 @@ const ATTACHMENT_SELECT = {
   fileSize: true,
   contentChars: true,
   createdAt: true,
+  // Presenza del binario, senza caricarne i byte: seleziona solo la chiave (join sul
+  // PK, nessun blob). La UI ci decide se mostrare "scarica l'originale".
+  binary: { select: { attachmentId: true } },
 } as const;
 
 export const aiConversationRepository = {
@@ -328,8 +335,29 @@ export const aiConversationRepository = {
         fileSize: input.fileSize ?? null,
         content: input.content,
         contentChars: input.content.length,
+        // I byte, se presenti, nascono insieme all'allegato (stessa scrittura): cosi'
+        // non esiste mai una bozza "file" senza il suo binario.
+        binary: input.binaryData ? { create: { data: input.binaryData } } : undefined,
       },
       select: ATTACHMENT_SELECT,
+    });
+  },
+
+  // Byte originali di un allegato, per il download. Torna anche i metadati che
+  // servono a impostare gli header e a validare l'accesso (workspace + conversazione
+  // a cui appartiene). Null se l'allegato non esiste o non ha un binario (allegati
+  // vecchi "text-only" o elementi CRM).
+  findAttachmentBinary(attachmentId: string) {
+    return prisma.aiConversationAttachment.findFirst({
+      where: { id: attachmentId, binary: { isNot: null } },
+      select: {
+        id: true,
+        workspaceId: true,
+        conversationId: true,
+        label: true,
+        mimeType: true,
+        binary: { select: { data: true } },
+      },
     });
   },
 

@@ -6,6 +6,8 @@ import {
   extractAttachmentFileText,
   formatAttachmentForPrompt,
   isAttachableEntityType,
+  isImageAttachment,
+  imagePlaceholderText,
 } from './chat-attachments.js';
 
 // Le parti pure degli allegati della chat (Fase 3a). Gli snapshot delle entita'
@@ -71,4 +73,20 @@ test('extractAttachmentFileText: taglia il testo al tetto per allegato', async (
     fileName: 'enorme.txt',
   });
   assert.equal(content.length, MAX_ATTACHMENT_CHARS);
+});
+
+test('isImageAttachment: riconosce le immagini da mimeType e da estensione', () => {
+  // Dal mimeType, anche se l'estensione non ci fosse.
+  assert.equal(isImageAttachment({ mimeType: 'image/png', fileName: 'senza-estensione' }), true);
+  assert.equal(isImageAttachment({ mimeType: 'image/jpeg', fileName: 'foto.jpg' }), true);
+  // Dall'estensione, quando il mimeType manca (o e' generico).
+  assert.equal(isImageAttachment({ mimeType: '', fileName: 'foto.PNG' }), true);
+  assert.equal(isImageAttachment({ mimeType: 'application/octet-stream', fileName: 'immagine.webp' }), true);
+  // Non immagini.
+  assert.equal(isImageAttachment({ mimeType: 'application/pdf', fileName: 'brief.pdf' }), false);
+  assert.equal(isImageAttachment({ mimeType: '', fileName: 'nota.txt' }), false);
+});
+
+test('imagePlaceholderText: testo segnaposto con il nome del file', () => {
+  assert.equal(imagePlaceholderText('foto.png'), '[IMMAGINE ALLEGATA] foto.png');
 });

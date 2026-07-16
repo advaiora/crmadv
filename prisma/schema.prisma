@@ -650,10 +650,26 @@ model AiConversationAttachment {
   conversation    AiConversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   message         AiConversationMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
   createdByUser   User?                  @relation("AiConversationAttachmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  binary          AiConversationAttachmentBinary?
 
   @@index([messageId])
   @@index([conversationId, createdByUserId, messageId])
   @@index([workspaceId])
+}
+
+// Byte VERI di un allegato file (documento o immagine). Tabella separata dal
+// record dell'allegato di proposito: i binari possono essere grandi e non devono
+// caricarsi a ogni elenco di allegati — si leggono SOLO quando si scarica il file.
+// 1-a-1 con l'allegato (attachmentId e' chiave primaria e chiave esterna); cancellato
+// l'allegato, cade anche il binario (cascade). Sostituisce il vecchio "estrai il
+// testo e butta il file": ora il testo estratto resta in AiConversationAttachment.content
+// (per l'AI e il RAG) e QUI ci sono i byte originali (per riscaricare/anteprima e,
+// in futuro con le chiavi, per la "vista" multimodale sulle immagini).
+model AiConversationAttachmentBinary {
+  attachmentId String                   @id
+  data         Bytes
+  createdAt    DateTime                 @default(now())
+  attachment   AiConversationAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
 }
 
 // Budget di spesa AI giornaliero (V4 — cost control). Limite in USD sulla spesa AI

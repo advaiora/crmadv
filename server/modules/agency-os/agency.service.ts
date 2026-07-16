@@ -23,6 +23,8 @@ import {
   extractAttachmentFileText,
   formatAttachmentForPrompt,
   isAttachableEntityType,
+  isImageAttachment,
+  imagePlaceholderText,
   type AttachableEntityType,
 } from './chat-attachments.js';
 import { rbacRepository } from '../../repositories/rbac.repository.js';
@@ -2632,6 +2634,7 @@ type ConversationAttachmentRow = {
   fileSize: number | null;
   contentChars: number;
   createdAt: Date;
+  binary?: { attachmentId: string } | null;
 };
 
 const mapConversationAttachment = (row: ConversationAttachmentRow) => ({
@@ -2644,6 +2647,8 @@ const mapConversationAttachment = (row: ConversationAttachmentRow) => ({
   fileSize: row.fileSize,
   contentChars: row.contentChars,
   createdAt: row.createdAt.toISOString(),
+  // C'è un binario originale da scaricare? (i byte non viaggiano qui, solo il flag)
+  hasFile: Boolean(row.binary),
 });
 
 const mapConversationMessage = (row: {
@@ -8051,8 +8056,10 @@ export const agencyService = {
     };
   },
 
-  // Allega un documento: se ne estrae il testo (stesso estrattore delle Fonti) e si
-  // conserva solo quello — il binario non viene salvato.
+  // Allega un file: si conservano i BYTE VERI (documenti e immagini). Per i documenti
+  // si estrae anche il testo (stesso estrattore delle Fonti), che è ciò che legge
+  // l'AI; per le immagini il testo è un segnaposto — la "vista" vera arriva con le
+  // chiavi. L'originale resta comunque riscaricabile.
   async addScopedChatFileAttachment(input: {
     workspaceId: string;
     userId: string;
@@ -8061,10 +8068,10 @@ export const agencyService = {
     file: { buffer: Buffer; fileName: string; mimeType: string };
   }) {
     const conversation = await this.resolveConversationForUser(input);
-    const content = await extractAttachmentFileText({
-      buffer: input.file.buffer,
-      fileName: input.file.fileName,
-    });
+    const isImage = isImageAttachment({ mimeType: input.file.mimeType, fileName: input.file.fileName });
+    const content = isImage
+      ? imagePlaceholderText(input.file.fileName)
+      : await extractAttachmentFileText({ buffer: input.file.buffer, fileName: input.file.fileName });
     const attachment = await aiConversationRepository.createAttachmentDraft({
       workspaceId: input.workspaceId,
       conversationId: conversation.id,
@@ -8074,6 +8081,7 @@ export const agencyService = {
       mimeType: input.file.mimeType || null,
       fileSize: input.file.buffer.byteLength,
       content,
+      binaryData: input.file.buffer,
     });
     return mapConversationAttachment(attachment);
   },
@@ -8132,6 +8140,25 @@ export const agencyService = {
       throw notFound('Allegato non trovato (o gia inviato).');
     }
     return { removed: true };
+  },
+
+  // Byte originali di un allegato file, per il download/anteprima. Accesso: deve
+  // essere del proprio workspace e l'utente dev'essere partecipante ATTIVO della
+  // conversazione a cui l'allegato appartiene (i byte sono contenuto, non gestione).
+  async getScopedChatAttachmentFile(input: { workspaceId: string; userId: string; attachmentId: string }) {
+    const row = await aiConversationRepository.findAttachmentBinary(input.attachmentId);
+    if (!row || row.binary === null || row.workspaceId !== input.workspaceId) {
+      throw notFound('Allegato non trovato.');
+    }
+    const allowed = await aiConversationRepository.isParticipant(row.conversationId, input.userId);
+    if (!allowed) {
+      throw forbidden('Non fai parte di questa conversazione.');
+    }
+    return {
+      data: Buffer.from(row.binary.data),
+      mimeType: row.mimeType ?? 'application/octet-stream',
+      label: row.label,
+    };
   },
 
   async sendScopedChatMessage(input: {

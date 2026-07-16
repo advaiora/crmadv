@@ -58,8 +58,14 @@ export const attachmentIconKey = (attachment) =>
   attachment?.kind === "entity" ? attachment.entityType || "project" : "file";
 
 // Etichetta del tipo, per tooltip e lettori di schermo.
-export const attachmentTypeLabel = (attachment) =>
-  attachment?.kind === "entity" ? ENTITY_LABELS[attachment.entityType] || "Elemento" : "Documento";
+export const attachmentTypeLabel = (attachment) => {
+  if (attachment?.kind === "entity") {
+    return ENTITY_LABELS[attachment.entityType] || "Elemento";
+  }
+  return typeof attachment?.mimeType === "string" && attachment.mimeType.startsWith("image/")
+    ? "Immagine"
+    : "Documento";
+};
 
 // Peso del file, solo per i documenti (gli elementi CRM non ne hanno uno).
 export const formatAttachmentSize = (attachment) => {
@@ -78,4 +84,4 @@ export const formatAttachmentSize = (attachment) => {
 
 // Formati di documento che il server sa leggere (stessa lista dell'estrattore
 // delle Fonti). Usata per l'attributo accept del selettore file.
-export const ATTACHMENT_FILE_ACCEPT = ".txt,.csv,.md,.docx,.pdf";
+export const ATTACHMENT_FILE_ACCEPT = ".txt,.csv,.md,.docx,.pdf,.png,.jpg,.jpeg,.gif,.webp";

@@ -2,14 +2,18 @@
 // conversazione, sopra il contesto d'ambito (progetto/cliente/generale).
 //
 // Due tipi:
-//  - documento caricato: il testo si estrae col medesimo estrattore delle Fonti
-//    (TXT/CSV/MD/DOCX/PDF). Come per le Fonti il binario NON viene conservato.
+//  - file caricato: si conservano i BYTE VERI (documenti e immagini) in una tabella a
+//    parte. Per i documenti si estrae anche il testo col medesimo estrattore delle Fonti
+//    (TXT/CSV/MD/DOCX/PDF), che e' cio' che legge l'AI/il RAG; per le immagini il testo
+//    e' un segnaposto (la "vista" multimodale vera arriva con le chiavi).
 //  - elemento CRM (progetto/cliente/fonte/preventivo): se ne salva uno SNAPSHOT
 //    testuale al momento dell'allegato, così il contesto resta quello che l'utente
 //    vedeva quando ha allegato (e non cambia sotto ai messaggi già scritti).
 //
-// Le immagini "con vista" restano fuori: richiedono storage dei binari e un motore
-// AI multimodale (rimandate alla Fase 3b, vedi spec-chat-ai-collaborativa.md).
+// Nota (16/7/2026): prima il binario NON veniva conservato (come le Fonti, "estrai e
+// butta") e le immagini erano proprio rifiutate. Ora i byte si tengono per tutti i
+// file, così l'originale si può riscaricare e — con le chiavi — dare in "vista" al
+// modello. Il modulo Fonti resta invariato (decisione separata).
 
 import { prisma } from '../../prisma.js';
 import { badRequest, notFound } from '../../core/errors.js';
@@ -236,6 +240,25 @@ export const buildEntitySnapshot = async (
     clientId: quote.clientId,
   };
 };
+
+// Estensioni immagine riconosciute (fallback quando il mimeType manca o è generico).
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+
+// È un'immagine? Prima si guarda il mimeType (image/*), poi l'estensione del nome.
+// Le immagini non passano dall'estrattore di testo (darebbe errore): si conservano
+// i byte e basta, col nome come segnaposto testuale.
+export const isImageAttachment = (input: { mimeType?: string | null; fileName: string }): boolean => {
+  const mime = (input.mimeType ?? '').toLowerCase();
+  if (mime.startsWith('image/')) {
+    return true;
+  }
+  const ext = input.fileName.split('.').pop()?.toLowerCase() ?? '';
+  return IMAGE_EXTENSIONS.has(ext);
+};
+
+// Testo segnaposto per un'immagine allegata: finché non c'è la "vista" multimodale
+// (chiavi), il modello vede almeno il nome del file. I byte veri sono conservati a parte.
+export const imagePlaceholderText = (fileName: string): string => `[IMMAGINE ALLEGATA] ${fileName}`;
 
 // Estrae il testo di un documento caricato. Traduce l'errore dell'estrattore in un
 // 400 leggibile: l'utente deve capire perché quel file non si può allegare.

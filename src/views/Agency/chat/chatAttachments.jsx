@@ -1,7 +1,8 @@
 import React from "react";
-import { BookOpen, FileText, Folder, Paperclip, Tag, User, X } from "react-feather";
+import { BookOpen, Download, FileText, Folder, Paperclip, Tag, User, X } from "react-feather";
 import { Spinner } from "react-bootstrap";
 import { attachmentIconKey, attachmentTypeLabel, formatAttachmentSize } from "./chatShared";
+import { downloadAgencyChatAttachment } from "../../../modules/agency-os/api/agency.api";
 
 // Allegati della chat (Fase 3a), condivisi tra il popup globale e la scheda Chat
 // del progetto: chip in composizione, chip dentro la bolla e selettore di elementi
@@ -21,27 +22,55 @@ const AttachmentIcon = ({ attachment, size = 13 }) => {
 };
 
 // Un chip di allegato. Con onRemove e' quello del composer (togliibile); senza,
-// e' quello mostrato dentro la bolla del messaggio inviato.
-export const AttachmentChip = ({ attachment, onRemove, busy = false }) => (
-  <span className="ai-chat-attachment" title={`${attachmentTypeLabel(attachment)}: ${attachment.label}`}>
-    <AttachmentIcon attachment={attachment} />
-    <span className="ai-chat-attachment-label">{attachment.label}</span>
-    {formatAttachmentSize(attachment) && (
-      <span className="ai-chat-attachment-meta">{formatAttachmentSize(attachment)}</span>
-    )}
-    {onRemove && (
-      <button
-        type="button"
-        className="ai-chat-attachment-remove"
-        aria-label={`Togli allegato ${attachment.label}`}
-        onClick={() => onRemove(attachment)}
-        disabled={busy}
-      >
-        <X size={12} />
-      </button>
-    )}
-  </span>
-);
+// e' quello mostrato dentro la bolla del messaggio inviato. Se l'allegato ha un
+// binario originale (hasFile), compare il tasto per scaricarlo.
+export const AttachmentChip = ({ attachment, onRemove, busy = false }) => {
+  const [downloading, setDownloading] = React.useState(false);
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadAgencyChatAttachment(attachment);
+    } catch {
+      // Download fallito: silenzioso, il chip resta e l'utente puo' riprovare.
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <span className="ai-chat-attachment" title={`${attachmentTypeLabel(attachment)}: ${attachment.label}`}>
+      <AttachmentIcon attachment={attachment} />
+      <span className="ai-chat-attachment-label">{attachment.label}</span>
+      {formatAttachmentSize(attachment) && (
+        <span className="ai-chat-attachment-meta">{formatAttachmentSize(attachment)}</span>
+      )}
+      {attachment.hasFile && (
+        <button
+          type="button"
+          className="ai-chat-attachment-open"
+          aria-label={`Scarica l'originale di ${attachment.label}`}
+          onClick={handleDownload}
+          disabled={downloading}
+        >
+          <Download size={12} />
+        </button>
+      )}
+      {onRemove && (
+        <button
+          type="button"
+          className="ai-chat-attachment-remove"
+          aria-label={`Togli allegato ${attachment.label}`}
+          onClick={() => onRemove(attachment)}
+          disabled={busy}
+        >
+          <X size={12} />
+        </button>
+      )}
+    </span>
+  );
+};
 
 // Riga di chip. Usata sopra il composer e dentro la bolla.
 export const AttachmentChips = ({ attachments, onRemove, busy = false, className = "" }) => {

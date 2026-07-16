@@ -463,6 +463,39 @@ export const uploadAgencyChatFileAttachment = async (target, file, { conversatio
   return result?.attachment || null;
 };
 
+// Scarica l'ORIGINALE di un allegato file (byte veri). Non passa da agencyFetch, che
+// si aspetta l'involucro JSON { data }: qui la risposta e' binaria. Riusa lo stesso
+// schema di autenticazione, poi apre il "salva file" del browser via blob.
+export const downloadAgencyChatAttachment = async (attachment) => {
+  const authHeaders = getDevAuthHeaders();
+  if (!authHeaders.Authorization) {
+    throw new AgencyApiError("Sessione non disponibile. Effettua il login.", {
+      status: 401,
+      code: "UNAUTHORIZED",
+    });
+  }
+  const response = await apiFetch(`/agency/chat/attachments/${attachment.id}/file`, {
+    method: "GET",
+    headers: { ...authHeaders },
+  });
+  if (!response.ok) {
+    throw new AgencyApiError("Download dell'allegato non riuscito.", { status: response.status });
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = attachment.label || "allegato";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    // Si revoca l'URL dopo un attimo: subito romperebbe il download appena avviato.
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+};
+
 export const addAgencyChatEntityAttachment = async (
   target,
   { entityType, entityId },

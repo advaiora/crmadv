@@ -812,6 +812,28 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     return ok(reply, result);
   });
 
+  // Download/anteprima dell'ORIGINALE di un allegato file. Ritorna i byte grezzi (non
+  // l'involucro { data }): scaricare e' lettura, quindi basta chat.view. Il filename
+  // ha un fallback ASCII piu' la versione UTF-8 (RFC 5987), sanificato contro header
+  // injection.
+  app.get<{ Params: { attachmentId: string } }>(
+    '/agency/chat/attachments/:attachmentId/file',
+    async (request, reply) => {
+      const { user, workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
+      const file = await agencyService.getScopedChatAttachmentFile({
+        workspaceId: workspace.id,
+        userId: user.id,
+        attachmentId: request.params.attachmentId,
+      });
+      const asciiName = file.label.replace(/[^\w.\-]+/g, '_').slice(0, 100) || 'allegato';
+      reply
+        .header('Content-Type', file.mimeType)
+        .header('Content-Disposition', `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(file.label)}`)
+        .header('Cache-Control', 'private, no-store');
+      return reply.send(file.data);
+    },
+  );
+
   app.get('/agency/ai/estimates', async (request, reply) => {
     const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
     const estimates = await agencyService.getWorkspaceAiCostEstimates(workspace.id);

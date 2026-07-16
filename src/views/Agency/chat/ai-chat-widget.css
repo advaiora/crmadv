@@ -489,7 +489,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.ai-chat-attachment-remove {
+.ai-chat-attachment-remove,
+.ai-chat-attachment-open {
   display: inline-flex;
   align-items: center;
   padding: 0;
@@ -500,11 +501,13 @@
   cursor: pointer;
 }
 
-.ai-chat-attachment-remove:hover:not(:disabled) {
+.ai-chat-attachment-remove:hover:not(:disabled),
+.ai-chat-attachment-open:hover:not(:disabled) {
   opacity: 1;
 }
 
-.ai-chat-attachment-remove:disabled {
+.ai-chat-attachment-remove:disabled,
+.ai-chat-attachment-open:disabled {
   cursor: default;
   opacity: 0.3;
 }
