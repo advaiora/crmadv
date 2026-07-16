@@ -15,6 +15,7 @@
 
 import {
   Archive,
+  ArrowUpRight,
   ChevronLeft,
   Cpu,
   Edit2,
@@ -59,6 +60,11 @@ export const IconResume = RotateCcw; // riprendi un'archiviata in una nuova chat
 export const IconParticipants = UserPlus;
 
 export const IconAttach = Paperclip; // allega un documento o un elemento del CRM
+
+// Navigazione suggerita dall'AI (Fase 6): "vai a quest'area del CRM". La freccia in
+// uscita dice "ti porto altrove", coerente con l'affordance "apri" gia' usata nel
+// prodotto (es. il tasto Open del widget "I miei progetti").
+export const IconNavigate = ArrowUpRight;
 
 // --- La finestra ---
 

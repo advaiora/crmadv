@@ -25,6 +25,13 @@ import {
   type AttachableEntityType,
 } from './chat-attachments.js';
 import { rbacRepository } from '../../repositories/rbac.repository.js';
+import { moduleRepository } from '../../repositories/module.repository.js';
+import {
+  resolveAccessibleNavAreas,
+  buildNavPromptSection,
+  parseNavSuggestions,
+  type ChatNavSuggestion,
+} from './chat-nav.js';
 import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
@@ -8174,12 +8181,24 @@ export const agencyService = {
       titleIfEmpty: conversation.title ? null : buildSessionTitle(message),
     });
 
-    const buildResult = async (extra: Record<string, unknown> = {}) => {
+    // I suggerimenti di navigazione (Fase 6) non sono persistiti: sono CTA una tantum.
+    // Si agganciano qui al messaggio dell'AI appena creato, cosi' la UI li legge
+    // uniformemente da `message.suggestions` come ogni altro campo. Riaprendo la
+    // sessione non tornano (listMessages non li ha), ed e' voluto.
+    const buildResult = async (
+      extra: Record<string, unknown> = {},
+      suggestionAttach?: { messageId: string; suggestions: ChatNavSuggestion[] },
+    ) => {
       const rows = await aiConversationRepository.listMessages(conversation.id);
+      const messages = rows.map(mapConversationMessage).map((row) =>
+        suggestionAttach && suggestionAttach.suggestions.length > 0 && row.id === suggestionAttach.messageId
+          ? { ...row, suggestions: suggestionAttach.suggestions }
+          : row,
+      );
       return {
         conversationId: conversation.id,
         scope: input.target.scope,
-        messages: rows.map(mapConversationMessage),
+        messages,
         ...extra,
       };
     };
@@ -8217,21 +8236,28 @@ export const agencyService = {
       .reverse();
     const promptAttachments = [...previousAttachments, ...turnAttachments];
 
-    // Contesto per l'ambito (profilo + RAG + allegati) e storico recente.
-    const [context, history] = await Promise.all([
+    // Contesto per l'ambito (profilo + RAG + allegati), storico recente e le aree del
+    // CRM su cui l'utente puo' andare (per la navigazione suggerita, Fase 6).
+    const [context, history, enabledModules, permissions] = await Promise.all([
       buildScopedChatContext(input.workspaceId, input.target, message, promptAttachments),
       aiConversationRepository.listMessages(conversation.id, CHAT_HISTORY_CONTEXT_LIMIT),
+      moduleRepository.listEnabledModules(input.workspaceId),
+      rbacRepository.listUserPermissions(input.userId, input.workspaceId),
     ]);
     const contextMessages = history.map((row) => ({
       role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
       content: row.content,
     }));
 
+    // Solo le aree accessibili finiscono nel prompt: il modello non propone porte
+    // chiuse, e i suggerimenti che tornano puntano solo dove l'utente puo' entrare.
+    const navAreas = resolveAccessibleNavAreas(enabledModules, permissions);
+
     let result: AgencyAiTextResult | null;
     try {
       result = await runAgencyAiTextWithMeta({
         workspaceId: input.workspaceId,
-        system: context.system,
+        system: context.system + buildNavPromptSection(navAreas),
         messages: contextMessages,
         functionName: `chat.${input.target.scope}`,
         conversationId: conversation.id,
@@ -8247,18 +8273,18 @@ export const agencyService = {
       throw badRequest('Generazione della risposta non riuscita.');
     }
 
-    await aiConversationRepository.createMessages([
-      {
-        workspaceId: input.workspaceId,
-        conversationId: conversation.id,
-        authorUserId: null,
-        role: 'assistant',
-        content: result.text,
-        citationsJson: context.citations as unknown as Prisma.InputJsonValue,
-      },
-    ]);
+    // I token [[vai:…]] si tolgono dal testo salvato (DB pulito) e diventano bottoni.
+    const { text: assistantText, suggestions } = parseNavSuggestions(result.text, navAreas);
+    const assistantRow = await aiConversationRepository.createMessage({
+      workspaceId: input.workspaceId,
+      conversationId: conversation.id,
+      authorUserId: null,
+      role: 'assistant',
+      content: assistantText,
+      citationsJson: context.citations as unknown as Prisma.InputJsonValue,
+    });
 
-    return buildResult({ aiInvoked: true });
+    return buildResult({ aiInvoked: true }, { messageId: assistantRow.id, suggestions });
   },
 
   async listScopedChatParticipants(input: {

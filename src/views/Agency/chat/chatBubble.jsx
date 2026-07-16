@@ -2,6 +2,7 @@ import React from "react";
 import { Badge } from "react-bootstrap";
 import { authorLabel, formatTime } from "./chatShared";
 import { AttachmentChips } from "./chatAttachments";
+import { IconNavigate } from "./chatIcons";
 
 // Bolla di conversazione condivisa (Fase 1/2), riusata sia dalla scheda Chat del
 // progetto sia dal popup di Chat globale, cosi' le bolle restano identiche ovunque.
@@ -11,11 +12,13 @@ import { AttachmentChips } from "./chatAttachments";
 // (utenti o AI) a sinistra, con l'autore mostrato sopra. Gli allegati (Fase 3a)
 // stanno sotto al testo, dentro la bolla. Le fonti citate (RAG) dell'assistente
 // sono in un dettaglio richiudibile sotto la risposta.
-const ChatBubble = ({ message, currentUserId }) => {
+const ChatBubble = ({ message, currentUserId, onNavigate }) => {
   const isAssistant = message.role === "assistant";
   const isMine = !isAssistant && Boolean(message.author?.id) && message.author.id === currentUserId;
   const citations = Array.isArray(message.citations) ? message.citations : [];
   const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  // Navigazione suggerita (Fase 6): CTA una tantum, solo sulle risposte dell'AI.
+  const suggestions = Array.isArray(message.suggestions) ? message.suggestions : [];
   const label = isMine ? "Tu" : authorLabel(message);
 
   return (
@@ -35,6 +38,22 @@ const ChatBubble = ({ message, currentUserId }) => {
           )}
         </div>
         <div className={`small text-muted mt-1 ${isMine ? "text-end" : ""}`}>{formatTime(message.createdAt)}</div>
+        {isAssistant && suggestions.length > 0 && (
+          <div className="ai-chat-suggestions">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion.key}
+                type="button"
+                className="ai-chat-suggestion"
+                onClick={() => onNavigate?.(suggestion.route, suggestion)}
+                title={`Vai a ${suggestion.label}`}
+              >
+                <IconNavigate size={13} />
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        )}
         {isAssistant && citations.length > 0 && (
           <details className="small mt-1">
             <summary className="text-muted" style={{ cursor: "pointer" }}>

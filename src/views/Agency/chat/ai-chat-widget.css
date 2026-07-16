@@ -765,6 +765,34 @@
   background: var(--muted);
 }
 
+/* --- Navigazione suggerita dall'AI (Fase 6, spec "Navigazione assistita") ---
+   Bottoni sotto la bolla dell'assistente: portano in un'area del CRM SOLO al clic,
+   mai in automatico. Vestiti come .ai-chat-resume (azione leggera, non un blocco). */
+.ai-chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ai-chat-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 10px;
+}
+
+.ai-chat-suggestion:hover {
+  background: var(--muted);
+}
+
 /* --- Partecipanti del gruppo (15/7/2026, spec 4-ter §3) --- */
 /* Vestito come l'elenco sessioni: e' un pannello che scende dall'intestazione della
    conversazione, non una scatola in piu' (design §3.3: separa lo spazio, non le

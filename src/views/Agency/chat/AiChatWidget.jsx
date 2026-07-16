@@ -1,5 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
+import { useHistory } from "react-router-dom";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
 import { useSession } from "../../../hooks/useSession";
 import {
@@ -294,6 +295,7 @@ const EntityPicker = ({ items, loading, error, query, onQuery, onSelect, onRetry
 // casi: "una sola implementazione, non una copia".
 const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   const { session } = useSession();
+  const history = useHistory();
   const currentUserId = session?.userId || null;
 
   const [open, setOpen] = React.useState(false);
@@ -808,6 +810,20 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
     }
   };
 
+  // Navigazione suggerita (Fase 6): l'AI propone, l'utente decide. Si naviga SOLO al
+  // clic — mai in automatico. Nel popup si chiude prima l'overlay, cosi' la
+  // destinazione e' visibile; la casella inline cambia rotta e si smonta da se'.
+  const navigateToSuggestion = React.useCallback(
+    (route) => {
+      if (!route) return;
+      if (!inline) {
+        setOpen(false);
+      }
+      history.push(route);
+    },
+    [history, inline],
+  );
+
   if (!inline && !open) {
     return null;
   }
@@ -978,7 +994,12 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
               ) : (
                 <>
                   {messages.map((message) => (
-                    <ChatBubble key={message.id} message={message} currentUserId={currentUserId} />
+                    <ChatBubble
+                      key={message.id}
+                      message={message}
+                      currentUserId={currentUserId}
+                      onNavigate={navigateToSuggestion}
+                    />
                   ))}
                   {aiThinking && (
                     <div className="d-flex justify-content-start mb-3">
