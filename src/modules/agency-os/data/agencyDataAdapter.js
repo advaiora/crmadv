@@ -49,17 +49,9 @@ import {
   fetchAgencyRuntimeSettings as fetchAgencyRuntimeSettingsApi,
   updateAgencyRuntimeSettings as updateAgencyRuntimeSettingsApi,
   fetchAgencyAiUsage as fetchAgencyAiUsageApi,
-  fetchAgencyProjectChat as fetchAgencyProjectChatApi,
-  sendAgencyProjectChatMessage as sendAgencyProjectChatMessageApi,
-  clearAgencyProjectChat as clearAgencyProjectChatApi,
-  fetchAgencyProjectChatParticipants as fetchAgencyProjectChatParticipantsApi,
-  addAgencyProjectChatParticipant as addAgencyProjectChatParticipantApi,
-  removeAgencyProjectChatParticipant as removeAgencyProjectChatParticipantApi,
-  fetchAgencyChatAttachments as fetchAgencyChatAttachmentsApi,
-  uploadAgencyChatFileAttachment as uploadAgencyChatFileAttachmentApi,
-  addAgencyChatEntityAttachment as addAgencyChatEntityAttachmentApi,
-  removeAgencyChatAttachment as removeAgencyChatAttachmentApi,
-  fetchAgencyChatProjects as fetchAgencyChatProjectsApi,
+  // Le funzioni della chat sono uscite da qui il 15/7/2026 (spec 4-ter §3): erano
+  // servite solo alla scheda Chat estesa del progetto, che non esiste piu'. Il popup
+  // parla direttamente con agency.api, che e' l'unico strato di cui ha bisogno.
   fetchAgencyAiEstimates as fetchAgencyAiEstimatesApi,
   fetchAgencyAiBudgets as fetchAgencyAiBudgetsApi,
   updateAgencyAiBudgets as updateAgencyAiBudgetsApi,
@@ -1623,52 +1615,6 @@ export const getAgencyAiUsage = async (options = {}) => {
     },
     AGENCY_DATA_SOURCE.DB,
   );
-};
-
-const EMPTY_PROJECT_CHAT = { aiConfigured: false, messages: [] };
-
-export const getAgencyProjectChat = async (projectId) => {
-  const result = await fetchAgencyProjectChatApi(projectId);
-  return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
-};
-
-export const sendAgencyProjectChatMessage = async (projectId, message, { askAi = false, attachmentIds = [] } = {}) => {
-  const result = await sendAgencyProjectChatMessageApi(projectId, message, { askAi, attachmentIds });
-  return withDataSource(result || EMPTY_PROJECT_CHAT, AGENCY_DATA_SOURCE.DB);
-};
-
-// --- Allegati della chat (Fase 3a). Passano dal bersaglio d'ambito: dalla scheda
-// di progetto e' sempre { scope: 'project', id: projectId }. ---
-
-export const getAgencyChatAttachments = async (target) => fetchAgencyChatAttachmentsApi(target);
-
-export const uploadAgencyChatFileAttachment = async (target, file) =>
-  uploadAgencyChatFileAttachmentApi(target, file);
-
-export const addAgencyChatEntityAttachment = async (target, entity) =>
-  addAgencyChatEntityAttachmentApi(target, entity);
-
-export const removeAgencyChatAttachment = async (attachmentId) => removeAgencyChatAttachmentApi(attachmentId);
-
-// Progetti/clienti selezionabili come allegato: stessa lista (gia' filtrata per
-// visibilita') del selettore d'ambito della chat globale.
-export const getAgencyChatProjects = async () => fetchAgencyChatProjectsApi();
-
-export const clearAgencyProjectChat = async (projectId) => {
-  const result = await clearAgencyProjectChatApi(projectId);
-  return withDataSource(result || { messages: [] }, AGENCY_DATA_SOURCE.DB);
-};
-
-export const getAgencyProjectChatParticipants = async (projectId) => {
-  return fetchAgencyProjectChatParticipantsApi(projectId);
-};
-
-export const addAgencyProjectChatParticipant = async (projectId, userId) => {
-  return addAgencyProjectChatParticipantApi(projectId, userId);
-};
-
-export const removeAgencyProjectChatParticipant = async (projectId, memberId) => {
-  return removeAgencyProjectChatParticipantApi(projectId, memberId);
 };
 
 export const getAgencyAiEstimates = async () => {

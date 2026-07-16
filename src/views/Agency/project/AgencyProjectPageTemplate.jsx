@@ -23,7 +23,10 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
     { key: "overview", label: "Overview", path: projectOverviewPath, group: "primary" },
     { key: "assets", label: "Fonti", path: `${projectRootPath}/assets`, group: "primary" },
     { key: "discovery", label: "Discovery", path: `${projectRootPath}/discovery`, group: "primary" },
-    { key: "chat", label: "Chat", path: `${projectRootPath}/chat`, group: "primary" },
+    // Niente scheda "Chat" (tolta il 15/7/2026, spec 4-ter §3): la chat del progetto
+    // vive nel popup, che si espande a tutto schermo ed e' raggiungibile da ogni
+    // pagina — non solo da dentro il progetto. Partecipanti, azzeramento e
+    // scioglimento del gruppo sono stati spostati li' prima di togliere la scheda.
     { key: "web", label: "Web", path: `${projectRootPath}/web`, group: "primary" },
     { key: "ads", label: "Ads", path: `${projectRootPath}/ads`, group: "primary" },
     { key: "reports-client", label: "Report", path: `${projectRootPath}/reports/client`, group: "primary" },

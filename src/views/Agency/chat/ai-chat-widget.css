@@ -730,6 +730,117 @@
   background: var(--muted);
 }
 
+/* --- Partecipanti del gruppo (15/7/2026, spec 4-ter §3) --- */
+/* Vestito come l'elenco sessioni: e' un pannello che scende dall'intestazione della
+   conversazione, non una scatola in piu' (design §3.3: separa lo spazio, non le
+   cornici). */
+.ai-chat-participants {
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  padding-bottom: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.ai-chat-participants-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.ai-chat-participant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px;
+}
+
+.ai-chat-participant-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+}
+
+.ai-chat-participant-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-chat-participant-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ai-chat-participant-action {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 2px 6px;
+}
+
+.ai-chat-participant-action:hover:not(:disabled) {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.ai-chat-participant-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ai-chat-invite {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 0;
+}
+
+.ai-chat-participants-note {
+  padding: 8px 12px 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* Azioni che non si tornano indietro: staccate da una hairline e in fondo, cosi'
+   non si premono per sbaglio mentre si invita qualcuno (design §1.2). */
+.ai-chat-participants-danger {
+  display: flex;
+  gap: 6px;
+  margin: 10px 12px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-chat-danger-action {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--destructive, var(--foreground));
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-sm, 8px);
+  padding: 4px 8px;
+}
+
+.ai-chat-danger-action:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--destructive, var(--foreground)) 12%, transparent);
+}
+
+.ai-chat-danger-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* --- Mondo MESSAGGI dentro il popup (15/7/2026, spec 4-ter §1) --- */
 /* Le persone del workspace: l'elenco e' la conversazione. Vestito come l'elenco
    delle sessioni qui sopra — sono due mondi distinti, non due estetiche distinte. */

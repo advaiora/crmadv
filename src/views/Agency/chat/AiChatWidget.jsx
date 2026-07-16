@@ -1,8 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
-import { useHistory } from "react-router-dom";
-import { ExternalLink } from "react-feather";
 import { useSession } from "../../../hooks/useSession";
 import {
   fetchAgencyChatProjects,
@@ -25,6 +23,7 @@ import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission } from "../../../
 import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from "../../../modules/messaging/ui/constants";
 import ChatBubble from "./chatBubble";
 import MessagingPanel from "./MessagingPanel";
+import ChatParticipantsPanel from "./ChatParticipantsPanel";
 import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
 import { ATTACHMENT_FILE_ACCEPT, formatListDate, mentionsAi } from "./chatShared";
 import {
@@ -37,6 +36,7 @@ import {
   IconExpand,
   IconMessaging,
   IconNewChat,
+  IconParticipants,
   IconRename,
   IconResume,
   IconSearch,
@@ -288,7 +288,6 @@ const EntityPicker = ({ items, loading, error, query, onQuery, onSelect, onRetry
 };
 
 const AiChatWidget = () => {
-  const history = useHistory();
   const { session } = useSession();
   const currentUserId = session?.userId || null;
 
@@ -316,6 +315,7 @@ const AiChatWidget = () => {
   const [sessions, setSessions] = React.useState([]);
   const [sessionsLoading, setSessionsLoading] = React.useState(false);
   const [showSessions, setShowSessions] = React.useState(false);
+  const [showParticipants, setShowParticipants] = React.useState(false);
 
   const [messages, setMessages] = React.useState([]);
   const [aiConfigured, setAiConfigured] = React.useState(true);
@@ -472,6 +472,10 @@ const AiChatWidget = () => {
       setBudgetNotice("");
       setAttachments([]);
       setShowAttachPanel(false);
+      // I partecipanti sono di UNA sessione: cambiando conversazione il pannello
+      // aperto mostrerebbe il gruppo di quella di prima. Si chiude qui, che e' il
+      // punto da cui passa ogni cambio, invece che nei singoli chiamanti.
+      setShowParticipants(false);
       try {
         const chat = await fetchScopedChat(target, { conversationId: wantedConversationId });
         const openId = chat?.conversationId || null;
@@ -771,14 +775,6 @@ const AiChatWidget = () => {
     }
   };
 
-  const openFullPage = () => {
-    if (selectedTarget?.scope !== "project") {
-      return;
-    }
-    setOpen(false);
-    history.push(`/agency/projects/${selectedTarget.id}/chat`);
-  };
-
   if (!open) {
     return null;
   }
@@ -879,17 +875,42 @@ const AiChatWidget = () => {
                   <IconSessionList size={15} />
                 </button>
               )}
-              {selectedTarget?.scope === "project" && (
+              {/* Gestione del gruppo: prima viveva solo nella scheda Chat del
+                  progetto (quindi su Cliente e Generale non esisteva), e al suo
+                  posto qui c'era un rimando a quella pagina. Ora e' qui, per tutti
+                  e tre gli ambiti — ed e' cio' che ha permesso di cancellarla. */}
+              {!isFrozen && conversationId && (
                 <button
                   type="button"
                   className="ai-chat-openfull"
-                  onClick={openFullPage}
-                  title="Apri la scheda Chat del progetto (partecipanti, azzera…)"
+                  onClick={() => setShowParticipants((current) => !current)}
+                  aria-expanded={showParticipants}
+                  title="Partecipanti, azzera, sciogli il gruppo"
                 >
-                  <ExternalLink size={15} />
+                  <IconParticipants size={15} />
                 </button>
               )}
             </div>
+
+            {showParticipants && conversationId && (
+              <ChatParticipantsPanel
+                target={selectedTarget}
+                conversationId={conversationId}
+                currentUserId={currentUserId}
+                onClose={() => setShowParticipants(false)}
+                onFrozen={() => {
+                  // Uscito o sciolto: da qui in poi la sessione e' in sola lettura.
+                  // Va riletta (il server decide cosa mostrarmi) e l'elenco pure,
+                  // perche' ora e' contrassegnata "Archiviata".
+                  setShowParticipants(false);
+                  void openTarget(selectedTarget, conversationId);
+                }}
+                onCleared={() => {
+                  setShowParticipants(false);
+                  void openTarget(selectedTarget, conversationId);
+                }}
+              />
+            )}
 
             {isFrozen && (
               <div className="ai-chat-notice">

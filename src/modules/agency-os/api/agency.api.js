@@ -555,45 +555,69 @@ export const sendAgencyProjectChatMessage = async (
   return result?.chat || null;
 };
 
-export const clearAgencyProjectChat = async (projectId, { conversationId, signal } = {}) => {
+// Le quattro funzioni "…AgencyProjectChatParticipant…" e `clearAgencyProjectChat`
+// stavano qui: parlavano solo dell'ambito Progetto, perche' l'unico posto da cui si
+// gestivano i gruppi era la scheda Chat estesa del progetto. Sostituite il 15/7/2026
+// dalle equivalenti per ambito qui sotto, che valgono per tutti e tre.
+
+// --- PARTECIPANTI e AZZERAMENTO per ambito (15/7/2026, spec 4-ter §3) ---
+//
+// Il server ha le stesse tre operazioni su ognuno dei tre ambiti, ma sotto percorsi
+// diversi (il progetto per via delle rotte di Fase 1, cliente e generale da Fase 2).
+// Queste funzioni instradano in base all'ambito, come gia' fa la chat: il popup
+// lavora su un `target`, non deve sapere che il progetto ha un percorso tutto suo.
+//
+// Nascono per portare la gestione dei gruppi dentro il popup e poter cancellare la
+// scheda Chat estesa del progetto, che era l'unico posto dove si potevano gestire.
+const chatScopeBasePath = (target) => {
+  if (target.scope === "general") return "/agency/chat/general";
+  if (target.scope === "client") return `/agency/chat/client/${encodeURIComponent(target.id)}`;
+  return `/agency/projects/${encodeURIComponent(target.id)}/chat`;
+};
+
+// `conversationId` va SEMPRE passato: i partecipanti sono della singola sessione, non
+// dell'ambito. Omettendolo il server ripiega sull'ultima sessione usata — cioe' si
+// finirebbe per invitare qualcuno in una conversazione diversa da quella aperta,
+// senza alcun errore (vedi nota operativa #21).
+export const fetchScopedChatParticipants = async (target, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(`${chatScopeBasePath(target)}/participants${chatSessionQuery(conversationId)}`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.participants || null;
+};
+
+export const addScopedChatParticipant = async (target, userId, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(`${chatScopeBasePath(target)}/participants${chatSessionQuery(conversationId)}`, {
+    method: "POST",
+    body: { userId },
+    signal,
+  });
+
+  return result?.participants || null;
+};
+
+// Rimuove un partecipante — oppure esci tu, passando il tuo stesso id. In entrambi i
+// casi il server CONGELA la riga invece di cancellarla: la sessione resta a chi esce,
+// in sola lettura e ferma al momento dell'uscita.
+export const removeScopedChatParticipant = async (target, memberId, { conversationId, signal } = {}) => {
   const result = await agencyFetch(
-    `/agency/projects/${encodeURIComponent(projectId)}/chat${chatSessionQuery(conversationId)}`,
+    `${chatScopeBasePath(target)}/participants/${encodeURIComponent(memberId)}${chatSessionQuery(conversationId)}`,
     { method: "DELETE", signal },
   );
+
+  return result?.participants || null;
+};
+
+// Azzera i messaggi della sessione. Non reversibile e vale per tutti i partecipanti.
+export const clearScopedChat = async (target, { conversationId, signal } = {}) => {
+  const result = await agencyFetch(`${chatScopeBasePath(target)}${chatSessionQuery(conversationId)}`, {
+    method: "DELETE",
+    signal,
+  });
 
   return result?.chat || null;
-};
-
-export const fetchAgencyProjectChatParticipants = async (projectId, { conversationId, signal } = {}) => {
-  const result = await agencyFetch(
-    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants${chatSessionQuery(conversationId)}`,
-    { method: "GET", signal },
-  );
-
-  return result?.participants || null;
-};
-
-export const addAgencyProjectChatParticipant = async (projectId, userId, { conversationId, signal } = {}) => {
-  const result = await agencyFetch(
-    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants${chatSessionQuery(conversationId)}`,
-    { method: "POST", body: { userId }, signal },
-  );
-
-  return result?.participants || null;
-};
-
-// Rimuove un partecipante — oppure esci tu, passando il tuo stesso id. In entrambi
-// i casi il server CONGELA la riga invece di cancellarla: la sessione resta a chi
-// esce, in sola lettura e ferma al momento dell'uscita.
-export const removeAgencyProjectChatParticipant = async (projectId, memberId, { conversationId, signal } = {}) => {
-  const result = await agencyFetch(
-    `/agency/projects/${encodeURIComponent(projectId)}/chat/participants/${encodeURIComponent(
-      memberId,
-    )}${chatSessionQuery(conversationId)}`,
-    { method: "DELETE", signal },
-  );
-
-  return result?.participants || null;
 };
 
 export const fetchAgencyAiEstimates = async ({ signal } = {}) => {
