@@ -32,6 +32,13 @@ import {
   parseNavSuggestions,
   type ChatNavSuggestion,
 } from './chat-nav.js';
+import {
+  CONTEXT_FETCH_LIMIT,
+  planContextCompression,
+  buildSummaryRequest,
+  buildCompressedContext,
+  type ContextMessage,
+} from './chat-context.js';
 import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
@@ -2566,9 +2573,9 @@ const retrieveSourceExcerptsForQuery = async (input: {
   }
 };
 
-// Quanti messaggi passati includere nel prompt della chat (ultimi N turni), per
-// dare continuità senza gonfiare troppo l'input.
-const CHAT_HISTORY_CONTEXT_LIMIT = 12;
+// Nota: la finestra di storico passata al modello e' governata dalla compressione
+// del contesto (Fase 5, CONTEXT_FETCH_LIMIT in chat-context.ts), non piu' da un tetto
+// fisso di turni: oltre soglia i messaggi vecchi si riassumono invece di sparire.
 
 // Quanti allegati dei turni PRECEDENTI ripassare al modello, oltre a quelli del
 // turno corrente. Tenuto basso: ogni allegato pesa fino a ATTACHMENT_PROMPT_CHARS
@@ -8236,15 +8243,16 @@ export const agencyService = {
       .reverse();
     const promptAttachments = [...previousAttachments, ...turnAttachments];
 
-    // Contesto per l'ambito (profilo + RAG + allegati), storico recente e le aree del
-    // CRM su cui l'utente puo' andare (per la navigazione suggerita, Fase 6).
+    // Contesto per l'ambito (profilo + RAG + allegati), finestra di storico (piu' ampia
+    // del passato: la compressione decide cosa tenere) e le aree del CRM su cui
+    // l'utente puo' andare (per la navigazione suggerita, Fase 6).
     const [context, history, enabledModules, permissions] = await Promise.all([
       buildScopedChatContext(input.workspaceId, input.target, message, promptAttachments),
-      aiConversationRepository.listMessages(conversation.id, CHAT_HISTORY_CONTEXT_LIMIT),
+      aiConversationRepository.listMessages(conversation.id, CONTEXT_FETCH_LIMIT),
       moduleRepository.listEnabledModules(input.workspaceId),
       rbacRepository.listUserPermissions(input.userId, input.workspaceId),
     ]);
-    const contextMessages = history.map((row) => ({
+    const historyMessages: ContextMessage[] = history.map((row) => ({
       role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
       content: row.content,
     }));
@@ -8252,12 +8260,46 @@ export const agencyService = {
     // Solo le aree accessibili finiscono nel prompt: il modello non propone porte
     // chiuse, e i suggerimenti che tornano puntano solo dove l'utente puo' entrare.
     const navAreas = resolveAccessibleNavAreas(enabledModules, permissions);
+    const systemPrompt = context.system + buildNavPromptSection(navAreas);
+
+    // Compressione del contesto (Fase 5). Oltre la soglia (~45% della finestra del
+    // modello) i messaggi piu' vecchi della finestra vengono RIASSUNTI in un turno
+    // sintetico, e si tiene verbatim solo la coda recente. Invisibile all'utente (che
+    // vede sempre lo storico intero da listMessages): comprimiamo solo cio' che l'AI
+    // legge. Il riassunto e' esso stesso una chiamata AI, loggata e a budget.
+    // status.model e' gia' il modello effettivo risolto: serve solo a scegliere la
+    // finestra di contesto giusta (per-modello).
+    const plan = planContextCompression({ systemText: systemPrompt, messages: historyMessages, model: status.model });
+    let contextMessages: ContextMessage[] = plan.keepVerbatim;
+    if (plan.needsCompression) {
+      const summaryRequest = buildSummaryRequest(plan.toSummarize);
+      let summary: AgencyAiTextResult | null = null;
+      try {
+        summary = await runAgencyAiTextWithMeta({
+          workspaceId: input.workspaceId,
+          system: summaryRequest.system,
+          messages: summaryRequest.messages,
+          functionName: 'chat.summary',
+          conversationId: conversation.id,
+          projectId: input.target.scope === 'project' ? input.target.projectId : undefined,
+        });
+      } catch (error) {
+        // Se non c'e' budget nemmeno per riassumere si prosegue con la sola coda
+        // recente: meglio una risposta con meno contesto che nessuna risposta.
+        if (!(error instanceof AiBudgetExceededError)) {
+          throw error;
+        }
+      }
+      contextMessages = summary?.text
+        ? buildCompressedContext(summary.text, plan.keepVerbatim)
+        : plan.keepVerbatim;
+    }
 
     let result: AgencyAiTextResult | null;
     try {
       result = await runAgencyAiTextWithMeta({
         workspaceId: input.workspaceId,
-        system: context.system + buildNavPromptSection(navAreas),
+        system: systemPrompt,
         messages: contextMessages,
         functionName: `chat.${input.target.scope}`,
         conversationId: conversation.id,
