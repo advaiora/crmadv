@@ -25,6 +25,7 @@ import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from "../../../modules/me
 import ChatBubble from "./chatBubble";
 import MessagingPanel from "./MessagingPanel";
 import ChatParticipantsPanel from "./ChatParticipantsPanel";
+import ChatOnboarding from "./ChatOnboarding";
 import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
 import { ATTACHMENT_FILE_ACCEPT, formatListDate, mentionsAi } from "./chatShared";
 import {
@@ -852,6 +853,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
         />
       ) : (
         <>
+        <ChatOnboarding canUseMessaging={canUseMessaging} />
         <ScopeTabs activeScope={scope} onScope={changeScope} />
 
         {showPicker ? (

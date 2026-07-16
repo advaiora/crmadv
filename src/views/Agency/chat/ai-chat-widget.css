@@ -793,6 +793,52 @@
   background: var(--muted);
 }
 
+/* --- Onboarding leggero (guida in-contesto dismissibile) --- */
+.ai-chat-onboard {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 8px);
+  background: color-mix(in srgb, var(--primary) 8%, var(--background));
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  color: var(--foreground);
+}
+
+.ai-chat-onboard-text {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.ai-chat-onboard-dismiss {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border-radius: var(--radius-sm, 6px);
+  padding: 2px;
+  margin-top: 1px;
+}
+
+.ai-chat-onboard-dismiss:hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+/* Nel popup espanso / casella il contenuto sta a 860px centrati: allinea la guida. */
+.ai-chat-panel.is-expanded .ai-chat-onboard,
+.ai-chat-inline .ai-chat-onboard {
+  width: 100%;
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* --- Partecipanti del gruppo (15/7/2026, spec 4-ter §3) --- */
 /* Vestito come l'elenco sessioni: e' un pannello che scende dall'intestazione della
    conversazione, non una scatola in piu' (design §3.3: separa lo spazio, non le
