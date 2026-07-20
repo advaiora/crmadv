@@ -110,6 +110,17 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     });
   });
 
+  // Modelli selezionabili nel selettore di Chat AI (deciso 20/7/2026: provider + modello,
+  // ambito per sessione). Sola lettura → chat.view, come le altre GET della chat.
+  app.get('/agency/chat/models', async (request, reply) => {
+    const { workspace } = await ensureChatAccess(request, CHAT_PERMISSIONS.view);
+    const models = await agencyService.listChatModels({ workspaceId: workspace.id });
+
+    return ok(reply, {
+      models,
+    });
+  });
+
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId',
     async (request, reply) => {

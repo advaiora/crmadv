@@ -1,7 +1,14 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, Paperclip } from "react-feather";
-import { ASK_AI_LABELS, ASK_AI_TYPES, askAiWithEntity, openAiChatOnEntity } from "./askAi";
+import { MessageCircle, MessageSquare, Paperclip } from "react-feather";
+import {
+  ASK_AI_LABELS,
+  ASK_AI_TYPES,
+  askAiWithEntity,
+  isAskAiScopeType,
+  openAiChatOnEntity,
+  pickChatForEntity,
+} from "./askAi";
 import "./ai-chat-widget.css";
 
 // Menu contestuale globale "Chiedi all'AI" (Fase 3a). Montato una volta sola nello
@@ -11,7 +18,9 @@ import "./ai-chat-widget.css";
 // riga, senza montare componenti per riga ne' ri-renderizzare nulla.
 
 const MENU_WIDTH = 232;
-const MENU_HEIGHT = 92;
+// Fino a tre voci (progetto/cliente); per fonte/preventivo una sola. Sovrastimare e'
+// sicuro: serve solo a non far uscire il menu dal fondo dello schermo.
+const MENU_HEIGHT = 132;
 
 const AskAiContextMenu = () => {
   const [menu, setMenu] = React.useState(null);
@@ -86,13 +95,23 @@ const AskAiContextMenu = () => {
       <div className="ai-chat-ctxmenu-head" title={menu.name}>
         {menu.name || "Elemento"}
       </div>
-      <button type="button" role="menuitem" className="ai-chat-ctxmenu-item" onClick={() => run(askAiWithEntity)}>
-        <Paperclip size={14} />
-        <span>{ASK_AI_LABELS.attach}</span>
-      </button>
-      <button type="button" role="menuitem" className="ai-chat-ctxmenu-item" onClick={() => run(openAiChatOnEntity)}>
-        <MessageCircle size={14} />
-        <span>{ASK_AI_LABELS.open}</span>
+      {/* Progetto e cliente SONO ambiti-chat: hanno "aggiungi/apri". Fonte e preventivo
+          no: per loro solo "allega a una chat…" (scegli tu la destinazione). */}
+      {isAskAiScopeType(menu.entityType) && (
+        <>
+          <button type="button" role="menuitem" className="ai-chat-ctxmenu-item" onClick={() => run(askAiWithEntity)}>
+            <Paperclip size={14} />
+            <span>{ASK_AI_LABELS.attach}</span>
+          </button>
+          <button type="button" role="menuitem" className="ai-chat-ctxmenu-item" onClick={() => run(openAiChatOnEntity)}>
+            <MessageCircle size={14} />
+            <span>{ASK_AI_LABELS.open}</span>
+          </button>
+        </>
+      )}
+      <button type="button" role="menuitem" className="ai-chat-ctxmenu-item" onClick={() => run(pickChatForEntity)}>
+        <MessageSquare size={14} />
+        <span>{ASK_AI_LABELS.pick}</span>
       </button>
     </div>,
     document.body,

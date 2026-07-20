@@ -145,13 +145,19 @@ export const aiConversationRepository = {
   },
 
   // Aggiorna la data dell'ultimo messaggio (ordina l'elenco) e, se la sessione non
-  // ha ancora un titolo, glielo assegna. Chiamata a ogni invio.
-  touchSession(conversationId: string, input: { lastMessageAt: Date; titleIfEmpty?: string | null }) {
+  // ha ancora un titolo, glielo assegna. Chiamata a ogni invio. `model` (selettore
+  // per-sessione, 20/7/2026) si aggiorna solo se passato: undefined = non toccare la
+  // scelta precedente.
+  touchSession(
+    conversationId: string,
+    input: { lastMessageAt: Date; titleIfEmpty?: string | null; model?: string | null },
+  ) {
     return prisma.aiConversation.update({
       where: { id: conversationId },
       data: {
         lastMessageAt: input.lastMessageAt,
         ...(input.titleIfEmpty ? { title: input.titleIfEmpty } : {}),
+        ...(input.model !== undefined ? { model: input.model } : {}),
       },
     });
   },

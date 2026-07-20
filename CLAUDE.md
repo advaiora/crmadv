@@ -52,6 +52,12 @@ Per ogni cambiamento di schema che finisce su `main` si usano **solo migrazioni 
 
 Regola pratica quando si tocca lo schema: modifica `schema.prisma`, genera la migrazione con `prisma migrate dev`, **committa il file di migrazione** insieme al codice, e **segnala nell'handoff** che c'è una nuova migrazione (ricordando che l'arretrato `20260706085001` va riconciliato *prima*). **Non riscrivere migrazioni già applicate** (cambierebbe il loro checksum e romperebbe gli ambienti dove funzionano già).
 
+## Dev server e database — una sola sessione accesa per volta
+
+I dev server (`npm run dev:api` sulla 4000 e `npm run dev` sulla 5173) vanno tenuti accesi in **una sola sessione/finestra per volta**. Il motivo è concreto: l'API gira con `tsx watch`, che tiene un **lock sulla DLL di Prisma**; se una seconda sessione ha l'API accesa, `prisma generate` e le migrazioni si bloccano (e al reload la pagina può mostrare dati vuoti mentre l'API si riavvia — non è un bug). È così che il 16/7/2026 una sessione ha dovuto fermare i dev server di un'altra per poter migrare.
+
+Regola pratica: **prima di una migrazione o di `prisma generate`, ferma l'API dell'altra sessione** (o assicurati che nessun altro l'abbia accesa). Contesto ed esempi in `archivio-documenti/note-operative-ai.md` (nota #28).
+
 ## Colori e temi (chiaro/scuro) — regola d'oro
 
 Il tema è un sistema globale a token (variabili CSS) in `src/styles/scss/globals.css`. Sviluppando qualsiasi pagina/componente: **usa sempre i token `var(--…)` o i componenti Bootstrap standard, mai colori scritti a mano** (`#hex`/`rgb`/`rgba`), nemmeno negli stili inline in JSX. Così chiaro e scuro funzionano da soli, senza ritocchi pagina per pagina. Riferimento completo dei token: `archivio-documenti/design-system-temi.md`. Controlli automatici sui moduli: `npm run lint:css` (file CSS) e `npm run lint:colors` (stili inline in JSX).

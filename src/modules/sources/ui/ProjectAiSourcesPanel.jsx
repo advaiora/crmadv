@@ -9,6 +9,7 @@ import {
   reindexProjectSources,
   uploadProjectSourceFile,
 } from '../api/sourcesApi';
+import { askAiRowProps } from '../../../views/Agency/chat/askAi';
 
 const FILE_ACCEPT = '.pdf,.docx,.txt,.csv,.md';
 
@@ -338,7 +339,11 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
               const meta = STATUS_META[source.status] || STATUS_META.pending;
               const typeMeta = TYPE_META[source.type] || TYPE_META.text;
               return (
-                <div key={source.id} className="agency-record-row">
+                <div
+                  key={source.id}
+                  className="agency-record-row"
+                  {...askAiRowProps('source', { id: source.id, name: source.title })}
+                >
                   <div className="flex-grow-1">
                     <div className="d-flex align-items-center gap-2 mb-1">
                       <Badge bg={typeMeta.variant}>{typeMeta.label}</Badge>

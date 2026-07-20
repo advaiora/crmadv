@@ -364,6 +364,82 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Barra del selettore modello (deciso 20/7/2026: provider + modello, per sessione).
+   Una riga sottile e discreta sotto l'intestazione: densita', non un blocco d'accento
+   (design Apple-style a sottrazione). Solo token del tema; il <select> e' un componente
+   Bootstrap standard, quindi si tematizza da solo. */
+.ai-chat-model-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.ai-chat-model-icon {
+  display: inline-flex;
+  color: var(--muted-foreground);
+}
+
+.ai-chat-model-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.ai-chat-model-select {
+  flex: 1 1 auto;
+  max-width: 260px;
+}
+
+/* Banner "elemento in sospeso" (voce "Allega a una chat…", Fase 3b/#3). Una barra
+   discreta con un tocco d'accento, in cima al mondo Chat AI finché l'utente non sceglie
+   dove allegare. Solo token del tema. */
+.ai-chat-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--primary) 8%, var(--background));
+  font-size: 0.8125rem;
+  color: var(--foreground);
+}
+
+.ai-chat-pending-icon {
+  display: inline-flex;
+  color: var(--primary);
+}
+
+.ai-chat-pending-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ai-chat-pending-attach {
+  flex: none;
+}
+
+.ai-chat-pending-cancel {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  cursor: pointer;
+}
+
+.ai-chat-pending-cancel:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
 .ai-chat-conv-name {
   flex: 1 1 auto;
   font-weight: 600;

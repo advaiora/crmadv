@@ -361,6 +361,19 @@ export const fetchAgencyChatProjects = async ({ signal } = {}) => {
   return Array.isArray(result?.projects) ? result.projects : [];
 };
 
+// Modelli selezionabili nel selettore di Chat AI (deciso 20/7/2026: provider + modello,
+// ambito per sessione). Ritorna { configured, defaultProvider, defaultModel, models[] }
+// dove ogni modello ha { id, provider, label, hint, available } (available = provider
+// con chiave configurata). Null se la risposta non e' valida.
+export const fetchAgencyChatModels = async ({ signal } = {}) => {
+  const result = await agencyFetch(`/agency/chat/models`, {
+    method: "GET",
+    signal,
+  });
+
+  return result?.models || null;
+};
+
 // --- SESSIONI della chat (15/7/2026) ---
 // Un ambito (progetto/cliente/generale) ha N sessioni. `conversationId` dice su
 // QUALE si sta lavorando: va passato a ogni chiamata della sessione aperta —
@@ -534,11 +547,11 @@ export const fetchAgencyClientChat = async (clientId, { conversationId, signal }
 export const sendAgencyClientChatMessage = async (
   clientId,
   message,
-  { askAi = false, attachmentIds = [], conversationId, signal } = {},
+  { askAi = false, attachmentIds = [], conversationId, model, signal } = {},
 ) => {
   const result = await agencyFetch(
     `/agency/chat/client/${encodeURIComponent(clientId)}${chatSessionQuery(conversationId)}`,
-    { method: "POST", body: { message, askAi, attachmentIds }, signal },
+    { method: "POST", body: { message, askAi, attachmentIds, model }, signal },
   );
 
   return result?.chat || null;
@@ -555,11 +568,11 @@ export const fetchAgencyGeneralChat = async ({ conversationId, signal } = {}) =>
 
 export const sendAgencyGeneralChatMessage = async (
   message,
-  { askAi = false, attachmentIds = [], conversationId, signal } = {},
+  { askAi = false, attachmentIds = [], conversationId, model, signal } = {},
 ) => {
   const result = await agencyFetch(`/agency/chat/general${chatSessionQuery(conversationId)}`, {
     method: "POST",
-    body: { message, askAi, attachmentIds },
+    body: { message, askAi, attachmentIds, model },
     signal,
   });
 
@@ -578,11 +591,11 @@ export const fetchAgencyProjectChat = async (projectId, { conversationId, signal
 export const sendAgencyProjectChatMessage = async (
   projectId,
   message,
-  { askAi = false, attachmentIds = [], conversationId, signal } = {},
+  { askAi = false, attachmentIds = [], conversationId, model, signal } = {},
 ) => {
   const result = await agencyFetch(
     `/agency/projects/${encodeURIComponent(projectId)}/chat${chatSessionQuery(conversationId)}`,
-    { method: "POST", body: { message, askAi, attachmentIds }, signal },
+    { method: "POST", body: { message, askAi, attachmentIds, model }, signal },
   );
 
   return result?.chat || null;

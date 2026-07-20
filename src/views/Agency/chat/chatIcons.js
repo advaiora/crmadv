@@ -27,6 +27,7 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Sliders,
   UserPlus,
   Users,
   X,
@@ -60,6 +61,11 @@ export const IconResume = RotateCcw; // riprendi un'archiviata in una nuova chat
 export const IconParticipants = UserPlus;
 
 export const IconAttach = Paperclip; // allega un documento o un elemento del CRM
+
+// Selettore del modello AI per la sessione (deciso 20/7/2026: provider + modello,
+// ambito per sessione). Non il Cpu di IconAi (quello e' "il mondo macchina"): qui si
+// REGOLA quale motore risponde, quindi il simbolo dei cursori di regolazione.
+export const IconModel = Sliders;
 
 // Navigazione suggerita dall'AI (Fase 6): "vai a quest'area del CRM". La freccia in
 // uscita dice "ti porto altrove", coerente con l'affordance "apri" gia' usata nel

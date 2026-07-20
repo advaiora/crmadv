@@ -28,6 +28,7 @@ import {
 import '../../modules/quotes/ui/quotes-ui.css';
 import { hasPermission } from '../../utils/workspaceAccess';
 import CollapsibleSection from '../../components/ui/CollapsibleSection';
+import { askAiRowProps } from '../Agency/chat/askAi';
 import RowDisclosureButton from '../../components/ui/RowDisclosureButton';
 import DetailField from '../../components/ui/DetailField';
 
@@ -397,6 +398,10 @@ const QuotesList = () => {
                               <tr
                                 className={`quote-clickable-row ${isExpanded ? 'ui-row-expanded' : ''}`.trim()}
                                 onClick={() => history.push(`/apps/quotes/${quote.id}`)}
+                                {...askAiRowProps('quote', {
+                                  id: quote.id,
+                                  name: `Preventivo ${quote?.client?.name || `#${shortQuoteId(quote.id)}`}`,
+                                })}
                               >
                                 <td className="ui-col-disclosure">
                                   <RowDisclosureButton

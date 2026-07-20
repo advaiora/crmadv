@@ -2241,6 +2241,65 @@ const resolveAgencyProviderModel = (provider: string, configuredModel: string): 
   return configuredModel;
 };
 
+// Catalogo curato dei modelli selezionabili nel selettore per-sessione della Chat AI
+// (deciso il 20/7/2026: provider + modello specifico, ambito per sessione). Non e'
+// l'universo dei modelli: e' una lista umana e ristretta. Il `provider` di ogni voce
+// guida sia il ramo API sia la chiave usata; l'`id` contiene la parola chiave
+// (opus/sonnet/haiku, gpt-*) su cui poggiano gia' finestra di contesto (chat-context.ts)
+// e stima costi (estimateAgencyAiCostUsd). Gli id vanno tenuti allineati a quelli reali
+// del provider: il collaudo vero e' con le chiavi, a fine V.
+type AgencyAiModelOption = {
+  id: string;
+  provider: AgencyAiProvider;
+  label: string;
+  hint: string;
+};
+const AGENCY_AI_MODEL_CATALOG: readonly AgencyAiModelOption[] = [
+  { id: 'claude-opus-4-8', provider: 'anthropic', label: 'Claude Opus 4.8', hint: 'Massima qualita' },
+  { id: 'claude-sonnet-5', provider: 'anthropic', label: 'Claude Sonnet 5', hint: 'Equilibrato' },
+  { id: 'claude-haiku-4-5-20251001', provider: 'anthropic', label: 'Claude Haiku 4.5', hint: 'Veloce ed economico' },
+  { id: 'gpt-5', provider: 'openai', label: 'GPT-5', hint: 'Massima qualita' },
+  { id: 'gpt-4o', provider: 'openai', label: 'GPT-4o', hint: 'Equilibrato' },
+  { id: 'gpt-4o-mini', provider: 'openai', label: 'GPT-4o mini', hint: 'Veloce ed economico' },
+];
+const findAgencyCatalogModel = (id?: string | null): AgencyAiModelOption | null => {
+  const trimmed = typeof id === 'string' ? id.trim() : '';
+  if (!trimmed) {
+    return null;
+  }
+  return AGENCY_AI_MODEL_CATALOG.find((entry) => entry.id === trimmed) ?? null;
+};
+
+// Un modello del catalogo e' "usabile" solo se il suo provider ha una chiave (DB o env).
+const isAgencyProviderKeyPresent = (
+  runtimeConfig: Awaited<ReturnType<typeof resolveAgencyRuntimeConfig>>,
+  provider: AgencyAiProvider,
+): boolean => (
+  provider === 'anthropic'
+    ? Boolean(runtimeConfig.ai.anthropicApiKey)
+    : Boolean(runtimeConfig.ai.openAiApiKey)
+);
+
+// Opzioni per il selettore di modello in Chat AI: catalogo + disponibilita' per-provider
+// (chiave presente) + il default di workspace, cosi' la UI marca la scelta corrente e
+// disabilita i provider senza chiave.
+const getAgencyChatModelOptions = async (workspaceId?: string) => {
+  const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
+  const status = await getAgencyAiStatusPayload(workspaceId);
+  return {
+    configured: status.configured,
+    defaultProvider: status.provider,
+    defaultModel: status.model,
+    models: AGENCY_AI_MODEL_CATALOG.map((entry) => ({
+      id: entry.id,
+      provider: entry.provider,
+      label: entry.label,
+      hint: entry.hint,
+      available: isAgencyProviderKeyPresent(runtimeConfig, entry.provider),
+    })),
+  };
+};
+
 const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputTokens: number) => {
   const normalizedModel = model.toLowerCase();
   const rates = normalizedModel.includes('gpt-4o-mini')
@@ -3252,6 +3311,10 @@ const runAgencyAiTextWithMeta = async (input: {
   // Cliente il progetto non e' uno solo; con Generale non ce n'e' nessuno).
   projectId?: string;
   conversationId?: string;
+  // Modello scelto per la sessione (selettore per-sessione, deciso 20/7/2026). Se e' nel
+  // catalogo e il suo provider ha una chiave, sovrascrive provider+modello di workspace
+  // SOLO per questa chiamata; altrimenti resta il default di workspace (retro-compat).
+  model?: string;
 }): Promise<AgencyAiTextResult | null> => {
   const status = await getAgencyAiStatusPayload(input.workspaceId);
   const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
@@ -3265,11 +3328,20 @@ const runAgencyAiTextWithMeta = async (input: {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), input.timeoutMs || runtimeConfig.ai.timeoutMs);
   try {
-    const provider = status.provider as AgencyAiProvider;
-    const model = resolveAgencyProviderModel(
-      provider,
-      runtimeConfig.ai.functionModels[functionName] || status.model,
-    );
+    // Il selettore per-sessione puo' scegliere provider+modello per questa chiamata, ma
+    // solo tra i modelli del catalogo il cui provider ha una chiave. Fuori da questo caso
+    // (nessuna scelta, id sconosciuto, provider senza chiave) si usa il default di
+    // workspace come da sempre — incluso il riassunto interno (chat.summary).
+    const requested = findAgencyCatalogModel(input.model);
+    let provider: AgencyAiProvider;
+    let model: string;
+    if (requested && isAgencyProviderKeyPresent(runtimeConfig, requested.provider)) {
+      provider = requested.provider;
+      model = requested.id;
+    } else {
+      provider = status.provider as AgencyAiProvider;
+      model = resolveAgencyProviderModel(provider, runtimeConfig.ai.functionModels[functionName] || status.model);
+    }
     const conversation = input.messages.map((message) => ({ role: message.role, content: message.content }));
 
     let content: string;
@@ -7963,6 +8035,10 @@ export const agencyService = {
       scope: input.target.scope,
       conversationId: conversation!.id,
       title: conversation!.title,
+      // Modello scelto per la sessione (selettore per-sessione): la UI ci semina la
+      // scelta iniziale del selettore, cosi' e' condivisa tra i partecipanti. Null =
+      // usa il default di workspace.
+      model: conversation!.model,
       isParticipant: Boolean(participant) && !isFrozen,
       isFrozen,
       frozenAt: participant?.frozenAt ?? null,
@@ -8161,6 +8237,12 @@ export const agencyService = {
     };
   },
 
+  async listChatModels(input: { workspaceId?: string }) {
+    // Opzioni del selettore di modello in Chat AI: catalogo curato + disponibilita' per
+    // provider (chiave presente) + default di workspace. Lettura: basta chat.view.
+    return getAgencyChatModelOptions(input.workspaceId);
+  },
+
   async sendScopedChatMessage(input: {
     workspaceId: string;
     userId: string;
@@ -8172,6 +8254,10 @@ export const agencyService = {
       message: z.string().trim().min(1).max(4000),
       askAi: z.boolean().optional(),
       attachmentIds: z.array(z.string().min(1)).max(10).optional(),
+      // Modello scelto per la sessione (selettore per-sessione). Stringa libera qui: la
+      // validazione vera (catalogo + provider con chiave) e il fallback al default li fa
+      // runAgencyAiTextWithMeta. Puo' mancare (si usa il default di workspace).
+      model: z.string().trim().min(1).max(120).optional(),
     });
     const parsed = schema.safeParse(input.body ?? {});
     if (!parsed.success) {
@@ -8179,6 +8265,7 @@ export const agencyService = {
     }
     const message = parsed.data.message;
     const attachmentIds = parsed.data.attachmentIds ?? [];
+    const requestedModel = parsed.data.model;
 
     const conversation = await this.resolveConversationForUser(input);
 
@@ -8214,6 +8301,10 @@ export const agencyService = {
     await aiConversationRepository.touchSession(conversation.id, {
       lastMessageAt: createdMessage.createdAt,
       titleIfEmpty: conversation.title ? null : buildSessionTitle(message),
+      // Persiste il modello scelto sulla sessione (condiviso tra i partecipanti), ma
+      // solo se e' uno del catalogo: cosi' non si salva spazzatura. Nessuna scelta
+      // valida = si lascia il modello precedente della sessione.
+      model: findAgencyCatalogModel(requestedModel) ? requestedModel : undefined,
     });
 
     // I suggerimenti di navigazione (Fase 6) non sono persistiti: sono CTA una tantum.
@@ -8307,7 +8398,13 @@ export const agencyService = {
     // legge. Il riassunto e' esso stesso una chiamata AI, loggata e a budget.
     // status.model e' gia' il modello effettivo risolto: serve solo a scegliere la
     // finestra di contesto giusta (per-modello).
-    const plan = planContextCompression({ systemText: systemPrompt, messages: historyMessages, model: status.model });
+    // La finestra di contesto segue il modello EFFETTIVO della risposta: se l'utente ha
+    // scelto un modello del catalogo, si usa il suo per dimensionare la finestra (la
+    // validazione della chiave la fa runAgencyAiTextWithMeta, che altrimenti ricade sul
+    // default). Il riassunto interno resta sul modello di default (chat.summary).
+    const requestedCatalogModel = findAgencyCatalogModel(requestedModel);
+    const windowModel = requestedCatalogModel ? requestedCatalogModel.id : status.model;
+    const plan = planContextCompression({ systemText: systemPrompt, messages: historyMessages, model: windowModel });
     let contextMessages: ContextMessage[] = plan.keepVerbatim;
     if (plan.needsCompression) {
       const summaryRequest = buildSummaryRequest(plan.toSummarize);
@@ -8342,6 +8439,7 @@ export const agencyService = {
         functionName: `chat.${input.target.scope}`,
         conversationId: conversation.id,
         projectId: input.target.scope === 'project' ? input.target.projectId : undefined,
+        model: requestedModel,
       });
     } catch (error) {
       if (error instanceof AiBudgetExceededError) {

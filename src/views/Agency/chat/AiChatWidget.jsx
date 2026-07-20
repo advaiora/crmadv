@@ -5,6 +5,7 @@ import { Badge, Button, Form, Spinner } from "react-bootstrap";
 import { useSession } from "../../../hooks/useSession";
 import {
   fetchAgencyChatProjects,
+  fetchAgencyChatModels,
   fetchAgencyProjectChat,
   sendAgencyProjectChatMessage,
   fetchAgencyClientChat,
@@ -28,7 +29,7 @@ import MessagingPanel from "./MessagingPanel";
 import ChatParticipantsPanel from "./ChatParticipantsPanel";
 import ChatOnboarding from "./ChatOnboarding";
 import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
-import { ATTACHMENT_FILE_ACCEPT, formatListDate, mentionsAi } from "./chatShared";
+import { ATTACHMENT_FILE_ACCEPT, ENTITY_LABELS, formatListDate, mentionsAi } from "./chatShared";
 import {
   IconAi,
   IconAttach,
@@ -38,6 +39,7 @@ import {
   IconCollapse,
   IconExpand,
   IconMessaging,
+  IconModel,
   IconNewChat,
   IconParticipants,
   IconRename,
@@ -84,6 +86,24 @@ const sendScopedChatMessage = (target, message, opts) => {
   if (target.scope === "general") return sendAgencyGeneralChatMessage(message, opts);
   if (target.scope === "client") return sendAgencyClientChatMessage(target.id, message, opts);
   return sendAgencyProjectChatMessage(target.id, message, opts);
+};
+
+// --- Selettore del modello AI (deciso 20/7/2026: provider + modello, per sessione) ---
+// La scelta e' PER SESSIONE (conversationId). In attesa dell'eventuale colonna su
+// AiConversation, si tiene lato client: sopravvive al reload nel browser, ma non e'
+// ancora condivisa tra i partecipanti (upgrade previsto, vedi spec). Se manca la
+// scelta, o non e' piu' usabile, si ricade sul modello di default del workspace.
+const MODEL_STORAGE_KEY = "ai-chat:model-by-conversation";
+const PROVIDER_LABELS = { anthropic: "Anthropic", openai: "OpenAI" };
+const PROVIDER_ORDER = ["anthropic", "openai"];
+const readStoredModelMap = () => {
+  try {
+    const raw = window.localStorage.getItem(MODEL_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_err) {
+    return {};
+  }
 };
 
 // I due mondi sotto lo stesso ingresso (spec 4-ter). Non si mescolano MAI: stesso
@@ -349,6 +369,18 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   const [attachments, setAttachments] = React.useState([]);
   const [attachBusy, setAttachBusy] = React.useState(false);
   const [showAttachPanel, setShowAttachPanel] = React.useState(false);
+  // Elemento (fonte/preventivo/progetto/cliente) in attesa di essere allegato a una
+  // chat SCELTA dall'utente (voce "Allega a una chat…"). Resta finché non si preme
+  // "Allega qui" su una sessione aperta, o non si annulla.
+  const [pendingAttachment, setPendingAttachment] = React.useState(null);
+
+  // Selettore del modello AI (deciso 20/7/2026): `modelOptions` = catalogo + provider
+  // con chiave + default di workspace (caricato alla prima apertura); `modelByConv` = la
+  // scelta per sessione, persistita lato client. `modelSelectId` evita id duplicati se
+  // convivono due istanze del widget (overlay dello shell + casella inline).
+  const [modelOptions, setModelOptions] = React.useState(null);
+  const [modelByConv, setModelByConv] = React.useState(readStoredModelMap);
+  const modelSelectId = React.useId();
 
   const bottomRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
@@ -444,9 +476,79 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
     };
   }, [panelOpen, accessLoaded]);
 
+  // Modelli selezionabili in Chat AI (deciso 20/7/2026): alla prima apertura, come
+  // projects/access. Silenzioso: se non arriva, il selettore non compare e si usa il
+  // modello di default lato server.
+  React.useEffect(() => {
+    if (!panelOpen || modelOptions) {
+      return undefined;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await fetchAgencyChatModels();
+        if (!cancelled && result) {
+          setModelOptions(result);
+        }
+      } catch (_err) {
+        // Nessun selettore: si resta sul modello di default del workspace.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [panelOpen, modelOptions]);
+
   const canUseMessaging =
     hasModuleEnabled(access, MESSAGING_MODULE_KEY) && hasPermission(access, MESSAGING_PERMISSIONS.view);
   const canSendMessages = hasPermission(access, MESSAGING_PERMISSIONS.send);
+
+  // Modelli del selettore: disponibili (provider con chiave) e raggruppati per provider.
+  // `availableModelIds` serve sia a preselezionare sia a non inviare una scelta non piu'
+  // usabile (chiave tolta): in quel caso si ricade sul default lato server.
+  const availableModelIds = React.useMemo(
+    () => new Set((modelOptions?.models || []).filter((model) => model.available).map((model) => model.id)),
+    [modelOptions],
+  );
+  const modelGroups = React.useMemo(() => {
+    const list = modelOptions?.models || [];
+    const byProvider = new Map();
+    for (const model of list) {
+      const bucket = byProvider.get(model.provider) || [];
+      bucket.push(model);
+      byProvider.set(model.provider, bucket);
+    }
+    return PROVIDER_ORDER.filter((provider) => byProvider.has(provider)).map((provider) => ({
+      provider,
+      label: PROVIDER_LABELS[provider] || provider,
+      models: byProvider.get(provider),
+    }));
+  }, [modelOptions]);
+  const hasSelectableModel = availableModelIds.size > 0;
+  // Scelta esplicita per QUESTA sessione, se ancora usabile; altrimenti il default di
+  // workspace. `currentModelId` e' cio' che il selettore mostra; `outgoingModel` e' cio'
+  // che si invia (undefined = usa il default lato server, nessun override).
+  const chosenModelId = conversationId ? modelByConv[conversationId] : undefined;
+  const outgoingModel = chosenModelId && availableModelIds.has(chosenModelId) ? chosenModelId : undefined;
+  const currentModelId = outgoingModel || modelOptions?.defaultModel || "";
+
+  const chooseModel = React.useCallback(
+    (modelId) => {
+      if (!conversationId) {
+        return;
+      }
+      setModelByConv((current) => {
+        const next = { ...current, [conversationId]: modelId };
+        try {
+          window.localStorage.setItem(MODEL_STORAGE_KEY, JSON.stringify(next));
+        } catch (_err) {
+          // localStorage negato/pieno: la scelta vale comunque per la sessione corrente.
+        }
+        return next;
+      });
+    },
+    [conversationId],
+  );
 
   // Se i Messaggi non sono disponibili (modulo spento, permesso tolto) si torna alla
   // Chat AI: senza, si resterebbe su un mondo vuoto e senza tab per uscirne.
@@ -514,6 +616,14 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
         setAiConfigured(chat?.aiConfigured !== false);
         setIsParticipant(chat?.isParticipant !== false);
         setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
+        // Modello della sessione (server = verita' condivisa tra i partecipanti): se la
+        // sessione ne ha uno salvato, semina la scelta del selettore; altrimenti si
+        // mantiene l'eventuale scelta locale ancora non inviata.
+        if (openId && chat?.model) {
+          setModelByConv((current) =>
+            current[openId] === chat.model ? current : { ...current, [openId]: chat.model },
+          );
+        }
         // Bozze rimaste nel composer: appartengono a QUESTA sessione, quindi l'id va
         // passato — senza, tornerebbero quelle dell'ultima sessione usata.
         if (chat?.isParticipant !== false) {
@@ -686,6 +796,34 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
     [selectedTarget, conversationId],
   );
 
+  // "Allega qui" dal banner: allega l'elemento in sospeso alla sessione APERTA (quella
+  // che l'utente ha scelto navigando), come bozza del composer, poi svuota il sospeso.
+  // Il "selettore della chat di destinazione" È la navigazione stessa del popup: si
+  // atterra dove si vuole e si conferma qui — e a quel punto la sessione esiste già
+  // (nota operativa #24: mai allegare a una sessione non ancora creata).
+  const attachPendingHere = React.useCallback(async () => {
+    if (!pendingAttachment || !selectedTarget || !conversationId) {
+      return;
+    }
+    setAttachBusy(true);
+    setError("");
+    try {
+      const attachment = await addAgencyChatEntityAttachment(
+        selectedTarget,
+        { entityType: pendingAttachment.entityType, entityId: pendingAttachment.entityId },
+        { conversationId },
+      );
+      if (attachment) {
+        setAttachments((current) => [...current, attachment]);
+      }
+      setPendingAttachment(null);
+    } catch (err) {
+      setError(err?.message || "Non sono riuscito ad allegare l'elemento.");
+    } finally {
+      setAttachBusy(false);
+    }
+  }, [pendingAttachment, selectedTarget, conversationId]);
+
   const detachAttachment = React.useCallback(async (attachment) => {
     setAttachBusy(true);
     try {
@@ -727,6 +865,13 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
       // sui Messaggi va riportato sul mondo giusto, altrimenti l'azione non farebbe
       // niente di visibile.
       setMode("ai");
+      // "Allega a una chat…": non apre né allega subito. Mette l'elemento IN SOSPESO;
+      // l'utente sceglie ambito+sessione (navigando il popup) e poi preme "Allega qui".
+      // Unica via per fonte/preventivo, che non sono ambiti-chat.
+      if (mode === "pick") {
+        setPendingAttachment({ entityType, entityId, name });
+        return;
+      }
       const isCurrentTarget = selectedTarget?.scope === entityType && selectedTarget?.id === entityId;
       if (mode === "open" || !selectedTarget || isCurrentTarget) {
         openChatOnEntity(entityType, entityId, name);
@@ -819,6 +964,9 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
         askAi,
         attachmentIds: sentAttachments.map((attachment) => attachment.id),
         conversationId,
+        // Solo la scelta esplicita e ancora usabile: altrimenti si omette e il server
+        // usa il modello di default del workspace (nessun override).
+        model: outgoingModel,
       });
       setMessages(Array.isArray(chat?.messages) ? chat.messages : []);
       // Il primo messaggio battezza la sessione (titolo automatico) e la porta in
@@ -891,6 +1039,40 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
         />
       ) : (
         <>
+        {/* Elemento in sospeso (voce "Allega a una chat…"): l'utente sceglie dove
+            allegarlo navigando il popup, poi conferma con "Allega qui". Il banner resta
+            visibile sia sul selettore sia dentro la conversazione. */}
+        {pendingAttachment && (
+          <div className="ai-chat-pending">
+            <span className="ai-chat-pending-icon feather-icon" aria-hidden="true">
+              <IconAttach size={14} />
+            </span>
+            <span className="ai-chat-pending-text">
+              Allega <strong>{ENTITY_LABELS[pendingAttachment.entityType] || "elemento"}</strong>
+              {pendingAttachment.name ? ` "${pendingAttachment.name}"` : ""}: scegli o apri una chat, poi premi "Allega qui".
+            </span>
+            {conversationId && isParticipant && !isFrozen && (
+              <Button
+                size="sm"
+                variant="primary"
+                className="ai-chat-pending-attach"
+                onClick={() => void attachPendingHere()}
+                disabled={attachBusy}
+              >
+                Allega qui
+              </Button>
+            )}
+            <button
+              type="button"
+              className="ai-chat-pending-cancel"
+              onClick={() => setPendingAttachment(null)}
+              aria-label="Annulla"
+              title="Annulla"
+            >
+              <IconClose size={14} />
+            </button>
+          </div>
+        )}
         <ChatOnboarding canUseMessaging={canUseMessaging} />
         <ScopeTabs activeScope={scope} onScope={changeScope} />
 
@@ -958,6 +1140,40 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
                 </button>
               )}
             </div>
+
+            {/* Selettore del modello AI, per sessione (deciso 20/7/2026). Solo con una
+                sessione aperta, scrivibile (non archiviata) e AI configurata: in sola
+                lettura o senza provider con chiave non c'e' nulla da scegliere. */}
+            {conversationId && !isFrozen && isParticipant && aiConfigured && hasSelectableModel && (
+              <div className="ai-chat-model-bar">
+                <span className="ai-chat-model-icon feather-icon" aria-hidden="true">
+                  <IconModel size={14} />
+                </span>
+                <label className="ai-chat-model-label" htmlFor={modelSelectId}>
+                  Modello
+                </label>
+                <Form.Select
+                  id={modelSelectId}
+                  size="sm"
+                  className="ai-chat-model-select"
+                  value={currentModelId}
+                  onChange={(event) => chooseModel(event.target.value)}
+                  aria-label="Modello AI per questa conversazione"
+                >
+                  {modelGroups.map((group) => (
+                    <optgroup key={group.provider} label={group.label}>
+                      {group.models.map((model) => (
+                        <option key={model.id} value={model.id} disabled={!model.available}>
+                          {model.label}
+                          {model.hint ? ` — ${model.hint}` : ""}
+                          {model.available ? "" : " (chiave non configurata)"}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Form.Select>
+              </div>
+            )}
 
             {showParticipants && conversationId && (
               <ChatParticipantsPanel

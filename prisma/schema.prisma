@@ -542,6 +542,11 @@ model AiConversation {
   projectId       String?
   clientId        String?
   title           String?                     @db.VarChar(200)
+  // Modello AI scelto per QUESTA sessione (selettore per-sessione, deciso 20/7/2026).
+  // Null = usa il default di workspace. Persiste la scelta e la rende condivisa tra i
+  // partecipanti (prima era solo lato client). La stessa colonna servira' anche alla
+  // compressione "piena" del contesto (vedi chat-context.ts).
+  model           String?                     @db.VarChar(120)
   createdByUserId String?
   // Ultimo messaggio: ordina l'elenco delle sessioni. Denormalizzato di proposito
   // (aggiornato all'invio) per non fare un max(createdAt) sui messaggi per riga.

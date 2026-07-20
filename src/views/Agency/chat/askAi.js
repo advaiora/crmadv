@@ -6,17 +6,23 @@
 // nulla ne' ri-renderizzarsi. Le voci del menu "⋯" usano invece askAiWithEntity /
 // openAiChatOnEntity direttamente.
 //
-// Due sensi, come da spec:
+// Tre sensi, come da spec (Fase 3b / 4-ter):
 //  - "aggiungi alla chat aperta" -> mode 'attach': se una conversazione e' aperta,
 //    l'elemento ci finisce come allegato; se non lo e', si apre quella dell'elemento.
 //  - "apri chat su questo"       -> mode 'open': apre la chat DELL'elemento
 //    (progetto -> ambito Progetto, cliente -> ambito Cliente).
+//  - "allega a una chat…"        -> mode 'pick': scegli TU la chat di destinazione
+//    (ambito + sessione) e allega li' l'elemento. E' l'UNICA voce per gli elementi
+//    che non sono ambiti-chat (fonte, preventivo), e una TERZA voce per gli altri.
 
 export const AI_CHAT_ASK_EVENT = "ai-chat:ask";
 
-// Tipi che l'utente puo' interpellare dalle liste. Il server ne accetta anche altri
-// (fonte, preventivo): si aggiungeranno quando quelle liste avranno il loro menu.
-export const ASK_AI_TYPES = ["project", "client"];
+// Tipi interpellabili dalle liste. project/client sono anche AMBITI-chat (hanno
+// "apri"/"aggiungi"); source (fonte) e quote (preventivo) NO: per loro c'e' solo
+// "allega a una chat…". Il server accetta tutti e quattro come allegati.
+export const ASK_AI_TYPES = ["project", "client", "source", "quote"];
+export const ASK_AI_SCOPE_TYPES = ["project", "client"];
+export const isAskAiScopeType = (entityType) => ASK_AI_SCOPE_TYPES.includes(entityType);
 
 // Attributi da mettere sulla riga/card di una lista per abilitare il tasto destro.
 export const askAiRowProps = (entityType, entity) => ({
@@ -40,8 +46,16 @@ export const openAiChatOnEntity = (entityType, entity) => {
   dispatchAsk({ mode: "open", entityType, entityId: entity?.id, name: entity?.name || "" });
 };
 
-// Etichette delle due voci, condivise tra menu contestuale e menu "⋯".
+// "Allega a una chat…": apre il popup in scelta-destinazione, con l'elemento IN
+// SOSPESO. L'utente sceglie ambito+sessione e preme "Allega qui". Unica voce per
+// fonte/preventivo (non sono ambiti), terza voce per progetto/cliente.
+export const pickChatForEntity = (entityType, entity) => {
+  dispatchAsk({ mode: "pick", entityType, entityId: entity?.id, name: entity?.name || "" });
+};
+
+// Etichette delle voci, condivise tra menu contestuale e menu "⋯".
 export const ASK_AI_LABELS = {
   attach: "Aggiungi alla chat aperta",
   open: "Apri chat su questo",
+  pick: "Allega a una chat…",
 };

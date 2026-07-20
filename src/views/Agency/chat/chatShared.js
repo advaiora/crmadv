@@ -46,7 +46,7 @@ export const mentionsAi = (text) => /(^|\s)@ai\b/i.test(text || "");
 
 // --- Allegati (Fase 3a) ---
 
-const ENTITY_LABELS = {
+export const ENTITY_LABELS = {
   project: "Progetto",
   client: "Cliente",
   source: "Fonte",
