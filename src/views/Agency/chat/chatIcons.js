@@ -7,10 +7,10 @@
 // (Messaggi e Chat AI) la confusione diventerebbe insostenibile.
 //
 // CHI AGGIUNGE un pezzo di chat prende l'icona DA QUI. Se il concetto non c'e',
-// si aggiunge una voce a questo elenco — non si pesca a caso da react-feather:
+// si aggiunge una voce a questo elenco — non si pesca a caso da lucide-react:
 // e' cosi' che nascono i tre fumetti.
 //
-// Vincoli (design §1.1): react-feather, icone lineari coerenti, nessun ornamento.
+// Vincoli (design §7.4): Lucide, icone lineari coerenti, nessun ornamento.
 // Il touch target minimo di 44px (§3.1) e' responsabilita' del CSS, non dell'icona.
 
 import {
@@ -18,7 +18,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   Cpu,
-  Edit2,
+  Pencil,
   List,
   Maximize2,
   MessageSquare,
@@ -27,11 +27,11 @@ import {
   Plus,
   RotateCcw,
   Search,
-  Sliders,
+  SlidersHorizontal,
   UserPlus,
   Users,
   X,
-} from "react-feather";
+} from "lucide-react";
 
 // --- I tre concetti che non vanno mai confusi ---
 
@@ -52,7 +52,7 @@ export const IconAi = Cpu;
 
 export const IconSessionList = List; // elenco delle conversazioni
 export const IconNewChat = Plus; // nuova conversazione
-export const IconRename = Edit2; // rinomina una conversazione
+export const IconRename = Pencil; // rinomina una conversazione
 export const IconArchived = Archive; // conversazione archiviata (ci sei uscito)
 export const IconResume = RotateCcw; // riprendi un'archiviata in una nuova chat
 
@@ -65,7 +65,7 @@ export const IconAttach = Paperclip; // allega un documento o un elemento del CR
 // Selettore del modello AI per la sessione (deciso 20/7/2026: provider + modello,
 // ambito per sessione). Non il Cpu di IconAi (quello e' "il mondo macchina"): qui si
 // REGOLA quale motore risponde, quindi il simbolo dei cursori di regolazione.
-export const IconModel = Sliders;
+export const IconModel = SlidersHorizontal;
 
 // Navigazione suggerita dall'AI (Fase 6): "vai a quest'area del CRM". La freccia in
 // uscita dice "ti porto altrove", coerente con l'affordance "apri" gia' usata nel

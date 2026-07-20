@@ -206,7 +206,9 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
         && hasPermission(navbarData, MESSAGING_PERMISSIONS.view);
     const onMessagingPage = location.pathname.startsWith('/apps/email');
     const activityNotificationCount = recentActivity.length;
-    const notificationCount = activityNotificationCount + messagingUnreadCount;
+    // I messaggi non letti hanno il loro badge sul pulsante Chat (AiChatTrigger):
+    // la campana conta SOLO le attività, così lo stesso numero non compare due volte.
+    const notificationCount = activityNotificationCount;
     const userDisplayName = user?.name || user?.email || session?.userEmail || 'Utente';
     const userEmail = user?.email || session?.userEmail || '-';
     const workspaceName = branding?.companyName || session?.workspaceBranding?.companyName || workspace?.name || 'Workspace';
@@ -391,7 +393,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                         </Nav.Item>
 
                         <Nav.Item className="ms-2 app-topnav-chat-item">
-                            <AiChatTrigger />
+                            <AiChatTrigger unreadCount={messagingUnreadCount} />
                         </Nav.Item>
 
                         <Nav.Item className="ms-2 app-topnav-theme-item">

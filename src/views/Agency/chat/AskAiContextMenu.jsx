@@ -1,6 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, MessageSquare, Paperclip } from "react-feather";
+import { MessageCircle, MessageSquare, Paperclip } from "lucide-react";
 import {
   ASK_AI_LABELS,
   ASK_AI_TYPES,

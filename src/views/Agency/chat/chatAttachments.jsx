@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, Download, FileText, Folder, Paperclip, Tag, User, X } from "react-feather";
+import { BookOpen, Download, FileText, Folder, Paperclip, Tag, User, X } from "lucide-react";
 import { Spinner } from "react-bootstrap";
 import { attachmentIconKey, attachmentTypeLabel, formatAttachmentSize } from "./chatShared";
 import { downloadAgencyChatAttachment } from "../../../modules/agency-os/api/agency.api";

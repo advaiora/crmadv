@@ -1111,6 +1111,15 @@
   min-width: 18px;
 }
 
+/* NON LETTI sul pulsante d'ingresso in topbar: stesso contatore del pallino
+   interno (.ai-chat-dot), qui sovrapposto all'icona (position-top-end-overflow-1).
+   Il colore arriva dal tema via HkBadge (bg danger soft); qui solo la dimensione. */
+.ai-chat-trigger-badge {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .ai-chat-msg-bubble-wrap {
   max-width: 80%;
   white-space: pre-wrap;

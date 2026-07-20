@@ -48,6 +48,7 @@ import {
   IconSessionList,
 } from "./chatIcons";
 import { AI_CHAT_ASK_EVENT } from "./askAi";
+import HkBadge from "../../../components/@hk-badge/@hk-badge";
 import "./ai-chat-widget.css";
 
 export const AI_CHAT_TOGGLE_EVENT = "ai-chat:toggle";
@@ -57,17 +58,33 @@ export const AI_CHAT_OPEN_EVENT = "ai-chat:open";
 // come CommandPaletteTrigger. Il widget possiede lo stato, il trigger lo commuta.
 // L'icona e' quella dell'INGRESSO (spec 4-ter §6): apre l'aggregato delle chat,
 // non uno dei due mondi — per questo non e' ne' quella dei Messaggi ne' dell'AI.
-export const AiChatTrigger = () => (
+// `unreadCount` (i messaggi NON letti della messaggistica, calcolati in TopNav)
+// mostra un badge numerico sull'ingresso: e' qui che si va a leggerli. La campana
+// non li conta piu', cosi' lo stesso numero non compare due volte (design §4.1).
+export const AiChatTrigger = ({ unreadCount = 0 }) => (
   <Button
     variant="flush-dark"
     className="btn-icon btn-rounded flush-soft-hover topnav-action-btn"
-    aria-label="Apri le chat"
+    aria-label={unreadCount > 0 ? `Apri le chat — ${unreadCount} messaggi non letti` : "Apri le chat"}
     title="Chat"
     onClick={() => window.dispatchEvent(new CustomEvent(AI_CHAT_TOGGLE_EVENT))}
   >
     <span className="icon">
-      <span className="feather-icon">
-        <IconChatEntry />
+      <span className="position-relative">
+        <span className="feather-icon">
+          <IconChatEntry />
+        </span>
+        {unreadCount > 0 && (
+          <HkBadge
+            bg="danger"
+            soft
+            pill
+            size="sm"
+            className="position-top-end-overflow-1 ai-chat-trigger-badge"
+          >
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </HkBadge>
+        )}
       </span>
     </span>
   </Button>
