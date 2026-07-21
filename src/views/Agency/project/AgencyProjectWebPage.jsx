@@ -508,7 +508,7 @@ const AgencyProjectWebPage = () => {
               ? "Generazione AI..."
               : <><i className="bi bi-stars me-1" aria-hidden="true" />Genera con AI</>}
           </Button>
-          <Button type="button" size="sm" variant="outline-dark" onClick={handleRegenerateAll}>
+          <Button type="button" size="sm" variant="outline-secondary" onClick={handleRegenerateAll}>
             Genera bozza base
           </Button>
           <details className="small">
@@ -759,6 +759,10 @@ const AgencyProjectWebPage = () => {
                     <div className="fw-semibold small">Rigenera un blocco</div>
                     <div className="small text-muted">Usa AI su una singola parte per consumare meno token e lavorare piu velocemente.</div>
                   </div>
+                  <AiCostEstimate
+                    estimate={aiEstimates.byFunction["web.generateBlock"]}
+                    aiConfigured={aiEstimates.aiConfigured}
+                  />
                 </div>
                 <div className="d-flex flex-wrap gap-2">
                   {[
@@ -870,7 +874,7 @@ const AgencyProjectWebPage = () => {
           <div className="agency-output-panel">
               <h6 className="mb-2">Preview</h6>
               {output.previewHtmlBase ? (
-                <div className="border rounded-3 p-3 bg-light">
+                <div className="border rounded-3 p-3 agency-tile">
                   <div className="small" dangerouslySetInnerHTML={{ __html: output.previewHtmlBase }} />
                 </div>
               ) : (

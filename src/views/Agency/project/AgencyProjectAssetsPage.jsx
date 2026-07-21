@@ -904,7 +904,7 @@ const AgencyProjectAssetsPage = () => {
 
               <div
                 {...getRootProps({
-                  className: `border rounded-3 p-4 text-center mb-3 ${isDragActive ? "border-primary bg-light" : "bg-white"}`,
+                  className: `border rounded-3 p-4 text-center mb-3 ${isDragActive ? "border-primary agency-tile-accent" : "agency-tile"}`,
                 })}
                 style={{ cursor: "pointer" }}
               >
@@ -1005,7 +1005,7 @@ const AgencyProjectAssetsPage = () => {
                       {file.extractedTextPreview && (
                         <details className="small mt-2">
                           <summary className="text-muted">Anteprima testo estratto</summary>
-                          <div className="bg-light border rounded-3 p-2 mt-1" style={{ whiteSpace: "pre-wrap" }}>
+                          <div className="agency-tile border rounded-3 p-2 mt-1" style={{ whiteSpace: "pre-wrap" }}>
                             {file.extractedTextPreview.slice(0, 700)}
                             {file.extractedTextPreview.length > 700 ? "..." : ""}
                           </div>
@@ -1092,7 +1092,7 @@ const AgencyProjectAssetsPage = () => {
               )}
 
               {competitorSearchSuggestions.length > 0 && (
-                <div className="border rounded p-3 mb-3 bg-light">
+                <div className="border rounded p-3 mb-3 agency-tile">
                   <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
                     <div>
                       <div className="fw-semibold small">Suggerimenti trovati online</div>
@@ -1102,7 +1102,7 @@ const AgencyProjectAssetsPage = () => {
                   </div>
                   <div className="d-grid gap-2">
                     {competitorSearchSuggestions.map((suggestion) => (
-                      <div key={suggestion.id || suggestion.url} className="d-flex flex-column flex-md-row justify-content-between gap-2 border rounded p-2 bg-white">
+                      <div key={suggestion.id || suggestion.url} className="d-flex flex-column flex-md-row justify-content-between gap-2 border rounded p-2 agency-tile">
                         <div>
                           <div className="fw-semibold small">{suggestion.name || deriveNameFromUrl(suggestion.url)}</div>
                           <a className="small" href={suggestion.url} target="_blank" rel="noreferrer">{suggestion.url}</a>

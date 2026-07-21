@@ -29,7 +29,7 @@ const ChatBubble = ({ message, currentUserId, onNavigate }) => {
           {label}
         </div>
         <div
-          className={`rounded-3 px-3 py-2 ${isMine ? "bg-primary text-white" : "bg-body-secondary border"}`}
+          className={`rounded-3 px-3 py-2 ${isMine ? "ai-chat-bubble-mine" : "bg-body-secondary border"}`}
           style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
         >
           {message.content}

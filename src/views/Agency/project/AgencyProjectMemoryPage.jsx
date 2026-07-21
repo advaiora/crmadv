@@ -110,7 +110,7 @@ const AgencyProjectMemoryPage = () => {
       {error && <div className="alert alert-warning py-2" role="alert">{error}</div>}
 
       {!loading && !context && !error && (
-        <div className="border rounded-3 p-3 bg-white">
+        <div className="border rounded-3 p-3 agency-tile">
           <h6 className="mb-1">Memoria non ancora disponibile</h6>
           <p className="mb-2 text-muted small">
             Aggiungi fonti o rigenera Discovery per creare un contesto operativo riutilizzabile.
@@ -124,7 +124,7 @@ const AgencyProjectMemoryPage = () => {
       {context && (
         <div className="row g-3">
           <div className="col-12 col-xl-4">
-            <div className="border rounded-3 p-3 h-100 bg-white">
+            <div className="border rounded-3 p-3 h-100 agency-tile">
               <h6 className="mb-2">Qualita contesto</h6>
               <div className="d-flex flex-wrap gap-2 mb-2">
                 <Badge bg={context?.confidence?.isFallbackOnly ? "danger" : "success"}>
@@ -141,7 +141,7 @@ const AgencyProjectMemoryPage = () => {
           </div>
 
           <div className="col-12 col-xl-4">
-            <div className="border rounded-3 p-3 h-100 bg-white">
+            <div className="border rounded-3 p-3 h-100 agency-tile">
               <h6 className="mb-2">Fonti usate</h6>
               <div className="d-flex flex-wrap gap-2">
                 {usedSources.map((entry) => (
@@ -155,7 +155,7 @@ const AgencyProjectMemoryPage = () => {
           </div>
 
           <div className="col-12 col-xl-4">
-            <div className="border rounded-3 p-3 h-100 bg-white">
+            <div className="border rounded-3 p-3 h-100 agency-tile">
               <h6 className="mb-2">Cosa manca</h6>
               {missingCriticalInfo.length > 0 ? (
                 <ul className="small mb-0">
@@ -168,7 +168,7 @@ const AgencyProjectMemoryPage = () => {
           </div>
 
           <div className="col-12 col-xl-6">
-            <div className="border rounded-3 p-3 h-100 bg-white">
+            <div className="border rounded-3 p-3 h-100 agency-tile">
               <h6 className="mb-2">Discovery nel contesto</h6>
               <p className="small text-muted mb-2">
                 {context.discovery?.contextSummary || "Discovery non ancora sintetizzata."}
@@ -180,7 +180,7 @@ const AgencyProjectMemoryPage = () => {
           </div>
 
           <div className="col-12 col-xl-6">
-            <div className="border rounded-3 p-3 h-100 bg-white">
+            <div className="border rounded-3 p-3 h-100 agency-tile">
               <h6 className="mb-2">File non letti</h6>
               {unreadableFiles.length > 0 ? (
                 <ul className="small mb-2">
@@ -196,7 +196,7 @@ const AgencyProjectMemoryPage = () => {
           </div>
 
           <div className="col-12">
-            <div className="border rounded-3 p-3 bg-white">
+            <div className="border rounded-3 p-3 agency-tile">
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <div>
                   <h6 className="mb-0">Storico AI</h6>

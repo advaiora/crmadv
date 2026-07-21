@@ -504,6 +504,20 @@
   padding: 28px 0;
 }
 
+/* --- Bolle della conversazione (ritocco 21/7/2026) --- */
+/* Le bolle "mie" (a destra) non usano piu' l'accento PIENO con testo bianco fisso:
+   su un accento chiaro (o su un verde/petrolio) il bianco "scadeva" (contrasto
+   scarso) e l'accento pieno a ogni riga gridava (design §4.1: un accento per vista).
+   Ora una TINTA TENUE dell'accento con testo nel colore normale (--foreground):
+   risalta sempre, in chiaro e scuro e per qualunque accento di workspace, e resta
+   pulita/leggera. Le bolle "altrui" restano su superficie neutra (bg-body-secondary).
+   Solo token del tema, nessun colore a mano. */
+.ai-chat-bubble-mine {
+  background: color-mix(in srgb, var(--primary) 14%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  color: var(--foreground);
+}
+
 /* --- Allegati (Fase 3a): chip in composizione, chip in bolla, selettore elementi --- */
 
 .ai-chat-composer-spacer {

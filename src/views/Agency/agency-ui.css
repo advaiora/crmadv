@@ -216,6 +216,20 @@
   padding: 14px;
 }
 
+/* Tessere/riquadri a token: sostituiscono i residui `bg-white`/`bg="light"`
+   ereditati dal vecchio template (bonifica 21/7/2026). Prima rendevano in scuro solo
+   grazie a un override globale su `.bg-white`; ora usano direttamente il token della
+   superficie, a norma della regola d'oro. Il bordo resta gestito da `.border`. */
+.agency-page-shell .agency-tile {
+  background: var(--card);
+}
+
+/* Variante "attiva" (es. dropzone durante il trascinamento): un velo d'accento
+   leggero, cosi' il feedback non dipende da un colore a mano. */
+.agency-page-shell .agency-tile-accent {
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+}
+
 .agency-debug-only {
   display: none;
 }

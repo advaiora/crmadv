@@ -620,7 +620,7 @@ const AgencyProjectAdsPage = () => {
           <Button type="button" size="sm" variant="outline-secondary" onClick={handleGenerateOperationalPlan}>
             Genera checklist
           </Button>
-          <Button type="button" size="sm" variant="outline-dark" onClick={handleRegeneratePlaceholder}>
+          <Button type="button" size="sm" variant="outline-secondary" onClick={handleRegeneratePlaceholder}>
             Rigenerazione controllata
           </Button>
           <details className="small">

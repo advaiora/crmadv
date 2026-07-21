@@ -175,7 +175,7 @@ const AgencyProjectClientReportPage = () => {
         <Button type="button" size="sm" variant="primary" onClick={handleSave} disabled={saving || !clientReportState}>
           {saving ? "Salvataggio..." : "Salva report cliente"}
         </Button>
-        <Button type="button" size="sm" variant="outline-dark" onClick={handlePrint}>
+        <Button type="button" size="sm" variant="outline-secondary" onClick={handlePrint}>
           Stampa / Esporta PDF
         </Button>
         <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/reports`} type="button" size="sm" variant="outline-secondary">

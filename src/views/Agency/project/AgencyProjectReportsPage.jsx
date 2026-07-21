@@ -265,7 +265,7 @@ const AgencyProjectReportsPage = () => {
           to={`/agency/projects/${encodeURIComponent(projectId)}/reports/client`}
           type="button"
           size="sm"
-          variant="outline-dark"
+          variant="outline-secondary"
         >
           Vista cliente
         </Button>

@@ -52,7 +52,7 @@ const contactLabel = (contact) => contact?.name || contact?.email || "Utente";
 const MessageBubble = ({ message }) => (
   <div className={`d-flex mb-2 ${message.isMine ? "justify-content-end" : "justify-content-start"}`}>
     <div className="ai-chat-msg-bubble-wrap">
-      <div className={`rounded-3 px-3 py-2 ${message.isMine ? "bg-primary text-white" : "bg-body-secondary border"}`}>
+      <div className={`rounded-3 px-3 py-2 ${message.isMine ? "ai-chat-bubble-mine" : "bg-body-secondary border"}`}>
         {message.body}
       </div>
       <div className={`small text-muted mt-1 ${message.isMine ? "text-end" : ""}`}>{formatTime(message.createdAt)}</div>

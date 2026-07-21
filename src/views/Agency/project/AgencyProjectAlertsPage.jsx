@@ -72,7 +72,7 @@ const AgencyProjectAlertsPage = () => {
       </div>
 
       {!loading && alerts.length === 0 && (
-        <div className="border rounded-3 p-3 bg-white">
+        <div className="border rounded-3 p-3 agency-tile">
           <h6 className="mb-1">Nessun alert aperto</h6>
           <p className="mb-2 text-muted small">
             Quando mancano target, offerta, CTA, tracking o materiali, gli alert appariranno qui.
@@ -88,7 +88,7 @@ const AgencyProjectAlertsPage = () => {
           <h6 className="mb-2">Da risolvere prima</h6>
           <div className="d-flex flex-column gap-2">
             {criticalAlerts.map((alert) => (
-              <div key={alert.id} className="border rounded-3 p-3 bg-white">
+              <div key={alert.id} className="border rounded-3 p-3 agency-tile">
                 <div className="d-flex flex-wrap justify-content-between gap-2">
                   <div>
                     <div className="fw-semibold">{alert.title}</div>
