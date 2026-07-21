@@ -25,7 +25,13 @@ import {
   isAttachableEntityType,
   isImageAttachment,
   imagePlaceholderText,
+  resolveVisionMediaType,
+  buildMultimodalMessages,
+  MAX_VISION_IMAGES,
+  MAX_VISION_IMAGE_BYTES,
+  VISION_IMAGE_TOKEN_ESTIMATE,
   type AttachableEntityType,
+  type ChatVisionImage,
 } from './chat-attachments.js';
 import { rbacRepository } from '../../repositories/rbac.repository.js';
 import { moduleRepository } from '../../repositories/module.repository.js';
@@ -3315,6 +3321,9 @@ const runAgencyAiTextWithMeta = async (input: {
   // catalogo e il suo provider ha una chiave, sovrascrive provider+modello di workspace
   // SOLO per questa chiamata; altrimenti resta il default di workspace (retro-compat).
   model?: string;
+  // Immagini da far "vedere" al modello (Fase 3b). Vuoto/assente = flusso solo-testo
+  // identico a prima. Vanno come content block sull'ultimo messaggio user.
+  images?: ChatVisionImage[];
 }): Promise<AgencyAiTextResult | null> => {
   const status = await getAgencyAiStatusPayload(input.workspaceId);
   const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
@@ -3342,7 +3351,9 @@ const runAgencyAiTextWithMeta = async (input: {
       provider = status.provider as AgencyAiProvider;
       model = resolveAgencyProviderModel(provider, runtimeConfig.ai.functionModels[functionName] || status.model);
     }
-    const conversation = input.messages.map((message) => ({ role: message.role, content: message.content }));
+    // Immagini per la "vista" multimodale (Fase 3b): senza, buildMultimodalMessages
+    // torna i messaggi solo-testo identici a prima (retro-compat totale).
+    const visionImages = input.images ?? [];
 
     let content: string;
     if (provider === 'anthropic') {
@@ -3360,7 +3371,7 @@ const runAgencyAiTextWithMeta = async (input: {
           model,
           max_tokens: maxTokens,
           system: input.system,
-          messages: conversation,
+          messages: buildMultimodalMessages(input.messages, visionImages, 'anthropic'),
         }),
         signal: controller.signal,
       });
@@ -3371,7 +3382,10 @@ const runAgencyAiTextWithMeta = async (input: {
     } else {
       const requestBody: Record<string, unknown> = {
         model,
-        input: [{ role: 'system', content: input.system }, ...conversation],
+        input: [
+          { role: 'system', content: input.system },
+          ...buildMultimodalMessages(input.messages, visionImages, 'openai-responses'),
+        ],
       };
       if (runtimeConfig.ai.maxOutputTokens > 0) {
         requestBody.max_output_tokens = runtimeConfig.ai.maxOutputTokens;
@@ -3389,7 +3403,10 @@ const runAgencyAiTextWithMeta = async (input: {
       if (!response.ok && response.status !== 401 && response.status !== 403) {
         const chatRequestBody: Record<string, unknown> = {
           model,
-          messages: [{ role: 'system', content: input.system }, ...conversation],
+          messages: [
+            { role: 'system', content: input.system },
+            ...buildMultimodalMessages(input.messages, visionImages, 'openai-chat'),
+          ],
         };
         if (runtimeConfig.ai.maxOutputTokens > 0) {
           chatRequestBody.max_completion_tokens = runtimeConfig.ai.maxOutputTokens;
@@ -3416,7 +3433,11 @@ const runAgencyAiTextWithMeta = async (input: {
     }
 
     const promptText = `${input.system}\n${input.messages.map((message) => message.content).join('\n')}`;
-    const estimatedInputTokens = estimateAgencyAiTokens(promptText);
+    // Le immagini "viste" non sono nel testo: si somma una stima grossolana per non
+    // lasciare il loro costo fuori dal registro consumi (il costo reale dipende dalla
+    // risoluzione, qui ignota).
+    const estimatedInputTokens =
+      estimateAgencyAiTokens(promptText) + visionImages.length * VISION_IMAGE_TOKEN_ESTIMATE;
     const estimatedOutputTokens = estimateAgencyAiTokens(content);
     const estimatedCostUsd = estimateAgencyAiCostUsd(model, estimatedInputTokens, estimatedOutputTokens);
     const durationMs = Date.now() - startedAt;
@@ -3447,6 +3468,61 @@ const runAgencyAiTextWithMeta = async (input: {
     };
   } finally {
     clearTimeout(timeout);
+  }
+};
+
+// Immagini "viste" dal modello per un turno di chat (Fase 3b). Dagli allegati del
+// contesto (turno + recenti) tiene solo quelle in un formato supportato e sotto al
+// tetto di dimensione, ne carica i byte e le porta in base64. L'ordine segue
+// promptAttachments (turno corrente in coda), e si tengono al più MAX_VISION_IMAGES —
+// le ultime, cioè le più pertinenti. Best-effort: se una lettura fallisce si prosegue
+// senza quell'immagine (resta comunque il suo segnaposto testuale nel prompt).
+const collectPromptVisionImages = async (
+  conversationId: string,
+  promptAttachments: Array<{ id: string }>,
+): Promise<ChatVisionImage[]> => {
+  const ids = promptAttachments.map((attachment) => attachment.id);
+  if (ids.length === 0) {
+    return [];
+  }
+  try {
+    // Prima i soli metadati (niente blob): così si scopre QUALI allegati sono immagini
+    // senza caricare i byte dei documenti, che pure hanno un binario.
+    const meta = await aiConversationRepository.listAttachmentBinaryMeta(conversationId, ids);
+    const metaById = new Map(meta.map((row) => [row.id, row]));
+    const candidates: Array<{ id: string; mediaType: string }> = [];
+    for (const attachment of promptAttachments) {
+      const row = metaById.get(attachment.id);
+      if (!row) {
+        continue;
+      }
+      const mediaType = resolveVisionMediaType({ mimeType: row.mimeType, fileName: row.label });
+      if (mediaType) {
+        candidates.push({ id: attachment.id, mediaType });
+      }
+    }
+    // Tetto sui costi: le ultime N (turno corrente + più recenti).
+    const chosen = candidates.slice(-MAX_VISION_IMAGES);
+    const images: ChatVisionImage[] = [];
+    for (const candidate of chosen) {
+      const binary = await aiConversationRepository.findAttachmentBinary(candidate.id);
+      if (!binary?.binary) {
+        continue;
+      }
+      const buffer = Buffer.from(binary.binary.data);
+      // Immagini vuote o troppo grandi: si lasciano al loro segnaposto (i provider
+      // rifiutano i file grossi; il ridimensionamento è un lavoro a sé).
+      if (buffer.byteLength === 0 || buffer.byteLength > MAX_VISION_IMAGE_BYTES) {
+        continue;
+      }
+      images.push({ mediaType: candidate.mediaType, dataBase64: buffer.toString('base64') });
+    }
+    return images;
+  } catch (error) {
+    logAgencyServiceEvent('Vista multimodale immagini saltata (best-effort).', {
+      reason: (error as Error).message,
+    });
+    return [];
   }
 };
 
@@ -8375,11 +8451,13 @@ export const agencyService = {
     // Contesto per l'ambito (profilo + RAG + allegati), finestra di storico (piu' ampia
     // del passato: la compressione decide cosa tenere) e le aree del CRM su cui
     // l'utente puo' andare (per la navigazione suggerita, Fase 6).
-    const [context, history, enabledModules, permissions] = await Promise.all([
+    const [context, history, enabledModules, permissions, promptImages] = await Promise.all([
       buildScopedChatContext(input.workspaceId, input.target, message, promptAttachments),
       aiConversationRepository.listMessages(conversation.id, CONTEXT_FETCH_LIMIT),
       moduleRepository.listEnabledModules(input.workspaceId),
       rbacRepository.listUserPermissions(input.userId, input.workspaceId),
+      // "Vista" multimodale (Fase 3b): byte delle immagini tra gli allegati del contesto.
+      collectPromptVisionImages(conversation.id, promptAttachments),
     ]);
     const historyMessages: ContextMessage[] = history.map((row) => ({
       role: row.role === 'assistant' ? ('assistant' as const) : ('user' as const),
@@ -8440,6 +8518,9 @@ export const agencyService = {
         conversationId: conversation.id,
         projectId: input.target.scope === 'project' ? input.target.projectId : undefined,
         model: requestedModel,
+        // Le immagini allegate al turno (e alle poche recenti): il modello le VEDE, non
+        // ne legge più solo il nome. Il riassunto interno (sopra) resta solo-testo.
+        images: promptImages,
       });
     } catch (error) {
       if (error instanceof AiBudgetExceededError) {

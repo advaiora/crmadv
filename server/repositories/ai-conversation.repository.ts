@@ -367,6 +367,20 @@ export const aiConversationRepository = {
     });
   },
 
+  // Metadati (SENZA byte) degli allegati indicati che hanno un binario: la "vista"
+  // multimodale (Fase 3b) li usa per capire QUALI sono immagini prima di caricarne i
+  // byte — così non si tirano su i blob dei documenti per niente. Filtra per
+  // conversazione (difesa in profondità: gli id arrivano già dalla stessa conversazione).
+  listAttachmentBinaryMeta(conversationId: string, ids: string[]) {
+    if (ids.length === 0) {
+      return Promise.resolve([] as Array<{ id: string; label: string; mimeType: string | null }>);
+    }
+    return prisma.aiConversationAttachment.findMany({
+      where: { id: { in: ids }, conversationId, binary: { isNot: null } },
+      select: { id: true, label: true, mimeType: true },
+    });
+  },
+
   // Bozze dell'utente su questa conversazione (quelle mostrate nel composer).
   listAttachmentDrafts(conversationId: string, userId: string) {
     return prisma.aiConversationAttachment.findMany({

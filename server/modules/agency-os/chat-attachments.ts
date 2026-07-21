@@ -256,9 +256,130 @@ export const isImageAttachment = (input: { mimeType?: string | null; fileName: s
   return IMAGE_EXTENSIONS.has(ext);
 };
 
-// Testo segnaposto per un'immagine allegata: finché non c'è la "vista" multimodale
-// (chiavi), il modello vede almeno il nome del file. I byte veri sono conservati a parte.
+// Testo segnaposto per un'immagine allegata NEL PROMPT DI SISTEMA: dà al modello il
+// nome del file e la sigla [A1] per citarla. Con la "vista" multimodale (Fase 3b) il
+// modello riceve ANCHE l'immagine vera, come content block del messaggio utente.
 export const imagePlaceholderText = (fileName: string): string => `[IMMAGINE ALLEGATA] ${fileName}`;
+
+// --- "Vista" multimodale delle immagini (Fase 3b) --------------------------------
+// Finché non c'erano le chiavi un'immagine allegata dava al modello solo il nome
+// (segnaposto). Qui si costruisce il payload per FARGLIELA VEDERE: i byte diventano un
+// content block immagine nell'ultimo messaggio dell'utente, nel formato del provider.
+// Le tre API multimodali hanno forme diverse, quindi si tratta ogni provider a parte.
+
+// Formati immagine che TUTTI i provider usati (Anthropic + OpenAI) sanno "vedere".
+// SVG e BMP restano fuori (nessuno dei due li accetta): quelle immagini tengono il
+// solo segnaposto testuale.
+export const SUPPORTED_VISION_MEDIA_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
+
+// Estensione → media type, per dedurre il tipo quando il mimeType salvato manca o è
+// generico (es. application/octet-stream da certi upload).
+const VISION_EXTENSION_MEDIA_TYPES: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+};
+
+// Quante immagini al massimo si danno in pasto al modello per turno: il contesto
+// allegato è già limitato a pochi elementi, questo è un ulteriore tetto sui costi
+// (ogni immagine pesa parecchi token).
+export const MAX_VISION_IMAGES = 4;
+
+// Tetto di dimensione per immagine "vista". Oltre, l'immagine resta il suo segnaposto:
+// i provider rifiutano immagini troppo grandi, e il ridimensionamento vero è un lavoro
+// a sé (serve una libreria immagini) — fuori da questa passata.
+export const MAX_VISION_IMAGE_BYTES = 4 * 1024 * 1024;
+
+// Stima GROSSOLANA dei token di un'immagine, così il registro consumi non resta a zero
+// sul costo immagine (il costo reale dipende dalla risoluzione, che qui non si conosce).
+// Si somma alla stima già in uso per il testo.
+export const VISION_IMAGE_TOKEN_ESTIMATE = 1_300;
+
+// Media type "vedibile" di un allegato, o null se non è un'immagine in un formato
+// supportato. Prima il mimeType, poi l'estensione del nome come rete di sicurezza.
+export const resolveVisionMediaType = (input: {
+  mimeType?: string | null;
+  fileName: string;
+}): string | null => {
+  const mime = (input.mimeType ?? '').toLowerCase().trim();
+  if (SUPPORTED_VISION_MEDIA_TYPES.has(mime)) {
+    return mime;
+  }
+  const ext = input.fileName.split('.').pop()?.toLowerCase() ?? '';
+  return VISION_EXTENSION_MEDIA_TYPES[ext] ?? null;
+};
+
+// Un'immagine pronta per il prompt: media type + byte in base64 (senza il prefisso
+// `data:`, che si aggiunge solo dove serve).
+export type ChatVisionImage = { mediaType: string; dataBase64: string };
+
+// Messaggio di conversazione a solo testo (come lo passa il motore chat).
+export type ChatTextMessage = { role: 'user' | 'assistant'; content: string };
+
+// I tre "dialetti" multimodali da produrre: Anthropic Messages, OpenAI Responses e il
+// fallback OpenAI Chat Completions.
+export type VisionProvider = 'anthropic' | 'openai-responses' | 'openai-chat';
+
+// Blocco immagine nel formato del provider.
+const visionImageBlock = (image: ChatVisionImage, provider: VisionProvider): Record<string, unknown> => {
+  const dataUri = `data:${image.mediaType};base64,${image.dataBase64}`;
+  if (provider === 'anthropic') {
+    return { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.dataBase64 } };
+  }
+  if (provider === 'openai-responses') {
+    return { type: 'input_image', image_url: dataUri };
+  }
+  // openai-chat (chat/completions): image_url è un oggetto con `url`.
+  return { type: 'image_url', image_url: { url: dataUri } };
+};
+
+// Blocco testo nel formato del provider (la Responses API usa 'input_text').
+const visionTextBlock = (text: string, provider: VisionProvider): Record<string, unknown> =>
+  provider === 'openai-responses' ? { type: 'input_text', text } : { type: 'text', text };
+
+// Rende multimodale l'ULTIMO messaggio 'user' della conversazione, aggiungendo le
+// immagini come content block dopo il testo. Se non ci sono immagini (o non c'è un
+// messaggio user) restituisce i messaggi invariati con content stringa — cioè il
+// comportamento solo-testo di prima, byte per byte: il flusso senza immagini non cambia.
+export const buildMultimodalMessages = (
+  messages: ChatTextMessage[],
+  images: ChatVisionImage[],
+  provider: VisionProvider,
+): Array<{ role: string; content: unknown }> => {
+  const passthrough = () => messages.map((message) => ({ role: message.role, content: message.content }));
+  if (images.length === 0) {
+    return passthrough();
+  }
+  let lastUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') {
+      lastUserIndex = i;
+      break;
+    }
+  }
+  if (lastUserIndex === -1) {
+    return passthrough();
+  }
+  return messages.map((message, index) => {
+    if (index !== lastUserIndex) {
+      return { role: message.role, content: message.content };
+    }
+    return {
+      role: message.role,
+      content: [
+        visionTextBlock(message.content, provider),
+        ...images.map((image) => visionImageBlock(image, provider)),
+      ],
+    };
+  });
+};
 
 // Estrae il testo di un documento caricato. Traduce l'errore dell'estrattore in un
 // 400 leggibile: l'utente deve capire perché quel file non si può allegare.

@@ -57,6 +57,7 @@ Popup chat dalla topbar. Ripetere per **Generale**, **Cliente**, **Progetto**.
 - [ ] **4.3 — Fonte / Preventivo (#3).** Da tasto destro → "Allega a una chat…" → "Allega qui". Chiedi sul contenuto. **Atteso:** l'AI legge lo snapshot di fonte/preventivo.
 - [ ] **4.4 — Troncamento 6k.** Allega un documento lungo (>6.000 caratteri utili). **Atteso:** l'AI vede fino a ~6k con marcatore `[…estratto troncato]`; verifica che risponda su ciò che è dentro il limite.
 - [ ] **4.5 — Allegati dei turni precedenti.** Dopo alcuni turni, verifica che gli ultimi 3 allegati restino nel contesto.
+- [x] **4.6 — "Vista" multimodale immagini (Fase 3b).** ✅ Verificato **end-to-end il 21/7/2026** via script API (nota #29), su **entrambi** i provider con i modelli economici. Allegata `public/og-img.png` (screenshot dashboard) e chiesto di descriverla: **Haiku** e **gpt-4o-mini** hanno entrambi descritto il **contenuto reale** — grafico a barre, importi **$2249/$243.50**, "Welcome back", logo "Jampack", "4m 24s", voci sidebar — non il nome file. Prova che il percorso `collectPromptVisionImages → buildMultimodalMessages → API provider` funziona su Anthropic e OpenAI. Costo: frazione di centesimo. **Restano da provare a schermo (facoltativo):** i **casi limite** — un'immagine **> 4MB** o un **SVG/BMP** deve restare il solo segnaposto testuale (nessun crash), e il consumo nel registro (area 7) deve includere la stima token immagine (~1300/img).
 
 ---
 

@@ -8,6 +8,10 @@ import {
   isAttachableEntityType,
   isImageAttachment,
   imagePlaceholderText,
+  resolveVisionMediaType,
+  buildMultimodalMessages,
+  type ChatTextMessage,
+  type ChatVisionImage,
 } from './chat-attachments.js';
 
 // Le parti pure degli allegati della chat (Fase 3a). Gli snapshot delle entita'
@@ -89,4 +93,90 @@ test('isImageAttachment: riconosce le immagini da mimeType e da estensione', () 
 
 test('imagePlaceholderText: testo segnaposto con il nome del file', () => {
   assert.equal(imagePlaceholderText('foto.png'), '[IMMAGINE ALLEGATA] foto.png');
+});
+
+// --- "Vista" multimodale (Fase 3b) -----------------------------------------------
+
+test('resolveVisionMediaType: mappa i formati supportati e scarta gli altri', () => {
+  // Dal mimeType (normalizzato a minuscolo).
+  assert.equal(resolveVisionMediaType({ mimeType: 'image/png', fileName: 'x' }), 'image/png');
+  assert.equal(resolveVisionMediaType({ mimeType: 'IMAGE/JPEG', fileName: 'x' }), 'image/jpeg');
+  // Dedotto dall'estensione quando il mime manca o è generico.
+  assert.equal(resolveVisionMediaType({ mimeType: '', fileName: 'foto.WEBP' }), 'image/webp');
+  assert.equal(resolveVisionMediaType({ mimeType: 'application/octet-stream', fileName: 'a.jpg' }), 'image/jpeg');
+  // Immagini in formati che i provider NON vedono → null (resta il segnaposto).
+  assert.equal(resolveVisionMediaType({ mimeType: 'image/svg+xml', fileName: 'logo.svg' }), null);
+  assert.equal(resolveVisionMediaType({ mimeType: '', fileName: 'foto.bmp' }), null);
+  // Non immagini.
+  assert.equal(resolveVisionMediaType({ mimeType: 'application/pdf', fileName: 'brief.pdf' }), null);
+});
+
+test('buildMultimodalMessages: senza immagini lascia i messaggi solo-testo invariati', () => {
+  const msgs: ChatTextMessage[] = [
+    { role: 'user', content: 'ciao' },
+    { role: 'assistant', content: 'ehi' },
+  ];
+  const out = buildMultimodalMessages(msgs, [], 'anthropic');
+  assert.deepEqual(out, [
+    { role: 'user', content: 'ciao' },
+    { role: 'assistant', content: 'ehi' },
+  ]);
+});
+
+test('buildMultimodalMessages: inietta le immagini solo nell ultimo user (formato Anthropic)', () => {
+  const msgs: ChatTextMessage[] = [
+    { role: 'user', content: 'prima' },
+    { role: 'assistant', content: 'risposta' },
+    { role: 'user', content: 'guarda questa' },
+  ];
+  const images: ChatVisionImage[] = [{ mediaType: 'image/png', dataBase64: 'AAAA' }];
+  const out = buildMultimodalMessages(msgs, images, 'anthropic');
+  // I messaggi precedenti restano intatti (content stringa).
+  assert.deepEqual(out[0], { role: 'user', content: 'prima' });
+  assert.deepEqual(out[1], { role: 'assistant', content: 'risposta' });
+  // Solo l'ultimo user diventa blocchi: testo + immagine.
+  assert.deepEqual(out[2], {
+    role: 'user',
+    content: [
+      { type: 'text', text: 'guarda questa' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } },
+    ],
+  });
+});
+
+test('buildMultimodalMessages: formati OpenAI (responses e chat) per l immagine', () => {
+  const msgs: ChatTextMessage[] = [{ role: 'user', content: 'vedi' }];
+  const images: ChatVisionImage[] = [{ mediaType: 'image/jpeg', dataBase64: 'ZZZZ' }];
+
+  const responses = buildMultimodalMessages(msgs, images, 'openai-responses');
+  assert.deepEqual(responses[0], {
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'vedi' },
+      { type: 'input_image', image_url: 'data:image/jpeg;base64,ZZZZ' },
+    ],
+  });
+
+  const chat = buildMultimodalMessages(msgs, images, 'openai-chat');
+  assert.deepEqual(chat[0], {
+    role: 'user',
+    content: [
+      { type: 'text', text: 'vedi' },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,ZZZZ' } },
+    ],
+  });
+});
+
+test('buildMultimodalMessages: più immagini in coda al testo, nell ordine dato', () => {
+  const msgs: ChatTextMessage[] = [{ role: 'user', content: 'due foto' }];
+  const images: ChatVisionImage[] = [
+    { mediaType: 'image/png', dataBase64: 'UNO' },
+    { mediaType: 'image/webp', dataBase64: 'DUE' },
+  ];
+  const out = buildMultimodalMessages(msgs, images, 'anthropic') as Array<{ role: string; content: unknown[] }>;
+  const blocks = out[0].content;
+  assert.equal(blocks.length, 3); // testo + 2 immagini
+  assert.deepEqual(blocks[0], { type: 'text', text: 'due foto' });
+  assert.deepEqual(blocks[1], { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'UNO' } });
+  assert.deepEqual(blocks[2], { type: 'image', source: { type: 'base64', media_type: 'image/webp', data: 'DUE' } });
 });
