@@ -8716,6 +8716,14 @@ export const agencyService = {
         ai: ['none', 'openai', 'anthropic'],
         competitorSearch: ['none', 'openai_web_search', 'serpapi', 'custom'],
       },
+      // Catalogo curato dei modelli selezionabili, per popolare il select in UI: cosi'
+      // non si puo' piu' digitare a mano un id arbitrario (che ripiegherebbe su Opus).
+      availableModels: AGENCY_AI_MODEL_CATALOG.map((entry) => ({
+        id: entry.id,
+        label: entry.label,
+        provider: entry.provider,
+        hint: entry.hint,
+      })),
       security: {
         serverSideOnly: true,
         secretReadable: runtimeConfig.ai.dbSecretConfigured ? runtimeConfig.ai.dbSecretReadable : true,
@@ -8746,6 +8754,28 @@ export const agencyService = {
     }
 
     const payload = parsed.data;
+
+    // Il modello di default deve essere un id del CATALOGO curato (AGENCY_AI_MODEL_CATALOG):
+    // un id fuori catalogo (es. "sonnet 4.5" scritto a mano) farebbe ripiegare
+    // resolveAgencyProviderModel in SILENZIO sul default Anthropic (Opus, il piu' caro).
+    // Meglio rifiutare a monte, cosi' non si salva uno stato incoerente e costoso.
+    if (payload.ai?.model !== undefined) {
+      const modelOption = findAgencyCatalogModel(payload.ai.model);
+      if (!modelOption) {
+        throw badRequest(
+          `Modello AI non valido: "${payload.ai.model}". Scegli un modello dal catalogo.`,
+          { validModels: AGENCY_AI_MODEL_CATALOG.map((entry) => entry.id) },
+        );
+      }
+      // Coerenza provider/modello: un modello del provider sbagliato ricadrebbe anch'esso
+      // sul default (stesso problema). Si controlla solo se il provider e' esplicitato.
+      if (payload.ai.provider && payload.ai.provider !== 'none' && modelOption.provider !== payload.ai.provider) {
+        throw badRequest(
+          `Il modello "${modelOption.label}" e' del provider "${modelOption.provider}", diverso dal provider selezionato "${payload.ai.provider}". Scegli un modello del provider selezionato.`,
+        );
+      }
+    }
+
     const writes: Array<Promise<unknown>> = [];
 
     if (payload.ai?.enabled !== undefined) {

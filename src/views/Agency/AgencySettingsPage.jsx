@@ -162,6 +162,11 @@ const AgencySettingsPage = () => {
   const aiApiKeyConfigured = Boolean(runtimeSettings?.ai?.openAiApiKeyConfigured ?? (runtimeSettings?.ai?.apiKeyConfigured || aiStatus?.apiKeyConfigured));
   const anthropicApiKeyConfigured = Boolean(runtimeSettings?.ai?.anthropicApiKeyConfigured);
 
+  // Catalogo modelli dal backend, filtrato sul provider scelto: il select propone solo
+  // id validi del catalogo (niente piu' id digitati a mano che ripiegherebbero su Opus).
+  const availableModels = runtimeSettings?.availableModels ?? [];
+  const modelsForProvider = availableModels.filter((option) => option.provider === runtimeForm.aiProvider);
+
   const updateFormField = (field, value) => {
     setRuntimeForm((current) => ({
       ...current,
@@ -322,7 +327,18 @@ const AgencySettingsPage = () => {
                         <Form.Select
                           value={runtimeForm.aiProvider}
                           disabled={!canManage || !storageReady}
-                          onChange={(event) => updateFormField("aiProvider", event.target.value)}
+                          onChange={(event) => {
+                            const provider = event.target.value;
+                            setRuntimeForm((current) => {
+                              const models = (runtimeSettings?.availableModels ?? []).filter((option) => option.provider === provider);
+                              const keepCurrent = models.some((option) => option.id === current.aiModel);
+                              return {
+                                ...current,
+                                aiProvider: provider,
+                                aiModel: keepCurrent ? current.aiModel : (models[0]?.id ?? current.aiModel),
+                              };
+                            });
+                          }}
                         >
                           {AI_PROVIDER_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>{option.label}</option>
@@ -331,12 +347,24 @@ const AgencySettingsPage = () => {
                       </Form.Group>
                       <Form.Group className="mt-3" controlId="agency-ai-model">
                         <Form.Label>Modello</Form.Label>
-                        <Form.Control
+                        <Form.Select
                           value={runtimeForm.aiModel}
-                          disabled={!canManage || !storageReady}
+                          disabled={!canManage || !storageReady || runtimeForm.aiProvider === "none"}
                           onChange={(event) => updateFormField("aiModel", event.target.value)}
-                          placeholder="gpt-4o-mini"
-                        />
+                        >
+                          {modelsForProvider.length === 0 ? (
+                            <option value={runtimeForm.aiModel}>{runtimeForm.aiModel || "—"}</option>
+                          ) : (
+                            modelsForProvider.map((option) => (
+                              <option key={option.id} value={option.id}>{option.label}</option>
+                            ))
+                          )}
+                        </Form.Select>
+                        {runtimeForm.aiProvider !== "none" && modelsForProvider.length > 0 && (
+                          <Form.Text className="text-muted">
+                            {modelsForProvider.find((option) => option.id === runtimeForm.aiModel)?.hint || ""}
+                          </Form.Text>
+                        )}
                       </Form.Group>
                     </div>
                   </Col>
