@@ -794,7 +794,7 @@ const Signup = () => {
                                 }}
                                 onBlur={() => handleFieldBlur("email")}
                               />
-                              {showEmailError && <small className="text-danger d-block mt-1">Inserisci un'email valida.</small>}
+                              {showEmailError && <small className="text-danger d-block mt-1">Inserisci un&apos;email valida.</small>}
                             </Col>
 
                             <Col lg={12} as={Form.Group} className="mb-3">
@@ -809,7 +809,7 @@ const Signup = () => {
                                 }}
                                 onBlur={() => handleFieldBlur("workspaceName")}
                               />
-                              <Form.Text className="text-muted d-block mt-1">E' il nome che vedrai nel tuo CRM.</Form.Text>
+                              <Form.Text className="text-muted d-block mt-1">E&apos; il nome che vedrai nel tuo CRM.</Form.Text>
                               {showWorkspaceNameError && <small className="text-danger d-block mt-1">Inserisci il nome del tuo spazio di lavoro.</small>}
                             </Col>
 
@@ -825,7 +825,7 @@ const Signup = () => {
                                 }}
                                 onBlur={() => handleFieldBlur("workspaceSlug")}
                               />
-                              <Form.Text className="text-muted d-block mt-1">Sara' usato nell'indirizzo di accesso.</Form.Text>
+                              <Form.Text className="text-muted d-block mt-1">Sara&apos; usato nell&apos;indirizzo di accesso.</Form.Text>
                               {showWorkspaceSlugError && (
                                 <small className="text-danger d-block mt-1">
                                   {workspaceSlugError ? "Inserisci un indirizzo personalizzato." : "Usa solo lettere minuscole, numeri e trattini."}
@@ -833,7 +833,7 @@ const Signup = () => {
                               )}
                               {workspaceSlug && (
                                 <small className={`d-block mt-1 ${slugHasInvalidChars ? "text-danger" : "text-muted"}`}>
-                                  L'indirizzo sara': app.tuosito.com/{normalizedWorkspaceSlug}
+                                  L&apos;indirizzo sara&apos;: app.tuosito.com/{normalizedWorkspaceSlug}
                                 </small>
                               )}
                             </Col>

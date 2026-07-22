@@ -36,7 +36,7 @@ const parseExportFilename = (contentDisposition) => {
         return decodeURIComponent(utf8Match[1]);
     }
 
-    const asciiMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+    const asciiMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
     if (asciiMatch?.[1]) {
         return asciiMatch[1];
     }

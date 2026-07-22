@@ -738,7 +738,6 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   const renameSession = React.useCallback(
     async (session) => {
       if (!selectedTarget) return;
-      // eslint-disable-next-line no-alert
       const next = window.prompt("Nome della conversazione", session.title || "");
       if (next === null || !next.trim()) return;
       try {
@@ -1066,7 +1065,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
             </span>
             <span className="ai-chat-pending-text">
               Allega <strong>{ENTITY_LABELS[pendingAttachment.entityType] || "elemento"}</strong>
-              {pendingAttachment.name ? ` "${pendingAttachment.name}"` : ""}: scegli o apri una chat, poi premi "Allega qui".
+              {pendingAttachment.name ? ` "${pendingAttachment.name}"` : ""}: scegli o apri una chat, poi premi &quot;Allega qui&quot;.
             </span>
             {conversationId && isParticipant && !isFrozen && (
               <Button

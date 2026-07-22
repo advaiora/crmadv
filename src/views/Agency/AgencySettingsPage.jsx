@@ -42,11 +42,7 @@ const SEARCH_STATUS_LABEL = {
   not_configured: "Non configurata",
 };
 
-const AI_PROVIDER_OPTIONS = [
-  { value: "none", label: "Nessuno" },
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic (Claude)" },
-];
+const PROVIDER_LABELS = { openai: "OpenAI", anthropic: "Anthropic (Claude)" };
 
 const SEARCH_PROVIDER_OPTIONS = [
   { value: "none", label: "Nessuno" },
@@ -68,9 +64,7 @@ const buildRuntimeForm = (runtimeSettings) => ({
   aiDebugEnabled: Boolean(runtimeSettings?.ai?.debugEnabled),
   aiFunctionModelsText: JSON.stringify(runtimeSettings?.ai?.functionModels || {}, null, 2),
   openAiApiKey: "",
-  clearOpenAiApiKey: false,
   anthropicApiKey: "",
-  clearAnthropicApiKey: false,
   competitorSearchEnabled: Boolean(runtimeSettings?.competitorSearch?.enabled),
   competitorSearchProvider: runtimeSettings?.competitorSearch?.provider || "none",
 });
@@ -113,6 +107,8 @@ const AgencySettingsPage = () => {
   const [runtimeSettings, setRuntimeSettings] = React.useState(null);
   const [runtimeForm, setRuntimeForm] = React.useState(buildRuntimeForm(null));
   const [saveState, setSaveState] = React.useState({ status: "idle", message: "" });
+  // Selettore del pulsante "Cancella chiavi": "" = tutte, "openai" o "anthropic" = solo una.
+  const [clearKeysProvider, setClearKeysProvider] = React.useState("");
 
   const refreshSettings = React.useCallback(async () => {
     const [competitorResult, aiResult, runtimeResult] = await Promise.allSettled([
@@ -162,10 +158,14 @@ const AgencySettingsPage = () => {
   const aiApiKeyConfigured = Boolean(runtimeSettings?.ai?.openAiApiKeyConfigured ?? (runtimeSettings?.ai?.apiKeyConfigured || aiStatus?.apiKeyConfigured));
   const anthropicApiKeyConfigured = Boolean(runtimeSettings?.ai?.anthropicApiKeyConfigured);
 
-  // Catalogo modelli dal backend, filtrato sul provider scelto: il select propone solo
-  // id validi del catalogo (niente piu' id digitati a mano che ripiegherebbero su Opus).
+  // Catalogo modelli dal backend. Il "modello preferito" mostra SOLO i modelli dei
+  // provider con una chiave (attivi): scegliere un modello fissa anche il suo provider,
+  // cosi' entrambi i provider sono di prima classe e non si digita piu' un id a mano.
   const availableModels = runtimeSettings?.availableModels ?? [];
-  const modelsForProvider = availableModels.filter((option) => option.provider === runtimeForm.aiProvider);
+  const providerHasKey = { openai: aiApiKeyConfigured, anthropic: anthropicApiKeyConfigured };
+  const activeProviders = ["openai", "anthropic"].filter((prov) => providerHasKey[prov]);
+  const activeModels = availableModels.filter((option) => providerHasKey[option.provider]);
+  const selectedModelOption = availableModels.find((option) => option.id === runtimeForm.aiModel) || null;
 
   const updateFormField = (field, value) => {
     setRuntimeForm((current) => ({
@@ -214,11 +214,9 @@ const AgencySettingsPage = () => {
           ...(runtimeForm.openAiApiKey.trim()
             ? { openAiApiKey: runtimeForm.openAiApiKey.trim() }
             : {}),
-          clearOpenAiApiKey: runtimeForm.clearOpenAiApiKey,
           ...(runtimeForm.anthropicApiKey.trim()
             ? { anthropicApiKey: runtimeForm.anthropicApiKey.trim() }
             : {}),
-          clearAnthropicApiKey: runtimeForm.clearAnthropicApiKey,
         },
         competitorSearch: {
           enabled: runtimeForm.competitorSearchEnabled,
@@ -238,6 +236,39 @@ const AgencySettingsPage = () => {
         status: "error",
         message: error?.message || "Salvataggio non riuscito. Le modifiche non sono state applicate.",
       });
+    }
+  };
+
+  // Pulsante esplicito di rimozione chiavi (il campo chiave e' write-only: "vuoto = non
+  // cambiare", quindi serve un comando dedicato). Il selettore decide quali cancellare:
+  // "" = tutte, "openai"/"anthropic" = solo quella. Riusa i flag clear del salvataggio.
+  const handleClearKeys = async () => {
+    if (!canManage) {
+      setSaveState({ status: "error", message: "Solo un Superadmin puo cancellare le API key." });
+      return;
+    }
+    const label = clearKeysProvider === "openai"
+      ? "la chiave OpenAI"
+      : clearKeysProvider === "anthropic"
+        ? "la chiave Anthropic"
+        : "tutte le API key";
+    if (!window.confirm(`Cancellare permanentemente ${label} dal CRM? Non e' reversibile: per riattivare l'AI dovrai reinserire la chiave.`)) {
+      return;
+    }
+    setSaveState({ status: "saving", message: "Rimozione chiavi in corso..." });
+    try {
+      const saved = await saveAgencyRuntimeSettings({
+        ai: {
+          clearOpenAiApiKey: clearKeysProvider === "" || clearKeysProvider === "openai",
+          clearAnthropicApiKey: clearKeysProvider === "" || clearKeysProvider === "anthropic",
+        },
+      });
+      setRuntimeSettings(saved);
+      setRuntimeForm(buildRuntimeForm(saved));
+      await refreshSettings();
+      setSaveState({ status: "success", message: `Rimozione completata: ${label} non e' piu' presente nel CRM.` });
+    } catch (error) {
+      setSaveState({ status: "error", message: error?.message || "Rimozione non riuscita." });
     }
   };
 
@@ -278,10 +309,8 @@ const AgencySettingsPage = () => {
                 <Col md={4}>
                   <div className="border rounded-3 p-2 h-100">
                     <div className="small text-muted">API key</div>
-                    <div className="fw-semibold">{aiApiKeyConfigured ? "Presente" : "Assente"}</div>
-                    <div className="small text-muted">
-                      Origine: {runtimeSettings?.ai?.apiKeySource === "db" ? "CRM backend cifrato" : runtimeSettings?.ai?.apiKeySource === "env" ? ".env server" : "non configurata"}
-                    </div>
+                    <div className="fw-semibold">OpenAI: {aiApiKeyConfigured ? "presente" : "assente"}</div>
+                    <div className="fw-semibold">Anthropic: {anthropicApiKeyConfigured ? "presente" : "assente"}</div>
                   </div>
                 </Col>
                 <Col md={4}>
@@ -311,9 +340,9 @@ const AgencySettingsPage = () => {
 
               <Form onSubmit={handleSaveRuntimeSettings}>
                 <Row className="g-3">
-                  <Col lg={6}>
-                    <div className="border rounded-3 p-3 h-100">
-                      <h6 className="mb-3">AI generativa</h6>
+                  <Col lg={12}>
+                    <div className="border rounded-3 p-3">
+                      <h6 className="mb-3">Provider AI</h6>
                       <Form.Check
                         type="switch"
                         id="agency-ai-enabled"
@@ -322,108 +351,119 @@ const AgencySettingsPage = () => {
                         disabled={!canManage || !storageReady}
                         onChange={(event) => updateFormField("aiEnabled", event.target.checked)}
                       />
-                      <Form.Group className="mt-3" controlId="agency-ai-provider">
-                        <Form.Label>Provider AI</Form.Label>
-                        <Form.Select
-                          value={runtimeForm.aiProvider}
-                          disabled={!canManage || !storageReady}
-                          onChange={(event) => {
-                            const provider = event.target.value;
-                            setRuntimeForm((current) => {
-                              const models = (runtimeSettings?.availableModels ?? []).filter((option) => option.provider === provider);
-                              const keepCurrent = models.some((option) => option.id === current.aiModel);
-                              return {
-                                ...current,
-                                aiProvider: provider,
-                                aiModel: keepCurrent ? current.aiModel : (models[0]?.id ?? current.aiModel),
-                              };
-                            });
-                          }}
-                        >
-                          {AI_PROVIDER_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                          ))}
-                        </Form.Select>
-                      </Form.Group>
+                      <div className="small text-muted mt-1">
+                        Un solo interruttore per entrambi i provider: le generazioni AI sono attive se abilitate e almeno un provider ha la API key.
+                      </div>
+
                       <Form.Group className="mt-3" controlId="agency-ai-model">
-                        <Form.Label>Modello</Form.Label>
+                        <Form.Label>Modello preferito</Form.Label>
                         <Form.Select
                           value={runtimeForm.aiModel}
-                          disabled={!canManage || !storageReady || runtimeForm.aiProvider === "none"}
-                          onChange={(event) => updateFormField("aiModel", event.target.value)}
+                          disabled={!canManage || !storageReady || activeModels.length === 0}
+                          onChange={(event) => {
+                            const id = event.target.value;
+                            const option = availableModels.find((entry) => entry.id === id);
+                            setRuntimeForm((current) => ({
+                              ...current,
+                              aiModel: id,
+                              aiProvider: option?.provider ?? current.aiProvider,
+                            }));
+                          }}
                         >
-                          {modelsForProvider.length === 0 ? (
-                            <option value={runtimeForm.aiModel}>{runtimeForm.aiModel || "—"}</option>
+                          {activeModels.length === 0 ? (
+                            <option value="">Nessun provider attivo: aggiungi una API key</option>
                           ) : (
-                            modelsForProvider.map((option) => (
-                              <option key={option.id} value={option.id}>{option.label}</option>
+                            activeProviders.map((prov) => (
+                              <optgroup key={prov} label={PROVIDER_LABELS[prov]}>
+                                {activeModels
+                                  .filter((entry) => entry.provider === prov)
+                                  .map((entry) => (
+                                    <option key={entry.id} value={entry.id}>{entry.label}</option>
+                                  ))}
+                              </optgroup>
                             ))
                           )}
                         </Form.Select>
-                        {runtimeForm.aiProvider !== "none" && modelsForProvider.length > 0 && (
-                          <Form.Text className="text-muted">
-                            {modelsForProvider.find((option) => option.id === runtimeForm.aiModel)?.hint || ""}
-                          </Form.Text>
-                        )}
-                      </Form.Group>
-                    </div>
-                  </Col>
-
-                  <Col lg={6}>
-                    <div className="border rounded-3 p-3 h-100">
-                      <h6 className="mb-3">API key OpenAI</h6>
-                      <Form.Group controlId="agency-openai-api-key">
-                        <Form.Label>Nuova API key</Form.Label>
-                        <Form.Control
-                          type="password"
-                          autoComplete="new-password"
-                          value={runtimeForm.openAiApiKey}
-                          disabled={!canManage || !storageReady || runtimeForm.clearOpenAiApiKey}
-                          onChange={(event) => updateFormField("openAiApiKey", event.target.value)}
-                          placeholder={aiApiKeyConfigured ? "API key gia configurata: inserisci un valore solo per sostituirla" : "Inserisci API key lato server"}
-                        />
-                        <Form.Text>
-                          Campo write-only: il CRM non rilegge mai la chiave in chiaro.
+                        <Form.Text className="text-muted">
+                          {activeModels.length === 0
+                            ? "Il menu elenca solo i modelli dei provider con API key."
+                            : `Provider scelto dal modello: ${PROVIDER_LABELS[selectedModelOption?.provider] || "-"}${selectedModelOption?.hint ? ` (${selectedModelOption.hint})` : ""}`}
                         </Form.Text>
                       </Form.Group>
-                      <Form.Check
-                        className="mt-3"
-                        type="checkbox"
-                        id="agency-openai-clear-key"
-                        label="Rimuovi la API key salvata nel CRM"
-                        checked={runtimeForm.clearOpenAiApiKey}
-                        disabled={!canManage || !storageReady}
-                        onChange={(event) => updateFormField("clearOpenAiApiKey", event.target.checked)}
-                      />
-                    </div>
-                  </Col>
 
-                  <Col lg={6}>
-                    <div className="border rounded-3 p-3 h-100">
-                      <h6 className="mb-3">API key Anthropic (Claude)</h6>
-                      <Form.Group controlId="agency-anthropic-api-key">
-                        <Form.Label>Nuova API key</Form.Label>
-                        <Form.Control
-                          type="password"
-                          autoComplete="new-password"
-                          value={runtimeForm.anthropicApiKey}
-                          disabled={!canManage || !storageReady || runtimeForm.clearAnthropicApiKey}
-                          onChange={(event) => updateFormField("anthropicApiKey", event.target.value)}
-                          placeholder={anthropicApiKeyConfigured ? "API key gia configurata: inserisci un valore solo per sostituirla" : "Inserisci API key lato server"}
-                        />
-                        <Form.Text>
-                          Serve quando il provider AI e impostato su Anthropic (Claude). Campo write-only.
-                        </Form.Text>
-                      </Form.Group>
-                      <Form.Check
-                        className="mt-3"
-                        type="checkbox"
-                        id="agency-anthropic-clear-key"
-                        label="Rimuovi la API key salvata nel CRM"
-                        checked={runtimeForm.clearAnthropicApiKey}
-                        disabled={!canManage || !storageReady}
-                        onChange={(event) => updateFormField("clearAnthropicApiKey", event.target.checked)}
-                      />
+                      <Row className="g-3 mt-1">
+                        <Col md={6}>
+                          <Form.Group controlId="agency-openai-api-key">
+                            <Form.Label>
+                              API key OpenAI{" "}
+                              <Badge bg={aiApiKeyConfigured ? "success" : "secondary"} className="ms-1">
+                                {aiApiKeyConfigured ? "presente" : "assente"}
+                              </Badge>
+                            </Form.Label>
+                            <Form.Control
+                              type="password"
+                              autoComplete="new-password"
+                              value={runtimeForm.openAiApiKey}
+                              disabled={!canManage || !storageReady}
+                              onChange={(event) => updateFormField("openAiApiKey", event.target.value)}
+                              placeholder={aiApiKeyConfigured ? "Configurata: inserisci un valore solo per sostituirla" : "Inserisci API key OpenAI"}
+                            />
+                            <Form.Text>Campo write-only: il CRM non rilegge mai la chiave in chiaro.</Form.Text>
+                          </Form.Group>
+                        </Col>
+                        <Col md={6}>
+                          <Form.Group controlId="agency-anthropic-api-key">
+                            <Form.Label>
+                              API key Anthropic (Claude){" "}
+                              <Badge bg={anthropicApiKeyConfigured ? "success" : "secondary"} className="ms-1">
+                                {anthropicApiKeyConfigured ? "presente" : "assente"}
+                              </Badge>
+                            </Form.Label>
+                            <Form.Control
+                              type="password"
+                              autoComplete="new-password"
+                              value={runtimeForm.anthropicApiKey}
+                              disabled={!canManage || !storageReady}
+                              onChange={(event) => updateFormField("anthropicApiKey", event.target.value)}
+                              placeholder={anthropicApiKeyConfigured ? "Configurata: inserisci un valore solo per sostituirla" : "Inserisci API key Anthropic"}
+                            />
+                            <Form.Text>Campo write-only. Serve per usare i modelli Claude.</Form.Text>
+                          </Form.Group>
+                        </Col>
+                      </Row>
+
+                      <div className="border-top mt-3 pt-3">
+                        <div className="small fw-semibold mb-1">Rimozione chiavi</div>
+                        <div className="small text-muted mb-2">
+                          Il campo chiave e write-only, quindi per cancellare una chiave gia salvata serve un comando esplicito.
+                        </div>
+                        <Row className="g-2 align-items-end">
+                          <Col xs={12} sm="auto">
+                            <Form.Group controlId="agency-clear-keys-provider">
+                              <Form.Label className="small text-muted mb-1">Cosa cancellare</Form.Label>
+                              <Form.Select
+                                value={clearKeysProvider}
+                                disabled={!canManage || !storageReady}
+                                onChange={(event) => setClearKeysProvider(event.target.value)}
+                              >
+                                <option value="">Tutte le chiavi API</option>
+                                <option value="openai">Solo OpenAI</option>
+                                <option value="anthropic">Solo Anthropic</option>
+                              </Form.Select>
+                            </Form.Group>
+                          </Col>
+                          <Col xs={12} sm="auto">
+                            <Button
+                              type="button"
+                              variant="outline-danger"
+                              disabled={!canManage || !storageReady || saveState.status === "saving" || (!aiApiKeyConfigured && !anthropicApiKeyConfigured)}
+                              onClick={handleClearKeys}
+                            >
+                              Cancella permanentemente le chiavi API dal CRM
+                            </Button>
+                          </Col>
+                        </Row>
+                      </div>
                     </div>
                   </Col>
 
@@ -594,7 +634,7 @@ const AgencySettingsPage = () => {
 
                 <div className="d-flex gap-2 mt-3">
                   <Button type="submit" disabled={!canManage || !storageReady || saveState.status === "saving"}>
-                    {saveState.status === "saving" ? "Salvataggio..." : "Salva impostazioni runtime"}
+                    {saveState.status === "saving" ? "Salvataggio..." : "Salva impostazioni"}
                   </Button>
                   <Button type="button" variant="light" className="border" onClick={refreshSettings}>
                     Aggiorna stato

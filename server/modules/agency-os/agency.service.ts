@@ -2109,20 +2109,45 @@ export const resolveAgencyOpenAiApiKey = async (workspaceId?: string): Promise<s
 
 const getAgencyAiStatusPayload = async (workspaceId?: string) => {
   const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
-  const provider = runtimeConfig.ai.provider;
-  // Chiave pertinente al provider selezionato: OpenAI usa la sua, Anthropic la sua.
-  const providerKeyConfigured = provider === 'anthropic'
-    ? runtimeConfig.ai.anthropicApiKeyConfigured
-    : provider === 'openai'
-      ? runtimeConfig.ai.apiKeyConfigured
-      : false;
-  const configured = runtimeConfig.ai.enabled
-    && (provider === 'openai' || provider === 'anthropic')
-    && providerKeyConfigured;
+  const configuredProvider = runtimeConfig.ai.provider;
 
-  // Modello effettivo: se il provider è Anthropic ma il modello configurato non è
-  // un modello Claude (default storico gpt-*), si usa il default Claude.
-  const model = resolveAgencyProviderModel(provider, runtimeConfig.ai.model);
+  // Entrambi i provider sono di prima classe. Difetto storico: lo stato "configurato"
+  // guardava SOLO la chiave del provider di default, così avere solo l'altra chiave
+  // risultava "non configurato". Ora l'AI è "configurata" se è abilitata e ALMENO un
+  // provider (OpenAI o Anthropic) ha la chiave. Il provider EFFETTIVO usato dalle
+  // generazioni è quello di default se ha la chiave, altrimenti l'altro se ce l'ha: così
+  // una chiave presente basta a far funzionare l'AI e non si parte mai verso un provider
+  // senza chiave (niente 401 al posto del ripiego pulito). Il selettore per-sessione della
+  // chat resta libero di scegliere qualunque provider con chiave (invariato).
+  const openAiKeyPresent = Boolean(runtimeConfig.ai.openAiApiKey);
+  const anthropicKeyPresent = Boolean(runtimeConfig.ai.anthropicApiKey);
+
+  let provider: 'none' | AgencyAiProvider = 'none';
+  if (
+    (configuredProvider === 'openai' || configuredProvider === 'anthropic')
+    && isAgencyProviderKeyPresent(runtimeConfig, configuredProvider)
+  ) {
+    provider = configuredProvider;
+  } else if (openAiKeyPresent) {
+    provider = 'openai';
+  } else if (anthropicKeyPresent) {
+    provider = 'anthropic';
+  }
+
+  const configured = runtimeConfig.ai.enabled && provider !== 'none';
+  const providerKeyConfigured = provider === 'anthropic'
+    ? anthropicKeyPresent
+    : provider === 'openai'
+      ? openAiKeyPresent
+      : false;
+
+  // Modello effettivo per il provider risolto: se il modello di default è di un altro
+  // provider (es. default storico gpt-* con provider effettivo Anthropic),
+  // resolveAgencyProviderModel ripiega sul default del provider effettivo.
+  const model = resolveAgencyProviderModel(
+    provider === 'none' ? configuredProvider : provider,
+    runtimeConfig.ai.model,
+  );
 
   return {
     status: configured ? 'configured' : 'not_configured',

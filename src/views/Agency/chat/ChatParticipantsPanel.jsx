@@ -98,7 +98,6 @@ const ChatParticipantsPanel = ({
   const remove = async (memberId) => {
     const isMe = memberId === currentUserId;
     if (isMe) {
-      // eslint-disable-next-line no-alert
       const ok = window.confirm(
         "Uscire dalla conversazione? Resterà nel tuo elenco come archiviata, in sola lettura: vedrai i messaggi fino a questo momento, non quelli successivi.",
       );
@@ -120,7 +119,6 @@ const ChatParticipantsPanel = ({
   };
 
   const clear = async () => {
-    // eslint-disable-next-line no-alert
     const ok = window.confirm("Azzerare la conversazione? L'operazione non è reversibile e vale per tutti i partecipanti.");
     if (!ok) return;
     setBusy(true);
@@ -136,7 +134,6 @@ const ChatParticipantsPanel = ({
   };
 
   const disband = async () => {
-    // eslint-disable-next-line no-alert
     const ok = window.confirm(
       "Sciogliere il gruppo? La conversazione resta tua e torna solitaria. Gli altri la ritroveranno archiviata, in sola lettura fino a questo momento: chi vuole proseguire potrà riprenderla in una nuova chat.",
     );

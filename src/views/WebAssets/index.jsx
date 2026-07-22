@@ -613,7 +613,6 @@ const WebAssetsPage = () => {
       nextErrors.url = 'URL obbligatorio';
     } else {
       try {
-        // eslint-disable-next-line no-new
         new URL(urlValue);
       } catch (_error) {
         nextErrors.url = 'URL non valido';

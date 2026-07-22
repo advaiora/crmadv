@@ -124,7 +124,7 @@ const AcceptInvite = () => {
             <Card.Body className="p-4 p-md-5">
               <h4 className="mb-2">Accettazione invito</h4>
               <p className="text-muted mb-4">
-                Stiamo verificando il token invito e configurando l'accesso al workspace.
+                Stiamo verificando il token invito e configurando l&apos;accesso al workspace.
               </p>
 
               {loading && (

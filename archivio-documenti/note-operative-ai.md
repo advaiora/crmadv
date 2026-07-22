@@ -71,16 +71,17 @@
 
 ---
 
-## 5. Lint generale (`npm run lint`): serve la variabile d'ambiente + ha errori preesistenti
+## 5. Lint generale (`npm run lint`): ora gira su flat config, verde con avvisi advisory
 
-**Contesto:** dopo aver aggiunto/modificato file `.jsx`, per controllare la qualità del codice (variabili inutilizzate, regole React) serve il lint generale, non solo `lint:css`/`lint:colors` (che coprono **solo** `src/modules/**`).
+> **Aggiornato il 22/7/2026:** migrato a **flat config** (`eslint.config.js`); il vecchio `.eslintrc.cjs` non esiste più. Le indicazioni sotto valgono per il nuovo assetto.
 
-**Errore:** lanciare `eslint` direttamente (`npx eslint …` o `./node_modules/.bin/eslint …`) fallisce con *"ESLint couldn't find an eslint.config.(js|mjs|cjs) file"*: il binario installato è ESLint 9 (default flat-config), ma il progetto usa ancora `.eslintrc.cjs` (formato legacy).
+**Contesto:** dopo aver aggiunto/modificato file `.jsx`, per controllare la qualità del codice (regole React, hook) serve il lint generale, non solo `lint:css`/`lint:colors` (che coprono **solo** `src/modules/**`).
 
-**Modo corretto:**
-- Lanciare `npm run lint` (che usa lo script del progetto) **oppure**, per lintare solo alcuni file, anteporre la variabile: `ESLINT_USE_FLAT_CONFIG=false ./node_modules/.bin/eslint --ext js,jsx <percorsi>`.
-- **`npm run lint` NON è verde sul repo**: alcuni file preesistenti (es. `src/components/command-palette/CommandPalette.jsx`, `src/routes/RouteList.jsx`) violano già regole nuove del plugin react-hooks (`react-hooks/set-state-in-effect`, `react-refresh/only-export-components`). Sono **preesistenti** (verificabili lintando la versione `git show HEAD:…`), non vanno "sistemati" di straforo. Verificare quindi solo che **i propri file nuovi/modificati** siano puliti, lintandoli singolarmente.
-- Regole react-hooks recenti utili da conoscere: non scrivere `ref.current = …` **durante il render** (`react-hooks/refs`) — farlo dentro un `useEffect`; ed evitare `setState` sincrono nel corpo di un `useEffect` quando possibile.
+**Come funziona adesso:**
+- `npm run lint` **gira ed è verde** (`0 errori`, ~13 avvisi advisory). Lo script è `eslint . --report-unused-disable-directives` (niente più `--ext js,jsx`, che nel flat config non è valido; niente più `--max-warnings 0`, che con gli avvisi pre-esistenti terrebbe il comando perennemente rosso). Anche `npx eslint <percorsi>` diretto ora funziona (trova `eslint.config.js`) — **non serve più** il vecchio trucco `ESLINT_USE_FLAT_CONFIG=false`.
+- **I ~13 avvisi sono pre-esistenti e voluti**, NON vanno "sistemati" di straforo: `react-refresh/only-export-components` (file del design system che esportano componente + costante/hook, scelta strutturale — vedi nota #1) e `react-hooks/exhaustive-deps` (dipendenze degli hook, rischiose da auto-correggere). Verificare quindi solo che **i propri file nuovi/modificati** non aggiungano errori.
+- **Il flat config NON abilita l'intero ruleset "React Compiler"** del plugin react-hooks 7.x (`set-state-in-effect`, `static-components`, `immutability`, `use-memo`…): tiene solo `rules-of-hooks` (error) ed `exhaustive-deps` (warn), fedele all'intento storico. Adottare quelle regole strette è una scelta a sé (molte correzioni di massa), **da concordare**.
+- I `.ts` non si lintano qui (vedi #6): per i tipi si usa `tsc`.
 
 ---
 
@@ -88,7 +89,7 @@
 
 **Contesto:** dopo aver aggiunto/modificato file `.ts` (es. in `src/lib/`), si vuole controllarne la qualità come si fa con i `.jsx`.
 
-**Errore:** lanciare eslint su un `.ts` restituisce `Parsing error: Unexpected token type` sulla parola chiave `type`/sulle annotazioni. Sembra un errore nel proprio codice, ma **non lo è**: lo script `npm run lint` è `eslint . --ext js,jsx` e la config (`.eslintrc.cjs`) usa il **parser di default** (espree), **senza** parser TypeScript. Quindi i `.ts` non sono proprio previsti da ESLint.
+**Errore:** lanciare eslint su un `.ts` restituisce `Parsing error: Unexpected token type` sulla parola chiave `type`/sulle annotazioni. Sembra un errore nel proprio codice, ma **non lo è**: il lint del progetto copre solo i `.js`/`.jsx` (il flat config `eslint.config.js` usa il **parser di default** espree, **senza** parser TypeScript) e lo `eslint.config.js` mira `src/**/*.{js,jsx}`. Quindi i `.ts` non sono proprio previsti da ESLint.
 
 **Modo corretto:**
 - Non lintare i `.ts` con ESLint. Per controllarne i tipi usare `tsc`:
