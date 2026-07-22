@@ -2447,12 +2447,32 @@ const extractAnthropicTextContent = (payload: unknown): string => {
   return text;
 };
 
-// Claude a volte incornicia il JSON in un blocco markdown (```json … ```). Lo
-// stripping rende il parse robusto senza forzare structured outputs.
+// Claude a volte incornicia il JSON in un blocco markdown (```json … ```), aggiunge
+// un preambolo/commento, o tronca la risposta lasciando la fence di chiusura assente.
+// Lo stripping rende il parse robusto senza forzare structured outputs. NB: il vecchio
+// regex ancorato (^```…```$) rimuoveva la fence SOLO se tutta la risposta era un blocco
+// pulito: negli altri casi la fence sopravviveva e JSON.parse falliva, facendo ricadere
+// in silenzio le generazioni JSON (Discovery/Web/Ads) sul fallback rule-based.
 const stripJsonCodeFence = (raw: string): string => {
-  const trimmed = raw.trim();
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);
-  return fenced ? fenced[1].trim() : trimmed;
+  let text = raw.trim();
+  // 1) Rimuove la fence di apertura (anche se la chiusura manca per troncamento) e
+  //    l'eventuale fence di chiusura. Solo se la risposta INIZIA con ``` così una
+  //    ``` dentro un valore stringa del JSON pulito non innesca lo strip.
+  if (text.startsWith('```')) {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+  }
+  // 2) Se resta del testo attorno all'oggetto/array JSON (preambolo o coda), lo isola
+  //    dal primo delimitatore di apertura all'ultimo di chiusura. No-op su JSON già
+  //    pulito; su risposta troncata restituisce il frammento (il parse fallirà come
+  //    "Unexpected end", segnalando il troncamento invece di una fence non rimossa).
+  const objStart = text.indexOf('{');
+  const arrStart = text.indexOf('[');
+  const start = objStart === -1 ? arrStart : arrStart === -1 ? objStart : Math.min(objStart, arrStart);
+  const end = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
+  if (start !== -1 && end >= start) {
+    text = text.slice(start, end + 1);
+  }
+  return text;
 };
 
 const extractOpenAiTextContent = (payload: unknown): string => {
