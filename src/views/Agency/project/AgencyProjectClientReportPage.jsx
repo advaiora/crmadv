@@ -5,6 +5,7 @@ import {
   getAgencyProjectClientReport,
   saveAgencyProjectClientReport,
 } from "../../../modules/agency-os/data/agencyDataAdapter";
+import { fetchAgencyProjectClientReportPdfBlob } from "../../../modules/agency-os/api/agency.api";
 import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSource";
 import {
   formatReportLabel,
@@ -50,6 +51,7 @@ const AgencyProjectClientReportPage = () => {
   const [saveMessage, setSaveMessage] = React.useState("");
   const [saveError, setSaveError] = React.useState("");
   const [runtimeMessage, setRuntimeMessage] = React.useState("");
+  const [downloadingPdf, setDownloadingPdf] = React.useState(false);
 
   const loadClientReport = React.useCallback(async () => {
     setLoading(true);
@@ -131,6 +133,28 @@ const AgencyProjectClientReportPage = () => {
     }
   };
 
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    setSaveError("");
+    setRuntimeMessage("");
+    try {
+      const { blob, filename } = await fetchAgencyProjectClientReportPdfBlob(projectId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename || `report_cliente_${projectId}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setRuntimeMessage("PDF del report cliente scaricato.");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Download PDF non riuscito.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <AgencyProjectPageTemplate
@@ -175,8 +199,11 @@ const AgencyProjectClientReportPage = () => {
         <Button type="button" size="sm" variant="primary" onClick={handleSave} disabled={saving || !clientReportState}>
           {saving ? "Salvataggio..." : "Salva report cliente"}
         </Button>
+        <Button type="button" size="sm" variant="outline-primary" onClick={handleDownloadPdf} disabled={downloadingPdf || !clientReportState}>
+          {downloadingPdf ? "Preparazione PDF..." : "Scarica PDF"}
+        </Button>
         <Button type="button" size="sm" variant="outline-secondary" onClick={handlePrint}>
-          Stampa / Esporta PDF
+          Stampa
         </Button>
         <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/reports`} type="button" size="sm" variant="outline-secondary">
           Report tecnico

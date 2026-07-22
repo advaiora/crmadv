@@ -291,6 +291,49 @@ export const fetchAgencyProjectSourceFileBlob = async (projectId, fileId, { down
   };
 };
 
+// Scarica il PDF brandizzato del report cliente (V6). Ritorna il blob + il nome file
+// suggerito dal server, come fetchAgencyProjectSourceFileBlob.
+export const fetchAgencyProjectClientReportPdfBlob = async (projectId, { signal } = {}) => {
+  const authHeaders = getDevAuthHeaders();
+  if (!authHeaders.Authorization) {
+    throw new AgencyApiError("Sessione non disponibile. Effettua il login.", {
+      status: 401,
+      code: "UNAUTHORIZED",
+    });
+  }
+
+  const response = await apiFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/reports/client/pdf`,
+    {
+      method: "GET",
+      signal,
+      headers: {
+        Accept: "application/pdf",
+        ...authHeaders,
+      },
+    },
+  );
+
+  if (!response.ok) {
+    let message = `Download PDF non riuscito con status ${response.status}`;
+    try {
+      const payload = await parseJsonSafe(response);
+      message = payload?.error?.message || message;
+    } catch (_error) {
+      // Keep generic PDF error.
+    }
+    throw new AgencyApiError(message, {
+      status: response.status,
+      code: mapStatusToCode(response.status),
+    });
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: parseContentDispositionFilename(response.headers.get("content-disposition")) || `report_cliente_${projectId}.pdf`,
+  };
+};
+
 export const searchAgencyProjectCompetitors = async (projectId, { dryRun = false, signal } = {}) => {
   const result = await agencyFetch(`/agency/projects/${encodeURIComponent(projectId)}/sources/competitors/search`, {
     method: "POST",

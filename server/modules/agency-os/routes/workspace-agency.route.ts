@@ -6,6 +6,8 @@ import { prisma } from '../../../prisma.js';
 import { PROJECTS_PERMISSIONS, ensureProjectsAccess } from '../../projects/projects.policies.js';
 import { CHAT_PERMISSIONS, ensureChatAccess } from '../chat.policies.js';
 import { agencyService } from '../agency.service.js';
+import { brandingRepository } from '../../../repositories/branding.repository.js';
+import { renderClientReportPdf } from '../reports/client-report-pdf.js';
 
 type AgencyProjectParams = {
   projectId: string;
@@ -1023,6 +1025,51 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       return ok(reply, {
         clientReport,
       });
+    },
+  );
+
+  // Export PDF brandizzato del report cliente (V6). Stessa autorizzazione della
+  // lettura (projects.view). Serve i byte come application/pdf in download.
+  app.get<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/reports/client/pdf',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const projectId = request.params.projectId;
+
+      const [clientReport, branding, project] = await Promise.all([
+        agencyService.getProjectClientReport(workspace.id, projectId),
+        brandingRepository.findByWorkspaceId(workspace.id),
+        prisma.project.findFirst({
+          where: { workspaceId: workspace.id, id: projectId },
+          select: { client: { select: { name: true } } },
+        }),
+      ]);
+
+      const workspaceLabel = branding?.workspaceName?.trim() || workspace.name;
+      const pdfBuffer = await renderClientReportPdf(
+        {
+          projectName: clientReport.input.projectName,
+          projectTypeLabel: clientReport.input.projectTypeLabel,
+          clientName: project?.client?.name ?? null,
+          generatedAt: clientReport.output.generatedAt,
+          report: clientReport.output,
+        },
+        {
+          name: workspaceLabel,
+          supportEmail: branding?.supportEmail ?? null,
+          supportPhone: branding?.supportPhone ?? null,
+          supportAddress: branding?.supportAddress ?? null,
+          logoUrl: branding?.logoUrl ?? null,
+          primaryColor: branding?.primaryColor ?? null,
+          secondaryColor: branding?.secondaryColor ?? null,
+        },
+      );
+
+      const safeName = clientReport.input.projectName.replace(/[^a-z0-9]+/gi, '_').slice(0, 40) || projectId.slice(0, 8);
+      reply.header('Content-Type', 'application/pdf');
+      reply.header('Content-Length', String(pdfBuffer.byteLength));
+      reply.header('Content-Disposition', `attachment; filename="report_cliente_${safeName}.pdf"`);
+      return reply.send(pdfBuffer);
     },
   );
 
