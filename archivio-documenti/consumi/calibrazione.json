@@ -1,0 +1,17 @@
+{
+  "_cosa_e": "Letture manuali del consumo reale dell'abbonamento, usate da scripts/agenti/consumi.mjs per convertire il suo indicatore interno ('peso') nella percentuale del limite. Senza almeno 2 campioni lo script parla solo in relativo.",
+  "_come_si_aggiunge": [
+    "1. Meglio farlo quando la finestra di 5 ore e' GIA' CARICA: un campione preso a consumo basso non dice nulla su come si comporta la curva vicino al limite.",
+    "2. Lancia 'node scripts/agenti/consumi.mjs' e annota il peso della finestra in corso.",
+    "3. Scrivi /usage nella casella dell'app e leggi la percentuale del limite.",
+    "4. Aggiungi qui sotto una voce con i due valori e la data.",
+    "5. Servono 3-5 campioni presi a livelli di carico diversi."
+  ],
+  "_campi": {
+    "quando": "data e ora della lettura, formato AAAA-MM-GG HH:MM",
+    "peso": "il peso della finestra in corso riportato dallo script",
+    "percentuale": "la percentuale del limite riportata da /usage",
+    "nota": "opzionale: cosa si stava facendo, o qualsiasi cosa utile a rileggere il campione"
+  },
+  "campioni": []
+}

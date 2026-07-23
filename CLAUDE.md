@@ -34,6 +34,24 @@ Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativ
 - **Leggilo a inizio sessione** ed evita gli errori già annotati.
 - Quando ti accorgi di aver eseguito un'operazione in modo inefficiente o sbagliato, **aggiorna quel file in autonomia** (senza che l'utente lo chieda), aggiungendo una voce breve nel formato *Contesto → Errore → Modo corretto*.
 
+## Team di agent (dal 23/7/2026)
+
+Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può modificare file**:
+
+- **`esploratore`** — chiamalo **prima** di scrivere codice: torna la mappa dei file da toccare e la **lista completa dei punti da collegare**. Su questo progetto conviene quasi sempre, perché quello che legge lui resta nel suo contesto e non appesantisce la sessione.
+- **`revisore`** — chiamalo a **ogni tappa conclusa**, non solo prima del commit: dopo schema+migrazione, dopo il collegamento, e in chiusura. Due chiamate per pezzo di lavoro sono il default; mai su codice a metà.
+- **`architetto`** — ogni 5-10 sessioni: misura i consumi e **propone** modifiche al team. Non applica mai niente: le modifiche approvate le applica la sessione principale, e si annotano nel registro.
+
+**Consumi.** Si lavora su abbonamento MAX 5x: non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: `node scripts/agenti/consumi.mjs`.
+
+**Promemoria da fare all'utente (non aspettare che lo chieda).** Il monitor non può leggere la percentuale del limite: nessun comando e nessun file locale la espongono, verificato. Quando la finestra risulta **già carica** e i campioni registrati sono meno di 5, chiedi la lettura — appoggiandola a qualcosa che si sta già facendo, tipicamente l'handoff:
+
+> «Scrivi `/usage` nella casella dell'app e passami la percentuale che riporta. Serve a far parlare il monitor in percentuale; adesso è un buon momento perché la finestra è carica.»
+
+I campioni vanno in `archivio-documenti/consumi/calibrazione.json`. Non chiederlo a finestra scarica (il campione non servirebbe) né più di una volta per sessione.
+
+Tutto il resto — com'è composto il team, l'archivio delle alternative scartate, il registro delle decisioni — sta in `archivio-documenti/team-agenti.md`.
+
 ## Regole di scrittura degli handoff
 
 - Linguaggio **chiaro e semplice**, niente sigle o nomi "in codice" non spiegati.
