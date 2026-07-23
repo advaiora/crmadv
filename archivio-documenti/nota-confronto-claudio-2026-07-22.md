@@ -4,6 +4,20 @@
 
 ---
 
+## ✅ ESITO DEL CONFRONTO — 23 luglio 2026
+
+Jacopo e Claudio si sono confrontati. Decisioni prese:
+
+| # | Questione | Decisione |
+|---|---|---|
+| **4** | JSON non valido con Claude | ✅ **FATTO il 23/7 (opzione A)**: structured output via **tool-use** nel ramo Anthropic, attivo per la **Discovery brief**. Verificato dal vivo con Claude Sonnet 5: `cacheHit:false`, **1029 token di output**, tutte le 8 sezioni compilate. ⚠️ **Da sapere:** lo schema dello strumento deve elencare **davvero** i campi — con uno schema generico Claude risponde `{"_dummy":…}` (4 token): JSON valido ma vuoto (dettagli in `note-operative-ai.md` #32). **Resta da migrare** agli schemi: Discovery *sezione*, Web progetto/blocco, Ads asset — oggi restano sul percorso testuale storico (nessuna regressione, ma per loro il rischio JSON non valido esiste ancora). |
+| **1** | Discovery: grounding vs ipotesi | ⏸️ **Ora si può decidere**: sbloccata dal #4. **Primo responso reale (23/7):** con l'AI davvero usata, la Discovery **inferisce** il target e **dichiara cosa validare** — es. *"Dalle fonti emerge come target le PMI e i titolari di partita IVA della provincia di Verona… Da validare con il cliente: settori merceologici prevalenti, dimensione tipica…"*. Cioè si comporta già molto vicino all'**opzione B** senza toccare i prompt: il *"Target non definito"* era davvero il fallback. Da guardare insieme su piu' progetti prima di decidere se serve ancora modificare i prompt. |
+| — | Arretrato migrazioni DB | ✅ **Nessuna azione nuova**: è il promemoria per Claudio di applicare le migrazioni pendenti **nell'ordine giusto**, tenendo presente che la `20260706085001` su un DB che ha già quelle tabelle va **marcata come applicata** (`prisma migrate resolve --applied`), non eseguita. Claudio ne è consapevole. |
+| **2** | Impostazioni AI — semantica `configured` | ✅ **CHIUSO**: nessun problema, consumatori già verificati. |
+| **3** | ESLint | ✅ **CHIUSO due volte**: (a) confermata la politica **"blocca solo sul rosso"** (niente `--max-warnings 0`, gli avvisi restano advisory); (b) confermato di **non adottare** il ruleset "React Compiler" → resta il set classico. *(Resta aperto solo il debito "due librerie di icone", tracciato in roadmap.)* |
+
+---
+
 ## 1. Discovery AI — grounding stretto vs ipotesi ragionate *(DECISIONE DI PRODOTTO — era bloccata in attesa di Claudio)*
 
 > ### ⚡ AGGIORNAMENTO 22/7 (pomeriggio) — QUESTA DISCUSSIONE VA RIFORMULATA PRIMA DI DECIDERE

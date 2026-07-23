@@ -48,6 +48,12 @@ import {
   buildCompressedContext,
   type ContextMessage,
 } from './chat-context.js';
+import {
+  ANTHROPIC_JSON_TOOL_NAME,
+  buildAnthropicJsonTool,
+  extractAnthropicToolInput,
+  isEmptyStructuredPayload,
+} from './anthropic-json.js';
 import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
@@ -2447,6 +2453,7 @@ const extractAnthropicTextContent = (payload: unknown): string => {
   return text;
 };
 
+
 // Claude a volte incornicia il JSON in un blocco markdown (```json … ```), aggiunge
 // un preambolo/commento, o tronca la risposta lasciando la fence di chiusura assente.
 // Lo stripping rende il parse robusto senza forzare structured outputs. NB: il vecchio
@@ -3147,6 +3154,13 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
   // Progetto a cui imputare il consumo nel registro (tutti i chiamanti ce l'hanno:
   // lo usano gia' per la chiave di lock).
   projectId?: string;
+  // JSON Schema dell'output atteso. Se presente, con Anthropic si usa lo structured
+  // output (tool-use): il JSON lo produce l'API ed e' valido per costruzione.
+  // Se assente si resta sul comportamento storico (JSON chiesto a prompt + parse del
+  // testo): serve a non far regredire i chiamanti non ancora migrati.
+  // NB: lo schema deve elencare davvero i campi attesi, altrimenti Claude risponde con
+  // un oggetto vuoto (vedi nota in anthropic-json.ts).
+  jsonSchema?: Record<string, unknown>;
 }): Promise<AgencyAiJsonResult | null> => {
   const status = await getAgencyAiStatusPayload(input.workspaceId);
   const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
@@ -3182,13 +3196,31 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
       const systemPrompt = `${input.system}\nRispondi solo con JSON valido.`;
 
       let content: string;
+      // Valorizzato solo con lo structured output (Anthropic tool-use): in quel caso il
+      // JSON e' gia' un oggetto validato dall'API e non va ri-parsato dal testo.
+      let structuredPayload: Record<string, unknown> | null = null;
       if (provider === 'anthropic') {
         // Anthropic Messages API. max_tokens è obbligatorio: usa il tetto
-        // configurato o il default. Il JSON è richiesto via system prompt e reso
-        // robusto in parse (strip del code fence markdown).
+        // configurato o il default. Il JSON NON è più chiesto via prompt e ripulito in
+        // parse: si obbliga il modello a rispondere chiamando uno "strumento"
+        // (structured output), così a produrre il JSON è l'API — valido per costruzione.
+        // Prima, su risposte lunghe, Claude emetteva JSON malformato e la generazione
+        // ricadeva in silenzio sul rule-based (con la chiamata comunque fatturata).
         const maxTokens = runtimeConfig.ai.maxOutputTokens > 0
           ? runtimeConfig.ai.maxOutputTokens
           : DEFAULT_ANTHROPIC_MAX_TOKENS;
+        // Structured output solo se il chiamante ha dichiarato lo schema dell'output.
+        const useStructuredOutput = Boolean(input.jsonSchema);
+        const requestBody: Record<string, unknown> = {
+          model,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userContent }],
+        };
+        if (input.jsonSchema) {
+          requestBody.tools = [buildAnthropicJsonTool(input.jsonSchema)];
+          requestBody.tool_choice = { type: 'tool', name: ANTHROPIC_JSON_TOOL_NAME };
+        }
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -3196,21 +3228,27 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
             'anthropic-version': ANTHROPIC_API_VERSION,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            model,
-            max_tokens: maxTokens,
-            system: systemPrompt,
-            messages: [{ role: 'user', content: userContent }],
-          }),
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`Anthropic API error ${response.status}`);
         }
         const responsePayload = await response.json();
-        content = extractAnthropicTextContent(responsePayload);
-        if (!content.trim()) {
-          throw new Error('Anthropic response empty');
+        if (useStructuredOutput) {
+          structuredPayload = extractAnthropicToolInput(responsePayload, ANTHROPIC_JSON_TOOL_NAME);
+          // Un tool_use che torna vuoto NON e' un successo: meglio fallire (e far
+          // ripiegare il chiamante sul rule-based) che spacciare per AI un brief vuoto.
+          if (isEmptyStructuredPayload(structuredPayload)) {
+            throw new Error('Anthropic structured output empty');
+          }
+          // Solo per la stima token/costo del registro consumi.
+          content = JSON.stringify(structuredPayload);
+        } else {
+          content = extractAnthropicTextContent(responsePayload);
+          if (!content.trim()) {
+            throw new Error('Anthropic response empty');
+          }
         }
       } else {
         const requestBody: Record<string, unknown> = {
@@ -3298,7 +3336,9 @@ const runAgencyOpenAiJsonWithMeta = async (input: {
       }
 
       return {
-        payload: JSON.parse(stripJsonCodeFence(content)) as Record<string, unknown>,
+        // Con lo structured output il payload e' gia' un oggetto valido: si ri-parsa dal
+        // testo solo nel ramo OpenAI o nel ripiego testuale di Anthropic.
+        payload: structuredPayload ?? (JSON.parse(stripJsonCodeFence(content)) as Record<string, unknown>),
         meta: {
           functionName,
           model,
@@ -4054,6 +4094,40 @@ const DISCOVERY_SECTION_KEYS = [
 ] as const;
 
 type DiscoverySectionKey = typeof DISCOVERY_SECTION_KEYS[number];
+
+// Schema dell'output della Discovery, usato per lo structured output di Anthropic
+// (tool-use). E' derivato da DISCOVERY_SECTION_KEYS cosi' resta allineato se un giorno si
+// aggiunge una sezione. Deve elencare davvero i campi: e' lo schema a guidare la
+// generazione del modello (vedi la nota in anthropic-json.ts).
+const DISCOVERY_AI_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    sections: {
+      type: 'object',
+      description: 'Testo di ciascuna sezione del brief Discovery.',
+      properties: Object.fromEntries(
+        DISCOVERY_SECTION_KEYS.map((key) => [key, { type: 'string' }]),
+      ),
+      required: [...DISCOVERY_SECTION_KEYS],
+    },
+    missingFields: {
+      type: 'array',
+      description: 'Campi che le fonti non permettono di determinare.',
+      items: { type: 'string' },
+    },
+    usedSourcesBySection: {
+      type: 'object',
+      description: 'Per ogni sezione, gli identificativi delle fonti usate.',
+      additionalProperties: { type: 'array', items: { type: 'string' } },
+    },
+    confidenceBySection: {
+      type: 'object',
+      description: 'Per ogni sezione, il livello di confidenza (alta/media/bassa).',
+      additionalProperties: { type: 'string' },
+    },
+  },
+  required: ['sections'],
+};
 
 const discoverySectionRegenerateBodySchema = z.object({
   sectionKey: z.enum(DISCOVERY_SECTION_KEYS),
@@ -9368,6 +9442,7 @@ export const agencyService = {
           lockKey: `${workspaceId}:${projectId}:discovery.generateBrief:${inputHash}`,
           system: systemPrompt,
           user: aiUserPayload,
+          jsonSchema: DISCOVERY_AI_JSON_SCHEMA,
         });
       const aiPayload = aiResult?.payload || {};
 

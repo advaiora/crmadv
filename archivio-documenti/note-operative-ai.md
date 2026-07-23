@@ -434,3 +434,22 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Nella helper `fetch`, aggiungere `content-type: application/json` **solo se c'è un body** (`if (body) headers['content-type'] = 'application/json'`). GET/DELETE senza corpo vanno mandati senza quell'header.
 - Un `DELETE` andato a buon fine qui risponde **204** (nessun corpo), non 200: assertare `status === 204`.
 - Regola di pulizia: se uno script di collaudo **crea** dati (asset, righe demo), deve **cancellarli in fondo** e **verificare che siano spariti** (ri-listare e contare), perché un 4xx sulla delete può passare inosservato e lasciare sporcizia nel workspace Demo.
+
+---
+
+## 32. Structured output (Anthropic tool-use): lo schema DEVE elencare i campi, altrimenti esce un oggetto vuoto
+
+**Contesto:** 23/7, implementazione dello structured output per far produrre a Claude JSON sempre valido (opzione A decisa con Claudio). Si obbliga il modello a rispondere chiamando uno "strumento" con un `input_schema`.
+
+**Errore:** ho passato uno schema **generico e permissivo** (`{type:'object', properties:{}, additionalProperties:true}`), ragionando che "tanto la forma del JSON è già descritta nel system prompt". Risultato dal vivo: Claude ha chiamato lo strumento restituendo **`{"_dummy": …}`** con **4 token di output**. JSON validissimo — e completamente vuoto. Peggio: il codice lo prendeva per una generazione riuscita e marcava `generationMode: 'ai_with_sources'` su un brief che in realtà veniva tutto dal fallback rule-based. Cioè avevo **sostituito un fallback silenzioso con una bugia silenziosa**.
+
+**Perché:** nello structured output è **lo schema** a guidare la generazione, non il system prompt. Se lo schema non dichiara proprietà, il modello non ha campi da riempire e produce un segnaposto.
+
+**Modo corretto:**
+- Passare uno schema **vero**, con le proprietà attese (qui: `sections` con le 8 chiavi della Discovery, `missingFields`, ecc.). Con lo schema reale: **1029** token di output, tutte le sezioni compilate e ancorate alle fonti.
+- Derivare lo schema dalle costanti già esistenti (es. `DISCOVERY_SECTION_KEYS`) così non si disallinea quando si aggiunge un campo.
+- Attivare il tool-use **solo se il chiamante fornisce lo schema**; senza schema restare sul comportamento precedente, così i chiamanti non ancora migrati non regrediscono.
+- Trattare un payload vuoto (solo chiavi tipo `_dummy`) come **fallimento**, non come successo: meglio ripiegare sul rule-based che spacciare per AI un contenuto che non c'è.
+- **Regola di verifica generale:** dopo aver "sistemato" una generazione AI, non fermarsi al flag di modalità (nota #30). Guardare **i token di output e le chiavi del payload**: `estimatedOutputTokens: 4` e una sola chiave sconosciuta erano il segnale che qualcosa non tornava, mentre il flag diceva "AI usata".
+
+**Trappola collaterale (cache):** la Discovery mette in cache il payload per `inputHash`; ri-generare sullo stesso progetto con fonti invariate **non richiama l'AI** (`cacheHit: true`). Per collaudare davvero un cambiamento al motore, usare un **progetto diverso** (o svuotare la voce di cache), altrimenti si "verifica" il risultato vecchio.
