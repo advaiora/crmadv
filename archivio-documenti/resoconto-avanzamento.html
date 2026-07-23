@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Stato di avanzamento — CRM Agenzia Next-Gen</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+
+  :root {
+    --paper:      #F1F3F1;
+    --surface:    #FBFCFB;
+    --ink:        #16201C;
+    --ink-2:      #4A574F;
+    --ink-3:      #79857D;
+    --rule:       #DCE2DD;
+    --track:      #E2E7E2;
+    --accent:     #0E6B54;
+    --accent-dim: rgba(14, 107, 84, .14);
+    --warn:       #8C5F0B;
+    --warn-bg:    rgba(140, 95, 11, .10);
+    --warn-rule:  rgba(140, 95, 11, .32);
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:      #0E1412;
+      --surface:    #151D1A;
+      --ink:        #E9EFEB;
+      --ink-2:      #A4B1A9;
+      --ink-3:      #74827A;
+      --rule:       #26312B;
+      --track:      #202B26;
+      --accent:     #3ABF97;
+      --accent-dim: rgba(58, 191, 151, .16);
+      --warn:       #DCA84A;
+      --warn-bg:    rgba(220, 168, 74, .10);
+      --warn-rule:  rgba(220, 168, 74, .30);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0E1412;
+    --surface:    #151D1A;
+    --ink:        #E9EFEB;
+    --ink-2:      #A4B1A9;
+    --ink-3:      #74827A;
+    --rule:       #26312B;
+    --track:      #202B26;
+    --accent:     #3ABF97;
+    --accent-dim: rgba(58, 191, 151, .16);
+    --warn:       #DCA84A;
+    --warn-bg:    rgba(220, 168, 74, .10);
+    --warn-rule:  rgba(220, 168, 74, .30);
+  }
+
+  :root[data-theme="light"] {
+    --paper:      #F1F3F1;
+    --surface:    #FBFCFB;
+    --ink:        #16201C;
+    --ink-2:      #4A574F;
+    --ink-3:      #79857D;
+    --rule:       #DCE2DD;
+    --track:      #E2E7E2;
+    --accent:     #0E6B54;
+    --accent-dim: rgba(14, 107, 84, .14);
+    --warn:       #8C5F0B;
+    --warn-bg:    rgba(140, 95, 11, .10);
+    --warn-rule:  rgba(140, 95, 11, .32);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .page {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.75rem;
+  }
+
+  /* ---------- intestazione ---------- */
+
+  .masthead { display: flex; flex-direction: column; gap: .5rem; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-size: clamp(1.8rem, 6.5vw, 2.5rem);
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -.022em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .masthead .meta {
+    font-family: var(--mono);
+    font-size: .78rem;
+    color: var(--ink-3);
+    letter-spacing: .01em;
+  }
+
+  /* ---------- cifra di sintesi ---------- */
+
+  .headline {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1.5rem 1.35rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .figure {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    flex-wrap: wrap;
+  }
+
+  .figure .num {
+    font-family: var(--mono);
+    font-size: clamp(2.9rem, 13vw, 4rem);
+    font-weight: 600;
+    line-height: .9;
+    letter-spacing: -.045em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .figure .caption {
+    font-size: .86rem;
+    color: var(--ink-2);
+    max-width: 17rem;
+  }
+
+  .headline p {
+    margin: 0;
+    font-size: .96rem;
+    color: var(--ink-2);
+  }
+
+  /* ---------- barre ---------- */
+
+  .bar {
+    position: relative;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--track);
+    overflow: hidden;
+  }
+
+  .bar.tall { height: 10px; }
+
+  /* Nessuna animazione: se l'animazione non partisse (browser incorporati,
+     schede in background) le barre resterebbero a zero e il report
+     mostrerebbe un avanzamento nullo. Larghezza statica, sempre corretta. */
+  .bar > i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent);
+    width: var(--w);
+  }
+
+  /* ---------- scala delle versioni ---------- */
+
+  h2 {
+    font-size: 1.06rem;
+    font-weight: 700;
+    letter-spacing: -.008em;
+    margin: 0 0 1rem;
+    padding-bottom: .55rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .ladder {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* la stanghetta verticale che tiene insieme la sequenza delle build */
+  .ladder::before {
+    content: "";
+    position: absolute;
+    top: .95rem;
+    bottom: 1.1rem;
+    left: 1.55rem;
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .v {
+    display: grid;
+    grid-template-columns: 3.2rem minmax(0, 1fr);
+    column-gap: 1rem;
+    align-items: start;
+    padding: .8rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .v:last-child { border-bottom: 0; }
+
+  .v .tag {
+    position: relative;
+    font-family: var(--mono);
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    background: var(--paper);
+    padding: .1rem 0;
+    text-align: center;
+    z-index: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .v[data-state="done"] .tag,
+  .v[data-state="near"] .tag { color: var(--accent); }
+
+  .v[data-state="todo"] .tag { color: var(--ink-3); }
+
+  .body { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+
+  .line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+  }
+
+  .name {
+    font-size: .95rem;
+    font-weight: 600;
+    letter-spacing: -.005em;
+  }
+
+  .v[data-state="todo"] .name { font-weight: 500; color: var(--ink-2); }
+
+  .pct {
+    font-family: var(--mono);
+    font-size: .85rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-2);
+    flex: none;
+  }
+
+  .v[data-state="todo"] .pct { color: var(--ink-3); }
+
+  .sub {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    font-size: .82rem;
+    color: var(--ink-3);
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: .16rem .45rem;
+    border-radius: 3px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .v[data-state="active"] .chip { background: var(--warn-bg); color: var(--warn); }
+  .v[data-state="todo"] .chip  { background: var(--track); color: var(--ink-3); }
+
+  .note {
+    margin: 1rem 0 0;
+    font-size: .82rem;
+    line-height: 1.55;
+    color: var(--ink-3);
+  }
+
+  /* ---------- blocchi di testo ---------- */
+
+  .stack { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .item { display: flex; flex-direction: column; gap: .3rem; }
+
+  .item h3 {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: .76rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .item p { margin: 0; font-size: .94rem; color: var(--ink-2); }
+
+  .item p strong { color: var(--ink); font-weight: 600; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .84em;
+    background: var(--accent-dim);
+    padding: .08em .32em;
+    border-radius: 3px;
+    color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+
+  .callout {
+    background: var(--warn-bg);
+    border-left: 2px solid var(--warn-rule);
+    border-radius: 0 3px 3px 0;
+    padding: .85rem 1rem;
+  }
+
+  .callout h3 { color: var(--warn); }
+  .callout code { background: var(--warn-bg); border: 1px solid var(--warn-rule); }
+
+  .method {
+    font-size: .89rem;
+    color: var(--ink-2);
+    line-height: 1.62;
+    margin: 0;
+  }
+
+  footer {
+    font-family: var(--mono);
+    font-size: .74rem;
+    line-height: 1.6;
+    color: var(--ink-3);
+    border-top: 1px solid var(--rule);
+    padding-top: 1rem;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 26rem) {
+    .v { grid-template-columns: 2.6rem minmax(0, 1fr); column-gap: .8rem; }
+    .ladder::before { left: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">CRM Agenzia Next-Gen</div>
+    <h1>Stato di avanzamento</h1>
+    <div class="meta">Aggiornato al 23 luglio 2026 · resoconto per Claudio</div>
+  </header>
+
+  <section class="headline">
+    <div class="figure">
+      <div class="num">~50%</div>
+      <div class="caption">del lavoro totale previsto dalle 11 versioni della roadmap</div>
+    </div>
+    <div class="bar tall"><i style="--w: 50%"></i></div>
+    <p>Le prime quattro versioni sono di fatto chiuse, la V5 (il motore AI) è al residuo finale, la V6 è a metà. Quello che resta è concentrato in <strong>moduli interi ancora da costruire</strong>, non in rifiniture sparse.</p>
+  </section>
+
+  <section>
+    <h2>Stato per versione</h2>
+    <ol class="ladder">
+
+      <li class="v" data-state="done">
+        <div class="tag">V1</div>
+        <div class="body">
+          <div class="line"><span class="name">Apple shell, Command-K, pulizia</span><span class="pct">95%</span></div>
+          <div class="bar"><i style="--w: 95%"></i></div>
+          <div class="sub"><span class="chip">chiusa</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="near">
+        <div class="tag">V2</div>
+        <div class="body">
+          <div class="line"><span class="name">Console Super Admin, ruoli, reparti</span><span class="pct">85%</span></div>
+          <div class="bar"><i style="--w: 85%"></i></div>
+          <div class="sub"><span class="chip">quasi chiusa</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="done">
+        <div class="tag">V3</div>
+        <div class="body">
+          <div class="line"><span class="name">Custom Fields, import/export, Brevo</span><span class="pct">100%</span></div>
+          <div class="bar"><i style="--w: 100%"></i></div>
+          <div class="sub"><span class="chip">chiusa</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="done">
+        <div class="tag">V4</div>
+        <div class="body">
+          <div class="line"><span class="name">Chat AI collaborativa e messaggistica</span><span class="pct">95%</span></div>
+          <div class="bar"><i style="--w: 95%"></i></div>
+          <div class="sub"><span class="chip">chiusa</span><span>collaudi confermati il 22/7</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="near">
+        <div class="tag">V5</div>
+        <div class="body">
+          <div class="line"><span class="name">Motore AI: Fonti e RAG, multi-provider, budget</span><span class="pct">85%</span></div>
+          <div class="bar"><i style="--w: 85%"></i></div>
+          <div class="sub"><span class="chip">residuo finale</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="active">
+        <div class="tag">V6</div>
+        <div class="body">
+          <div class="line"><span class="name">Verticali AI: Web &amp; ADV, SEO, Higgsfield, report</span><span class="pct">50%</span></div>
+          <div class="bar"><i style="--w: 50%"></i></div>
+          <div class="sub"><span class="chip">in corso</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="todo">
+        <div class="tag">V7</div>
+        <div class="body">
+          <div class="line"><span class="name">Laboratorio e Zero Error Protocol</span><span class="pct">0%</span></div>
+          <div class="bar"><i style="--w: 0%"></i></div>
+          <div class="sub"><span class="chip">non iniziata</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="todo">
+        <div class="tag">V8</div>
+        <div class="body">
+          <div class="line"><span class="name">Preventivatore Pro e strumenti di vendita</span><span class="pct">0%</span></div>
+          <div class="bar"><i style="--w: 0%"></i></div>
+          <div class="sub"><span class="chip">non iniziata</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="todo">
+        <div class="tag">V9</div>
+        <div class="body">
+          <div class="line"><span class="name">Calendario e comunicazione avanzata</span><span class="pct">0%</span></div>
+          <div class="bar"><i style="--w: 0%"></i></div>
+          <div class="sub"><span class="chip">non iniziata</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="todo">
+        <div class="tag">V10</div>
+        <div class="body">
+          <div class="line"><span class="name">Contabilità, redditività, integrazioni</span><span class="pct">0%</span></div>
+          <div class="bar"><i style="--w: 0%"></i></div>
+          <div class="sub"><span class="chip">non iniziata</span></div>
+        </div>
+      </li>
+
+      <li class="v" data-state="todo">
+        <div class="tag">V11</div>
+        <div class="body">
+          <div class="line"><span class="name">Migrazione legacy, hardening, rollout</span><span class="pct">0%</span></div>
+          <div class="bar"><i style="--w: 0%"></i></div>
+          <div class="sub"><span class="chip">non iniziata</span></div>
+        </div>
+      </li>
+
+    </ol>
+    <p class="note">V1 e V2 non sono mai state formalmente dichiarate chiuse nella roadmap: le loro percentuali vengono da una verifica fatta direttamente nel codice.</p>
+  </section>
+
+  <section>
+    <h2>Cosa manca nelle versioni quasi chiuse</h2>
+    <div class="stack">
+
+      <div class="item">
+        <h3>V2</h3>
+        <p>Mancano i <strong>vincoli gerarchici sugli appuntamenti</strong> — verificato: il modulo calendario non conosce i reparti. Rimandata di proposito anche la granularità “vede” contro “vede ma non modifica” sul singolo progetto.</p>
+      </div>
+
+      <div class="item">
+        <h3>V5</h3>
+        <p>Restano: la Discovery consolidata su RAG, l’<strong>audit grafico chiaro/scuro dell’area Agency</strong> (in ritardo dichiarato), la migrazione del blob fonti legacy (analizzata e rimandata per decisione) e l’estensione dello structured output alle generazioni non ancora migrate.</p>
+      </div>
+
+      <div class="item">
+        <h3>V6</h3>
+        <p>Fatti il <strong>SEO Audit Engine</strong> e il primo pezzo del report PDF brandizzato. Mancano <strong>Higgsfield</strong> (verificato: zero righe di codice, da costruire da zero), i sotto-progetti di Web &amp; ADV e l’import dei dati Google Ads nel report — quest’ultimo grosso, perché il collegamento a Google Ads non esiste.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Ultimo lavoro — 23 luglio</h2>
+    <div class="stack">
+
+      <div class="item">
+        <h3>SEO + sicurezza</h3>
+        <p>SEO Audit Engine completato. Chiuso strada facendo un <strong>buco di sicurezza SSRF</strong> su scansione SEO e healthcheck: la protezione è ora centralizzata in <code>server/core/net-guard.ts</code>.</p>
+      </div>
+
+      <div class="item">
+        <h3>JSON di Claude</h3>
+        <p>Risolto con l’<strong>opzione A</strong> concordata: structured output via tool-use, il JSON lo produce l’API ed è valido per costruzione. Migrata però <strong>solo la generazione del brief Discovery</strong>: Discovery per sezione, Web e Ads hanno ancora il rischio.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Punti che ti riguardano</h2>
+    <div class="stack">
+
+      <div class="item callout">
+        <h3>Migrazioni database</h3>
+        <p><strong>Nove migrazioni pendenti</strong>, tutte da applicare <strong>dopo</strong> aver riconciliato l’arretrato <code>20260706085001</code>. Nessuna nuova nelle ultime due sessioni.</p>
+      </div>
+
+      <div class="item">
+        <h3>Questioni chiuse</h3>
+        <p>Quelle che erano in attesa di te sono state discusse e chiuse: ESLint resta com’è, la semantica di “AI configurata” nelle impostazioni, e il nodo JSON di Anthropic.</p>
+      </div>
+
+      <div class="item">
+        <h3>Decisione ancora aperta</h3>
+        <p>Se la <strong>Discovery debba inferire</strong> i dati mancanti. Dato nuovo: con l’AI davvero attiva inferisce già il target e dichiara cosa validare, senza toccare i prompt. Meglio guardarla su un paio di progetti in più prima di decidere.</p>
+      </div>
+
+      <div class="item">
+        <h3>Dev server</h3>
+        <p>Tutti spenti, porte 4000 e 5173 libere.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Nota sul metodo</h2>
+    <p class="method">Il 50% è la media delle undici versioni <strong>pesata per sforzo</strong> — V5 e V6 pesano più della V3 — moltiplicata per il completamento di ciascuna. Contando invece le singole funzionalità del brief il numero salirebbe a circa due terzi: la differenza è che il residuo sta in moduli interi da costruire (Laboratorio, contabilità, migrazione legacy) più che in rifiniture. Il 50% è la stima più onesta in termini di lavoro effettivo.</p>
+  </section>
+
+  <footer>
+    Fonti: archivio-documenti/03-roadmap-confronto-e-build.md<br>
+    handoff-2026-07-23-1137.md · verifiche dirette nel codice
+  </footer>
+
+</div>
+
+</body>
+</html>
