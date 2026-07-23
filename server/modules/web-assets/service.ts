@@ -9,6 +9,8 @@ import {
 } from '@prisma/client';
 import { z } from 'zod';
 import { badRequest, conflict, notFound } from '../../core/errors.js';
+import { safeFetch, SsrfBlockedError } from '../../core/net-guard.js';
+import { analyzeSeoHtml } from './seo-analyzer.js';
 import {
   type WebAssetListFilters,
   type WebAssetLookupFilters,
@@ -668,24 +670,6 @@ const resolveMaintenanceStatus = (
   return 'IN_PROGRESS';
 };
 
-const htmlTagContent = (html: string, tagName: string): string | null => {
-  const match = html.match(new RegExp(`<${tagName}[^>]*>(.*?)<\\/${tagName}>`, 'is'));
-  if (!match || typeof match[1] !== 'string') {
-    return null;
-  }
-
-  return match[1].replace(/\s+/g, ' ').trim() || null;
-};
-
-const metaTagContent = (html: string, name: string): string | null => {
-  const match = html.match(new RegExp(`<meta[^>]+name=[\"']${name}[\"'][^>]+content=[\"']([^\"']*)[\"'][^>]*>`, 'i'));
-  if (!match || typeof match[1] !== 'string') {
-    return null;
-  }
-
-  return match[1].trim() || null;
-};
-
 export const webAssetsService = {
   parseListQuery(query: unknown): WebAssetListQuery {
     return parseWithSchema(listQuerySchema, query ?? {}, 'Invalid web assets query params');
@@ -1070,14 +1054,7 @@ export const webAssetsService = {
     let errorMessage: string | null = null;
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-      const response = await fetch(asset.url, {
-        method: 'GET',
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+      const response = await safeFetch(asset.url, { timeoutMs: HEALTH_CHECK_TIMEOUT_MS });
 
       httpStatus = response.status;
       if (!response.ok) {
@@ -1085,7 +1062,7 @@ export const webAssetsService = {
       }
     } catch (error) {
       status = 'DOWN';
-      errorCode = 'REQUEST_FAILED';
+      errorCode = error instanceof SsrfBlockedError ? 'URL_BLOCKED' : 'REQUEST_FAILED';
       errorMessage = error instanceof Error ? error.message : 'Health check failed';
     }
 
@@ -1228,90 +1205,38 @@ export const webAssetsService = {
     payload: SeoScanPayload;
   }) {
     const asset = await this.getWebAsset(input.workspaceId, input.assetId);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-
-    let html = '';
-    try {
-      const response = await fetch(asset.url, {
-        method: 'GET',
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        throw new Error(`SEO scan failed with status ${response.status}`);
-      }
-
-      html = await response.text();
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    const title = htmlTagContent(html, 'title');
-    const metaDescription = metaTagContent(html, 'description');
-    const keywordsMeta = metaTagContent(html, 'keywords');
-    const h1Count = (html.match(/<h1\b[^>]*>/gi) ?? []).length;
-    const detectedKeywords = keywordsMeta
-      ? keywordsMeta.split(',').map((keyword) => keyword.trim()).filter(Boolean)
-      : [];
     const requestedKeywords = input.payload.keywords ?? [];
 
-    let score = 100;
-    const issues: string[] = [];
-    const suggestions: string[] = [];
-
-    if (!title) {
-      score -= 30;
-      issues.push('Missing <title> tag.');
-      suggestions.push('Add a descriptive page title.');
-    } else if (title.length < 30 || title.length > 60) {
-      score -= 10;
-      suggestions.push('Keep title length between 30 and 60 characters.');
-    }
-
-    if (!metaDescription) {
-      score -= 25;
-      issues.push('Missing meta description.');
-      suggestions.push('Add a meta description between 120 and 160 characters.');
-    } else if (metaDescription.length < 120 || metaDescription.length > 160) {
-      score -= 10;
-      suggestions.push('Optimize meta description length (120-160 characters).');
-    }
-
-    if (h1Count === 0) {
-      score -= 20;
-      issues.push('No H1 heading found.');
-      suggestions.push('Add one primary H1 heading.');
-    } else if (h1Count > 1) {
-      score -= 5;
-      suggestions.push('Use a single H1 heading per page when possible.');
-    }
-
-    if (requestedKeywords.length > 0) {
-      const normalizedHtml = html.toLowerCase();
-      const missingKeywords = requestedKeywords.filter(
-        (keyword) => !normalizedHtml.includes(keyword.toLowerCase()),
-      );
-      if (missingKeywords.length > 0) {
-        score -= Math.min(20, missingKeywords.length * 4);
-        issues.push(`Missing keyword coverage: ${missingKeywords.join(', ')}`);
+    let html = '';
+    let finalUrl = asset.url;
+    try {
+      const response = await safeFetch(asset.url, { timeoutMs: HEALTH_CHECK_TIMEOUT_MS });
+      if (!response.ok) {
+        throw badRequest(`La pagina ha risposto con stato ${response.status}.`);
       }
+      finalUrl = response.url || asset.url;
+      html = await response.text();
+    } catch (error) {
+      if (error instanceof SsrfBlockedError) {
+        throw badRequest(`URL non analizzabile: ${error.message}`);
+      }
+      throw error;
     }
 
-    score = Math.max(0, Math.min(100, score));
+    const analysis = analyzeSeoHtml({ html, url: finalUrl, requestedKeywords });
 
     const report = await webAssetsRepository.createSeoReport({
       workspaceId: input.workspaceId,
       assetType: asset.assetType,
       assetId: asset.id,
-      score,
+      score: analysis.score,
       status: mapDeploymentToVersionStatus(asset.deploymentEnvironment),
-      metaTitle: title,
-      metaDescription,
-      h1Count,
-      keywordList: detectedKeywords,
-      issues,
-      suggestions,
+      metaTitle: analysis.metaTitle,
+      metaDescription: analysis.metaDescription,
+      h1Count: analysis.h1Count,
+      keywordList: analysis.detectedKeywords,
+      issues: analysis.issues,
+      suggestions: analysis.suggestions,
       createdByUserId: input.actorUserId,
     });
 
@@ -1319,7 +1244,8 @@ export const webAssetsService = {
       report,
       keywordCoverage: {
         requested: requestedKeywords,
-        detected: detectedKeywords,
+        detected: analysis.detectedKeywords,
+        missing: analysis.missingKeywords,
       },
     };
   },

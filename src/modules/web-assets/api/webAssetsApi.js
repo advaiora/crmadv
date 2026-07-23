@@ -92,3 +92,9 @@ export const listWebAssetAlerts = (assetId, params = {}) =>
 
 export const updateWebAssetAlert = (assetId, alertId, payload) =>
   apiPatch(`/web-assets/${assetId}/alerts/${alertId}`, payload);
+
+export const listWebAssetSeoReports = (assetId, params = {}) =>
+  apiGet(withQuery(`/web-assets/${assetId}/seo/reports`, params));
+
+export const runWebAssetSeoScan = (assetId, payload = {}) =>
+  apiPost(`/web-assets/${assetId}/seo/scan`, payload);

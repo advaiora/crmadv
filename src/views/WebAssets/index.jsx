@@ -11,7 +11,7 @@ import {
   Spinner,
   Table,
 } from 'react-bootstrap';
-import { Eye, GitCompare, History, Pencil, Plus, RefreshCw, RotateCcw, Save, Trash2, X } from 'lucide-react';
+import { Eye, GitCompare, History, Pencil, Plus, RefreshCw, RotateCcw, Save, Search, Trash2, X } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import {
   compareWebAssetVersions,
@@ -33,6 +33,8 @@ import {
   lookupWebAssetOwners,
   lookupWebAssetProjects,
   runWebAssetHealthCheck,
+  runWebAssetSeoScan,
+  listWebAssetSeoReports,
   rollbackWebAssetVersion,
   setWebAssetPublished,
   switchWebAssetDeployment,
@@ -100,6 +102,35 @@ const toIsoStringFromLocalInput = (value) => {
   }
 
   return parsed.toISOString();
+};
+
+// Colore (variante Bootstrap, quindi a token e coerente col tema) del punteggio SEO.
+const seoScoreVariant = (score) => {
+  if (typeof score !== 'number') {
+    return 'secondary';
+  }
+  if (score >= 80) {
+    return 'success';
+  }
+  if (score >= 50) {
+    return 'warning';
+  }
+  return 'danger';
+};
+
+const SEO_SEVERITY_VARIANT = { high: 'danger', medium: 'warning', low: 'secondary' };
+const SEO_SEVERITY_LABEL = { high: 'Alta', medium: 'Media', low: 'Bassa' };
+
+// Normalizza un problema SEO: i report nuovi hanno { code, severity, message }, quelli
+// storici potevano essere semplici stringhe.
+const normalizeSeoIssue = (issue) => {
+  if (issue && typeof issue === 'object') {
+    return {
+      severity: issue.severity || 'medium',
+      message: issue.message || issue.code || 'Problema rilevato',
+    };
+  }
+  return { severity: 'medium', message: String(issue) };
 };
 
 const getApiErrorMessage = (error, fallbackMessage) => {
@@ -273,6 +304,12 @@ const WebAssetsPage = () => {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsData, setAnalyticsData] = useState({ snapshots: [], events: [], summary: null, topEvents: [] });
   const [analyticsMessage, setAnalyticsMessage] = useState('');
+
+  const [seoLoading, setSeoLoading] = useState(false);
+  const [seoReports, setSeoReports] = useState([]);
+  const [seoMessage, setSeoMessage] = useState('');
+  const [seoScanning, setSeoScanning] = useState(false);
+  const [seoKeywords, setSeoKeywords] = useState('');
   const [snapshotForm, setSnapshotForm] = useState({
     provider: 'manual',
     sourceLabel: '',
@@ -459,6 +496,23 @@ const WebAssetsPage = () => {
     }
   }, []);
 
+  const loadSeoReports = useCallback(async (assetId) => {
+    if (!assetId) {
+      setSeoReports([]);
+      return;
+    }
+
+    setSeoLoading(true);
+    try {
+      const result = await listWebAssetSeoReports(assetId, { limit: 20 });
+      setSeoReports(Array.isArray(result?.items) ? result.items : []);
+    } catch (_error) {
+      setSeoReports([]);
+    } finally {
+      setSeoLoading(false);
+    }
+  }, []);
+
   const loadAnalytics = useCallback(async (assetId) => {
     if (!assetId) {
       setAnalyticsData({ snapshots: [], events: [], summary: null, topEvents: [] });
@@ -525,8 +579,9 @@ const WebAssetsPage = () => {
       loadAnalytics(assetId),
       loadMaintenance(assetId),
       loadAlerts(assetId),
+      loadSeoReports(assetId),
     ]);
-  }, [loadAlerts, loadAnalytics, loadHealth, loadMaintenance, loadVersions]);
+  }, [loadAlerts, loadAnalytics, loadHealth, loadMaintenance, loadSeoReports, loadVersions]);
 
   const loadAudit = useCallback(async (overrides = {}) => {
     const nextPage = overrides.page || auditPage;
@@ -950,6 +1005,28 @@ const WebAssetsPage = () => {
     }
   };
 
+  const handleRunSeoScan = async () => {
+    if (!selectedAsset?.id) {
+      return;
+    }
+
+    setSeoMessage('');
+    setSeoScanning(true);
+    try {
+      const keywords = seoKeywords
+        .split(',')
+        .map((keyword) => keyword.trim())
+        .filter(Boolean);
+      await runWebAssetSeoScan(selectedAsset.id, keywords.length > 0 ? { keywords } : {});
+      setSeoMessage('Scansione SEO completata.');
+      await loadSeoReports(selectedAsset.id);
+    } catch (scanError) {
+      setSeoMessage(getApiErrorMessage(scanError, 'Scansione SEO non riuscita'));
+    } finally {
+      setSeoScanning(false);
+    }
+  };
+
   const handleCreateAnalyticsSnapshot = async (event) => {
     event.preventDefault();
     if (!selectedAsset?.id) {
@@ -1062,6 +1139,7 @@ const WebAssetsPage = () => {
         const canDelete = hasPermission(access, WEB_ASSETS_PERMISSIONS.delete);
         const canPublish = hasPermission(access, WEB_ASSETS_PERMISSIONS.publish);
         const canAuditView = hasPermission(access, 'audit.view');
+        const latestSeoReport = seoReports[0] ?? null;
         const statusSelectDisabled = isWebAssetStatusFieldDisabled({
           submitting,
           canPublish,
@@ -1783,6 +1861,13 @@ const WebAssetsPage = () => {
                       >
                         Maintenance
                       </Button>
+                      <Button
+                        size="sm"
+                        variant={detailSection === 'seo' ? 'primary' : 'outline-secondary'}
+                        onClick={() => setDetailSection('seo')}
+                      >
+                        SEO
+                      </Button>
                       {canAuditView && (
                         <Button
                           size="sm"
@@ -2329,6 +2414,174 @@ const WebAssetsPage = () => {
                         </Card>
                       </Col>
                       </Row>
+                    )}
+                  </Card.Body>
+                </Card>
+              )}
+
+              {selectedAsset && detailSection === 'seo' && (
+                <Card className="card-border mt-3">
+                  <Card.Header className="bg-transparent border-0 pb-0">
+                    <h5 className="mb-1">Audit SEO</h5>
+                    <p className="small text-muted mb-0">
+                      Analisi on-page dell&apos;URL dell&apos;asset: title, meta, heading, immagini, indicizzazione.
+                    </p>
+                  </Card.Header>
+                  <Card.Body>
+                    {seoMessage && (
+                      <Alert variant={seoMessage.includes('non riuscita') ? 'danger' : 'success'} className="py-2">
+                        {seoMessage}
+                      </Alert>
+                    )}
+
+                    <Row className="g-2 align-items-end mb-3">
+                      <Col md>
+                        <Form.Label className="small text-muted mb-1">
+                          Keyword da verificare (facoltative, separate da virgola)
+                        </Form.Label>
+                        <Form.Control
+                          value={seoKeywords}
+                          onChange={(event) => setSeoKeywords(event.target.value)}
+                          placeholder="es. agenzia marketing, siti web, milano"
+                          disabled={!canEdit}
+                        />
+                      </Col>
+                      <Col md="auto">
+                        {canEdit ? (
+                          <Button
+                            type="button"
+                            variant="primary"
+                            disabled={seoScanning}
+                            onClick={() => void handleRunSeoScan()}
+                          >
+                            <Search size={16} className="me-1" />
+                            {seoScanning ? 'Scansione...' : 'Esegui scansione'}
+                          </Button>
+                        ) : (
+                          <div className="small text-muted">Permesso web.edit richiesto per la scansione.</div>
+                        )}
+                      </Col>
+                    </Row>
+
+                    {seoLoading && seoReports.length === 0 ? (
+                      <div className="d-flex align-items-center gap-2 text-muted small">
+                        <Spinner size="sm" animation="border" /> Carico i report...
+                      </div>
+                    ) : latestSeoReport ? (
+                      <>
+                        <Row className="g-3">
+                          <Col md={4}>
+                            <Card className="h-100">
+                              <Card.Body className="text-center">
+                                <div className="small text-muted mb-1">Punteggio</div>
+                                <div className={`display-5 fw-semibold text-${seoScoreVariant(latestSeoReport.score)}`}>
+                                  {latestSeoReport.score}
+                                  <span className="fs-5 text-muted">/100</span>
+                                </div>
+                                <div className="small text-muted mt-1">
+                                  {formatDateTime(latestSeoReport.createdAt)}
+                                </div>
+                              </Card.Body>
+                            </Card>
+                          </Col>
+                          <Col md={8}>
+                            <Card className="h-100">
+                              <Card.Body>
+                                <dl className="row mb-0 small">
+                                  <dt className="col-sm-4 text-muted fw-normal">Title</dt>
+                                  <dd className="col-sm-8 mb-2">
+                                    {latestSeoReport.metaTitle || <span className="text-danger">assente</span>}
+                                  </dd>
+                                  <dt className="col-sm-4 text-muted fw-normal">Meta description</dt>
+                                  <dd className="col-sm-8 mb-2">
+                                    {latestSeoReport.metaDescription || <span className="text-danger">assente</span>}
+                                  </dd>
+                                  <dt className="col-sm-4 text-muted fw-normal">Heading H1</dt>
+                                  <dd className="col-sm-8 mb-2">{latestSeoReport.h1Count}</dd>
+                                  <dt className="col-sm-4 text-muted fw-normal">Keyword nella pagina</dt>
+                                  <dd className="col-sm-8 mb-0">
+                                    {Array.isArray(latestSeoReport.keywordList) && latestSeoReport.keywordList.length > 0 ? (
+                                      latestSeoReport.keywordList.map((keyword) => (
+                                        <Badge bg="light" text="dark" className="me-1" key={keyword}>{keyword}</Badge>
+                                      ))
+                                    ) : (
+                                      <span className="text-muted">nessuna</span>
+                                    )}
+                                  </dd>
+                                </dl>
+                              </Card.Body>
+                            </Card>
+                          </Col>
+                        </Row>
+
+                        <div className="mt-3">
+                          <h6 className="mb-2">Problemi rilevati</h6>
+                          {Array.isArray(latestSeoReport.issues) && latestSeoReport.issues.length > 0 ? (
+                            <ul className="list-unstyled mb-0">
+                              {latestSeoReport.issues.map((rawIssue, index) => {
+                                const issue = normalizeSeoIssue(rawIssue);
+                                return (
+                                  <li key={index} className="d-flex align-items-start gap-2 mb-1">
+                                    <Badge bg={SEO_SEVERITY_VARIANT[issue.severity] || 'secondary'}>
+                                      {SEO_SEVERITY_LABEL[issue.severity] || 'Media'}
+                                    </Badge>
+                                    <span className="small">{issue.message}</span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <div className="small text-success">Nessun problema rilevato.</div>
+                          )}
+                        </div>
+
+                        {Array.isArray(latestSeoReport.suggestions) && latestSeoReport.suggestions.length > 0 && (
+                          <div className="mt-3">
+                            <h6 className="mb-2">Consigli</h6>
+                            <ul className="small mb-0">
+                              {latestSeoReport.suggestions.map((suggestion, index) => (
+                                <li key={index}>{String(suggestion)}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {seoReports.length > 1 && (
+                          <div className="mt-4">
+                            <h6 className="mb-2">Storico scansioni</h6>
+                            <Table responsive hover size="sm" className="mb-0">
+                              <thead>
+                                <tr>
+                                  <th>Data</th>
+                                  <th className="text-center">Punteggio</th>
+                                  <th className="text-center">Problemi</th>
+                                  <th>Eseguita da</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {seoReports.map((report) => (
+                                  <tr key={report.id}>
+                                    <td>{formatDateTime(report.createdAt)}</td>
+                                    <td className="text-center">
+                                      <Badge bg={seoScoreVariant(report.score)}>{report.score}</Badge>
+                                    </td>
+                                    <td className="text-center">
+                                      {Array.isArray(report.issues) ? report.issues.length : 0}
+                                    </td>
+                                    <td className="small text-muted">
+                                      {report.createdByName || report.createdByEmail || '-'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </Table>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-muted small">
+                        Nessuna scansione ancora eseguita. Avvia la prima analisi SEO di questo asset.
+                      </div>
                     )}
                   </Card.Body>
                 </Card>

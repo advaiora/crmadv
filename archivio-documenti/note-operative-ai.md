@@ -421,3 +421,16 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Non fidarsi del corpo: controllare il **flag di modalità** nella risposta (qui `discovery.aiGeneration.mode` — `ai_with_sources` vs `fallback_rule_based`) e l'eventuale campo `error`. Se c'è un flag che dice "ho usato l'AI o il fallback", è quello la verità, non la prosa.
 - **Incrociare con `AiUsageLog`**: se compare una riga `functionName` della funzione (es. `discovery.generateBrief`) con `status: success` **ma** l'output è quello del fallback, l'AI è girata e la spesa è stata **buttata** → c'è un bug tra "chiamata AI" e "uso del risultato" (tipicamente il parse). Il log costi si scrive **prima** del parse, quindi "costo loggato" NON implica "risultato usato".
 - Per un'app multi-provider, collaudare **ogni provider**: qui OpenAI (JSON forzato `json_object`) funzionava, Anthropic no. Un collaudo sul solo provider "buono" avrebbe mancato il bug. Il default del workspace decide quale path si esercita davvero.
+
+---
+
+## 31. Script di verifica API: DELETE (e ogni richiesta senza body) NON deve mandare `content-type: application/json`
+
+**Contesto:** script Node di collaudo (login → crea → scansiona → **cancella** l'asset di prova). La `fetch` helper metteva sempre l'header `content-type: application/json` su ogni chiamata, anche sul `DELETE` che non ha corpo.
+
+**Errore:** il `DELETE /web-assets/:id` tornava **400** `FST_ERR_CTP_EMPTY_JSON_BODY` ("Body cannot be empty when content-type is set to 'application/json'"). Fastify, se vede `content-type: application/json`, **pretende** un corpo JSON: mandare l'header senza body è un 400 lato parser, **prima** di arrivare all'handler. Sembrava un blocco di business (asset non cancellabile) e la pulizia falliva, lasciando **due asset di prova nel workspace Demo**.
+
+**Modo corretto:**
+- Nella helper `fetch`, aggiungere `content-type: application/json` **solo se c'è un body** (`if (body) headers['content-type'] = 'application/json'`). GET/DELETE senza corpo vanno mandati senza quell'header.
+- Un `DELETE` andato a buon fine qui risponde **204** (nessun corpo), non 200: assertare `status === 204`.
+- Regola di pulizia: se uno script di collaudo **crea** dati (asset, righe demo), deve **cancellarli in fondo** e **verificare che siano spariti** (ri-listare e contare), perché un 4xx sulla delete può passare inosservato e lasciare sporcizia nel workspace Demo.

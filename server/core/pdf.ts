@@ -8,7 +8,7 @@
 // utility pdfkit generiche (buffer di output, salto pagina). Nulla di specifico dei
 // preventivi resta qui.
 
-import { isIP } from 'node:net';
+import { isBlockedHostname } from './net-guard.js';
 
 // Dati brand del workspace usati dai PDF (nome, contatti, logo, colori).
 export type WorkspacePdfData = {
@@ -39,8 +39,6 @@ const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
 const LOGO_CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_LOGO_CACHE_ITEMS = 50;
 const SUPPORTED_LOGO_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
-const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
-const BLOCKED_HOSTNAME_SUFFIXES = ['.local', '.internal', '.localhost'];
 
 const remoteImageCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
 
@@ -152,56 +150,6 @@ const parseLogoDataUrl = (logoUrl: string) => {
   } catch {
     return null;
   }
-};
-
-const isPrivateIpv4Address = (host: string) => {
-  const parts = host.split('.').map((segment) => Number.parseInt(segment, 10));
-  if (parts.length !== 4 || parts.some((segment) => Number.isNaN(segment) || segment < 0 || segment > 255)) {
-    return false;
-  }
-
-  if (parts[0] === 10) {
-    return true;
-  }
-  if (parts[0] === 127) {
-    return true;
-  }
-  if (parts[0] === 169 && parts[1] === 254) {
-    return true;
-  }
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
-    return true;
-  }
-  if (parts[0] === 192 && parts[1] === 168) {
-    return true;
-  }
-
-  return false;
-};
-
-const isBlockedHostname = (hostname: string) => {
-  const normalized = hostname.trim().toLowerCase();
-  if (!normalized) {
-    return true;
-  }
-
-  if (LOCAL_HOSTNAMES.has(normalized)) {
-    return true;
-  }
-
-  if (BLOCKED_HOSTNAME_SUFFIXES.some((suffix) => normalized.endsWith(suffix))) {
-    return true;
-  }
-
-  const ipVersion = isIP(normalized);
-  if (ipVersion === 4 && isPrivateIpv4Address(normalized)) {
-    return true;
-  }
-  if (ipVersion === 6 && (normalized === '::1' || normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))) {
-    return true;
-  }
-
-  return false;
 };
 
 const isAllowedRemoteImageUrl = (rawUrl: string) => {
