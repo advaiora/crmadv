@@ -363,6 +363,44 @@
     .v { grid-template-columns: 2.6rem minmax(0, 1fr); column-gap: .8rem; }
     .ladder::before { left: 1.3rem; }
   }
+
+  /* ---------- stampa / esportazione PDF ---------- */
+
+  @page { margin: 14mm 15mm; }
+
+  @media print {
+    /* Sempre tema chiaro: un PDF a fondo scuro e' illeggibile su carta. */
+    :root {
+      --paper:      #FFFFFF;
+      --surface:    #FAFBFA;
+      --ink:        #16201C;
+      --ink-2:      #414D46;
+      --ink-3:      #6B776F;
+      --rule:       #D3DAD4;
+      --track:      #E4E9E4;
+      --accent:     #0E6B54;
+      --accent-dim: rgba(14, 107, 84, .14);
+      --warn:       #7A5309;
+      --warn-bg:    rgba(140, 95, 11, .10);
+      --warn-rule:  rgba(140, 95, 11, .45);
+    }
+
+    /* Senza questo il browser non stampa gli sfondi: le barre di
+       avanzamento e i riquadri sparirebbero dal PDF. */
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    body { background: #FFFFFF; font-size: 11pt; }
+
+    .page { max-width: none; padding: 0; gap: 1.6rem; }
+
+    /* Niente elementi spezzati a meta' fra due pagine. */
+    section, .headline, .v, .item { break-inside: avoid; page-break-inside: avoid; }
+    h2 { break-after: avoid; page-break-after: avoid; }
+
+    .headline { border-color: var(--rule); }
+    .figure .num { font-size: 34pt; }
+    h1 { font-size: 22pt; }
+  }
 </style>
 </head>
 <body>

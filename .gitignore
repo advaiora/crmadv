@@ -26,3 +26,6 @@ dist-ssr
 # .env file
 .env
 .env
+
+# PDF rigenerato dal resoconto HTML (vedi archivio-documenti/resoconto-avanzamento.html)
+archivio-documenti/resoconto-avanzamento.pdf
