@@ -58,6 +58,19 @@ I dev server (`npm run dev:api` sulla 4000 e `npm run dev` sulla 5173) vanno ten
 
 Regola pratica: **prima di una migrazione o di `prisma generate`, ferma l'API dell'altra sessione** (o assicurati che nessun altro l'abbia accesa). Contesto ed esempi in `archivio-documenti/note-operative-ai.md` (nota #28).
 
+### Ciclo di vita dei dev server (deciso il 23/7/2026)
+
+Il problema da evitare sono i server **orfani**: accesi da una sessione ormai chiusa, che bloccano `prisma generate` e le migrazioni mentre nessuno se la sente di spegnerli (perché vale la regola "non terminare processi di altri"). È successo il 23/7/2026: API e frontend erano accesi da una sessione già finita. Il ciclo è quindi questo:
+
+- **A inizio sessione l'assistente NON avvia niente in automatico.** *Offre* di avviare i due server e li accende **solo se servono davvero** (cioè se si deve guardare il CRM nel browser). Motivo della scelta: l'API accesa tiene il lock su Prisma, quindi accenderla per abitudine farebbe partire ogni sessione già bloccata per il database, oltre a costare 30-70 secondi di avvio a vuoto.
+- **I due server si accendono sempre INSIEME** (`dev:api` sulla 4000 e `dev` sulla 5173). Il frontend da solo mostra il CRM **vuoto o in errore**, perché i dati arrivano dall'API.
+- **Prima di avviarli si controlla che le porte 4000 e 5173 siano libere.** Se sono occupate non si avvia nulla e lo si segnala: vuol dire che un'altra sessione le sta tenendo.
+- **A fine sessione (insieme all'handoff) si spengono TUTTI i server aperti durante la sessione**, **compresi quelli avviati a mano dall'utente** dal terminale per guardare il CRM su Chrome. Non si chiede: si spengono. Fra una sessione e l'altra non deve sopravvivere nessun server.
+- **Unica eccezione:** un server che **non** appartiene a questa sessione (altra finestra ancora attiva) **non si termina mai** — si segnala soltanto. Nota che dalla porta si vede solo un PID: se non è chiaro di chi sia, **si chiede** invece di terminarlo.
+- **L'handoff deve sempre dichiarare lo stato dei server**: tutti spenti, oppure quali restano accesi, su quali porte e di chi sono.
+
+Se durante la sessione serve una migrazione, si ferma l'API, si migra, si riaccende.
+
 ## Colori e temi (chiaro/scuro) — regola d'oro
 
 Il tema è un sistema globale a token (variabili CSS) in `src/styles/scss/globals.css`. Sviluppando qualsiasi pagina/componente: **usa sempre i token `var(--…)` o i componenti Bootstrap standard, mai colori scritti a mano** (`#hex`/`rgb`/`rgba`), nemmeno negli stili inline in JSX. Così chiaro e scuro funzionano da soli, senza ritocchi pagina per pagina. Riferimento completo dei token: `archivio-documenti/design-system-temi.md`. Controlli automatici sui moduli: `npm run lint:css` (file CSS) e `npm run lint:colors` (stili inline in JSX).

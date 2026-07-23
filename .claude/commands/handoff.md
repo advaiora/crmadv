@@ -1,6 +1,6 @@
 ---
 description: Genera l'handoff di staffetta (Jacopo ⇄ Claudio) e tiene solo le ultime 3 versioni
-allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Bash(git:*), Read, Write, Glob, Grep
+allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Bash(git:*), Bash(netstat:*), Read, Write, Glob, Grep
 ---
 
 # Genera handoff di staffetta
@@ -78,11 +78,21 @@ Dopo aver scritto il nuovo file, elenca tutti i file `handoff-*.md` nella cartel
 - Non cancellare mai il file appena creato.
 - Verifica alla fine che nella cartella ci siano al massimo 3 file `handoff-*.md`.
 
-### 5. Conferma all'utente
+### 5. Spegni i dev server della sessione
+Regola di progetto (vedi `CLAUDE.md`, "Ciclo di vita dei dev server"): **fra una sessione e l'altra non deve sopravvivere nessun dev server**, altrimenti resta acceso un server "orfano" che blocca `prisma generate` e le migrazioni e che nessuno se la sente di spegnere.
+
+- Controlla le porte: `netstat -ano | grep LISTENING | grep -E ":4000|:5173"`.
+- **Spegni tutti i server aperti durante questa sessione**, inclusi quelli che ha avviato **a mano l'utente** dal terminale per guardare il CRM su Chrome. Non chiedere il permesso: è la regola. Se li hai avviati tu con lo strumento di preview, spegnili con quello.
+- **Eccezione:** se risulta attivo un server che **non** appartiene a questa sessione (un'altra finestra ancora al lavoro), **non terminarlo**: segnalalo soltanto. Dalla porta si vede solo un PID, quindi se non è chiaro di chi sia, **chiedi** invece di terminare.
+- Verifica alla fine che le porte siano libere.
+- **Riporta lo stato dei server nell'handoff** (nella sezione "Dove mi sono fermato"): tutti spenti, oppure quali restano accesi, su quali porte e di chi sono.
+
+### 6. Conferma all'utente
 Riporta in modo sintetico:
 - Il nome del nuovo file di handoff creato.
 - Quali eventuali handoff vecchi sono stati cancellati.
 - I file di handoff attualmente presenti (massimo 3).
+- Lo stato dei dev server (spenti / eventuali rimasti attivi e perché).
 
 ## Nota
 La cartella di lavoro degli handoff è **`archivio-documenti/handoff/`**. Il file più recente è sempre quello da leggere per primo quando si riprende il lavoro.
