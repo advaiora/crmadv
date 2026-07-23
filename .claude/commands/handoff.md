@@ -1,6 +1,6 @@
 ---
 description: Genera l'handoff di staffetta (Jacopo ⇄ Claudio) e tiene solo le ultime 3 versioni
-allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Read, Write, Glob
+allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Bash(git:*), Read, Write, Glob, Grep
 ---
 
 # Genera handoff di staffetta
@@ -27,8 +27,20 @@ Sei a fine sessione di lavoro su questo progetto. Devi scrivere il **documento d
 
 ## Cosa fare, passo per passo
 
-### 1. Ricostruisci cosa è stato fatto in questa sessione
-Ripercorri la conversazione e le modifiche reali (file toccati, decisioni prese, eventuali commit). Se serve, controlla lo stato git e i file modificati.
+### 1. Ricostruisci cosa è stato fatto in questa sessione — VERIFICANDO, non solo ricordando
+Ripercorri la conversazione, poi **controlla sempre lo stato reale del repo**, senza saltare questo passo:
+- `git log --oneline` (i commit di questa sessione) e `git status --short` (cosa è rimasto non committato);
+- se serve, `git show --stat <commit>` per vedere quali file sono cambiati davvero.
+
+La memoria della conversazione **non basta**: in una sessione lunga una cosa viene spesso prima annunciata come "da fare" e poi chiusa poco dopo. Scrivendo solo a memoria si finisce per riportare la versione vecchia.
+
+### 1-bis. Controlla cosa risulta ANCORA aperto (regola anti-scorie)
+Leggi l'**handoff precedente** (il file più recente già presente nella cartella) e la roadmap `archivio-documenti/03-roadmap-confronto-e-build.md`. Per **ogni** punto che l'handoff precedente dava come "in sospeso / da fare / rimandato":
+- verifica nei commit e nei documenti se **nel frattempo è stato chiuso**;
+- se è stato chiuso, **non riportarlo come pendente**: semmai scrivi che è stato chiuso;
+- se è ancora aperto, riportalo.
+
+**Regola non negoziabile:** non scrivere come "in sospeso" nulla che non hai **verificato adesso**. Un elenco di pendenze stantio è peggio di nessun elenco, perché fa rifare al collega un lavoro già fatto.
 
 ### 2. Calcola la data/ora per il nome del file
 Esegui:
