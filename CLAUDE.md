@@ -36,10 +36,12 @@ Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativ
 
 ## Team di agent (dal 23/7/2026)
 
-Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può modificare file**:
+Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può modificare file**.
 
-- **`esploratore`** — chiamalo **prima** di scrivere codice: torna la mappa dei file da toccare e la **lista completa dei punti da collegare**. Su questo progetto conviene quasi sempre, perché quello che legge lui resta nel suo contesto e non appesantisce la sessione.
-- **`revisore`** — chiamalo a **ogni tappa conclusa**, non solo prima del commit: dopo schema+migrazione, dopo il collegamento, e in chiusura. Due chiamate per pezzo di lavoro sono il default; mai su codice a metà.
+> **Li chiama l'assistente, non l'utente.** Fanno parte del metodo di lavoro: non si chiede il permesso di usarli e non si aspetta che l'utente li nomini. Le condizioni qui sotto sono verificabili apposta — non sono un "quando ti sembra utile".
+
+- **`esploratore`** — **chiamalo prima di scrivere codice** ogni volta che ricorre almeno una di queste: la modifica tocca un file oltre le ~800 righe; aggiunge o cambia un permesso, una rotta, una tabella o una colonna; tocca l'area Agency, Web Assets o la chat; oppure **non sai già con certezza l'elenco completo dei file da toccare**. Se non ricorre nessuna, procedi senza. Torna la mappa e la **lista dei punti da collegare**: quella lista è ciò che il revisore spunterà dopo.
+- **`revisore`** — **chiamalo a ogni tappa conclusa**, non solo prima del commit: (a) subito dopo schema+migrazione, prima di costruirci sopra; (b) subito dopo aver completato il collegamento; (c) prima di proporre il commit. Due chiamate per pezzo di lavoro sono il default, si sale a tre-quattro se si toccano schema, permessi o generazioni AI. **Mai su codice a metà.**
 - **`architetto`** — ogni 5-10 sessioni: misura i consumi e **propone** modifiche al team. Non applica mai niente: le modifiche approvate le applica la sessione principale, e si annotano nel registro.
 
 **Consumi.** Si lavora su abbonamento MAX 5x: non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: `node scripts/agenti/consumi.mjs`.

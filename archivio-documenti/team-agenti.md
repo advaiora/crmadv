@@ -65,6 +65,12 @@ Tre agent. **Nessuno dei tre può modificare file**: non hanno gli strumenti di 
 | **revisore** | a ogni tappa di lavoro conclusa | le segnalazioni, dalla più grave alla meno grave | Opus |
 | **architetto** | ogni 5-10 sessioni, o quando i consumi preoccupano | il quadro dei consumi e le **proposte** di modifica al team | Opus |
 
+### Chi li chiama
+
+**Li chiama l'assistente da solo, non la persona.** Non c'è nessun comando da digitare: la descrizione di ciascun agent dice all'assistente quando usarlo, e in `CLAUDE.md` ci sono le condizioni verificabili che fanno scattare la chiamata (dimensione del file toccato, presenza di un permesso/rotta/tabella nuovi, area del codice, tappa di lavoro raggiunta). Sono scritte come condizioni e non come consigli proprio perché non dipendano da un giudizio a caldo.
+
+> ⚠️ **Il limite onesto:** questo resta un innesco *deciso da un modello*, quindi non è garantito al 100% come lo sarebbe un controllo automatico. Il modo per accorgersene è già dentro il sistema: se l'architetto rileva una **quota subagent vicina a zero**, vuol dire che gli agent esistono ma non li chiama nessuno — e a quel punto o le condizioni sono scritte male, o vanno rese vincolanti in altro modo. È il primo controllo che l'architetto è tenuto a fare.
+
 ### Come si incastrano nel lavoro reale
 
 ```
