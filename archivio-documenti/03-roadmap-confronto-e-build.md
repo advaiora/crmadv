@@ -338,14 +338,14 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - Completamento **API framework** a plugin per integrazioni future.
 **Done quando:** l'Admin vede la redditività effettiva per cliente/reparto in tempo reale.
 
-### 🟦 V12 — Finale: Migrazione Legacy, Hardening & Rollout
+### 🟦 V12 — Finale: Importazione dati legacy, Hardening & Rollout
 **Obiettivo:** transizione completa senza interruzioni.
 **Contenuto:**
-- **Schema mapping & migrazione dati** dal sistema legacy (continuità clienti/storico).
+- **Mappatura schema & importazione dei dati** dal sistema legacy (continuità clienti/storico). *(NB: qui "importazione" = travaso dei dati reali dal vecchio sistema al nuovo — è cosa diversa dalle migrazioni dello schema del DB, che si fanno tracciate durante lo sviluppo.)*
 - **Hardening** sicurezza/performance, audit completo, test end-to-end.
 - Rollout progressivo + QA finale, dismissione definitiva del legacy.
 - **Onboarding leggero esteso a tutto il CRM (deciso 14 luglio 2026):** portare l'approccio "guida in-contesto" (empty state, tooltip, card dismissibili — **non** un tutorial/wizard pesante) a **tutte** le aree del prodotto, non solo alla Chat AI. Collocato qui perché ha senso solo a prodotto sostanzialmente completo (dopo la V11 — *era "dopo V9" prima del 15/7, "dopo V10" prima del 24/7*). L'onboarding **della sola chat** si fa invece dentro la V4.
-**Done quando:** tutti gli utenti operano sulla nuova piattaforma Apple-style, dati migrati e verificati.
+**Done quando:** tutti gli utenti operano sulla nuova piattaforma Apple-style, dati importati e verificati.
 
 ---
 
@@ -378,7 +378,7 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 | **V9** | Vendita | Preventivatore DnD + proposta Apple-style + 72h |
 | **V10** | Agenda | Meet/Zoom + Calendly + reminder + thread progetto + gruppi reparto + clienti |
 | **V11** | Finance | Fatture in Cloud + time-tracking + redditività |
-| **V12** | Go-live | Migrazione legacy + hardening + rollout |
+| **V12** | Go-live | Importazione dati legacy + hardening + rollout |
 
 > **Rinumerazione del 15 luglio 2026.** La **V4 è nuova** (Chat AI & Messaggistica): è nata dentro la vecchia V4 come implementazione minore e si è ingigantita fino a diventare una V a sé. Tutto ciò che seguiva **slitta di uno** (vecchia V4 → V5 … vecchia V10 → V11): si passa da 10 a **11 V**. Se in un documento o in un commit precedente al 15/7 leggi "V5", "V8", "V10", riferisciti alla **numerazione vecchia** e aggiungi uno.
 
