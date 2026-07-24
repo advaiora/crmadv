@@ -285,25 +285,33 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 > **Discovery AI — consentire ipotesi ragionate sui campi mancanti (emerso 20/7/2026 dal collaudo; ⛔ DA DISCUTERE CON CLAUDIO PRIMA di attuare).** Generando la Discovery di un progetto le cui fonti non esplicitano il *target*, l'AI lo marca "non definito" invece di inferirlo dagli indizi (es. "fotografa di matrimoni a Torino" → coppie in procinto di sposarsi in zona). **Causa:** il system prompt impone **grounding stretto** — *"Non inventare target, offerta, CTA, USP o dati di mercato non presenti"* (`agency.service.ts:9191`); e gli alert *"Target non definito / Offerta non chiara / USP non evidenti"* sono **rule-based** (`agency.service.ts:3821-3827`, controllo delle "evidenze" nelle fonti), non prodotti dall'AI. **Non è un bug:** è la stessa scelta anti-allucinazione che rende affidabile il RAG/chat. **Rimedio proposto:** allentare il prompt **solo per la Discovery** (lavoro da strategist, non risposta factual) → consentire un'**ipotesi ragionata** sui campi mancanti, marcata esplicitamente *"da validare"* (mantiene l'anti-allucinazione, aumenta il valore); eventualmente affinare il rilevatore rule-based delle evidenze. ⚠️ **Jacopo vuole confrontarsi con Claudio PRIMA di procedere** (è motore AI = V5, e la scelta grounding-stretto-vs-inferenza è una decisione di prodotto da condividere). → **Nota di confronto pronta (22/7):** `archivio-documenti/nota-confronto-claudio-2026-07-22.md` (opzioni A/B/C, trade-off, posizioni di codice aggiornate: prompt `agency.service.ts:9327`/`:9631`, alert rule-based `:3922-3928`).
 
-### 🟦 V6 — Verticali AI: Web & ADV + Audit/Report
+### 🟦 V6 — Reportistica multi-sorgente (dashboard operativa + report cliente)
+**Obiettivo:** un sistema unico di reportistica delle performance, dal team al cliente.
+**Contenuto:** raccoglie i dati di performance da **Google Ads**, **Meta** e **file Excel non standardizzati dei clienti** in un **formato comune**; li **storicizza** (rilevazioni datate a **intervalli liberi**, con agganci a campagne/eventi/sorgente/ambito/tag) per leggere tendenze nel tempo; li presenta in una **dashboard operativa interna** (strutturata come il **master template** del progetto "Revisioni fogli di calcolo" — filtri periodo/sede, sezioni Metriche/KPI/Operatori/Canali/Top prestazioni — con le entità di dominio rese **neutre e adattabili** per settore) da cui si **deriva**, filtrato e brandizzato, il **report per il cliente** (riusa l'export PDF Apple-style già fatto in V7). Metriche **configurabili** con **set salvabili ("carnè")** per workspace; **report separati** per fonte **+ combinato**; standardizzazione dei fogli Excel **assistita dall'AI** (propone il mapping colonna→metrica, l'utente conferma, il **profilo si salva** e si riusa). ✅ **Impianto approvato da Claudio (24/7/2026).**
+**Riferimenti:** visione leggibile in `archivio-documenti/report-multisorgente-per-claudio.md`; dettaglio tecnico, decisioni e vincoli in `archivio-documenti/report-multisorgente-decisioni.md`.
+**Dipendenze esterne:** OAuth Google/Meta + **developer token Google Ads** (approvazione manuale di Google, da avviare per tempo). **Primo passo sviluppabile subito** (indipendente da OAuth e dalla modalità dati): **serbatoio dati comune + storico + set metriche** → **una migrazione tracciata**.
+**Idea da tenere da parte (non ora):** un'AI che **apprende** quali metriche si usano per cliente/reparto e **propone** i set — vedi `report-multisorgente-decisioni.md`.
+**Done quando:** da un progetto si genera una dashboard operativa multi-fonte con storico, e se ne deriva il report cliente brandizzato.
+
+### 🟦 V7 — Verticali AI: Web & ADV + Audit/Report
 **Obiettivo:** produzione asset guidata dal contesto.
 **Contenuto:**
 - **Web & ADV**: generazione strutture HTML/landing + copy campagne **Meta/Google/TikTok** per sotto-progetto.
-- **Higgsfield** visual generation (catena Contesto → Claude → Higgsfield).
+- **Generazione visiva** — grafiche statiche per social e ADS. ⚠️ **Impostazione da rivedere prima dello sviluppo (nota di Jacopo, 24/7/2026).** Lo **scopo resta valido e prioritario**: integrare nel CRM un sistema di **generazione immagini** (soprattutto **grafiche statiche per social e ads**) che si appoggi a **Claude** — sfruttando **skill di prompt engineering già sviluppate e collaudate** (le ha Jacopo) — più un **collegamento MCP** verso una piattaforma/modello di generazione immagini. **Higgsfield** era stato indicato perché offre un'integrazione MCP con Claude: **resta un'opzione in teoria valida ma NON confermata** (non c'era, e non c'è, certezza che sia l'integrazione ideale allo scopo). La catena "Contesto → Claude → Higgsfield" va quindi letta come **ipotesi di partenza, non come scelta fatta**. **Prima di scrivere codice servirà una sessione esplorativa lunga e approfondita** su fattibilità, sensatezza e aderenza allo scopo dell'opzione MCP scelta (Higgsfield o alternative).
 - **Audit Engine SEO** (analisi URL: H1, meta, mancanze) — completa il modulo `seo`. ✅ **FATTO (22/7/2026):** l'analyzer era già registrato ma minimale; ora arricchito e messo in sicurezza. **Backend:** analyzer puro e testato `server/modules/web-assets/seo-analyzer.ts` (title, meta description robusta all'ordine attributi, H1/H2, canonical, viewport, `lang`, robots `noindex`, Open Graph, copertura `alt` immagini, HTTPS, copertura keyword) con punteggio pesato e problemi tipizzati `{code, severity, message}`; **anti-SSRF** condiviso `server/core/net-guard.ts` (`safeFetch` con validazione host + risoluzione DNS + redirect ri-validati) estratto dalla logica del logo PDF (ora in un posto solo) e applicato a **SEO scan + healthcheck** dei web asset. **UI:** nuova tab **SEO** nel dettaglio asset (pulsante "Esegui scansione" con keyword, punteggio, lettura meta/H1, problemi per severità, consigli, storico). Verificato: tsc 233=baseline, unit **239/239** (+14: analyzer+guard), scansione reale E2E (score+issues) e **blocco SSRF su 127.0.0.1 → 400**, eslint/lint:colors puliti. Nessuna migrazione (tabella `WebAssetSeoReport` già presente). **Rimane possibile in futuro:** suggerimenti generati dall'AI (oggi rule-based, di proposito indipendenti dal nodo AI di Claudio).
-- **Report PDF brandizzato Apple-style** con import dati (es. conversioni Google Ads). ✅ **PRIMO PEZZO FATTO (22/7/2026):** export PDF brandizzato del **report cliente** — pulsante "Scarica PDF" nella pagina Report cliente → `GET /agency/projects/:id/reports/client/pdf` → PDF pdfkit in stile Apple (brand: logo+colori da `WorkspaceBranding`, sezioni Executive/Stato/Attività/Elementi/Opportunità/Prossimi passi). Helper PDF condivisi estratti in `server/core/pdf.ts` (riusati da preventivi e report; logo con anti-SSRF in un posto solo). Verificato E2E (endpoint 200 `application/pdf`, browser click→download, testo corretto); `quotePdf.test.ts` 2/2, tsc 233=baseline, unit 225/225. **Ancora da fare:** l'**import dati esterni** (conversioni Google Ads) come sezione dati del report.
+- **Report PDF brandizzato Apple-style** con import dati (es. conversioni Google Ads). ✅ **PRIMO PEZZO FATTO (22/7/2026):** export PDF brandizzato del **report cliente** — pulsante "Scarica PDF" nella pagina Report cliente → `GET /agency/projects/:id/reports/client/pdf` → PDF pdfkit in stile Apple (brand: logo+colori da `WorkspaceBranding`, sezioni Executive/Stato/Attività/Elementi/Opportunità/Prossimi passi). Helper PDF condivisi estratti in `server/core/pdf.ts` (riusati da preventivi e report; logo con anti-SSRF in un posto solo). Verificato E2E (endpoint 200 `application/pdf`, browser click→download, testo corretto); `quotePdf.test.ts` 2/2, tsc 233=baseline, unit 225/225. **Ancora da fare → PROMOSSO alla nuova V6** (*Reportistica multi-sorgente*): l'**import dati esterni** (Google Ads, Meta, Excel dei clienti) è cresciuto fino a diventare una **V a sé** — vedi V6 qui sopra. L'**export PDF** del report cliente (già fatto) resta qui come base, ma viene riusato dalla V6.
 **Done quando:** da un progetto si generano landing+copy coerenti col brand e un report cliente brandizzato.
 
 > **Da fare (richiesto da Jacopo, 21/7/2026) — immagini di cliente/progetto tra gli Elementi allegabili alla Chat AI.** Oggi allegando un **cliente/progetto** in chat si porta solo il suo **snapshot testuale** (nome, obiettivo, ecc.), non le sue immagini. Da quando esistono immagini legate all'entità — **soprattutto le creatività generate dal sistema visivo (Higgsfield, questa V)**, e gli eventuali **asset brand** del Modulo Fonti (V5) — vanno rese **allegabili in chat come immagini vere**. Il valore è immediato: allego una creatività e chiedo all'AI di commentarla/criticarla/iterarla. **La pipeline che le fa *vedere* al modello esiste già** — `collectPromptVisionImages` → `buildMultimodalMessages`, la **"vista" multimodale fatta e collaudata in V4 il 21/7** (immagini png/jpeg/gif/webp sui tre provider). **Quello che manca** è che le immagini di cliente/progetto esistano come **entità di prima classe allegabili**: verosimilmente un **nuovo tipo allegabile** (es. `creative`/`asset`) accanto agli attuali `project`/`client`/`source`/`quote` (`ATTACHABLE_ENTITY_TYPES` in `server/modules/agency-os/chat-attachments.ts`), oppure l'estensione dello snapshot d'entità perché esponga i propri binari immagine. **Collocato qui** perché è quando le creatività diventano un oggetto reale del CRM; se gli asset-brand immagine diventassero allegabili prima (V5 Fonti), può partire di lì.
 
-### 🟦 V7 — Laboratorio & Zero Error Protocol
+### 🟦 V8 — Laboratorio & Zero Error Protocol
 **Obiettivo:** azzerare gli errori di stampa.
 **Contenuto:**
 - Modulo **Laboratorio (Stampa)**: schede materiali/misure, ruolo **Reparto Lab**.
 - **Validazione AI obbligatoria** pre-stampa: confronto dati tecnici ↔ Fonti del progetto, con segnalazione discrepanze in tempo reale.
 **Done quando:** nessun job va in stampa senza esito di validazione AI.
 
-### 🟦 V8 — Preventivatore Pro & Strumenti di Vendita
+### 🟦 V9 — Preventivatore Pro & Strumenti di Vendita
 **Obiettivo:** vendita rapida e d'impatto.
 **Contenuto:**
 - **Builder drag-and-drop** su pacchetti predefiniti.
@@ -311,7 +319,7 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - **Validità 72h** automatica + notifica account manager alla scadenza.
 **Done quando:** in pochi click si genera sia il documento tecnico sia la proposta visuale, con scadenza gestita.
 
-### 🟦 V9 — Calendario & Comunicazione Avanzata
+### 🟦 V10 — Calendario & Comunicazione Avanzata
 **Obiettivo:** appuntamenti e comunicazioni centralizzati.
 **Contenuto:**
 - Integrazione **Meet/Zoom**.
@@ -321,7 +329,7 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - **Thread di messaggistica come allegato alla chat AI** *(spostato dalla V4 il 20/7/2026)*: da progettare **insieme** al modello a conversazioni; decisioni già prese e direzioni (A "Cita nella chat AI" / B allegato granulare) nel blocco **V4 → "Fuori perimetro / V9"**.
 **Done quando:** un cliente prenota da link personale, riceve reminder, e la conversazione resta legata al progetto.
 
-### 🟦 V10 — Contabilità, Redditività & Integrazioni Business
+### 🟦 V11 — Contabilità, Redditività & Integrazioni Business
 **Obiettivo:** controllo di gestione data-driven.
 **Contenuto:**
 - Connettore **Fatture in Cloud** (fatturati/flussi nel CRM, riservato Admin).
@@ -330,13 +338,13 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - Completamento **API framework** a plugin per integrazioni future.
 **Done quando:** l'Admin vede la redditività effettiva per cliente/reparto in tempo reale.
 
-### 🟦 V11 — Finale: Migrazione Legacy, Hardening & Rollout
+### 🟦 V12 — Finale: Migrazione Legacy, Hardening & Rollout
 **Obiettivo:** transizione completa senza interruzioni.
 **Contenuto:**
 - **Schema mapping & migrazione dati** dal sistema legacy (continuità clienti/storico).
 - **Hardening** sicurezza/performance, audit completo, test end-to-end.
 - Rollout progressivo + QA finale, dismissione definitiva del legacy.
-- **Onboarding leggero esteso a tutto il CRM (deciso 14 luglio 2026):** portare l'approccio "guida in-contesto" (empty state, tooltip, card dismissibili — **non** un tutorial/wizard pesante) a **tutte** le aree del prodotto, non solo alla Chat AI. Collocato qui perché ha senso solo a prodotto sostanzialmente completo (dopo la V10 — *era "dopo V9" nella numerazione precedente al 15/7*). L'onboarding **della sola chat** si fa invece dentro la V4.
+- **Onboarding leggero esteso a tutto il CRM (deciso 14 luglio 2026):** portare l'approccio "guida in-contesto" (empty state, tooltip, card dismissibili — **non** un tutorial/wizard pesante) a **tutte** le aree del prodotto, non solo alla Chat AI. Collocato qui perché ha senso solo a prodotto sostanzialmente completo (dopo la V11 — *era "dopo V9" prima del 15/7, "dopo V10" prima del 24/7*). L'onboarding **della sola chat** si fa invece dentro la V4.
 **Done quando:** tutti gli utenti operano sulla nuova piattaforma Apple-style, dati migrati e verificati.
 
 ---
@@ -364,14 +372,17 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 | **V3** | Dato | Custom Fields + import/export + Brevo |
 | **V4** | **Conversazione** *(in corso)* | Chat AI collaborativa + messaggistica sotto un solo ingresso |
 | **V5** | **AI core** *(spezzata: si completa dopo la V4)* | Fonti vettorizzate + Discovery RAG + multi-model + budgeting |
-| **V6** | Produzione AI | Web&ADV + Higgsfield + SEO audit + report Apple-style |
-| **V7** | Lab | Zero Error Protocol (validazione stampa) |
-| **V8** | Vendita | Preventivatore DnD + proposta Apple-style + 72h |
-| **V9** | Agenda | Meet/Zoom + Calendly + reminder + thread progetto + gruppi reparto + clienti |
-| **V10** | Finance | Fatture in Cloud + time-tracking + redditività |
-| **V11** | Go-live | Migrazione legacy + hardening + rollout |
+| **V6** | **Reportistica** *(nuova, 24/7)* | Multi-fonte (Google/Meta/Excel) + storico + dashboard operativa → report cliente |
+| **V7** | Produzione AI | Web&ADV + generazione visiva + SEO audit + report Apple-style |
+| **V8** | Lab | Zero Error Protocol (validazione stampa) |
+| **V9** | Vendita | Preventivatore DnD + proposta Apple-style + 72h |
+| **V10** | Agenda | Meet/Zoom + Calendly + reminder + thread progetto + gruppi reparto + clienti |
+| **V11** | Finance | Fatture in Cloud + time-tracking + redditività |
+| **V12** | Go-live | Migrazione legacy + hardening + rollout |
 
 > **Rinumerazione del 15 luglio 2026.** La **V4 è nuova** (Chat AI & Messaggistica): è nata dentro la vecchia V4 come implementazione minore e si è ingigantita fino a diventare una V a sé. Tutto ciò che seguiva **slitta di uno** (vecchia V4 → V5 … vecchia V10 → V11): si passa da 10 a **11 V**. Se in un documento o in un commit precedente al 15/7 leggi "V5", "V8", "V10", riferisciti alla **numerazione vecchia** e aggiungi uno.
+
+> **Rinumerazione del 24 luglio 2026.** È stata inserita una **nuova V6** (*Reportistica multi-sorgente*) **prima** della vecchia V6, perché quest'ultima aveva ancora pezzi aperti (generazione visiva). Tutto ciò che seguiva **slitta di uno**: vecchia V6 "Produzione AI" → **V7**, Lab → V8, Vendita → V9, Agenda → V10, Finance → V11, Go-live → V12: si passa da 11 a **12 V**. Se in un documento o in un commit precedente al 24/7 leggi "V6"–"V11" riferito a Produzione AI / Lab / Vendita / Agenda / Finance / Go-live, aggiungi uno.
 
 ### Note di sequenziamento
 - **La V4 (chat) e la V5 (AI core) sono intrecciate, ed è voluto.** La V4 gira sul motore già costruito nella V5 (RAG, budget, multi-provider): **numericamente la V4 dipende dalla V5, cronologicamente no**. Il residuo della V5 si completa **dopo** la chiusura della V4.
