@@ -4141,6 +4141,217 @@ const adsAssetGenerateBodySchema = z.object({
   assetKey: z.enum(['headlines', 'primary_texts', 'keywords', 'creative_angles', 'angle', 'sitelinks']),
 });
 
+// Schemi JSON per lo structured output di Anthropic sulle altre generazioni Agency
+// (Discovery sezione, Web progetto, Web blocco, Ads asset). Stesso principio di
+// DISCOVERY_AI_JSON_SCHEMA: elencano DAVVERO i campi che il codice legge a valle, perche'
+// e' lo schema a guidare la generazione. Uno schema generico (properties vuote) fa
+// rispondere Claude con un oggetto segnaposto `{"_dummy"}` — JSON valido ma vuoto (vedi la
+// nota in anthropic-json.ts). I campi "morti" del requiredOutput dei prompt (es.
+// assumptions/confidence su web blocco e ads asset), che nessuna riga legge, sono esclusi.
+
+// Discovery, singola sezione: campi letti in generateProjectDiscoverySectionWithAi.
+const DISCOVERY_SECTION_AI_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    sectionText: { type: 'string', description: 'Testo rigenerato della sezione Discovery.' },
+    usedSources: {
+      type: 'array',
+      description: 'Identificativi delle fonti usate per questa sezione.',
+      items: { type: 'string' },
+    },
+    missingFields: {
+      type: 'array',
+      description: 'Dati che le fonti non permettono di determinare.',
+      items: { type: 'string' },
+    },
+    confidence: { type: 'string', description: 'Livello di confidenza: low, medium o high.' },
+  },
+  required: ['sectionText'],
+};
+
+// Web, progetto completo: campi letti da normalizeWebOutputFromJson piu' missingInputs e
+// recommendations (letti a parte in generateProjectWebProjectWithAi).
+const WEB_PROJECT_AI_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    pageGoal: { type: 'string' },
+    pageType: {
+      type: 'string',
+      description: 'Uno tra: landing, homepage, service_page, ecommerce_page, section.',
+    },
+    targetSummary: { type: 'string' },
+    offerSummary: { type: 'string' },
+    valueProp: { type: 'string' },
+    sectionPlan: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          title: { type: 'string' },
+          objective: { type: 'string' },
+        },
+        required: ['key', 'title', 'objective'],
+      },
+    },
+    copyBlocks: {
+      type: 'object',
+      properties: {
+        headline: { type: 'string' },
+        subheadline: { type: 'string' },
+        intro: { type: 'string' },
+        benefits: { type: 'array', items: { type: 'string' } },
+        objectionHandling: { type: 'string' },
+      },
+      required: ['headline', 'subheadline', 'intro', 'benefits'],
+    },
+    ctaSet: {
+      type: 'object',
+      properties: {
+        primary: { type: 'string' },
+        secondary: { type: 'string' },
+        final: { type: 'string' },
+      },
+      required: ['primary'],
+    },
+    trustElements: { type: 'array', items: { type: 'string' } },
+    faqItems: { type: 'array', items: { type: 'string' } },
+    wireframe: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', description: 'text oppure visual.' },
+        blocks: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['blocks'],
+    },
+    previewHtmlBase: { type: 'string', description: 'HTML statico sicuro, senza script.' },
+    missingInputs: { type: 'array', items: { type: 'string' } },
+    recommendations: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['pageGoal', 'pageType', 'targetSummary', 'offerSummary', 'valueProp', 'sectionPlan', 'copyBlocks', 'ctaSet'],
+};
+
+// Web, singolo blocco: la generazione riguarda un solo blockKey e il codice legge solo il
+// campo corrispondente (switch in generateProjectWebBlockWithAi). Schema mirato per chiave:
+// Claude produce esattamente quel campo (required) senza sprecare token sugli altri. Il
+// Record copre tutto l'enum, quindi aggiungere un blockKey senza schema non compila.
+type WebBlockKey = z.infer<typeof webBlockGenerateBodySchema>['blockKey'];
+const WEB_BLOCK_AI_JSON_SCHEMAS: Record<WebBlockKey, Record<string, unknown>> = {
+  hero: {
+    type: 'object',
+    properties: {
+      headline: { type: 'string' },
+      subheadline: { type: 'string' },
+      intro: { type: 'string' },
+    },
+    required: ['headline', 'subheadline', 'intro'],
+  },
+  benefits: {
+    type: 'object',
+    properties: { benefits: { type: 'array', items: { type: 'string' } } },
+    required: ['benefits'],
+  },
+  faq: {
+    type: 'object',
+    properties: { faqItems: { type: 'array', items: { type: 'string' } } },
+    required: ['faqItems'],
+  },
+  cta: {
+    type: 'object',
+    properties: {
+      ctaSet: {
+        type: 'object',
+        properties: {
+          primary: { type: 'string' },
+          secondary: { type: 'string' },
+          final: { type: 'string' },
+        },
+        required: ['primary'],
+      },
+    },
+    required: ['ctaSet'],
+  },
+  trust: {
+    type: 'object',
+    properties: { trustElements: { type: 'array', items: { type: 'string' } } },
+    required: ['trustElements'],
+  },
+  wireframe: {
+    type: 'object',
+    properties: {
+      wireframe: {
+        type: 'object',
+        properties: {
+          mode: { type: 'string', description: 'text oppure visual.' },
+          blocks: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['blocks'],
+      },
+    },
+    required: ['wireframe'],
+  },
+  section_plan: {
+    type: 'object',
+    properties: {
+      sectionPlan: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            key: { type: 'string' },
+            title: { type: 'string' },
+            objective: { type: 'string' },
+          },
+          required: ['key', 'title', 'objective'],
+        },
+      },
+    },
+    required: ['sectionPlan'],
+  },
+};
+
+// Ads, singolo asset: come il web blocco, la generazione riguarda un solo assetKey e il
+// codice legge solo i campi corrispondenti (switch in generateProjectAdsAssetWithAi).
+type AdsAssetKey = z.infer<typeof adsAssetGenerateBodySchema>['assetKey'];
+const ADS_ASSET_AI_JSON_SCHEMAS: Record<AdsAssetKey, Record<string, unknown>> = {
+  headlines: {
+    type: 'object',
+    properties: {
+      headlines: { type: 'array', items: { type: 'string' } },
+      descriptions: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['headlines'],
+  },
+  primary_texts: {
+    type: 'object',
+    properties: { primaryTexts: { type: 'array', items: { type: 'string' } } },
+    required: ['primaryTexts'],
+  },
+  keywords: {
+    type: 'object',
+    properties: { keywordSeeds: { type: 'array', items: { type: 'string' } } },
+    required: ['keywordSeeds'],
+  },
+  creative_angles: {
+    type: 'object',
+    properties: { creativeAngles: { type: 'array', items: { type: 'string' } } },
+    required: ['creativeAngles'],
+  },
+  angle: {
+    type: 'object',
+    properties: {
+      offerAngle: { type: 'string' },
+      campaignAngle: { type: 'string' },
+    },
+    required: ['offerAngle', 'campaignAngle'],
+  },
+  sitelinks: {
+    type: 'object',
+    properties: { extensionsIdeas: { type: 'array', items: { type: 'string' } } },
+    required: ['extensionsIdeas'],
+  },
+};
+
 const normalizeDiscoverySectionsFromBriefJson = (value: Prisma.JsonValue | null): DiscoverySections => {
   if (!isRecord(value)) {
     return { ...DEFAULT_DISCOVERY_SECTIONS };
@@ -6264,6 +6475,7 @@ export const agencyService = {
           lockKey: `${input.workspaceId}:${input.projectId}:web.generateProject:${input.webProjectId}:${inputHash}`,
           system: systemPrompt,
           user: aiUserPayload,
+          jsonSchema: WEB_PROJECT_AI_JSON_SCHEMA,
         });
       const aiPayload = aiResult?.payload || {};
 
@@ -6448,6 +6660,7 @@ export const agencyService = {
             'Non inventare prove sociali o dati non presenti. Restituisci JSON compatibile con il blocco richiesto.',
           ].join(' '),
           user: aiUserPayload,
+          jsonSchema: WEB_BLOCK_AI_JSON_SCHEMAS[parsed.blockKey],
         });
       const source = aiResult?.payload || {};
       const nextRawOutput: Record<string, unknown> = {
@@ -6851,6 +7064,7 @@ export const agencyService = {
               'Non inventare dati di mercato o promesse non presenti. Restituisci solo JSON valido.',
             ].join(' '),
             user: aiUserPayload,
+            jsonSchema: ADS_ASSET_AI_JSON_SCHEMAS[parsed.assetKey],
           });
         const source = aiResult?.payload || {};
         const googleAds = { ...currentAds.output.googleAds };
@@ -9747,6 +9961,7 @@ export const agencyService = {
           lockKey: `${input.workspaceId}:${input.projectId}:discovery.generateSection:${parsed.sectionKey}:${inputHash}`,
           system: systemPrompt,
           user: aiUserPayload,
+          jsonSchema: DISCOVERY_SECTION_AI_JSON_SCHEMA,
         });
       const aiPayload = aiResult?.payload || {};
       const source = isRecord(aiPayload) ? aiPayload : {};
