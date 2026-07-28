@@ -8,6 +8,7 @@ import { CHAT_PERMISSIONS, ensureChatAccess } from '../chat.policies.js';
 import { agencyService } from '../agency.service.js';
 import { brandingRepository } from '../../../repositories/branding.repository.js';
 import { renderClientReportPdf } from '../reports/client-report-pdf.js';
+import { performanceReportingService } from '../reporting/performance.service.js';
 
 type AgencyProjectParams = {
   projectId: string;
@@ -19,6 +20,19 @@ type AgencyProjectFileParams = AgencyProjectParams & {
 
 type AgencyWebProjectParams = AgencyProjectParams & {
   webProjectId: string;
+};
+
+type AgencyPerformanceSnapshotParams = AgencyProjectParams & {
+  snapshotId: string;
+};
+
+type AgencyMetricSetParams = {
+  metricSetId: string;
+};
+
+type AgencyPerformanceSnapshotQuery = {
+  source?: string;
+  limit?: string;
 };
 
 type AgencySourceFileQuery = {
@@ -1265,6 +1279,100 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       return ok(reply, {
         tasks,
       });
+    },
+  );
+
+  // === Reportistica multi-sorgente (V6): serbatoio dati ===
+  // Storico delle rilevazioni di performance per progetto. Permessi riusati da
+  // Progetti (view/create/delete), come il resto dell'area Agency.
+  app.get<{ Params: AgencyProjectParams; Querystring: AgencyPerformanceSnapshotQuery }>(
+    '/agency/projects/:projectId/performance/snapshots',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const snapshots = await performanceReportingService.listProjectSnapshots({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        query: request.query,
+      });
+
+      return ok(reply, { snapshots });
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/performance/snapshots',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      const snapshot = await performanceReportingService.createProjectSnapshot({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+        body: request.body,
+      });
+
+      return ok(reply, { snapshot });
+    },
+  );
+
+  app.delete<{ Params: AgencyPerformanceSnapshotParams }>(
+    '/agency/projects/:projectId/performance/snapshots/:snapshotId',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.delete);
+      const deleted = await performanceReportingService.deleteProjectSnapshot({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        snapshotId: request.params.snapshotId,
+      });
+
+      return ok(reply, { deleted });
+    },
+  );
+
+  // Set di metriche salvabili ("carne'"), condivisi a livello di workspace.
+  app.get('/agency/performance/metric-sets', async (request, reply) => {
+    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const metricSets = await performanceReportingService.listMetricSets({
+      workspaceId: workspace.id,
+    });
+
+    return ok(reply, { metricSets });
+  });
+
+  app.post<{ Body: unknown }>('/agency/performance/metric-sets', async (request, reply) => {
+    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+    const metricSet = await performanceReportingService.createMetricSet({
+      workspaceId: workspace.id,
+      userId: user.id,
+      body: request.body,
+    });
+
+    return ok(reply, { metricSet });
+  });
+
+  app.patch<{ Params: AgencyMetricSetParams; Body: unknown }>(
+    '/agency/performance/metric-sets/:metricSetId',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const metricSet = await performanceReportingService.updateMetricSet({
+        workspaceId: workspace.id,
+        id: request.params.metricSetId,
+        body: request.body,
+      });
+
+      return ok(reply, { metricSet });
+    },
+  );
+
+  app.delete<{ Params: AgencyMetricSetParams }>(
+    '/agency/performance/metric-sets/:metricSetId',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.delete);
+      const deleted = await performanceReportingService.deleteMetricSet({
+        workspaceId: workspace.id,
+        id: request.params.metricSetId,
+      });
+
+      return ok(reply, { deleted });
     },
   );
 };

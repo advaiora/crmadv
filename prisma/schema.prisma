@@ -221,6 +221,8 @@ model Workspace {
   aiConversationParticipants AiConversationParticipant[]
   aiConversationMessages     AiConversationMessage[]
   aiConversationAttachments  AiConversationAttachment[]
+  performanceSnapshots       PerformanceSnapshot[]
+  performanceMetricSets      PerformanceMetricSet[]
 }
 
 model User {
@@ -272,6 +274,8 @@ model User {
   aiConversationInvitesSent             AiConversationParticipant[] @relation("AiConversationParticipantInvitedBy")
   authoredAiMessages                    AiConversationMessage[]     @relation("AiConversationMessageAuthor")
   createdAiAttachments                  AiConversationAttachment[]  @relation("AiConversationAttachmentCreatedBy")
+  createdPerformanceSnapshots           PerformanceSnapshot[]       @relation("PerformanceSnapshotCreatedByUser")
+  createdPerformanceMetricSets          PerformanceMetricSet[]      @relation("PerformanceMetricSetCreatedByUser")
 }
 
 model TeamInvite {
@@ -411,6 +415,7 @@ model Project {
   ownerUser            User?                 @relation("ProjectOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   departments          ProjectDepartment[]
   access               ProjectAccess[]
+  performanceSnapshots PerformanceSnapshot[]
 
   @@index([workspaceId, name])
   @@index([workspaceId, clientId])
@@ -1211,6 +1216,68 @@ model WebAssetAnalyticsEvent {
   @@index([workspaceId, assetType, assetId, occurredAt(sort: Desc)])
   @@index([workspaceId, eventName, occurredAt(sort: Desc)])
   @@index([createdByUserId])
+}
+
+// === Reportistica multi-sorgente (Agency) — serbatoio dati comune ===
+// Rilevazioni di performance datate e accumulate (storico), da piu' sorgenti
+// (Google Ads, Meta, Excel dei clienti). Ogni rilevazione salva TUTTE le
+// metriche grezze in `metrics` (Json): la selezione delle metriche da mostrare
+// e' un filtro di presentazione e non incide su cosa si salva.
+// Modellato sul pattern gia' collaudato di WebAssetAnalyticsSnapshot.
+
+enum PerformanceSource {
+  GOOGLE_ADS
+  META_ADS
+  EXCEL
+}
+
+enum PerformanceScopeLevel {
+  ACCOUNT
+  CAMPAIGN_GROUP
+  CAMPAIGN
+  AD_SET
+}
+
+model PerformanceSnapshot {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  projectId       String
+  source          PerformanceSource
+  sourceLabel     String?               @db.VarChar(160)
+  scopeLevel      PerformanceScopeLevel @default(ACCOUNT)
+  periodStart     DateTime
+  periodEnd       DateTime
+  metrics         Json
+  campaignRefs    String[]              @default([])
+  contextEvent    String?               @db.VarChar(200)
+  tags            String[]              @default([])
+  createdByUserId String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project         Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdByUser   User?                 @relation("PerformanceSnapshotCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, projectId, periodEnd(sort: Desc)])
+  @@index([workspaceId, source, periodEnd(sort: Desc)])
+  @@index([createdByUserId])
+}
+
+// Set di metriche salvabili ("carne'"): combinazioni rinominabili di metriche
+// da mostrare, condivise a livello di workspace (tutto il team le riusa).
+model PerformanceMetricSet {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  name            String    @db.VarChar(120)
+  icon            String?   @db.VarChar(60)
+  metrics         String[]  @default([])
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdByUser   User?     @relation("PerformanceMetricSetCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, name])
 }
 
 model WebAssetMaintenanceWindow {
