@@ -16,6 +16,7 @@ import AgencyProjectDiagnosisPage from "../views/Agency/project/AgencyProjectDia
 import AgencyProjectMemoryPage from "../views/Agency/project/AgencyProjectMemoryPage";
 import AgencyProjectOpportunitiesPage from "../views/Agency/project/AgencyProjectOpportunitiesPage";
 import AgencyProjectOverviewPage from "../views/Agency/project/AgencyProjectOverviewPage";
+import AgencyProjectPerformancePage from "../views/Agency/project/AgencyProjectPerformancePage";
 import AgencyProjectReportsPage from "../views/Agency/project/AgencyProjectReportsPage";
 import AgencyProjectTasksPage from "../views/Agency/project/AgencyProjectTasksPage";
 import AgencyProjectWebPage from "../views/Agency/project/AgencyProjectWebPage";
@@ -108,6 +109,7 @@ export const routes = [
     { path: 'agency/projects/:projectId/alerts', exact: true, component: AgencyProjectAlertsPage },
     { path: 'agency/projects/:projectId/reports', exact: true, component: AgencyProjectReportsPage },
     { path: 'agency/projects/:projectId/reports/client', exact: true, component: AgencyProjectClientReportPage },
+    { path: 'agency/projects/:projectId/performance', exact: true, component: AgencyProjectPerformancePage },
     { path: 'agency/projects/:projectId/opportunities', exact: true, component: AgencyProjectOpportunitiesPage },
     { path: 'agency/projects/:projectId/memory', exact: true, component: AgencyProjectMemoryPage },
     { path: 'agency/projects/:projectId/assets', exact: true, component: AgencyProjectAssetsPage },

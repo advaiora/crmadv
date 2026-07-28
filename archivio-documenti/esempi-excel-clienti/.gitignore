@@ -1,0 +1,6 @@
+# Materiale di riferimento LOCALE copiato dal progetto "Revisioni fogli di calcolo".
+# Contiene dati REALI dei clienti (PII, inclusi dati sanitari): NON deve mai finire su git.
+# Solo README.md e questo .gitignore sono tracciati; tutto il resto e' ignorato.
+*
+!.gitignore
+!README.md

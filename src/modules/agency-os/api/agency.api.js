@@ -996,3 +996,97 @@ export const syncAgencyProjectTasks = async (projectId, { signal } = {}) => {
 
   return result?.tasks || null;
 };
+
+// === Reportistica multi-sorgente / Performance (V6) ===
+// Serbatoio dati: rilevazioni storiche per progetto + set di metriche ("carne'")
+// condivisi a workspace + descrittori dei connettori (per ora stub simulati).
+
+export const fetchAgencyPerformanceConnectors = async ({ signal } = {}) => {
+  const result = await agencyFetch("/agency/performance/connectors", { method: "GET", signal });
+  return result?.connectors || [];
+};
+
+export const fetchAgencyProjectPerformanceSnapshots = async (
+  projectId,
+  { source, limit, signal } = {},
+) => {
+  const params = new URLSearchParams();
+  if (source) {
+    params.set("source", source);
+  }
+  if (limit) {
+    params.set("limit", String(limit));
+  }
+  const query = params.toString();
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/performance/snapshots${query ? `?${query}` : ""}`,
+    { method: "GET", signal },
+  );
+  return result?.snapshots || [];
+};
+
+export const refreshAgencyProjectPerformanceSnapshot = async (projectId, payload, { signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/performance/refresh`,
+    { method: "POST", body: payload, signal },
+  );
+  return result?.snapshot || null;
+};
+
+export const deleteAgencyProjectPerformanceSnapshot = async (projectId, snapshotId, { signal } = {}) => {
+  await agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/performance/snapshots/${encodeURIComponent(snapshotId)}`,
+    { method: "DELETE", signal },
+  );
+  return true;
+};
+
+export const fetchAgencyPerformanceMetricSets = async ({ signal } = {}) => {
+  const result = await agencyFetch("/agency/performance/metric-sets", { method: "GET", signal });
+  return result?.metricSets || [];
+};
+
+export const createAgencyPerformanceMetricSet = async (payload, { signal } = {}) => {
+  const result = await agencyFetch("/agency/performance/metric-sets", {
+    method: "POST",
+    body: payload,
+    signal,
+  });
+  return result?.metricSet || null;
+};
+
+export const updateAgencyPerformanceMetricSet = async (metricSetId, payload, { signal } = {}) => {
+  const result = await agencyFetch(
+    `/agency/performance/metric-sets/${encodeURIComponent(metricSetId)}`,
+    { method: "PATCH", body: payload, signal },
+  );
+  return result?.metricSet || null;
+};
+
+export const deleteAgencyPerformanceMetricSet = async (metricSetId, { signal } = {}) => {
+  await agencyFetch(`/agency/performance/metric-sets/${encodeURIComponent(metricSetId)}`, {
+    method: "DELETE",
+    signal,
+  });
+  return true;
+};
+
+// Ingestion Excel: preview (l'AI propone la mappatura) e commit (scrive gli snapshot).
+export const previewAgencyProjectExcel = async (projectId, file, { signal } = {}) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/performance/excel/preview`,
+    { method: "POST", body: formData, signal },
+  );
+};
+
+export const commitAgencyProjectExcel = async (projectId, file, mapping, { signal } = {}) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("mapping", JSON.stringify(mapping));
+  return agencyFetch(
+    `/agency/projects/${encodeURIComponent(projectId)}/performance/excel/commit`,
+    { method: "POST", body: formData, signal },
+  );
+};

@@ -29,6 +29,7 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
     // scioglimento del gruppo sono stati spostati li' prima di togliere la scheda.
     { key: "web", label: "Web", path: `${projectRootPath}/web`, group: "primary" },
     { key: "ads", label: "Ads", path: `${projectRootPath}/ads`, group: "primary" },
+    { key: "performance", label: "Performance", path: `${projectRootPath}/performance`, group: "primary" },
     { key: "reports-client", label: "Report", path: `${projectRootPath}/reports/client`, group: "primary" },
     { key: "tasks", label: "Task", path: `${projectRootPath}/tasks`, group: "primary" },
     { key: "opportunities", label: "Opportunita", path: `${projectRootPath}/opportunities`, group: "secondary" },

@@ -3,6 +3,7 @@ import type { PerformanceMetricSet, PerformanceSnapshot } from '@prisma/client';
 import { z } from 'zod';
 import { badRequest, notFound } from '../../../core/errors.js';
 import { performanceRepository } from './performance.repository.js';
+import { getConnector, listConnectorDescriptors } from './performance-connectors.js';
 
 // Logica del serbatoio "Reportistica multi-sorgente" (Agency, V6): valida gli
 // input (Zod), applica lo scoping a workspace/progetto e orchestra il repository.
@@ -35,6 +36,23 @@ const listSnapshotsQuerySchema = z.object({
   source: z.enum(SOURCE_VALUES).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
+
+// "Aggiorna ora": si rileva una nuova fotografia da un connettore (solo le sorgenti
+// a connettore, non l'Excel). Il periodo e' l'unica parte obbligatoria (massima
+// elasticita', come deciso per lo storico).
+const refreshSnapshotBodySchema = z
+  .object({
+    source: z.enum(['GOOGLE_ADS', 'META_ADS']),
+    scopeLevel: z.enum(SCOPE_LEVEL_VALUES).optional().default('ACCOUNT'),
+    periodStart: z.coerce.date(),
+    periodEnd: z.coerce.date(),
+    contextEvent: z.string().trim().max(200).optional(),
+    tags: z.array(z.string().trim().min(1).max(80)).optional().default([]),
+  })
+  .refine((data) => data.periodEnd >= data.periodStart, {
+    message: 'La fine del periodo deve essere successiva o uguale all\'inizio.',
+    path: ['periodEnd'],
+  });
 
 const createMetricSetBodySchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -138,6 +156,52 @@ export const performanceReportingService = {
       periodEnd: parsed.data.periodEnd,
       metrics: parsed.data.metrics as Prisma.InputJsonValue,
       campaignRefs: parsed.data.campaignRefs,
+      contextEvent: parsed.data.contextEvent ?? null,
+      tags: parsed.data.tags,
+      createdByUserId: input.userId,
+    });
+
+    return mapSnapshot(created);
+  },
+
+  // Descrittori dei connettori per le card della dashboard (stato/simulato).
+  listConnectors() {
+    return listConnectorDescriptors();
+  },
+
+  // "Aggiorna ora": interroga il connettore (per ora stub) e SALVA una nuova
+  // rilevazione datata. Coerente con la decisione "snapshot a comando": lo storico
+  // si accumula a ogni aggiornamento manuale, non si sovrascrive.
+  async refreshProjectSnapshot(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string | null;
+    body: unknown;
+  }) {
+    const parsed = refreshSnapshotBodySchema.safeParse(input.body);
+    if (!parsed.success) {
+      throw badRequest('Dati dell\'aggiornamento non validi.', { issues: parsed.error.flatten() });
+    }
+
+    await ensureProjectInWorkspace(input.workspaceId, input.projectId);
+
+    const connector = getConnector(parsed.data.source);
+    const fetched = connector.fetchMetrics({
+      projectId: input.projectId,
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+    });
+
+    const created = await performanceRepository.createSnapshot({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      source: parsed.data.source,
+      sourceLabel: fetched.sourceLabel,
+      scopeLevel: parsed.data.scopeLevel,
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+      metrics: fetched.metrics as Prisma.InputJsonValue,
+      campaignRefs: [],
       contextEvent: parsed.data.contextEvent ?? null,
       tags: parsed.data.tags,
       createdByUserId: input.userId,

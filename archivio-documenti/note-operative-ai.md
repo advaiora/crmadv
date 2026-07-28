@@ -453,3 +453,16 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Regola di verifica generale:** dopo aver "sistemato" una generazione AI, non fermarsi al flag di modalità (nota #30). Guardare **i token di output e le chiavi del payload**: `estimatedOutputTokens: 4` e una sola chiave sconosciuta erano il segnale che qualcosa non tornava, mentre il flag diceva "AI usata".
 
 **Trappola collaterale (cache):** la Discovery mette in cache il payload per `inputHash`; ri-generare sullo stesso progetto con fonti invariate **non richiama l'AI** (`cacheHit: true`). Per collaudare davvero un cambiamento al motore, usare un **progetto diverso** (o svuotare la voce di cache), altrimenti si "verifica" il risultato vecchio.
+
+---
+
+## 33. Frontend Vite ascolta su IPv6 (`[::1]`), l'API su IPv4 (`0.0.0.0`): host diversi per i curl
+
+**Contesto:** verifica che i file `.jsx`/`.js` compilino via transform di Vite (`curl http://<host>:5173/src/.../File.jsx`, nota #11), con i dev server avviati a mano dall'utente.
+
+**Errore:** usato `http://127.0.0.1:5173/...` (come per l'API, nota #29) → **tutti** i file davano `HTTP 000` (connessione rifiutata). Sembrava che i file non compilassero o che il server fosse morto; in realta' era solo l'host sbagliato. Verificato con `netstat`: il frontend Vite era in ascolto su **`[::1]:5173` (solo IPv6)**, mentre l'API era su `0.0.0.0:4000` (IPv4). Quindi `127.0.0.1:5173` (IPv4) rifiuta, ma `localhost:5173` (che risolve a `::1`) e `[::1]:5173` rispondono `200`.
+
+**Modo corretto:**
+- Per i curl al **frontend Vite** (transform dei moduli, `@vite/client`, ecc.) usare **`localhost:5173`** o **`[::1]:5173`**, NON `127.0.0.1`.
+- Per i curl all'**API** restare su **`127.0.0.1:4000`** (nota #29: il `fetch` di Node su `localhost` andrebbe a `::1` dove l'API IPv4 non ascolta — l'opposto del frontend).
+- Diagnosi rapida di un `HTTP 000` su TUTTI i file (non solo uno): `netstat -ano | grep LISTENING | grep :5173` per vedere se l'indirizzo e' `[::1]` o `0.0.0.0`, e allineare l'host del curl. `000` = rete/host, non codice (come gia' in #11).

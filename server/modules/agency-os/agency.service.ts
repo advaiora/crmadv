@@ -3144,7 +3144,9 @@ const buildAgencyAiDiscoverySnapshot = (sections: DiscoverySections, notes = '')
   notes: clipAgencyAiText(notes, 1200),
 });
 
-const runAgencyOpenAiJsonWithMeta = async (input: {
+// Esportato per riuso dal modulo Reportistica (sotto-modulo Excel+AI): la mappatura
+// colonna->metrica proposta dall'AI usa questo stesso helper structured-output.
+export const runAgencyOpenAiJsonWithMeta = async (input: {
   workspaceId?: string;
   system: string;
   user: unknown;

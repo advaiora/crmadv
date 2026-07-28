@@ -9,6 +9,7 @@ import { agencyService } from '../agency.service.js';
 import { brandingRepository } from '../../../repositories/branding.repository.js';
 import { renderClientReportPdf } from '../reports/client-report-pdf.js';
 import { performanceReportingService } from '../reporting/performance.service.js';
+import { excelIngestionService } from '../reporting/excel-ingestion.service.js';
 
 type AgencyProjectParams = {
   projectId: string;
@@ -1314,6 +1315,22 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     },
   );
 
+  // "Aggiorna ora": rileva e SALVA una nuova fotografia da un connettore (stub).
+  app.post<{ Params: AgencyProjectParams; Body: unknown }>(
+    '/agency/projects/:projectId/performance/refresh',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      const snapshot = await performanceReportingService.refreshProjectSnapshot({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+        body: request.body,
+      });
+
+      return ok(reply, { snapshot });
+    },
+  );
+
   app.delete<{ Params: AgencyPerformanceSnapshotParams }>(
     '/agency/projects/:projectId/performance/snapshots/:snapshotId',
     async (request, reply) => {
@@ -1327,6 +1344,14 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       return ok(reply, { deleted });
     },
   );
+
+  // Descrittori dei connettori (card della dashboard, modello "Provider AI").
+  app.get('/agency/performance/connectors', async (request, reply) => {
+    await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const connectors = performanceReportingService.listConnectors();
+
+    return ok(reply, { connectors });
+  });
 
   // Set di metriche salvabili ("carne'"), condivisi a livello di workspace.
   app.get('/agency/performance/metric-sets', async (request, reply) => {
@@ -1373,6 +1398,68 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       });
 
       return ok(reply, { deleted });
+    },
+  );
+
+  // === Ingestion Excel (sotto-modulo Excel+AI) ===
+  // Upload di un file Excel del cliente -> l'AI propone la mappatura -> anteprima
+  // con riconciliazione -> (commit) scrittura degli snapshot source=EXCEL.
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/performance/excel/preview',
+    async (request, reply) => {
+      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      const uploaded = await request.file();
+      if (!uploaded) {
+        throw badRequest('Nessun file caricato.');
+      }
+      const buffer = await uploaded.toBuffer();
+      const preview = await excelIngestionService.preview({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        buffer,
+        filename: uploaded.filename,
+      });
+
+      return ok(reply, preview);
+    },
+  );
+
+  app.post<{ Params: AgencyProjectParams }>(
+    '/agency/projects/:projectId/performance/excel/commit',
+    async (request, reply) => {
+      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      let buffer: Buffer | null = null;
+      let filename = 'import.xlsx';
+      let mappingRaw = '';
+      for await (const part of request.parts()) {
+        if (part.type === 'file') {
+          buffer = await part.toBuffer();
+          filename = part.filename;
+        } else if (part.fieldname === 'mapping' && typeof part.value === 'string') {
+          mappingRaw = part.value;
+        }
+      }
+      if (!buffer) {
+        throw badRequest('Nessun file caricato.');
+      }
+      let mapping: unknown = {};
+      if (mappingRaw) {
+        try {
+          mapping = JSON.parse(mappingRaw);
+        } catch (_error) {
+          throw badRequest('Mappatura non valida (JSON).');
+        }
+      }
+      const result = await excelIngestionService.commit({
+        workspaceId: workspace.id,
+        projectId: request.params.projectId,
+        userId: user.id,
+        buffer,
+        filename,
+        mapping,
+      });
+
+      return ok(reply, result);
     },
   );
 };
