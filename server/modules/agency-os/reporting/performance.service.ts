@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
-import type { PerformanceMetricSet, PerformanceSnapshot } from '@prisma/client';
+import type { PerformanceMetricSet, PerformanceSnapshot, PerformanceSource } from '@prisma/client';
 import { z } from 'zod';
-import { badRequest, notFound } from '../../../core/errors.js';
+import { badRequest, conflict, notFound } from '../../../core/errors.js';
 import { performanceRepository } from './performance.repository.js';
 import { getConnector, listConnectorDescriptors } from './performance-connectors.js';
 
@@ -192,6 +192,11 @@ export const performanceReportingService = {
       periodEnd: parsed.data.periodEnd,
     });
 
+    // Decisione approvata (report-multisorgente-decisioni.md): ogni "aggiorna ora"
+    // lascia una rilevazione datata e NON sovrascrive lo storico. L'anti-doppione
+    // dei totali (piu' fotografie dello stesso mese) e' risolto in visualizzazione
+    // tenendo solo la fotografia piu' recente per mese/fonte (latestPerMonthSource),
+    // non cancellando in scrittura.
     const created = await performanceRepository.createSnapshot({
       workspaceId: input.workspaceId,
       projectId: input.projectId,
@@ -208,6 +213,101 @@ export const performanceReportingService = {
     });
 
     return mapSnapshot(created);
+  },
+
+  // Usato dall'anteprima Excel: tra i mesi che verrebbero importati, quali sono
+  // gia' presenti nel serbatoio per questa fonte/progetto. Ritorna gli stessi ISO
+  // ricevuti in input (quelli esistenti), cosi' il frontend li confronta 1:1 con
+  // i periodStart delle righe in anteprima.
+  async findExistingProjectPeriods(input: {
+    workspaceId: string;
+    projectId: string;
+    source: PerformanceSource;
+    periodStarts: string[];
+  }): Promise<string[]> {
+    const existing = await performanceRepository.findExistingPeriodStarts({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      source: input.source,
+      periodStarts: input.periodStarts.map((iso) => new Date(iso)),
+    });
+    const existingTimes = new Set(existing.map((date) => date.getTime()));
+    return input.periodStarts.filter((iso) => existingTimes.has(new Date(iso).getTime()));
+  },
+
+  // Commit transazionale degli snapshot Excel (uno per mese): o tutti o nessuno.
+  // Con replace=true cancella prima le rilevazioni EXCEL degli stessi mesi
+  // (anti-doppione mirato); senza replace, se trova mesi gia' presenti, 409.
+  async commitExcelSnapshots(input: {
+    workspaceId: string;
+    projectId: string;
+    userId: string | null;
+    sourceLabel: string | null;
+    contextEvent: string | null;
+    tags: string[];
+    snapshots: Array<{ periodStart: string; periodEnd: string; metrics: Record<string, number> }>;
+    replace: boolean;
+  }) {
+    await ensureProjectInWorkspace(input.workspaceId, input.projectId);
+
+    const rows = input.snapshots.map((snapshot) => ({
+      periodStart: new Date(snapshot.periodStart),
+      periodEnd: new Date(snapshot.periodEnd),
+      metrics: snapshot.metrics,
+    }));
+    const periodStarts = rows.map((row) => row.periodStart);
+
+    const existing = await performanceRepository.findExistingPeriodStarts({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      source: 'EXCEL',
+      periodStarts,
+    });
+    if (existing.length > 0 && !input.replace) {
+      throw conflict('Alcuni mesi di questo file sono gia\' presenti nel serbatoio.', {
+        reason: 'duplicate_period',
+        source: 'EXCEL',
+        existingCount: existing.length,
+      });
+    }
+
+    const created = await performanceRepository.withTransaction(async (tx) => {
+      if (input.replace && existing.length > 0) {
+        await performanceRepository.deleteSnapshotsByPeriodStarts(
+          {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            source: 'EXCEL',
+            periodStarts,
+          },
+          tx,
+        );
+      }
+      const out = [];
+      for (const row of rows) {
+        const createdRow = await performanceRepository.createSnapshot(
+          {
+            workspaceId: input.workspaceId,
+            projectId: input.projectId,
+            source: 'EXCEL',
+            sourceLabel: input.sourceLabel,
+            scopeLevel: 'ACCOUNT',
+            periodStart: row.periodStart,
+            periodEnd: row.periodEnd,
+            metrics: row.metrics as Prisma.InputJsonValue,
+            campaignRefs: [],
+            contextEvent: input.contextEvent,
+            tags: input.tags,
+            createdByUserId: input.userId,
+          },
+          tx,
+        );
+        out.push(createdRow);
+      }
+      return out;
+    });
+
+    return { created: created.map(mapSnapshot), replaced: input.replace ? existing.length : 0 };
   },
 
   async deleteProjectSnapshot(input: { workspaceId: string; projectId: string; snapshotId: string }) {

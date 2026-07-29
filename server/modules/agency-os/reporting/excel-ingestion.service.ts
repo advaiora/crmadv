@@ -314,6 +314,14 @@ export const excelIngestionService = {
       sampleRows,
     });
     const { snapshots, reconciliation } = applyMapping(parsed, mapping);
+    // Anti-doppione: segnala quali mesi sono gia' presenti nel serbatoio (fonte
+    // EXCEL), cosi' l'anteprima avvisa prima di duplicare i totali.
+    const existingPeriods = await performanceReportingService.findExistingProjectPeriods({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      source: 'EXCEL',
+      periodStarts: snapshots.map((snapshot) => snapshot.periodStart),
+    });
     return {
       filename: input.filename,
       sheetName: parsed.sheetName,
@@ -322,12 +330,13 @@ export const excelIngestionService = {
       rowCount: parsed.rowCount,
       mapping,
       mappingMode: mode,
-      preview: { snapshots, reconciliation },
+      preview: { snapshots, reconciliation, existingPeriods },
     };
   },
 
   // Commit: applica la mappatura (eventualmente corretta dall'utente) e SCRIVE gli
-  // snapshot nel serbatoio, riusando il service gia' validato.
+  // snapshot nel serbatoio in un'unica transazione (o tutti o nessuno). Con
+  // replace=true sostituisce i mesi gia' presenti invece di duplicarli.
   async commit(input: {
     workspaceId: string;
     projectId: string;
@@ -335,6 +344,7 @@ export const excelIngestionService = {
     buffer: Buffer;
     filename: string;
     mapping: unknown;
+    replace: boolean;
   }) {
     const parsed = await parseExcelBuffer(input.buffer);
     ensureParsable(parsed);
@@ -344,27 +354,23 @@ export const excelIngestionService = {
       throw badRequest('Nessuna rilevazione ricavabile: controlla la colonna della data e il formato.');
     }
 
-    const created = [];
-    for (const snapshot of snapshots) {
-      const row = await performanceReportingService.createProjectSnapshot({
-        workspaceId: input.workspaceId,
-        projectId: input.projectId,
-        userId: input.userId,
-        body: {
-          source: 'EXCEL',
-          // Troncato al limite della colonna (VarChar 160) per non far fallire il
-          // commit con un 400 generico su nomi file molto lunghi.
-          sourceLabel: `Excel: ${input.filename}`.slice(0, 160),
-          periodStart: snapshot.periodStart,
-          periodEnd: snapshot.periodEnd,
-          metrics: snapshot.metrics,
-          tags: ['excel'],
-          ...(mapping.rowMeaning ? { contextEvent: `Import ${mapping.rowMeaning}` } : {}),
-        },
-      });
-      created.push(row);
-    }
+    const { created, replaced } = await performanceReportingService.commitExcelSnapshots({
+      workspaceId: input.workspaceId,
+      projectId: input.projectId,
+      userId: input.userId,
+      // Troncato al limite della colonna (VarChar 160) per non far fallire il
+      // commit con un 400 generico su nomi file molto lunghi.
+      sourceLabel: `Excel: ${input.filename}`.slice(0, 160),
+      contextEvent: mapping.rowMeaning ? `Import ${mapping.rowMeaning}` : null,
+      tags: ['excel'],
+      snapshots: snapshots.map((snapshot) => ({
+        periodStart: snapshot.periodStart,
+        periodEnd: snapshot.periodEnd,
+        metrics: snapshot.metrics,
+      })),
+      replace: input.replace,
+    });
 
-    return { filename: input.filename, created: created.length, snapshots: created, mapping, reconciliation };
+    return { filename: input.filename, created: created.length, replaced, snapshots: created, mapping, reconciliation };
   },
 };

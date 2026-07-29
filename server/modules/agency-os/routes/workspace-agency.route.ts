@@ -1431,12 +1431,15 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
       let buffer: Buffer | null = null;
       let filename = 'import.xlsx';
       let mappingRaw = '';
+      let replace = false;
       for await (const part of request.parts()) {
         if (part.type === 'file') {
           buffer = await part.toBuffer();
           filename = part.filename;
         } else if (part.fieldname === 'mapping' && typeof part.value === 'string') {
           mappingRaw = part.value;
+        } else if (part.fieldname === 'replace' && typeof part.value === 'string') {
+          replace = part.value === 'true' || part.value === '1';
         }
       }
       if (!buffer) {
@@ -1457,6 +1460,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
         buffer,
         filename,
         mapping,
+        replace,
       });
 
       return ok(reply, result);

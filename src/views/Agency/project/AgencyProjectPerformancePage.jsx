@@ -21,6 +21,7 @@ import {
   formatMetric,
   formatMetricValue,
   deriveTotals,
+  latestPerMonthSource,
   sourceLabel,
   sourceShort,
   formatPeriod,
@@ -108,16 +109,30 @@ const AgencyProjectPerformancePage = () => {
     return snapshots.filter((snapshot) => snapshot.source === sourceFilter);
   }, [snapshots, sourceFilter]);
 
-  const totals = React.useMemo(() => deriveTotals(filteredSnapshots), [filteredSnapshots]);
+  // "Ultima fotografia per mese/fonte": totali e andamento non sommano le
+  // fotografie ripetute dello stesso mese (i connettori le accumulano), cosi' i
+  // numeri non si gonfiano. Lo storico grezzo (tabella) resta su filteredSnapshots.
+  const dedupedSnapshots = React.useMemo(
+    () => latestPerMonthSource(filteredSnapshots),
+    [filteredSnapshots],
+  );
+
+  const totals = React.useMemo(() => deriveTotals(dedupedSnapshots), [dedupedSnapshots]);
 
   const trendRows = React.useMemo(() => {
     const groups = new Map();
-    filteredSnapshots.forEach((snapshot) => {
-      const key = `${snapshot.periodStart}|${snapshot.periodEnd}`;
+    dedupedSnapshots.forEach((snapshot) => {
+      // Raggruppo per mese (periodStart e' sempre il primo del mese): piu' fonti
+      // dello stesso mese confluiscono in un unico punto dell'andamento.
+      const key = snapshot.periodStart;
       if (!groups.has(key)) {
         groups.set(key, { periodStart: snapshot.periodStart, periodEnd: snapshot.periodEnd, items: [] });
       }
-      groups.get(key).items.push(snapshot);
+      const group = groups.get(key);
+      group.items.push(snapshot);
+      if (new Date(snapshot.periodEnd).getTime() > new Date(group.periodEnd).getTime()) {
+        group.periodEnd = snapshot.periodEnd;
+      }
     });
     const rows = Array.from(groups.values()).map((group) => ({
       periodStart: group.periodStart,
@@ -126,7 +141,7 @@ const AgencyProjectPerformancePage = () => {
     }));
     rows.sort((a, b) => new Date(a.periodStart).getTime() - new Date(b.periodStart).getTime());
     return rows;
-  }, [filteredSnapshots, trendMetric]);
+  }, [dedupedSnapshots, trendMetric]);
 
   const trendMax = React.useMemo(
     () => Math.max(1, ...trendRows.map((row) => row.value)),
@@ -158,6 +173,9 @@ const AgencyProjectPerformancePage = () => {
     setRefreshingSource(source);
     setError("");
     try {
+      // I connettori accumulano una fotografia datata a ogni aggiornamento (lo
+      // storico non si sovrascrive); il doppio conteggio dei totali e' evitato in
+      // lettura da latestPerMonthSource, non bloccando qui la scrittura.
       await refreshAgencyProjectPerformanceSnapshot(projectId, { source, ...currentMonthRange() });
       await loadSnapshots();
     } catch (refreshError) {
@@ -192,14 +210,14 @@ const AgencyProjectPerformancePage = () => {
     setExcelFile(null);
   };
 
-  const handleExcelCommit = async () => {
+  const handleExcelCommit = async (replace = false) => {
     if (!excelFile || !excelPreview) {
       return;
     }
     setExcelBusy(true);
     setError("");
     try {
-      await commitAgencyProjectExcel(projectId, excelFile, excelPreview.mapping);
+      await commitAgencyProjectExcel(projectId, excelFile, excelPreview.mapping, { replace });
       await loadSnapshots();
       setExcelPreview(null);
       setExcelFile(null);
@@ -267,6 +285,29 @@ const AgencyProjectPerformancePage = () => {
   };
 
   const summaryTitle = sourceFilter === "ALL" ? "Riepilogo combinato" : `Riepilogo ${sourceShort(sourceFilter)}`;
+
+  // Anti-doppione Excel: mesi (periodStart) del file gia' presenti nel serbatoio.
+  const excelExistingPeriods = excelPreview?.preview?.existingPeriods || [];
+  const excelHasDuplicates = excelExistingPeriods.length > 0;
+  const excelSnapshotCount = excelPreview?.preview?.snapshots?.length || 0;
+  const excelNewCount = Math.max(0, excelSnapshotCount - excelExistingPeriods.length);
+  // Re-import "puro" = TUTTI i mesi del file sono gia' presenti; "arricchimento" =
+  // file incrementale con alcuni mesi ripetuti + almeno un mese nuovo in coda.
+  const excelAllExisting = excelSnapshotCount > 0 && excelNewCount === 0;
+  let excelNoticeText = "";
+  if (excelHasDuplicates) {
+    const nEx = excelExistingPeriods.length;
+    if (excelAllExisting) {
+      excelNoticeText =
+        nEx === 1
+          ? "L’unico mese di questo file è già presente nel database. “Sostituisci e importa” lo riscrive con i valori di questo file (utile se il file è stato corretto)."
+          : `Tutti i ${nEx} mesi di questo file sono già presenti nel database. “Sostituisci e importa” li riscrive con i valori di questo file (utile se il file è stato corretto).`;
+    } else {
+      const presenti = nEx === 1 ? "1 mese già presente" : `${nEx} mesi già presenti`;
+      const nuovi = excelNewCount === 1 ? "1 mese nuovo" : `${excelNewCount} mesi nuovi`;
+      excelNoticeText = `Questo file contiene anche ${presenti} (contrassegnati sotto), oltre a ${nuovi}. Con “Sostituisci e importa” i mesi già presenti vengono aggiornati con i valori di questo file e quelli nuovi vengono aggiunti — nessun doppione.`;
+    }
+  }
 
   return (
     <AgencyProjectPageTemplate
@@ -361,7 +402,14 @@ const AgencyProjectPerformancePage = () => {
               <tbody>
                 {excelPreview.preview.snapshots.map((snapshot) => (
                   <tr key={snapshot.periodKey}>
-                    <td className="small">{formatPeriod(snapshot.periodStart, snapshot.periodEnd)}</td>
+                    <td className="small">
+                      {formatPeriod(snapshot.periodStart, snapshot.periodEnd)}
+                      {excelExistingPeriods.includes(snapshot.periodStart) ? (
+                        <span className="badge text-bg-warning ms-2">già presente</span>
+                      ) : excelHasDuplicates ? (
+                        <span className="badge text-bg-success ms-2">nuovo</span>
+                      ) : null}
+                    </td>
                     <td className="text-end small">{formatMetricValue(snapshot.metrics.leads, "int")}</td>
                     <td className="text-end small">{formatMetricValue(snapshot.metrics.conversions, "int")}</td>
                     <td className="text-end small">{formatMetricValue(snapshot.metrics.conversionValue, "currency")}</td>
@@ -371,10 +419,22 @@ const AgencyProjectPerformancePage = () => {
             </table>
           </div>
 
+          {excelHasDuplicates && (
+            <div className="alert alert-warning py-2 px-3 small" role="alert">
+              {excelNoticeText}
+            </div>
+          )}
+
           <div className="d-flex gap-2">
-            <button type="button" className="btn btn-sm btn-primary" disabled={excelBusy} onClick={handleExcelCommit}>
-              {excelBusy ? "Importo…" : `Conferma e importa (${excelPreview.preview.snapshots.length} rilevazioni)`}
-            </button>
+            {excelHasDuplicates ? (
+              <button type="button" className="btn btn-sm btn-warning" disabled={excelBusy} onClick={() => handleExcelCommit(true)}>
+                {excelBusy ? "Importo…" : "Sostituisci e importa"}
+              </button>
+            ) : (
+              <button type="button" className="btn btn-sm btn-primary" disabled={excelBusy} onClick={() => handleExcelCommit(false)}>
+                {excelBusy ? "Importo…" : `Conferma e importa (${excelPreview.preview.snapshots.length} rilevazioni)`}
+              </button>
+            )}
             <button type="button" className="btn btn-sm btn-outline-secondary" disabled={excelBusy} onClick={cancelExcel}>
               Annulla
             </button>

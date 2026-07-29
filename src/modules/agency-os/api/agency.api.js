@@ -1081,10 +1081,11 @@ export const previewAgencyProjectExcel = async (projectId, file, { signal } = {}
   );
 };
 
-export const commitAgencyProjectExcel = async (projectId, file, mapping, { signal } = {}) => {
+export const commitAgencyProjectExcel = async (projectId, file, mapping, { replace = false, signal } = {}) => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("mapping", JSON.stringify(mapping));
+  formData.append("replace", replace ? "true" : "false");
   return agencyFetch(
     `/agency/projects/${encodeURIComponent(projectId)}/performance/excel/commit`,
     { method: "POST", body: formData, signal },

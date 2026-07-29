@@ -67,6 +67,27 @@ export const formatMetric = (metrics, key) => {
   return formatMetricValue(metrics?.[key], def.format);
 };
 
+// Opzione "ultima fotografia": i connettori "aggiorna ora" ACCUMULANO fotografie
+// datate dello stesso mese (decisione approvata: lo storico non si sovrascrive).
+// Per i TOTALI e per l'ANDAMENTO non vanno sommate (sono cumulative → gonfierebbero
+// i numeri): si tiene solo la piu' recente (createdAt max) per ciascuna coppia
+// fonte+periodStart. La tabella dello storico resta invece completa, grezza.
+// Il criterio (source, periodStart) e' lo stesso dell'anti-doppione lato serbatoio.
+export const latestPerMonthSource = (snapshots) => {
+  const latest = new Map();
+  (snapshots || []).forEach((snapshot) => {
+    const key = `${snapshot.source}|${snapshot.periodStart}`;
+    const current = latest.get(key);
+    if (
+      !current ||
+      new Date(snapshot.createdAt).getTime() > new Date(current.createdAt).getTime()
+    ) {
+      latest.set(key, snapshot);
+    }
+  });
+  return Array.from(latest.values());
+};
+
 // Somma le metriche additive di piu' rilevazioni e RICALCOLA i rapporti dai totali
 // (stessa regola del merge multi-fonte: non si mediano i rapporti).
 export const deriveTotals = (snapshots) => {
