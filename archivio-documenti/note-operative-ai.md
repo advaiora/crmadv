@@ -479,3 +479,16 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Prima di dire all'utente di aprire il CRM nel browser, **verificare lo stato reale**, non fidarsi del "started successfully": `netstat -ano | grep LISTENING | grep -E ":4000|:5173"` + un `curl` di salute all'API (`http://127.0.0.1:4000/health` deve dare `{"status":"ok",...}`). Se non rispondono, riavviare e ri-verificare.
 - Ricordare all'utente di usare **`localhost:5173`**, non `127.0.0.1:5173` (Vite ascolta su IPv6 `[::1]`, nota #33).
 - **In chiusura sessione:** `preview_list` puo' tornare **vuoto** mentre i processi sono ancora **vivi** (netstat li vede su 4000/5173). Se non ci sono piu' `serverId` validi per `preview_stop`, spegnerli individuando i PID dalla porta (`Get-NetTCPConnection -LocalPort 4000,5173 -State Listen`) e terminandoli mirati per PID — mai per command-line (nota #17), e solo dopo aver verificato che siano di questa sessione.
+
+---
+
+## 35. Seed che aggiunge definizioni "con nome" a un workspace: prima guarda cosa c'e' gia'
+
+**Contesto:** scrivere un seed di arricchimento demo che crea `CustomFieldDefinition` (ma vale per qualsiasi entita' "con nome" per-workspace: project type, metric set, checklist template...). Il 30/7/2026, arricchimento clienti/progetti demo.
+
+**Errore:** ho definito un custom field `priorita_cliente` (select alta/media/bassa) senza controllare le definizioni gia' presenti nel workspace demo. C'era gia' un campo `priorita` con **le stesse identiche opzioni**, residuo dei test V3 Custom Fields (9/7): il mio era un **doppione** semantico. Me ne sono accorto solo dalla verifica a valle (`CUSTOM defs=[...]` mostrava sei campi, non i quattro attesi), e ho dovuto scrivere uno script una-tantum per cancellare la definizione `priorita_cliente` e ripulire la chiave dai `customFields` dei 12 clienti gia' scritti.
+
+**Modo corretto:**
+- **Prima** di definire entita' "con nome" in un seed su un workspace gia' popolato, **interrogare cosa esiste** (`customFieldDefinition.findMany({where:{workspaceId, entity}})`, o l'equivalente per project type/metric set). Il workspace demo **accumula definizioni incidentali** dai collaudi delle feature (es. `priorita` e `marketing` lasciati dalla V3), non e' un foglio bianco.
+- Se esiste gia' un campo adatto, **riusarne la chiave** (consolidare) invece di crearne uno quasi-uguale: si evita il doppione e si **riempie** un campo altrimenti orfano (coerente con l'obiettivo "niente buchi" del demo).
+- La chiave e' identita': un `upsert` su `(workspaceId, entity, key)` con una chiave diversa **non** aggiorna quello esistente, ne crea un altro. Cambiare chiave a meta' lavoro lascia **artefatti** (definizione vecchia + valori gia' scritti nei JSON degli oggetti) che vanno ripuliti a mano — su un DB pulito non si ripresenterebbero, ma sul DB di sviluppo restano finche' non li togli.
