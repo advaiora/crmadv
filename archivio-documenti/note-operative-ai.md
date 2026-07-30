@@ -466,3 +466,16 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Per i curl al **frontend Vite** (transform dei moduli, `@vite/client`, ecc.) usare **`localhost:5173`** o **`[::1]:5173`**, NON `127.0.0.1`.
 - Per i curl all'**API** restare su **`127.0.0.1:4000`** (nota #29: il `fetch` di Node su `localhost` andrebbe a `::1` dove l'API IPv4 non ascolta — l'opposto del frontend).
 - Diagnosi rapida di un `HTTP 000` su TUTTI i file (non solo uno): `netstat -ano | grep LISTENING | grep :5173` per vedere se l'indirizzo e' `[::1]` o `0.0.0.0`, e allineare l'host del curl. `000` = rete/host, non codice (come gia' in #11).
+
+---
+
+## 34. I dev server avviati con `preview_start` possono fermarsi tra un turno e l'altro
+
+**Contesto:** avviati API (4000) e frontend (5173) con lo strumento di preview per una verifica; poco dopo l'utente segnala che il browser non carica.
+
+**Errore:** fidarsi del messaggio "Server started successfully" e dire all'utente di aprire il browser senza ricontrollare. I server avviati con `preview_start`, in una sessione lunga, possono **fermarsi tra i turni** (lo strumento ne perde traccia: `preview_list` torna vuoto), e a quel punto la pagina non carica. Ho comunicato "sono accesi" quando in realta' erano gia' giu'.
+
+**Modo corretto:**
+- Prima di dire all'utente di aprire il CRM nel browser, **verificare lo stato reale**, non fidarsi del "started successfully": `netstat -ano | grep LISTENING | grep -E ":4000|:5173"` + un `curl` di salute all'API (`http://127.0.0.1:4000/health` deve dare `{"status":"ok",...}`). Se non rispondono, riavviare e ri-verificare.
+- Ricordare all'utente di usare **`localhost:5173`**, non `127.0.0.1:5173` (Vite ascolta su IPv6 `[::1]`, nota #33).
+- **In chiusura sessione:** `preview_list` puo' tornare **vuoto** mentre i processi sono ancora **vivi** (netstat li vede su 4000/5173). Se non ci sono piu' `serverId` validi per `preview_stop`, spegnerli individuando i PID dalla porta (`Get-NetTCPConnection -LocalPort 4000,5173 -State Listen`) e terminandoli mirati per PID — mai per command-line (nota #17), e solo dopo aver verificato che siano di questa sessione.
