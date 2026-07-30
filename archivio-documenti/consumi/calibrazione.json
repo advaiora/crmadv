@@ -13,5 +13,12 @@
     "percentuale": "la percentuale del limite riportata da /usage",
     "nota": "opzionale: cosa si stava facendo, o qualsiasi cosa utile a rileggere il campione"
   },
-  "campioni": []
+  "campioni": [
+    {
+      "quando": "2026-07-30 08:53",
+      "peso": 14.1,
+      "percentuale": 10,
+      "nota": "Fine sessione (rifiniture Reportistica + pianificazione arricchimento demo). Carico basso-medio: 12% del picco storico. Serve un campione a finestra carica per completare la conversione."
+    }
+  ]
 }
