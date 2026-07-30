@@ -74,6 +74,16 @@ Per ogni cambiamento di schema che finisce su `main` si usano **solo migrazioni 
 
 Regola pratica quando si tocca lo schema: modifica `schema.prisma`, genera la migrazione con `prisma migrate dev`, **committa il file di migrazione** insieme al codice, e **segnala nell'handoff** che c'è una nuova migrazione (ricordando che l'arretrato `20260706085001` va riconciliato *prima*). **Non riscrivere migrazioni già applicate** (cambierebbe il loro checksum e romperebbe gli ambienti dove funzionano già).
 
+## Frontend `.jsx` — regole di manutenzione (dal 30/7/2026)
+
+Il frontend è la parte più fragile del progetto (niente tipi, storicamente niente test). Dal 30/7/2026 esiste una rete minima che va **mantenuta e allargata**, non aggirata:
+
+- **I test frontend esistono**: `npm run test:frontend` (Vitest + Testing Library; in sviluppo `npm run test:frontend:watch`). Il file di test sta **accanto al sorgente** (`X.test.js` / `X.test.jsx`). Esempi da imitare: `src/lib/brandingPalette.test.ts` (funzione pura), `src/components/ui/DetailField.test.jsx` (render di componente).
+- **Il codice nuovo nasce col suo test.** Vale per helper/funzioni pure (sempre) e per i componenti quando hanno logica propria (condizioni, varianti, stati). Quando si tocca un file esistente estraendone logica, la parte estratta va coperta.
+- **Soglie di dimensione file** (guardrail ESLint, `warn`): oltre **500 righe** il lint segnala; **800** è la soglia-mostro (`npm run mappa`, §1: non si apre intero). Un warning `max-lines` significa **spezzare, non allungare**: a un file già sopra soglia non si aggiungono feature — prima si estrae qualcosa.
+- **I warning dei guardrail non si zittiscono** con `eslint-disable`: si leggono e si riducono. Il lint resta "blocca solo sul rosso".
+- **Per spezzare un file-mostro** (sessioni dedicate, una alla volta): `npm run mappa` → **esploratore** → estrarre prima le funzioni pure (con test) → poi i sottocomponenti evidenti (con smoke test) → verifica in anteprima → **revisore** → commit. Mai rifattorizzare un mostro "di passaggio" mentre si fa altro.
+
 ## Dev server e database — una sola sessione accesa per volta
 
 I dev server (`npm run dev:api` sulla 4000 e `npm run dev` sulla 5173) vanno tenuti accesi in **una sola sessione/finestra per volta**. Il motivo è concreto: l'API gira con `tsx watch`, che tiene un **lock sulla DLL di Prisma**; se una seconda sessione ha l'API accesa, `prisma generate` e le migrazioni si bloccano (e al reload la pagina può mostrare dati vuoti mentre l'API si riavvia — non è un bug). È così che il 16/7/2026 una sessione ha dovuto fermare i dev server di un'altra per poter migrare.

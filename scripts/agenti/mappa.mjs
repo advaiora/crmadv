@@ -114,7 +114,11 @@ function inventario() {
     perEst[e] = (perEst[e] || 0) + 1;
     const r = nRighe(leggi(f));
     totRighe += r;
-    if (r > SOGLIA_FILE_MOSTRO) mostri.push({ file: rel(f), righe: r });
+    // La vendored @hk-gantt resta nei conteggi (esiste nel repo) ma NON tra i mostri:
+    // non e' codice nostro, non va presa di mira da un riordino (allineato a eslint/vitest).
+    if (r > SOGLIA_FILE_MOSTRO && !rel(f).startsWith('src/components/@hk-gantt/')) {
+      mostri.push({ file: rel(f), righe: r });
+    }
   }
   mostri.sort((a, b) => b.righe - a.righe);
   return { perEst, totRighe, mostri };
@@ -138,6 +142,34 @@ function moduliBackend() {
       .sort((a, b) => b.righe - a.righe);
     return { nome, files };
   });
+}
+
+// Frontend .jsx raggruppato per "area" (views/<Area>, modules/<nome>, components, layout...).
+// Stessa idea dei moduli backend: vedere la superficie senza aprire i file.
+function areeFrontend() {
+  const gruppi = new Map();
+  for (const f of elencaFile(path.join(RADICE, 'src'))) {
+    if (est(f) !== '.jsx') continue;
+    if (/\.(test|spec)\.jsx$/.test(f)) continue; // i test non sono debito: fuori dai pesi per area
+    const r = rel(f); // es. src/views/Agency/chat/AiChatWidget.jsx
+    const parti = r.split('/');
+    let chiave;
+    if (parti[1] === 'views' && parti.length > 3) chiave = `views/${parti[2]}`;
+    else if (parti[1] === 'modules' && parti.length > 3) chiave = `modules/${parti[2]}`;
+    else if (parti[1] === 'components' && parti[2] === '@hk-gantt') continue; // libreria vendored, non nostra
+    else chiave = parti.length > 2 ? parti[1] : '(radice src)';
+    const txt = leggi(f);
+    const voce = { file: r, righe: nRighe(txt), exp: estraiExport(txt) };
+    if (!gruppi.has(chiave)) gruppi.set(chiave, []);
+    gruppi.get(chiave).push(voce);
+  }
+  const out = [...gruppi.entries()].map(([nome, files]) => ({
+    nome,
+    files: files.sort((a, b) => b.righe - a.righe),
+    totRighe: files.reduce((s, f) => s + f.righe, 0),
+  }));
+  out.sort((a, b) => b.totRighe - a.totRighe);
+  return out;
 }
 
 function catenaPermessi() {
@@ -226,6 +258,7 @@ function componi() {
   const commit = gitHead();
   const inv = inventario();
   const moduli = moduliBackend();
+  const aree = areeFrontend();
   const perm = catenaPermessi();
   const centr = centralini();
   const prisma = modelliPrisma();
@@ -258,7 +291,8 @@ function componi() {
 
   R.push(`## 1. File da NON aprire interi (oltre ${SOGLIA_FILE_MOSTRO} righe)`);
   R.push('');
-  R.push('Cerca per nome e leggi solo l\'intorno che serve.');
+  R.push('Cerca per nome e leggi solo l\'intorno che serve. (Esclusa la libreria vendored');
+  R.push('@hk-gantt: non e\' codice nostro e non va presa di mira da un riordino.)');
   R.push('');
   R.push('| righe | file |');
   R.push('|---:|---|');
@@ -281,6 +315,30 @@ function componi() {
       R.push(`- \`${nomeCorto}\` (${f.righe} righe)${tag} — export: ${exp}`);
     }
     if (mod.files.length > mostrati.length) R.push(`- _(+${mod.files.length - mostrati.length} altri file)_`);
+    R.push('');
+  }
+
+  R.push('## 2b. Frontend `.jsx` per area');
+  R.push('');
+  R.push('Aree ordinate per peso (righe totali). Per area: i file piu\' grossi con gli export,');
+  R.push('cosi\' scegli il punto d\'ingresso senza aprire i file. (Esclusi i file di test');
+  R.push('`*.test.jsx`/`*.spec.jsx` — non sono debito — e la libreria vendored @hk-gantt.)');
+  R.push('');
+  const totJsx = aree.reduce((s, a) => s + a.files.length, 0);
+  const totRigheJsx = aree.reduce((s, a) => s + a.totRighe, 0);
+  R.push(`Totale: **${totJsx}** file \`.jsx\`, **${totRigheJsx.toLocaleString('it-IT')}** righe.`);
+  R.push('');
+  for (const area of aree) {
+    R.push(`### ${area.nome} (${area.files.length} file, ${area.totRighe.toLocaleString('it-IT')} righe)`);
+    const mostrati = area.files.slice(0, 6);
+    for (const f of mostrati) {
+      const nomeCorto = f.file.replace(/^src\//, '');
+      const exp = f.exp.length
+        ? f.exp.slice(0, 10).join(', ') + (f.exp.length > 10 ? ` (+${f.exp.length - 10})` : '')
+        : '—';
+      R.push(`- \`${nomeCorto}\` (${f.righe} righe) — export: ${exp}`);
+    }
+    if (area.files.length > mostrati.length) R.push(`- _(+${area.files.length - mostrati.length} altri file)_`);
     R.push('');
   }
 
@@ -337,11 +395,11 @@ function componi() {
     R.push('');
   }
 
-  R.push('## 7. Limiti di questa mappa (v1)');
+  R.push('## 7. Limiti di questa mappa (v2)');
   R.push('');
-  R.push('- **Export**: estratti a regex — possono sfuggire re-export, export default rinominati, barrel file.');
-  R.push('- **Catene rotte/Prisma**: qui sono *puntatori*, non ancora cross-riferite riga per riga (rimandato a una v2).');
-  R.push('- **Frontend `.jsx`**: conteggiato in §0/§1 ma non dettagliato negli export (v2).');
+  R.push('- **Export**: estratti a regex — possono sfuggire re-export, export default rinominati, barrel file. Vale anche per la sezione frontend (§2b).');
+  R.push('- **Catene rotte/Prisma**: qui sono *puntatori*, non ancora cross-riferite riga per riga.');
+  R.push('- **Frontend**: la §2b elenca i `.jsx` (non i `.js` di utilita\' ne\' i `.ts`); per area mostra solo i file piu\' grossi.');
   R.push('- E\' una fotografia: se il codice e\' cambiato dopo la data in cima, rigenera o vai al codice.');
   R.push('');
 

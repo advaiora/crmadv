@@ -506,3 +506,18 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - I subagent la' dentro sono marcati `isSidechain: true` (nei file principali il flag e' sempre `false`); piu' robusto marcarli **anche per posizione** (dentro `subagents/`), cosi' reggono se il flag cambiasse.
 - Attribuire il loro consumo alla **sessione madre** (la cartella nonna), non a una pseudo-sessione col nome del file.
 - Regola generale: prima di fidarsi di un numero che vale **0 esatto**, verificare che non sia "0 perche' non l'ho letto" invece di "0 perche' non c'e'".
+
+---
+
+## 37. Test frontend (Vitest): su questa macchina l'avvio dell'ambiente e' LENTO per natura — un timeout non e' un test rotto
+
+**Contesto:** 30/7/2026, primo avvio della rete di test frontend (`npm run test:frontend`, Vitest + Testing Library). Un test banale (render + `getByRole`) e' fallito con `Test timed out in 5000ms`.
+
+**Errore (di interpretazione, corretto dal revisore):** la prima diagnosi era "cold-start dopo `npm install`, al secondo giro tutto veloce". **Falsa**: anche a cache calda l'`environment` puo' restare altissimo **quando la macchina e' sotto carico** (misure del 30/7 sulla stessa suite: environment da 13 s a 83 s, giri interi da 19 s a 135 s — verosimilmente jsdom sotto scansione antivirus). Non e' il primo giro a essere lento: e' il **carico della macchina** a comandare, e col timeout di default (5 s) un test poteva tornare rosso **a caso** nei giri peggiori.
+
+**Modo corretto:**
+- Il timeout per singolo test e' stato alzato a **15 s** in `vite.config.js` (`test.testTimeout`) proprio per questo: margine contro l'ambiente saturo, non licenza di scrivere test lenti (i test veri restano sotto il secondo).
+- Mettere in conto la durata: `test:frontend` va da **~20 s a macchina scarica a ~2 minuti sotto carico** (misurati entrambi il 30/7: 22 s e 135 s, stessa suite). Non e' un errore, non interromperlo; lanciarlo in background e leggere l'esito.
+- Un fallimento **con timeout** su un test banale = prima sospettare l'ambiente (guardare la riga `Duration`: `environment` spropositato rispetto a `tests`). Un fallimento **di asserzione** (`expected ... to be ...`) invece e' reale sempre, anche al primo giro.
+- Setup del sistema test (per non ri-scoprirlo): config dentro `vite.config.js` (sezione `test`, ambiente `jsdom`, setup `src/test/setup.js`); i test stanno accanto ai sorgenti (`X.test.js/.jsx/.ts`, stesso nome del sorgente, minuscole comprese); si scrive con **import espliciti** da `vitest` (niente globals). L'`include` mira `src/**` ed **esclude** `src/components/@hk-gantt/**`: la libreria vendored ha test propri in stile Jest che non girano qui (un include ingenuo li catturerebbe e fallirebbero).
+- Non lanciare `test:frontend` **in parallelo** a lint/build/altri processi pesanti: i tempi si sporcano e anche 15 s possono non bastare (nota #28, contesa).

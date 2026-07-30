@@ -48,5 +48,19 @@ export default defineConfig(({ mode }) => {
         moment: 'moment/moment.js', // Adjust path if needed
       },
     },
+    // Test frontend (Vitest legge questa stessa config: stesso transform di Vite,
+    // niente configurazione doppia). Si lanciano con `npm run test:frontend`.
+    test: {
+      environment: 'jsdom',
+      // Su questa macchina l'avvio dell'ambiente jsdom e' cronicamente lento
+      // (~20s a file, antivirus): col timeout di default (5s) un test puo'
+      // diventare rosso a caso sotto carico. 15s = margine, non licenza di lentezza.
+      testTimeout: 15000,
+      setupFiles: ['src/test/setup.js'],
+      include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+      // La libreria "vendored" @hk-gantt ha test propri in stile Jest (globali
+      // test/expect, non nostri): esclusi, come gia' fa eslint.config.js.
+      exclude: ['**/node_modules/**', 'src/components/@hk-gantt/**'],
+    },
   };
 })
