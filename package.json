@@ -24,7 +24,8 @@
     "test:unit": "node --test --import tsx \"server/**/*.test.ts\"",
     "test:integration": "node --test --import tsx \"server/**/*.smoke.ts\"",
     "test:backend": "npm run test:unit && npm run test:integration",
-    "security:vault-hygiene": "node scripts/security/vault-hygiene-check.mjs"
+    "security:vault-hygiene": "node scripts/security/vault-hygiene-check.mjs",
+    "mappa": "node scripts/agenti/mappa.mjs"
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.14.4",

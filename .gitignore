@@ -29,3 +29,7 @@ dist-ssr
 
 # PDF rigenerato dal resoconto HTML (vedi archivio-documenti/resoconto-avanzamento.html)
 archivio-documenti/resoconto-avanzamento.pdf
+
+# Mappa del progetto: artefatto generato da `npm run mappa`, rigenerato a richiesta
+# prima di chiamare esploratore/revisore. Non si committa (rigenerarlo e' gratis).
+archivio-documenti/mappa/

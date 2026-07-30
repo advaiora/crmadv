@@ -44,6 +44,8 @@ Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può
 - **`revisore`** — **chiamalo a ogni tappa conclusa**, non solo prima del commit: (a) subito dopo schema+migrazione, prima di costruirci sopra; (b) subito dopo aver completato il collegamento; (c) prima di proporre il commit. Due chiamate per pezzo di lavoro sono il default, si sale a tre-quattro se si toccano schema, permessi o generazioni AI. **Mai su codice a metà.**
 - **`architetto`** — ogni 5-10 sessioni: misura i consumi e **propone** modifiche al team. Non applica mai niente: le modifiche approvate le applica la sessione principale, e si annotano nel registro.
 
+**Mappa del progetto (dal 30/7/2026).** C'è `archivio-documenti/mappa/mappa-progetto.md`, una fotografia strutturale (moduli backend + funzioni esportate, catena permessi, centralini, modelli Prisma, indice dei documenti grossi, file da non aprire interi) prodotta da `npm run mappa` in meno di un secondo. **Non è committata** (è generata, sta in `.gitignore`). **Prima di chiamare l'esploratore o il revisore, rigenerala** (`npm run mappa`): così partono da una mappa fresca invece di aprire i file-mostro. È uno script, il costo in token è nullo — si rigenera senza pensarci.
+
 **Consumi.** Si lavora su abbonamento MAX 5x: non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: `node scripts/agenti/consumi.mjs`.
 
 **Promemoria da fare all'utente (non aspettare che lo chieda).** Il monitor non può leggere la percentuale del limite: nessun comando e nessun file locale la espongono, verificato. Quando la finestra risulta **già carica** e i campioni registrati sono meno di 5, chiedi la lettura — appoggiandola a qualcosa che si sta già facendo, tipicamente l'handoff:

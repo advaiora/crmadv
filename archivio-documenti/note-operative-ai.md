@@ -492,3 +492,17 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Prima** di definire entita' "con nome" in un seed su un workspace gia' popolato, **interrogare cosa esiste** (`customFieldDefinition.findMany({where:{workspaceId, entity}})`, o l'equivalente per project type/metric set). Il workspace demo **accumula definizioni incidentali** dai collaudi delle feature (es. `priorita` e `marketing` lasciati dalla V3), non e' un foglio bianco.
 - Se esiste gia' un campo adatto, **riusarne la chiave** (consolidare) invece di crearne uno quasi-uguale: si evita il doppione e si **riempie** un campo altrimenti orfano (coerente con l'obiettivo "niente buchi" del demo).
 - La chiave e' identita': un `upsert` su `(workspaceId, entity, key)` con una chiave diversa **non** aggiorna quello esistente, ne crea un altro. Cambiare chiave a meta' lavoro lascia **artefatti** (definizione vecchia + valori gia' scritti nei JSON degli oggetti) che vanno ripuliti a mano — su un DB pulito non si ripresenterebbero, ma sul DB di sviluppo restano finche' non li togli.
+
+---
+
+## 36. Strumenti che leggono i log di Claude Code: entrare nelle sottocartelle `subagents/`
+
+**Contesto:** il misuratore dei consumi (`scripts/agenti/consumi.mjs`) legge i registri che Claude Code scrive in `~/.claude/projects/<progetto>/`. Il 30/7/2026 riportava **quota subagent 0,0%** anche se gli agenti erano stati usati decine di volte.
+
+**Errore:** lo script leggeva solo i `.jsonl` del **primo livello** della cartella di progetto. Ma Claude Code usa un layout a **cartelle-per-sessione**: il transcript principale sta in `<progetto>/<sessione>.jsonl`, mentre le chiamate dei subagent finiscono in `<progetto>/<sessione>/subagents/*.jsonl`. Risultato: tutti i subagent invisibili — quota falsata a 0 e **totale sottostimato** (quindi anche picco e finestra sotto il vero). Un'intera analisi del team ne era uscita distorta ("gli agenti non li usa nessuno", falso: c'erano ~54 invocazioni).
+
+**Modo corretto:**
+- Chi legge i registri di Claude Code deve **camminare le sottocartelle** (ricorsione), non fermarsi al primo livello.
+- I subagent la' dentro sono marcati `isSidechain: true` (nei file principali il flag e' sempre `false`); piu' robusto marcarli **anche per posizione** (dentro `subagents/`), cosi' reggono se il flag cambiasse.
+- Attribuire il loro consumo alla **sessione madre** (la cartella nonna), non a una pseudo-sessione col nome del file.
+- Regola generale: prima di fidarsi di un numero che vale **0 esatto**, verificare che non sia "0 perche' non l'ho letto" invece di "0 perche' non c'e'".

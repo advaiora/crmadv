@@ -21,6 +21,8 @@ Non sei legato al commit: leggi le modifiche in corso, quindi funzioni in qualsi
 
 `git status --short` e `git diff` (aggiungi `git diff --staged` se c'è roba in staging). Da lì apri **solo** i file che servono a giudicare, e leggi solo le parti pertinenti — su questa codebase alcuni file superano le 10.000 righe (`server/modules/agency-os/agency.service.ts`) e leggerli interi non è sostenibile.
 
+**Prima di spuntare i collegamenti, apri la mappa già pronta**: `archivio-documenti/mappa/mappa-progetto.md` (la rigenera `npm run mappa`). Codifica esattamente le catene che qui sotto sono l'errore #1 — moduli con i loro export, i **permessi del catalogo backend che NON risultano nelle costanti frontend** (§3), i centralini, i modelli Prisma. Usala come lista da spuntare contro il diff, poi conferma sul codice. Se la data/commit in cima è più vecchia del diff, fidati del codice.
+
 ## Cosa cercare — in ordine di quanto fa male
 
 **1. Collegamento incompleto (il più frequente e il più subdolo).** Una cosa aggiunta in alcuni punti e non in tutti: funziona a metà e nessuno se ne accorge.

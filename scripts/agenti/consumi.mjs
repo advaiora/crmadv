@@ -93,16 +93,50 @@ function peso(uso, modello) {
   );
 }
 
-function leggiChiamate(dir) {
-  const chiamate = [];
-  const viste = new Set(); // stessa chiamata annotata piu' volte: si conta una volta sola
-  for (const nome of fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl'))) {
-    let contenuto;
+// Elenca ricorsivamente tutti i .jsonl sotto una cartella. Serve perche' Claude
+// Code usa un layout a cartelle-per-sessione: il transcript principale sta in
+// <progetto>/<sessione>.jsonl, ma le chiamate dei subagent finiscono in
+// <progetto>/<sessione>/subagents/*.jsonl. Leggendo solo il primo livello si
+// perdevano TUTTI i subagent: quota subagent falsata a 0 e totale sottostimato.
+function elencaJsonl(base) {
+  const out = [];
+  let voci;
+  try {
+    voci = fs.readdirSync(base);
+  } catch {
+    return out;
+  }
+  for (const nome of voci) {
+    const p = path.join(base, nome);
+    let st;
     try {
-      contenuto = fs.readFileSync(path.join(dir, nome), 'utf8');
+      st = fs.statSync(p);
     } catch {
       continue;
     }
+    if (st.isDirectory()) out.push(...elencaJsonl(p));
+    else if (nome.endsWith('.jsonl')) out.push(p);
+  }
+  return out;
+}
+
+function leggiChiamate(base) {
+  const chiamate = [];
+  const viste = new Set(); // stessa chiamata annotata piu' volte: si conta una volta sola
+  for (const file of elencaJsonl(base)) {
+    let contenuto;
+    try {
+      contenuto = fs.readFileSync(file, 'utf8');
+    } catch {
+      continue;
+    }
+    // Se il file sta in .../<sessione>/subagents/..., il consumo va attribuito
+    // alla sessione che ha lanciato il subagent (la cartella nonna), e la riga
+    // va marcata come subagent anche se il flag isSidechain non fosse presente.
+    const parti = path.relative(base, file).split(path.sep);
+    const iSub = parti.indexOf('subagents');
+    const sessioneMadre = iSub > 0 ? parti[iSub - 1] : null;
+    const nomeBase = path.basename(file).replace('.jsonl', '');
     for (const riga of contenuto.split('\n')) {
       if (!riga.trim()) continue;
       let j;
@@ -119,9 +153,9 @@ function leggiChiamate(dir) {
       const u = m.usage;
       chiamate.push({
         t: Date.parse(j.timestamp),
-        sessione: j.sessionId || nome.replace('.jsonl', ''),
+        sessione: sessioneMadre || j.sessionId || nomeBase,
         modello: m.model || 'sconosciuto',
-        subagent: Boolean(j.isSidechain),
+        subagent: Boolean(j.isSidechain) || iSub > 0,
         entrata: u.input_tokens || 0,
         uscita: u.output_tokens || 0,
         cacheScritta: u.cache_creation_input_tokens || 0,
