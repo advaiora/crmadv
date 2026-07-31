@@ -46,13 +46,15 @@ Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può
 
 **Mappa del progetto (dal 30/7/2026).** C'è `archivio-documenti/mappa/mappa-progetto.md`, una fotografia strutturale (moduli backend + funzioni esportate, catena permessi, centralini, modelli Prisma, indice dei documenti grossi, file da non aprire interi) prodotta da `npm run mappa` in meno di un secondo. **Non è committata** (è generata, sta in `.gitignore`). **Prima di chiamare l'esploratore o il revisore, rigenerala** (`npm run mappa`): così partono da una mappa fresca invece di aprire i file-mostro. È uno script, il costo in token è nullo — si rigenera senza pensarci.
 
-**Consumi.** Si lavora su abbonamento MAX 5x: non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: `node scripts/agenti/consumi.mjs`.
+**Consumi.** Si lavora su abbonamento MAX 5x: non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: `node scripts/agenti/consumi.mjs`. Dal 31/7/2026 il monitor misura **tutti i progetti insieme**, non solo questo: il limite è dell'account, e Jacopo lavora spesso su due progetti in parallelo (in una finestra misurata, il 41% del consumo veniva dall'altro progetto). L'uscita mostra anche la ripartizione per progetto.
 
 **Promemoria da fare all'utente (non aspettare che lo chieda).** Il monitor non può leggere la percentuale del limite: nessun comando e nessun file locale la espongono, verificato. Quando la finestra risulta **già carica** e i campioni registrati sono meno di 5, chiedi la lettura — appoggiandola a qualcosa che si sta già facendo, tipicamente l'handoff:
 
 > «Scrivi `/usage` nella casella dell'app e passami la percentuale che riporta. Serve a far parlare il monitor in percentuale; adesso è un buon momento perché la finestra è carica.»
 
 I campioni vanno in `archivio-documenti/consumi/calibrazione.json`. Non chiederlo a finestra scarica (il campione non servirebbe) né più di una volta per sessione.
+
+**Il campione migliore si prende subito dopo un reset** (`/usage` dice l'ora del prossimo), riferendolo alla finestra **appena chiusa**: così il periodo misurato dallo script e quello del limite coincidono davvero, invece di sfasarsi come succede con la finestra scorrevole delle ultime 5 ore. Chiedi anche **quali modelli** e **se stava lavorando su altri progetti**: sono le due cose che il solo numero non racconta.
 
 Tutto il resto — com'è composto il team, l'archivio delle alternative scartate, il registro delle decisioni — sta in `archivio-documenti/team-agenti.md`.
 

@@ -1,24 +1,41 @@
 {
   "_cosa_e": "Letture manuali del consumo reale dell'abbonamento, usate da scripts/agenti/consumi.mjs per convertire il suo indicatore interno ('peso') nella percentuale del limite. Senza almeno 2 campioni lo script parla solo in relativo.",
+  "_regola_importante": "Il limite che /usage riporta e' dell'ACCOUNT INTERO, non del singolo progetto. Quindi il 'peso' di un campione deve essere quello account-wide (tutti i progetti insieme): dal 31/7/2026 lo script lo calcola cosi'. Un campione preso col vecchio metro solo-progetto, mentre un altro progetto lavorava in parallelo, e' sottopesato e va corretto o escluso.",
   "_come_si_aggiunge": [
     "1. Meglio farlo quando la finestra di 5 ore e' GIA' CARICA: un campione preso a consumo basso non dice nulla su come si comporta la curva vicino al limite.",
-    "2. Lancia 'node scripts/agenti/consumi.mjs' e annota il peso della finestra in corso.",
+    "2. Lancia 'node scripts/agenti/consumi.mjs' e annota il peso della finestra in corso (e' gia' account-wide).",
     "3. Scrivi /usage nella casella dell'app e leggi la percentuale del limite.",
     "4. Aggiungi qui sotto una voce con i due valori e la data.",
-    "5. Servono 3-5 campioni presi a livelli di carico diversi."
+    "5. Servono 3-5 campioni presi a livelli di carico diversi.",
+    "6. ATTENZIONE alle finestre: /usage ha una finestra propria con un orario di reset preciso; il peso dello script copre le ultime 5 ore SCORREVOLI. Il campione migliore si prende subito dopo un reset, riferendolo alla finestra appena chiusa (come il campione del 31/7)."
   ],
   "_campi": {
-    "quando": "data e ora della lettura, formato AAAA-MM-GG HH:MM",
-    "peso": "il peso della finestra in corso riportato dallo script",
+    "quando": "data e ora della lettura, formato AAAA-MM-GG HH:MM (ora locale)",
+    "peso": "il peso account-wide della finestra, dallo script",
     "percentuale": "la percentuale del limite riportata da /usage",
-    "nota": "opzionale: cosa si stava facendo, o qualsiasi cosa utile a rileggere il campione"
+    "escluso": "se presente e true, lo script IGNORA il campione nella stima (va sempre spiegato nella nota)",
+    "nota": "cosa si stava facendo, quali modelli, e qualsiasi cosa utile a rileggere il campione"
   },
   "campioni": [
     {
       "quando": "2026-07-30 08:53",
       "peso": 14.1,
       "percentuale": 10,
-      "nota": "Fine sessione (rifiniture Reportistica + pianificazione arricchimento demo). Carico basso-medio: 12% del picco storico. Serve un campione a finestra carica per completare la conversione."
+      "escluso": true,
+      "nota": "ESCLUSO il 31/7. Peso misurato col vecchio metro solo-progetto e NON ricostruibile account-wide: ricalcolando la finestra di 5 ore che finisce a quell'ora i log non contengono alcuna chiamata (l'orario annotato non corrisponde ai registri, forse fuso o momento diverso). Rapporto %/peso 0.71, fuori scala rispetto agli altri due (0.22 e 0.19). Tenuto solo come memoria storica."
+    },
+    {
+      "quando": "2026-07-30 17:11",
+      "peso": 82.3,
+      "percentuale": 18,
+      "nota": "CORRETTO il 31/7: il peso registrato allora era 57.0 (solo questo progetto); ricalcolato account-wide fa 82.3, di cui 25.9 di un altro progetto aperto in parallelo. Il ricalcolo solo-progetto dava 56.4, cioe' combacia col 57.0 di allora: conferma che il metodo di calcolo e' giusto e che cambiava solo il perimetro. Fine sessione fase 1 riordino .jsx (commit 11bc1a3), quasi tutta Fable 5 Max. Rapporto %/peso 0.219."
+    },
+    {
+      "quando": "2026-07-31 11:50",
+      "peso": 154.5,
+      "percentuale": 30,
+      "nota": "Campione PULITO, il migliore finora: riferito alla finestra appena CHIUSA (04:50-09:50 UTC, reset alle 11:50 locali) e non a una finestra scorrevole, quindi i due perimetri temporali coincidono davvero. Partita da 0% a inizio giornata e arrivata al 30% (dato dato da Jacopo con certezza). Peso account-wide 154.5 su 456 chiamate: 90.3 questo progetto (riordino .jsx, Fable 5 Max) + 64.1 il progetto dashboard-inventario-laboratorio (Opus 4.8 e Opus 5) — cioe' il 41% del limite consumato se lo mangiava l'altro progetto. Rapporto %/peso 0.194.",
+      "nota_modelli": "Con i pesi corretti CADE il sospetto del 30/7 che l'abbonamento contasse Fable diversamente dallo script: i rapporti dei due campioni validi sono 0.219 (sessione quasi tutta Fable) e 0.194 (sessione mista Fable+Opus 4.8+Opus 5), cioe' praticamente uguali. Lo scarto che si vedeva prima era l'altro progetto non conteggiato, non il modello."
     }
   ]
 }

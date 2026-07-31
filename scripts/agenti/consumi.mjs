@@ -1,11 +1,17 @@
 #!/usr/bin/env node
-// Misuratore dei consumi di Claude Code su questo progetto.
+// Misuratore dei consumi di Claude Code sull'ACCOUNT (tutti i progetti).
 //
 // A COSA SERVE: su abbonamento (MAX 5x) il problema non sono i soldi, e' restare
 // dentro la finestra di consumo per non prendere blocchi a meta' lavoro. Questo
 // script legge i registri locali che Claude Code scrive per ogni sessione e dice
 // quanto si e' consumato: nella finestra di 5 ore in corso, nella sessione, e
 // nello storico.
+//
+// PERCHE' TUTTO L'ACCOUNT (deciso il 31/7/2026 con Jacopo): i limiti che /usage
+// riporta sono dell'abbonamento intero, non del singolo progetto. Misurare solo
+// questa cartella mentre un altro progetto lavora in parallelo accoppierebbe un
+// peso parziale a una percentuale totale, falsando la calibrazione. Quindi si
+// scansiona ~/.claude/projects per intero.
 //
 // COSA NON FA: non manda niente da nessuna parte, non tocca il codice del
 // progetto, e senza il flag --scrivi non crea alcun file. Legge e stampa.
@@ -29,6 +35,7 @@ const FINESTRA_MS = 5 * 60 * 60 * 1000; // la finestra di consumo e' di 5 ore
 // Prezzi di listino per milione di token, verificati il 23/7/2026.
 // Servono solo come PROPORZIONE fra i tipi di token. Se cambiano, si aggiorna qui.
 const PREZZI = {
+  'claude-opus-5': { in: 5, out: 25 }, // assunto pari a Opus 4.x finche' non verificato a listino
   'claude-opus-4-8': { in: 5, out: 25 },
   'claude-opus-4-7': { in: 5, out: 25 },
   'claude-opus-4-6': { in: 5, out: 25 },
@@ -45,8 +52,17 @@ const RADICE = process.cwd();
 const FILE_CALIBRAZIONE = path.join(RADICE, 'archivio-documenti', 'consumi', 'calibrazione.json');
 const FILE_REGISTRO = path.join(RADICE, 'archivio-documenti', 'consumi', 'registro.md');
 
-// --- individua la cartella dei registri di questa sessione -------------------
+// --- individua le cartelle dei registri --------------------------------------
 
+// Radice di TUTTI i progetti: e' quella che si misura, perche' il limite
+// dell'abbonamento e' unico per l'account (vedi nota in testa al file).
+function cartellaTuttiProgetti() {
+  const base = path.join(os.homedir(), '.claude', 'projects');
+  return fs.existsSync(base) ? base : null;
+}
+
+// Cartella del SOLO progetto corrente: serve a etichettare le chiamate
+// (quanto di questa finestra e' nostro e quanto degli altri progetti).
 function cartellaRegistri() {
   const base = path.join(os.homedir(), '.claude', 'projects');
   if (!fs.existsSync(base)) return null;
@@ -120,10 +136,14 @@ function elencaJsonl(base) {
   return out;
 }
 
-function leggiChiamate(base) {
+function leggiChiamate(base, dirProgettoCorrente = null) {
   const chiamate = [];
   const viste = new Set(); // stessa chiamata annotata piu' volte: si conta una volta sola
   for (const file of elencaJsonl(base)) {
+    // A quale progetto appartiene questa chiamata: la prima parte del percorso
+    // relativo alla radice dei progetti e' la cartella-progetto.
+    const progetto = path.relative(base, file).split(path.sep)[0] || '(radice)';
+    const nostro = dirProgettoCorrente ? file.startsWith(dirProgettoCorrente + path.sep) : true;
     let contenuto;
     try {
       contenuto = fs.readFileSync(file, 'utf8');
@@ -154,6 +174,8 @@ function leggiChiamate(base) {
       chiamate.push({
         t: Date.parse(j.timestamp),
         sessione: sessioneMadre || j.sessionId || nomeBase,
+        progetto,
+        nostro,
         modello: m.model || 'sconosciuto',
         subagent: Boolean(j.isSidechain) || iSub > 0,
         entrata: u.input_tokens || 0,
@@ -231,7 +253,9 @@ function mediana(valori) {
 function leggiCalibrazione() {
   try {
     const j = JSON.parse(fs.readFileSync(FILE_CALIBRAZIONE, 'utf8'));
-    return Array.isArray(j.campioni) ? j.campioni.filter((c) => c.peso > 0 && c.percentuale > 0) : [];
+    // I campioni marcati "escluso" restano nel file come memoria storica ma
+    // non entrano nella stima (di solito: presi con un metro non confrontabile).
+    return Array.isArray(j.campioni) ? j.campioni.filter((c) => c.peso > 0 && c.percentuale > 0 && !c.escluso) : [];
   } catch {
     return [];
   }
@@ -257,15 +281,16 @@ const quando = (t) => new Date(t).toISOString().slice(0, 16).replace('T', ' ');
 
 function main() {
   const args = process.argv.slice(2);
-  const dir = cartellaRegistri();
-  if (!dir) {
-    console.error('Registri di Claude Code non trovati per questo progetto.');
+  const base = cartellaTuttiProgetti();
+  if (!base) {
+    console.error('Registri di Claude Code non trovati.');
     console.error(`Cercati in: ${path.join(os.homedir(), '.claude', 'projects')}`);
     process.exitCode = 1;
     return;
   }
+  const dirNostra = cartellaRegistri(); // puo' essere null: si misura comunque l'account
 
-  const chiamate = leggiChiamate(dir);
+  const chiamate = leggiChiamate(base, dirNostra);
   if (chiamate.length === 0) {
     console.error('Nessuna chiamata registrata: non c\'e\' ancora niente da misurare.');
     process.exitCode = 1;
@@ -273,7 +298,16 @@ function main() {
   }
 
   const adesso = Date.now();
-  const finestra = chiamate.filter((c) => c.t >= adesso - FINESTRA_MS).reduce(accumula, sommaVuota());
+  const inFinestra = chiamate.filter((c) => c.t >= adesso - FINESTRA_MS);
+  const finestra = inFinestra.reduce(accumula, sommaVuota());
+  // Ripartizione della finestra per progetto: serve a capire quanto del limite
+  // se lo sta mangiando un altro progetto aperto in parallelo.
+  const finestraPerProgetto = [...inFinestra.reduce((mappa, c) => {
+    const voce = mappa.get(c.progetto) || { progetto: c.progetto, peso: 0, nostro: c.nostro };
+    voce.peso += c.peso;
+    mappa.set(c.progetto, voce);
+    return mappa;
+  }, new Map()).values()].sort((a, b) => b.peso - a.peso);
   const totale = chiamate.reduce(accumula, sommaVuota());
   const picco = piccoFinestra(chiamate);
   const sessioni = perSessione(chiamate);
@@ -293,6 +327,7 @@ function main() {
     sessioni: sessioni.length,
     quotaSubagent: totale.peso > 0 ? pesoSubagent / totale.peso : 0,
     calibrazione: campioni.length,
+    finestraPerProgetto,
   };
 
   if (args.includes('--json')) {
@@ -304,12 +339,19 @@ function main() {
   const barra = '#'.repeat(Math.min(40, Math.round(perc * 40))).padEnd(40, '.');
 
   console.log('');
-  console.log('CONSUMI — Claude Code su questo progetto');
+  console.log('CONSUMI — Claude Code, TUTTI i progetti (il limite e\' dell\'account)');
   console.log(`(${sessioni.length} sessioni, ${chiamate.length} chiamate, dal ${quando(chiamate[0].t)})`);
   console.log('');
   console.log('FINESTRA IN CORSO (ultime 5 ore)');
   console.log(`  peso ${n1(finestra.peso)} unita'   [${barra}] ${(perc * 100).toFixed(0)}% del tuo picco storico`);
   console.log(`  chiamate ${finestra.chiamate} · uscita ${mln(finestra.uscita)} · cache riletta ${mln(finestra.cacheLetta)}`);
+  if (finestraPerProgetto.length > 1) {
+    const righe = finestraPerProgetto
+      .slice(0, 4)
+      .map((p) => `${p.nostro ? 'questo progetto' : p.progetto} ${n1(p.peso)}`)
+      .join(' · ');
+    console.log(`  ripartizione: ${righe}`);
+  }
   if (stima) {
     console.log(
       `  ≈ ${stima.percentuale.toFixed(0)}% del limite  (stima da ${stima.campioni} letture di /usage, scarto medio ${stima.scartoMedio.toFixed(1)} punti)`,

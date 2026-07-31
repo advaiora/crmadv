@@ -521,3 +521,19 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Un fallimento **con timeout** su un test banale = prima sospettare l'ambiente (guardare la riga `Duration`: `environment` spropositato rispetto a `tests`). Un fallimento **di asserzione** (`expected ... to be ...`) invece e' reale sempre, anche al primo giro.
 - Setup del sistema test (per non ri-scoprirlo): config dentro `vite.config.js` (sezione `test`, ambiente `jsdom`, setup `src/test/setup.js`); i test stanno accanto ai sorgenti (`X.test.js/.jsx/.ts`, stesso nome del sorgente, minuscole comprese); si scrive con **import espliciti** da `vitest` (niente globals). L'`include` mira `src/**` ed **esclude** `src/components/@hk-gantt/**`: la libreria vendored ha test propri in stile Jest che non girano qui (un include ingenuo li catturerebbe e fallirebbero).
 - Non lanciare `test:frontend` **in parallelo** a lint/build/altri processi pesanti: i tempi si sporcano e anche 15 s possono non bastare (nota #28, contesa).
+
+---
+
+## 38. Misurare un limite di ACCOUNT con un metro di PROGETTO: campioni falsati
+
+**Contesto:** taratura del monitor consumi (`scripts/agenti/consumi.mjs`). Lo script pesa i token dei registri locali; la percentuale reale del limite si legge a mano con `/usage` e si registra in `archivio-documenti/consumi/calibrazione.json`.
+
+**Errore:** lo script leggeva **solo la cartella di registri di questo progetto**, mentre i limiti che `/usage` riporta (finestra di 5 ore, settimanali) sono **dell'account intero**. Jacopo lavora spesso su due progetti in parallelo: ogni campione accoppiava quindi un peso *parziale* a una percentuale *totale*. Effetto misurato il 31/7/2026: nella finestra campionata il **41%** del consumo veniva da un altro progetto (64,1 unita' su 154,5).
+
+**Il danno vero non e' il numero storto, e' la diagnosi sbagliata che ne segue.** Dai due campioni falsati era nato il sospetto che l'abbonamento contasse il modello Fable in modo diverso dallo script (i rapporti %/peso divergevano di circa 2x, e Fable e' l'unico modello con listino doppio: sembrava tornare). Ricalcolati i pesi su tutto l'account, i rapporti sono diventati **0,219** e **0,194** — praticamente identici: il modello non c'entrava nulla, era l'altro progetto non contato. Lo scarto medio della stima e' sceso da **7,0 a 1,5 punti**.
+
+**Modo corretto:**
+- Il perimetro della misura deve **coincidere con il perimetro del limite**. Lo script ora scansiona tutta la cartella `~/.claude/projects` e stampa la **ripartizione per progetto** della finestra in corso.
+- **Prendere il campione subito dopo un reset**, riferendolo alla finestra **appena chiusa**: la finestra del piano ha un orario di reset preciso, quella dello script e' scorrevole (ultime 5 ore) — se non si allineano, i due numeri parlano di periodi diversi.
+- Chiedere sempre **quali modelli** e **se c'erano altri progetti attivi**: senza, il campione non e' rileggibile.
+- Un campione preso con un metro non confrontabile non va cancellato ne' lasciato a inquinare la stima: si marca `"escluso": true` con il motivo nella nota (lo script lo salta). Se invece i registri sono ancora sul disco, meglio ancora: si **ricalcola** il peso col metro nuovo, e il campione torna valido. Prova che il ricalcolo e' affidabile: rifacendo il conto solo-progetto del campione del 30/7 e' uscito 56,4 contro il 57,0 registrato allora.
