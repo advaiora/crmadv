@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Button, Card, Col, Form, Modal, Placeholder, Row } from "react-bootstrap";
+import { Alert, Button, Card, Placeholder } from "react-bootstrap";
 import { Link, useHistory, useLocation } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
+import { Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
 import ClientsModuleGate from "../../modules/clients/ui/ClientsModuleGate";
-import { deleteClient, exportClients, importClients, listClients, updateClient } from "../../modules/clients/ui/clientApi";
-import { CLIENTS_PERMISSIONS, CLIENTS_PRESET_TAGS } from "../../modules/clients/ui/constants";
-import { ClientEmptyState, ClientFiltersBar, ClientGridRow, ClientMobileCard, PageHeader } from "../../modules/clients/ui/components";
-import { getClientTypeLabel, getTagBadgeStyle, hasTag } from "../../modules/clients/ui/helpers";
+import { deleteClient, listClients } from "../../modules/clients/ui/clientApi";
+import { CLIENTS_PERMISSIONS } from "../../modules/clients/ui/constants";
+import { ClientEmptyState, ClientFiltersBar, ClientGridRow, ClientMobileCard, ClientTagsEditorModal, ClientsListPagination, PageHeader } from "../../modules/clients/ui/components";
+import { getClientTypeLabel } from "../../modules/clients/ui/helpers";
 import { getSortLabel, parsePageSize, parsePositiveInt, parseSort, parseType } from "../../modules/clients/ui/listQueryParams";
+import { useClientTagsEditor } from "../../modules/clients/ui/useClientTagsEditor";
+import { useClientsCsvTransfer } from "../../modules/clients/ui/useClientsCsvTransfer";
 import "../../modules/clients/ui/clients-ui.css";
 import { hasPermission } from "../../utils/workspaceAccess";
 
@@ -24,15 +26,7 @@ const ClientsList = () => {
 
   const [searchValue, setSearchValue] = useState(activeQuery);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [tagEditorClient, setTagEditorClient] = useState(null);
-  const [tagEditorTags, setTagEditorTags] = useState([]);
-  const [tagEditorDraft, setTagEditorDraft] = useState("");
-  const [tagEditorSaving, setTagEditorSaving] = useState(false);
-  const [tagEditorError, setTagEditorError] = useState("");
   const [error, setError] = useState("");
-  const [actionMessage, setActionMessage] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const fileInputRef = useRef(null);
 
@@ -121,6 +115,10 @@ const ClientsList = () => {
     void loadClients();
   }, [loadClients]);
 
+  // Import/export CSV nell'hook dedicato: errori sull'unico canale della
+  // pagina (setError), refresh della lista dopo un import riuscito.
+  const csvTransfer = useClientsCsvTransfer({ onError: setError, onImported: loadClients });
+
   const items = useMemo(() => {
     if (activeType === "all") {
       return clientsData.items;
@@ -197,7 +195,7 @@ const ClientsList = () => {
   );
 
   const triggerImport = () => {
-    if (!fileInputRef.current || importing) {
+    if (!fileInputRef.current || csvTransfer.importing) {
       return;
     }
 
@@ -210,73 +208,8 @@ const ClientsList = () => {
       return;
     }
 
-    setImporting(true);
-    setError("");
-    setActionMessage(null);
-
-    try {
-      const csv = await file.text();
-      const result = await importClients({
-        csv,
-        dryRun: false,
-      });
-
-      const summary = result.summary || {};
-      const failedRows = Number(summary.failedRows || 0);
-      const createdRows = Number(summary.createdRows || 0);
-      const totalRows = Number(summary.totalRows || 0);
-      const errorsPreview = Array.isArray(summary.errors) ? summary.errors.slice(0, 5) : [];
-
-      setActionMessage({
-        variant: failedRows > 0 ? "warning" : "success",
-        text: `Import completato: ${createdRows} creati, ${failedRows} falliti su ${totalRows} righe.`,
-        errors: errorsPreview,
-      });
-
-      await loadClients();
-    } catch (importError) {
-      setError(importError?.message || "Errore durante importazione clienti.");
-    } finally {
-      setImporting(false);
-      event.target.value = "";
-    }
-  };
-
-  const onExportClients = async () => {
-    if (exporting) {
-      return;
-    }
-
-    setExporting(true);
-    setError("");
-    setActionMessage(null);
-
-    try {
-      const { blob, filename } = await exportClients({
-        query: activeQuery || undefined,
-        sort: activeSort,
-        type: activeType !== "all" ? activeType : undefined,
-      });
-
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
-
-      setActionMessage({
-        variant: "success",
-        text: `Export completato: file ${filename} scaricato.`,
-        errors: [],
-      });
-    } catch (exportError) {
-      setError(exportError?.message || "Errore durante esportazione clienti.");
-    } finally {
-      setExporting(false);
-    }
+    await csvTransfer.importFromFile(file);
+    event.target.value = "";
   };
 
   const goToPage = (nextPage) => {
@@ -303,61 +236,9 @@ const ClientsList = () => {
     }));
   }, []);
 
-  const openTagsModal = useCallback((client) => {
-    setTagEditorClient(client);
-    setTagEditorTags(Array.isArray(client.tags) ? client.tags.filter(Boolean) : []);
-    setTagEditorDraft("");
-    setTagEditorError("");
-  }, []);
-
-  const closeTagsModal = (force = false) => {
-    const shouldForceClose = force === true;
-    if (tagEditorSaving && !shouldForceClose) {
-      return;
-    }
-
-    setTagEditorClient(null);
-    setTagEditorTags([]);
-    setTagEditorDraft("");
-    setTagEditorError("");
-  };
-
-  const togglePresetTagInModal = (presetTag) => {
-    setTagEditorTags((prev) => (hasTag(prev, presetTag) ? prev.filter((tag) => tag.toLowerCase() !== presetTag.toLowerCase()) : [...prev, presetTag]));
-  };
-
-  const removeTagInModal = (tagToRemove) => {
-    setTagEditorTags((prev) => prev.filter((tag) => tag !== tagToRemove));
-  };
-
-  const addCustomTagInModal = () => {
-    const normalized = tagEditorDraft.trim();
-    if (!normalized) {
-      return;
-    }
-
-    setTagEditorTags((prev) => (hasTag(prev, normalized) ? prev : [...prev, normalized]));
-    setTagEditorDraft("");
-  };
-
-  const saveTagsFromModal = async () => {
-    if (!tagEditorClient) {
-      return;
-    }
-
-    setTagEditorSaving(true);
-    setTagEditorError("");
-
-    try {
-      await updateClient(tagEditorClient.id, { tags: tagEditorTags });
-      updateClientTagsInState(tagEditorClient.id, tagEditorTags);
-      closeTagsModal(true);
-    } catch (updateError) {
-      setTagEditorError(updateError?.message || "Errore durante aggiornamento tag cliente.");
-    } finally {
-      setTagEditorSaving(false);
-    }
-  };
+  // Stato+logica del modal tag nell'hook dedicato; al salvataggio riflette
+  // i tag nella lista locale (updateClientTagsInState) senza ricaricare.
+  const tagsEditor = useClientTagsEditor({ onSaved: updateClientTagsInState });
 
   const renderLoadingRows = () => (
     <>
@@ -401,21 +282,27 @@ const ClientsList = () => {
                     )}
                     <Button
                       variant="outline-secondary"
-                      disabled={!canCreate || importing}
+                      disabled={!canCreate || csvTransfer.importing}
                       onClick={triggerImport}
                       className="d-none d-sm-inline-flex align-items-center gap-2 clients-import-export-btn"
                     >
                       <Upload size={15} />
-                      {importing ? "Importazione..." : "Importa CSV"}
+                      {csvTransfer.importing ? "Importazione..." : "Importa CSV"}
                     </Button>
                     <Button
                       variant="outline-secondary"
-                      disabled={exporting}
-                      onClick={() => void onExportClients()}
+                      disabled={csvTransfer.exporting}
+                      onClick={() =>
+                        void csvTransfer.exportWithFilters({
+                          query: activeQuery || undefined,
+                          sort: activeSort,
+                          type: activeType !== "all" ? activeType : undefined,
+                        })
+                      }
                       className="d-none d-sm-inline-flex align-items-center gap-2 clients-import-export-btn"
                     >
                       <Download size={15} />
-                      {exporting ? "Esportazione..." : "Esporta CSV"}
+                      {csvTransfer.exporting ? "Esportazione..." : "Esporta CSV"}
                     </Button>
                   </>
                 }
@@ -472,12 +359,12 @@ const ClientsList = () => {
                 </Alert>
               )}
 
-              {actionMessage && (
-                <Alert variant={actionMessage.variant} dismissible onClose={() => setActionMessage(null)}>
-                  <div>{actionMessage.text}</div>
-                  {Array.isArray(actionMessage.errors) && actionMessage.errors.length > 0 && (
+              {csvTransfer.actionMessage && (
+                <Alert variant={csvTransfer.actionMessage.variant} dismissible onClose={csvTransfer.dismissMessage}>
+                  <div>{csvTransfer.actionMessage.text}</div>
+                  {Array.isArray(csvTransfer.actionMessage.errors) && csvTransfer.actionMessage.errors.length > 0 && (
                     <div className="mt-2 small">
-                      {actionMessage.errors.map((entry) => (
+                      {csvTransfer.actionMessage.errors.map((entry) => (
                         <div key={`${entry.row}-${entry.message}`}>
                           Riga {entry.row}: {entry.message}
                         </div>
@@ -519,7 +406,7 @@ const ClientsList = () => {
                               onOpen={handleOpenClient}
                               onEdit={handleEditClient}
                               onDelete={onDeleteClient}
-                              onEditTags={openTagsModal}
+                              onEditTags={tagsEditor.open}
                             />
                           ))}
                       </div>
@@ -551,7 +438,7 @@ const ClientsList = () => {
                           onOpen={handleOpenClient}
                           onEdit={handleEditClient}
                           onDelete={onDeleteClient}
-                          onEditTags={openTagsModal}
+                          onEditTags={tagsEditor.open}
                         />
                       ))}
                   </div>
@@ -568,130 +455,16 @@ const ClientsList = () => {
                 />
               )}
 
-              <Modal show={Boolean(tagEditorClient)} onHide={() => closeTagsModal(false)} centered dialogClassName="clients-tags-modal">
-                <Modal.Header closeButton={!tagEditorSaving}>
-                  <Modal.Title>Modifica tag cliente</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                  <p className="mb-2 small text-muted">{tagEditorClient ? `Cliente: ${tagEditorClient.name}` : ""}</p>
+              <ClientTagsEditorModal editor={tagsEditor} />
 
-                  {tagEditorError && (
-                    <Alert variant="danger" className="py-2 px-3 mb-3">
-                      {tagEditorError}
-                    </Alert>
-                  )}
-
-                  <div className="clients-tags mb-3">
-                    {tagEditorTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
-                    {tagEditorTags.map((tag) => (
-                      <span key={`modal-tag-${tag}`} className="badge clients-tag-badge" style={getTagBadgeStyle(tag)}>
-                        {tag}
-                        <button
-                          type="button"
-                          className="clients-tag-remove-btn"
-                          onClick={() => removeTagInModal(tag)}
-                          disabled={tagEditorSaving}
-                          aria-label={`Rimuovi tag ${tag}`}
-                        >
-                          &times;
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="clients-tag-presets mb-3">
-                    {CLIENTS_PRESET_TAGS.map((presetTag) => (
-                      <Button
-                        key={`modal-preset-${presetTag}`}
-                        type="button"
-                        variant={hasTag(tagEditorTags, presetTag) ? "primary" : "outline-secondary"}
-                        size="sm"
-                        className="clients-tag-preset-btn"
-                        onClick={() => togglePresetTagInModal(presetTag)}
-                        disabled={tagEditorSaving}
-                      >
-                        {presetTag}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <Form.Group>
-                    <Form.Label className="small mb-1">Aggiungi tag personalizzato</Form.Label>
-                    <div className="input-group input-group-sm">
-                      <Form.Control
-                        value={tagEditorDraft}
-                        onChange={(event) => setTagEditorDraft(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter") {
-                            return;
-                          }
-
-                          event.preventDefault();
-                          addCustomTagInModal();
-                        }}
-                        placeholder="Nuovo tag"
-                        disabled={tagEditorSaving}
-                      />
-                      <Button type="button" variant="outline-secondary" onClick={addCustomTagInModal} disabled={tagEditorSaving || !tagEditorDraft.trim()}>
-                        Aggiungi
-                      </Button>
-                    </div>
-                  </Form.Group>
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button variant="outline-secondary" onClick={() => closeTagsModal(false)} disabled={tagEditorSaving}>
-                    Annulla
-                  </Button>
-                  <Button variant="primary" onClick={() => void saveTagsFromModal()} disabled={tagEditorSaving}>
-                    {tagEditorSaving ? "Salvataggio..." : "Salva tag"}
-                  </Button>
-                </Modal.Footer>
-              </Modal>
-
-              <Row className="align-items-center mt-3 gy-2">
-                <Col md={6}>
-                  <div className="text-muted small">
-                    Totale clienti: {clientsData.pageInfo.totalItems}
-                    {activeType !== "all" && <span> - visibili in pagina: {items.length}</span>}
-                  </div>
-                </Col>
-                <Col md={6}>
-                  <div className="clients-pagination-wrap d-flex justify-content-md-end align-items-center">
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => goToPage(activePage + 1)}
-                      disabled={!clientsData.pageInfo.hasNextPage || loading}
-                      className="clients-pagination-more-btn d-md-none"
-                    >
-                      Mostra altri
-                    </Button>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => goToPage(activePage - 1)}
-                      disabled={!clientsData.pageInfo.hasPrevPage || loading}
-                      className="clients-pagination-btn d-none d-md-inline-flex"
-                      aria-label="Pagina precedente"
-                    >
-                      <ChevronLeft size={15} />
-                    </Button>
-                    <span className="small clients-pagination-status d-none d-md-inline">
-                      Pagina {clientsData.pageInfo.page} di {paginationTotalPages}
-                    </span>
-                    <Button
-                      variant="outline-secondary"
-                      size="sm"
-                      onClick={() => goToPage(activePage + 1)}
-                      disabled={!clientsData.pageInfo.hasNextPage || loading}
-                      className="clients-pagination-btn d-none d-md-inline-flex"
-                      aria-label="Pagina successiva"
-                    >
-                      <ChevronRight size={15} />
-                    </Button>
-                  </div>
-                </Col>
-              </Row>
+              <ClientsListPagination
+                pageInfo={clientsData.pageInfo}
+                totalPages={paginationTotalPages}
+                activePage={activePage}
+                visibleCount={activeType !== "all" ? items.length : null}
+                loading={loading}
+                onGoToPage={goToPage}
+              />
             </div>
           </div>
         );

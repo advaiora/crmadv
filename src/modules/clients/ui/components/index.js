@@ -6,6 +6,8 @@ export { default as ClientMobileCard } from './ClientMobileCard';
 export { default as ClientRowDetails } from './ClientRowDetails';
 export { default as ClientFiltersBar } from './ClientFiltersBar';
 export { default as ClientTags } from './ClientTags';
+export { default as ClientTagsEditorModal } from './ClientTagsEditorModal';
 export { default as ClientTypeBadge } from './ClientTypeBadge';
+export { default as ClientsListPagination } from './ClientsListPagination';
 export { default as CopyField } from './CopyField';
 export { default as PageHeader } from './PageHeader';
