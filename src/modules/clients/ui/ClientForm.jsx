@@ -17,7 +17,7 @@ import {
     X,
 } from 'lucide-react';
 import { CLIENTS_PRESET_TAGS } from './constants';
-import { getClientNameLabel, getTagBadgeStyle } from './helpers';
+import { getClientNameLabel, getTagBadgeStyle, hasTag } from './helpers';
 import { validateAndNormalizePhone } from '../../../../core/utils/phone';
 import { listCustomFields } from '../../customFields/api/customFieldsApi';
 
@@ -97,8 +97,6 @@ const validateForm = (values, phoneValidationResult) => {
 
     return errors;
 };
-
-const hasTag = (tags, tagValue) => tags.some((tag) => tag.toLowerCase() === tagValue.toLowerCase());
 
 const ClientForm = ({
     initialValues,

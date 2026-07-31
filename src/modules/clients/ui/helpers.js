@@ -111,6 +111,9 @@ export const formatAddress = (address) => {
 
 export const hasContactValue = (value) => typeof value === 'string' && value.trim().length > 0;
 
+export const hasTag = (tags, tagValue) =>
+    Array.isArray(tags) && tags.some((tag) => tag.toLowerCase() === tagValue.toLowerCase());
+
 const getTagHash = (value) => {
     if (!value || typeof value !== 'string') {
         return 0;

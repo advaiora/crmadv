@@ -1,207 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Button, Card, Col, Form, Modal, Placeholder, Row } from "react-bootstrap";
 import { Link, useHistory, useLocation } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
 import ClientsModuleGate from "../../modules/clients/ui/ClientsModuleGate";
 import { deleteClient, exportClients, importClients, listClients, updateClient } from "../../modules/clients/ui/clientApi";
-import { CLIENTS_PAGE_SIZE_OPTIONS, CLIENTS_PERMISSIONS, CLIENTS_PRESET_TAGS, CLIENTS_SORT_OPTIONS } from "../../modules/clients/ui/constants";
-import { ClientActionsMenu, ClientAvatar, ClientEmptyState, ClientFiltersBar, ClientRowDetails, ClientTypeBadge, PageHeader } from "../../modules/clients/ui/components";
-import { getClientTypeLabel, getTagBadgeStyle } from "../../modules/clients/ui/helpers";
-import CollapsibleSection from "../../components/ui/CollapsibleSection";
+import { CLIENTS_PERMISSIONS, CLIENTS_PRESET_TAGS } from "../../modules/clients/ui/constants";
+import { ClientEmptyState, ClientFiltersBar, ClientGridRow, ClientMobileCard, PageHeader } from "../../modules/clients/ui/components";
+import { getClientTypeLabel, getTagBadgeStyle, hasTag } from "../../modules/clients/ui/helpers";
+import { getSortLabel, parsePageSize, parsePositiveInt, parseSort, parseType } from "../../modules/clients/ui/listQueryParams";
 import "../../modules/clients/ui/clients-ui.css";
 import { hasPermission } from "../../utils/workspaceAccess";
-import { rowActivationProps } from "../../utils/rowActivation";
-import { askAiRowProps } from "../Agency/chat/askAi";
-
-const parsePositiveInt = (value, fallback) => {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return fallback;
-  }
-
-  return parsed;
-};
-
-const parseSort = (value) => {
-  const hasOption = CLIENTS_SORT_OPTIONS.some((option) => option.value === value);
-  return hasOption ? value : "-updatedAt";
-};
-
-const parseType = (value) => (value === "person" || value === "company" ? value : "all");
-
-const parsePageSize = (value) => {
-  const parsed = parsePositiveInt(value, CLIENTS_PAGE_SIZE_OPTIONS[0]);
-  return CLIENTS_PAGE_SIZE_OPTIONS.includes(parsed) ? parsed : CLIENTS_PAGE_SIZE_OPTIONS[0];
-};
-
-const getSortLabel = (sort) => CLIENTS_SORT_OPTIONS.find((option) => option.value === sort)?.label || "Aggiornati di recente";
-const hasTag = (tags, tagValue) => tags.some((tag) => tag.toLowerCase() === tagValue.toLowerCase());
-
-// Tag di una riga cliente. Memoizzato: non si ri-renderizza all'apertura di una
-// linguetta finche' le sue props (client stabile, onEditTags stabile) non cambiano.
-const ClientTags = React.memo(function ClientTags({ client, maxVisible = 3, canEdit = false, onEditTags }) {
-  const tags = Array.isArray(client?.tags) ? client.tags.filter(Boolean) : [];
-  const visibleTags = tags.slice(0, maxVisible);
-  const remainingCount = tags.length - visibleTags.length;
-
-  return (
-    <div className="clients-tags clients-list-tags">
-      {visibleTags.length === 0 && <span className="text-muted small">Nessun tag</span>}
-      {visibleTags.map((tag) => (
-        <span key={`${client.id}-${tag}`} className="badge clients-tag-badge" style={getTagBadgeStyle(tag)}>
-          {tag}
-        </span>
-      ))}
-      {remainingCount > 0 && <span className="badge bg-light text-muted border">+{remainingCount}</span>}
-      {canEdit && (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline-secondary"
-          className="clients-tag-edit-btn"
-          onClick={() => onEditTags(client)}
-        >
-          Modifica tag
-        </Button>
-      )}
-    </div>
-  );
-});
-
-// Riga desktop completa (griglia + linguetta), memoizzata: aprire/chiudere una
-// riga NON ri-renderizza le altre 11 (props invariate) -> toggle quasi gratis.
-const ClientGridRow = React.memo(function ClientGridRow({
-  client,
-  isExpanded,
-  canEdit,
-  canDelete,
-  onToggle,
-  onOpen,
-  onEdit,
-  onDelete,
-  onEditTags,
-}) {
-  const detailId = `client-detail-${client.id}`;
-  return (
-    <>
-      <div
-        className={`clients-grid-row clients-row-clickable ${isExpanded ? "clients-row-expanded" : ""}`.trim()}
-        aria-label={`Apri scheda di ${client.name}`}
-        {...askAiRowProps("client", client)}
-        {...rowActivationProps(() => onOpen(client), { role: "row" })}
-      >
-        <div className="clients-grid-cell clients-col-disclosure" role="cell">
-          <button
-            type="button"
-            className="clients-row-disclosure"
-            onClick={() => onToggle(client.id)}
-            aria-expanded={isExpanded}
-            aria-controls={detailId}
-            aria-label={isExpanded ? `Nascondi dettagli di ${client.name}` : `Mostra dettagli di ${client.name}`}
-          >
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        <div className="clients-grid-cell" role="cell">
-          <div className="clients-row-primary">
-            <ClientAvatar name={client.name} type={client.type} />
-            <div className="clients-row-name-wrap">
-              <p className="clients-row-name">{client.name}</p>
-            </div>
-          </div>
-        </div>
-        <div className="clients-grid-cell" role="cell">
-          <ClientTypeBadge type={client.type} />
-        </div>
-        <div className="clients-grid-cell clients-cell-email" role="cell">
-          {client.email || <span className="text-muted">-</span>}
-        </div>
-        <div className="clients-grid-cell" role="cell">
-          {client.phone || <span className="text-muted">-</span>}
-        </div>
-        <div className="clients-grid-cell" role="cell">
-          <ClientTags client={client} maxVisible={3} canEdit={canEdit} onEditTags={onEditTags} />
-        </div>
-        <div className="clients-grid-cell clients-cell-actions" role="cell">
-          <ClientActionsMenu
-            client={client}
-            canEdit={canEdit}
-            canDelete={canDelete}
-            onOpen={onOpen}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        </div>
-      </div>
-      <CollapsibleSection open={isExpanded} id={detailId}>
-        <ClientRowDetails client={client} />
-      </CollapsibleSection>
-    </>
-  );
-});
-
-// Card mobile completa, memoizzata (stessa logica di ClientGridRow).
-const ClientMobileCard = React.memo(function ClientMobileCard({
-  client,
-  isExpanded,
-  canEdit,
-  canDelete,
-  onToggle,
-  onOpen,
-  onEdit,
-  onDelete,
-  onEditTags,
-}) {
-  const detailId = `client-detail-m-${client.id}`;
-  return (
-    <div
-      className="clients-mobile-card clients-row-clickable"
-      aria-label={`Apri scheda di ${client.name}`}
-      {...askAiRowProps("client", client)}
-      {...rowActivationProps(() => onOpen(client))}
-    >
-      <div className="d-flex justify-content-between align-items-start gap-2">
-        <div className="d-flex align-items-center gap-2">
-          <ClientAvatar name={client.name} type={client.type} size="sm" />
-          <div>
-            <div className="fw-semibold">{client.name}</div>
-            <div className="text-muted clients-mobile-meta">{client.email || "Email non impostata"}</div>
-          </div>
-        </div>
-        <div className="d-flex align-items-center gap-1">
-          <button
-            type="button"
-            className="clients-row-disclosure"
-            onClick={() => onToggle(client.id)}
-            aria-expanded={isExpanded}
-            aria-controls={detailId}
-            aria-label={isExpanded ? `Nascondi dettagli di ${client.name}` : `Mostra dettagli di ${client.name}`}
-          >
-            <ChevronRight size={16} />
-          </button>
-          <ClientActionsMenu
-            client={client}
-            canEdit={canEdit}
-            canDelete={canDelete}
-            onOpen={onOpen}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        </div>
-      </div>
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <ClientTypeBadge type={client.type} />
-        <div className="clients-mobile-tags">
-          <ClientTags client={client} maxVisible={2} canEdit={canEdit} onEditTags={onEditTags} />
-        </div>
-      </div>
-      <div className="text-muted clients-mobile-meta mt-2">{client.phone || "Telefono non impostato"}</div>
-      <CollapsibleSection open={isExpanded} id={detailId} className="clients-mobile-detail">
-        <ClientRowDetails client={client} />
-      </CollapsibleSection>
-    </div>
-  );
-});
 
 const ClientsList = () => {
   const history = useHistory();
@@ -355,8 +163,8 @@ const ClientsList = () => {
     history.push("/apps/clients");
   };
 
-  // Callback stabili: cosi' i componenti figli memoizzati (ClientActionsMenu,
-  // ClientRowDetails) NON si ri-renderizzano quando si apre/chiude una linguetta.
+  // Callback stabili: cosi' le righe memoizzate (ClientGridRow, ClientMobileCard)
+  // NON si ri-renderizzano quando si apre/chiude la linguetta di un'altra riga.
   const onDeleteClient = useCallback(
     async (client) => {
       try {
