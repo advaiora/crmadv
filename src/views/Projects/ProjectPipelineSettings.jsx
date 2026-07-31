@@ -1,16 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, Col, Form, ListGroup, Modal, Row } from "react-bootstrap";
+import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row } from "react-bootstrap";
 import { Plus, Pencil, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
 import { useChecklistTemplates } from "../../modules/checklists/hooks/useChecklistsQueries";
-import {
-  isApiError as isChecklistApiError,
-  listStageChecklistRules,
-  replaceStageChecklistRules,
-} from "../../modules/checklists/api/checklists.api";
-import { isApiError as isProjectApiError } from "../../modules/projects/api/projects.api";
+import { listStageChecklistRules, replaceStageChecklistRules } from "../../modules/checklists/api/checklists.api";
 import {
   useCreateCategory,
   useCreateStage,
@@ -26,67 +21,22 @@ import { useSelectedPipelineCategoryId } from "../../modules/projects/hooks/useS
 import EmptyState from "../../modules/projects/ui/states/EmptyState";
 import ErrorState from "../../modules/projects/ui/states/ErrorState";
 import LoadingState from "../../modules/projects/ui/states/LoadingState";
+import ConfirmDeleteModal from "../../modules/projects/ui/modals/ConfirmDeleteModal";
+import EditStageModal from "../../modules/projects/ui/modals/EditStageModal";
+import RenameCategoryModal from "../../modules/projects/ui/modals/RenameCategoryModal";
+import {
+  getErrorMessage,
+  isInUseError,
+  isLastStageError,
+  normalizeStageRulesPayload,
+  sortCategories,
+  sortStages,
+} from "../../modules/projects/ui/pipelineSettings.utils";
 import { hasPermission } from "../../utils/workspaceAccess";
 import "../../styles/css/project-pipeline-settings.css";
 import { readBrandingColor } from "../../lib/brandingColors";
 
 const PIPELINE_SETTINGS_PERMISSION = "projects.edit"; // TODO: replace with a dedicated pipeline-manage permission when available.
-
-const sortCategories = (categories) =>
-  [...categories].sort((left, right) => {
-    const leftOrder = Number(left?.sortOrder);
-    const rightOrder = Number(right?.sortOrder);
-    const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
-    const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
-
-    if (safeLeftOrder !== safeRightOrder) {
-      return safeLeftOrder - safeRightOrder;
-    }
-
-    return String(left?.name || "").localeCompare(String(right?.name || ""), "it");
-  });
-
-const sortStages = (stages) =>
-  [...stages].sort((left, right) => {
-    const leftOrder = Number(left?.sortOrder);
-    const rightOrder = Number(right?.sortOrder);
-    const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
-    const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
-
-    if (safeLeftOrder !== safeRightOrder) {
-      return safeLeftOrder - safeRightOrder;
-    }
-
-    return String(left?.name || "").localeCompare(String(right?.name || ""), "it");
-  });
-
-const getErrorMessage = (error) => {
-  if (!error) {
-    return "";
-  }
-
-  if (isProjectApiError(error) || isChecklistApiError(error)) {
-    return `${error.message} (${error.code || error.status || "API_ERROR"})`;
-  }
-
-  return error?.message || "Errore inatteso";
-};
-
-const isInUseError = (error) => isProjectApiError(error) && (error.code === "IN_USE" || error.status === 409);
-
-const isLastStageError = (error) => isProjectApiError(error) && (error.code === "LAST_STAGE_REQUIRED" || error.status === 400);
-
-const normalizeStageRulesPayload = (payload) => {
-  if (Array.isArray(payload?.items)) {
-    return payload.items;
-  }
-
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  return [];
-};
 
 const PipelineSettingsContent = ({ access }) => {
   const defaultStageColor = readBrandingColor("--bs-primary", "#0d6efd");
@@ -968,163 +918,41 @@ const PipelineSettingsContent = ({ access }) => {
         </Row>
       )}
 
-      <Modal show={Boolean(editingCategory)} onHide={() => setEditingCategory(null)} centered className="pipeline-modal">
-        <Modal.Header closeButton>
-          <Modal.Title>Rinomina categoria</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Control
-            value={editingCategory?.name || ""}
-            onChange={(event) =>
-              setEditingCategory((current) => ({
-                ...(current || {}),
-                name: event.target.value,
-              }))
-            }
-            placeholder="Nome categoria"
-            autoFocus
-          />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setEditingCategory(null)}>
-            Annulla
-          </Button>
-          <Button variant="primary" onClick={() => void handleSaveCategoryRename()} disabled={updateCategoryMutation.loading}>
-            {updateCategoryMutation.loading ? "Salvataggio..." : "Salva"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <RenameCategoryModal
+        category={editingCategory}
+        onChange={(name) => setEditingCategory((current) => ({ ...(current || {}), name }))}
+        onCancel={() => setEditingCategory(null)}
+        onSave={() => void handleSaveCategoryRename()}
+        saving={updateCategoryMutation.loading}
+      />
 
-      <Modal show={Boolean(deletingCategory)} onHide={() => setDeletingCategory(null)} centered className="pipeline-modal">
-        <Modal.Header closeButton>
-          <Modal.Title>Eliminare categoria?</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>Questa azione puo fallire se la categoria e in uso.</Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setDeletingCategory(null)}>
-            Annulla
-          </Button>
-          <Button variant="danger" onClick={() => void handleDeleteCategory()} disabled={deleteCategoryMutation.loading}>
-            {deleteCategoryMutation.loading ? "Eliminazione..." : "Elimina"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmDeleteModal
+        show={Boolean(deletingCategory)}
+        title="Eliminare categoria?"
+        message="Questa azione puo fallire se la categoria e in uso."
+        onCancel={() => setDeletingCategory(null)}
+        onConfirm={() => void handleDeleteCategory()}
+        confirming={deleteCategoryMutation.loading}
+      />
 
-      <Modal show={Boolean(editingStage)} onHide={() => setEditingStage(null)} centered className="pipeline-modal">
-        <Modal.Header closeButton>
-          <Modal.Title>Modifica stage</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Nome stage</Form.Label>
-            <Form.Control
-              value={editingStage?.name || ""}
-              onChange={(event) =>
-                setEditingStage((current) => ({
-                  ...(current || {}),
-                  name: event.target.value,
-                }))
-              }
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Colore</Form.Label>
-            <Form.Control
-              type="color"
-              value={editingStage?.color || defaultStageColor}
-              onChange={(event) =>
-                setEditingStage((current) => ({
-                  ...(current || {}),
-                  color: event.target.value,
-                }))
-              }
-            />
-          </Form.Group>
-          <Form.Check
-            type="switch"
-            id="edit-stage-is-closed"
-            label="Stage chiuso"
-            checked={Boolean(editingStage?.isClosed)}
-            onChange={(event) =>
-              setEditingStage((current) => ({
-                ...(current || {}),
-                isClosed: event.target.checked,
-              }))
-            }
-          />
-          <Form.Check
-            type="switch"
-            id="edit-stage-is-gated"
-            label="Checklist gate"
-            className="mt-3"
-            checked={Boolean(editingStage?.isGated)}
-            onChange={(event) =>
-              setEditingStage((current) => ({
-                ...(current || {}),
-                isGated: event.target.checked,
-                ...(event.target.checked ? {} : { gateChecklistTemplateId: "" }),
-              }))
-            }
-          />
-          <Form.Group className="mt-3">
-            <Form.Label>Template gate</Form.Label>
-            <Form.Select
-              value={editingStage?.gateChecklistTemplateId || ""}
-              disabled={!editingStage?.isGated}
-              onChange={(event) =>
-                setEditingStage((current) => ({
-                  ...(current || {}),
-                  gateChecklistTemplateId: event.target.value,
-                }))
-              }
-            >
-              <option value="">Seleziona template</option>
-              {activeChecklistTemplates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          <Form.Check
-            type="switch"
-            id="edit-stage-auto-create"
-            className="mt-3"
-            label="Auto-create checklist instance"
-            checked={Boolean(editingStage?.autoCreateInstance)}
-            disabled={!editingStage?.isGated}
-            onChange={(event) =>
-              setEditingStage((current) => ({
-                ...(current || {}),
-                autoCreateInstance: event.target.checked,
-              }))
-            }
-          />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setEditingStage(null)}>
-            Annulla
-          </Button>
-          <Button variant="primary" onClick={() => void handleSaveStage()} disabled={updateStageMutation.loading}>
-            {updateStageMutation.loading ? "Salvataggio..." : "Salva"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <EditStageModal
+        stage={editingStage}
+        checklistTemplates={activeChecklistTemplates}
+        defaultColor={defaultStageColor}
+        onChange={(patch) => setEditingStage((current) => ({ ...(current || {}), ...patch }))}
+        onCancel={() => setEditingStage(null)}
+        onSave={() => void handleSaveStage()}
+        saving={updateStageMutation.loading}
+      />
 
-      <Modal show={Boolean(deletingStage)} onHide={() => setDeletingStage(null)} centered className="pipeline-modal">
-        <Modal.Header closeButton>
-          <Modal.Title>Eliminare stage?</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>Vuoi eliminare questo stage? Questa azione non e reversibile.</Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setDeletingStage(null)}>
-            Annulla
-          </Button>
-          <Button variant="danger" onClick={() => void handleDeleteStage()} disabled={deleteStageMutation.loading}>
-            {deleteStageMutation.loading ? "Eliminazione..." : "Elimina"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ConfirmDeleteModal
+        show={Boolean(deletingStage)}
+        title="Eliminare stage?"
+        message="Vuoi eliminare questo stage? Questa azione non e reversibile."
+        onCancel={() => setDeletingStage(null)}
+        onConfirm={() => void handleDeleteStage()}
+        confirming={deleteStageMutation.loading}
+      />
 
       <ToastContainer position="bottom-right" theme="light" />
     </>
