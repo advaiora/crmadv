@@ -37,6 +37,13 @@
       "percentuale": 30,
       "nota": "Campione PULITO, il migliore finora: riferito alla finestra appena CHIUSA (04:50-09:50 UTC, reset alle 11:50 locali) e non a una finestra scorrevole, quindi i due perimetri temporali coincidono davvero. La finestra e' partita da 0% e ha raggiunto il 30% (percentuale riferita da Jacopo con certezza). Peso account-wide 156.3 su 456 chiamate, cosi' ripartito: 92.2 questo progetto (riordino .jsx, Fable 5 Max) + 64.1 il progetto dashboard-inventario-laboratorio (Opus 4.8 e Opus 5) — cioe' il 41% del limite consumato se lo mangiava l'altro progetto. RICALCOLATO il 3/8 da 154.5 a 156.3 per la correzione del conteggio dell'uscita (vedi campione precedente). Rapporto %/peso 0.192.",
       "nota_modelli": "Con i pesi corretti CADE il sospetto del 30/7 che l'abbonamento contasse Fable diversamente dallo script: i rapporti dei due campioni validi sono 0.214 (sessione quasi tutta Fable) e 0.192 (sessione mista Fable+Opus 4.8+Opus 5), cioe' praticamente uguali. Lo scarto che si vedeva prima era l'altro progetto non conteggiato, non il modello."
+    },
+    {
+      "quando": "2026-08-03 15:50",
+      "peso": 84.0,
+      "percentuale": 24,
+      "nota": "Preso a meta' finestra del piano, accoppiando i perimetri GIUSTI: /usage diceva 'si ripristina tra 1h38' (quindi finestra fissa ~12:23-17:23) e il peso e' quello di quell'intervallo via --finestra-a (84.0 su 378 chiamate), NON le 5 ore scorrevoli del monitor (che dicevano 124.4 e avrebbero falsato il rapporto). Sensibilita' verificata: spostando il reset di +/-10 minuti il peso resta fra 83.6 e 89.4. Tutto il peso e' di questo progetto (sessione: giro 2 ProjectPipelineSettings + spezzatura monitor consumi); Jacopo conferma nessun altro sviluppo in parallelo salvo poca cosa su dashboard-inventario, fuori da questa finestra. Modelli: Opus 5 la prima parte, Fable 5 dalla meta' in poi. Settimanali al momento della lettura: 28% tutti i modelli, 11% Fable.",
+      "nota_modelli": "Rapporto %/peso 0.286, sopra i due precedenti (0.214 e 0.192). Colpisce il confronto col campione del 30/7: peso quasi identico (84.3 vs 84.0) ma 18% contro 24%. Quello era quasi tutto Fable, questo per meta' Opus 5 — ipotesi APERTA che Opus 5 pesi sul limite piu' del listino assunto dallo script (5/25, 'pari a Opus 4.x finche' non verificato'). Con tre campioni non si decide: da riguardare al prossimo, meglio se preso in una sessione quasi tutta Opus 5. NOTA PIANO: /usage mostra 'Max (20x)', non 'MAX 5x' come scritto nei documenti — i rapporti restano nella stessa scala dei campioni vecchi, quindi non c'e' stato un cambio di piano fra i campioni: era sbagliata l'etichetta nei documenti."
     }
   ]
 }

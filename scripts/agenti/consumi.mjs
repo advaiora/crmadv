@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Misuratore dei consumi di Claude Code sull'ACCOUNT (tutti i progetti).
 //
-// A COSA SERVE: su abbonamento (MAX 5x) il problema non sono i soldi, e' restare
+// A COSA SERVE: su abbonamento (Max 20x) il problema non sono i soldi, e' restare
 // dentro la finestra di consumo per non prendere blocchi a meta' lavoro. Questo
 // script legge i registri locali che Claude Code scrive per ogni sessione e dice
 // quanto si e' consumato: nella finestra di 5 ore in corso, nella sessione, e

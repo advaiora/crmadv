@@ -10,7 +10,7 @@ Creato il 23/7/2026 da Jacopo. Concordato con Claudio prima di procedere.
 
 ## 1. Il contesto economico — leggilo prima di tutto il resto
 
-Il progetto gira su un **abbonamento MAX 5x**. Questo cambia completamente il senso della parola "costo":
+Il progetto gira su un **abbonamento Max 20x** (etichetta letta da `/usage` il 3/8/2026; prima qui era scritto "5x" per errore). Questo cambia completamente il senso della parola "costo":
 
 - **Non si paga a token.** Nessuna cifra in euro è rilevante.
 - L'unico vincolo vero è **restare dentro la finestra di consumo di 5 ore**, per non prendere un blocco a metà di un lavoro.
