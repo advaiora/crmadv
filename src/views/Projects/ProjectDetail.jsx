@@ -18,7 +18,7 @@ import ProjectEditForm from '../../modules/projects/ui/detail/ProjectEditForm';
 import ProjectHeader from '../../modules/projects/ui/detail/ProjectHeader';
 import ProjectStageHistory from '../../modules/projects/ui/detail/ProjectStageHistory';
 import ErrorState from '../../modules/projects/ui/states/ErrorState';
-import { getErrorMessage } from '../../modules/projects/ui/pipelineSettings.utils';
+import { getErrorMessage } from '../../modules/projects/ui/pipeline.utils';
 import { hasPermission } from '../../utils/workspaceAccess';
 
 const ProjectNotFoundState = ({ backPath }) => (

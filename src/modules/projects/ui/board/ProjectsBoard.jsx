@@ -5,7 +5,7 @@ import { Button, Form } from 'react-bootstrap';
 import { useHistory } from 'react-router-dom';
 import { useWindowWidth } from '@react-hook/window-size';
 import StageColumn from './StageColumn';
-import { sortStages } from '../pipelineSettings.utils';
+import { sortStages } from '../pipeline.utils';
 import './projects-board.css';
 
 const resolveProjectStageId = (project) => (

@@ -10,7 +10,7 @@ import {
   sortStages,
   toStageRulesDraft,
   toggleStageRuleTemplate,
-} from "./pipelineSettings.utils";
+} from "./pipeline.utils";
 
 describe("sortCategories / sortStages", () => {
   const disordinate = [

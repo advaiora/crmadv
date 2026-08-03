@@ -33,7 +33,7 @@ import {
   isLastStageError,
   sortCategories,
   sortStages,
-} from "../../modules/projects/ui/pipelineSettings.utils";
+} from "../../modules/projects/ui/pipeline.utils";
 import { hasPermission } from "../../utils/workspaceAccess";
 import "../../styles/css/project-pipeline-settings.css";
 import { readBrandingColor } from "../../lib/brandingColors";

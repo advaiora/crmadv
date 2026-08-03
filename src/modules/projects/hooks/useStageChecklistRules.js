@@ -5,7 +5,7 @@ import {
     setStageRuleGate,
     toStageRulesDraft,
     toggleStageRuleTemplate,
-} from '../ui/pipelineSettings.utils';
+} from '../ui/pipeline.utils';
 
 // Regole checklist degli stage di una categoria, estratte da
 // src/views/Projects/ProjectPipelineSettings.jsx (fase 2 riordino frontend).

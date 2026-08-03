@@ -556,3 +556,17 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Quando si corregge il metro, i campioni di taratura vanno ricalcolati**, non buttati (nota #38): `node scripts/agenti/consumi.mjs --finestra-a "2026-07-31T09:50Z"` ristampa il peso di una finestra passata. I due campioni sono passati da 82,3 e 154,5 a 84,3 e 156,3, e lo scarto medio della stima e' sceso da 1,5 a 1,3 punti.
 
 **Regola generale, gia' vista nella #36:** prima di fidarsi di un numero estratto dai registri, controllare **come sono fatte le righe**, non solo cosa contengono. Qui il difetto non dava nessun errore: dava un numero plausibile e sbagliato.
+
+---
+
+## 40. Rinominare un file: il censimento degli import con UN solo giro di ricerca puo' mancare occorrenze
+
+**Contesto:** 3/8/2026, rinomina di `pipelineSettings.utils.js` in `pipeline.utils.js` — serviva l'elenco completo dei file che lo importano.
+
+**Errore (sventato):** due ricerche con lo strumento Grep hanno dato **elenchi diversi e tutti e due incompleti**: la prima (pattern `pipelineSettings\.utils` su tutto il repo) non ha riportato i file in `src/modules/**`; la seconda (pattern piu' largo su `src/`) ha trovato quelli ma ha saltato `useStageChecklistRules.js`, che l'import ce l'ha eccome (riga 8). Fidarsi del primo elenco avrebbe lasciato un import rotto **silenzioso** (si sarebbe visto solo a runtime/test). Il campanello c'era: l'handoff parlava di 4 importatori, il primo giro ne trovava 2.
+
+**Modo corretto:**
+- Per i censimenti da rinomina usare **`git grep -n "<nome>"`** (deterministico sui file tracciati), non un solo giro dello strumento di ricerca.
+- **Confrontare il conteggio con un'aspettativa** (handoff, memoria, import noti): se i numeri non tornano, e' la ricerca a essere incompleta, non il progetto a essere diverso.
+- Dopo la rinomina, ri-verificare con `git grep` che il nome vecchio non compaia piu' (fuori dai documenti storici, che non si riscrivono).
+- Vale in generale: un elenco di occorrenze usato per **modifiche meccaniche di massa** va costruito con uno strumento esaustivo, e ogni discrepanza tra due giri di ricerca va spiegata prima di procedere.

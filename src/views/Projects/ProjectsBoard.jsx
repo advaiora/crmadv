@@ -11,7 +11,7 @@ import QuickCreateProjectModal from "../../modules/projects/ui/modals/QuickCreat
 import EmptyState from "../../modules/projects/ui/states/EmptyState";
 import ErrorState from "../../modules/projects/ui/states/ErrorState";
 import LoadingState from "../../modules/projects/ui/states/LoadingState";
-import { getErrorMessage, sortCategories, sortStages } from "../../modules/projects/ui/pipelineSettings.utils";
+import { getErrorMessage, sortCategories, sortStages } from "../../modules/projects/ui/pipeline.utils";
 import { hasPermission } from "../../utils/workspaceAccess";
 
 const resolveProjectStageId = (project) => project?.stageId || project?.pipelineStageId || project?.stage?.id || "";
