@@ -1,21 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Button, Card, Col, Row } from "react-bootstrap";
-import { Plus } from "lucide-react";
+import React, { useMemo } from "react";
+import { Card, Col, Row } from "react-bootstrap";
 import { Link } from "react-router-dom";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
 import { useChecklistTemplates } from "../../modules/checklists/hooks/useChecklistsQueries";
-import {
-  useCreateCategory,
-  useCreateStage,
-  useDeleteCategory,
-  useDeleteStage,
-  usePipelineCategories,
-  usePipelineStages,
-  useReorderStages,
-  useUpdateCategory,
-  useUpdateStage,
-} from "../../modules/projects/hooks/usePipelineSettingsQueries";
+import { usePipelineCategories, usePipelineStages } from "../../modules/projects/hooks/usePipelineSettingsQueries";
+import { usePipelineCategoryActions } from "../../modules/projects/hooks/usePipelineCategoryActions";
+import { usePipelineStageActions } from "../../modules/projects/hooks/usePipelineStageActions";
 import { useSelectedPipelineCategoryId } from "../../modules/projects/hooks/useSelectedPipelineCategoryId";
 import { useStageChecklistRules } from "../../modules/projects/hooks/useStageChecklistRules";
 import EmptyState from "../../modules/projects/ui/states/EmptyState";
@@ -25,29 +16,14 @@ import ConfirmDeleteModal from "../../modules/projects/ui/modals/ConfirmDeleteMo
 import EditStageModal from "../../modules/projects/ui/modals/EditStageModal";
 import RenameCategoryModal from "../../modules/projects/ui/modals/RenameCategoryModal";
 import CategoriesPanel, { CategoryNameForm } from "../../modules/projects/ui/pipeline/CategoriesPanel";
-import CreateStageForm from "../../modules/projects/ui/pipeline/CreateStageForm";
-import StageList from "../../modules/projects/ui/pipeline/StageList";
-import {
-  getErrorMessage,
-  isInUseError,
-  isLastStageError,
-  sortCategories,
-  sortStages,
-} from "../../modules/projects/ui/pipeline.utils";
+import StagesPanel from "../../modules/projects/ui/pipeline/StagesPanel";
+import { notifyOutcome } from "../../modules/projects/ui/notifyOutcome";
+import { getErrorMessage, sortCategories } from "../../modules/projects/ui/pipeline.utils";
 import { hasPermission } from "../../utils/workspaceAccess";
 import "../../styles/css/project-pipeline-settings.css";
 import { readBrandingColor } from "../../lib/brandingColors";
 
 const PIPELINE_SETTINGS_PERMISSION = "projects.edit"; // TODO: replace with a dedicated pipeline-manage permission when available.
-
-const emptyNewStage = (defaultColor) => ({
-  name: "",
-  color: defaultColor,
-  isClosed: false,
-  isGated: false,
-  gateChecklistTemplateId: "",
-  autoCreateInstance: true,
-});
 
 const PipelineSettingsContent = ({ access }) => {
   const defaultStageColor = readBrandingColor("--bs-primary", "#0d6efd");
@@ -57,30 +33,6 @@ const PipelineSettingsContent = ({ access }) => {
   const { categoryId, setCategoryId } = useSelectedPipelineCategoryId(categories);
   const stagesQuery = usePipelineStages(categoryId);
   const checklistTemplatesQuery = useChecklistTemplates();
-
-  const createCategoryMutation = useCreateCategory();
-  const updateCategoryMutation = useUpdateCategory();
-  const deleteCategoryMutation = useDeleteCategory();
-
-  const createStageMutation = useCreateStage();
-  const updateStageMutation = useUpdateStage();
-  const deleteStageMutation = useDeleteStage();
-  const reorderStagesMutation = useReorderStages();
-
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [editingCategory, setEditingCategory] = useState(null);
-  const [deletingCategory, setDeletingCategory] = useState(null);
-
-  const [showCreateStageForm, setShowCreateStageForm] = useState(false);
-  const [newStage, setNewStage] = useState(() => emptyNewStage(defaultStageColor));
-
-  const [editingStage, setEditingStage] = useState(null);
-  const [deletingStage, setDeletingStage] = useState(null);
-  const [localStages, setLocalStages] = useState([]);
-
-  useEffect(() => {
-    setLocalStages(sortStages(stagesQuery.data || []));
-  }, [stagesQuery.data]);
 
   const activeChecklistTemplates = useMemo(
     () => (checklistTemplatesQuery.data || []).filter((template) => !template.isArchived),
@@ -94,234 +46,31 @@ const PipelineSettingsContent = ({ access }) => {
   const selectedCategory = useMemo(() => categories.find((category) => category.id === categoryId) || null, [categories, categoryId]);
   const canManageStageChecklistRules = hasPermission(access, "checklists.manage_templates");
 
+  const categoryActions = usePipelineCategoryActions({ categoriesQuery, categoryId, setCategoryId });
+  const stageActions = usePipelineStageActions({ categoryId, stagesQuery, activeChecklistTemplates, defaultStageColor });
+
   const { rulesByStageId, toggleTemplate, toggleGate, saveRules } = useStageChecklistRules({
     categoryId,
-    stages: localStages,
+    stages: stageActions.stages,
     enabled: canManageStageChecklistRules,
   });
 
-  const handleSaveStageRules = async (stageId) => {
-    const { attempted, error } = await saveRules(stageId);
-    if (!attempted) {
-      return;
-    }
-
-    if (error) {
-      toast.error(error);
-      return;
-    }
-
-    toast.success("Regole checklist salvate");
-  };
-
   const handleCreateCategory = async (event) => {
     event.preventDefault();
-
-    const normalizedName = newCategoryName.trim();
-    if (!normalizedName) {
-      toast.error("Nome categoria obbligatorio");
-      return;
-    }
-
-    try {
-      const createdCategory = await createCategoryMutation.mutate({
-        name: normalizedName,
-      });
-
-      setNewCategoryName("");
-      await categoriesQuery.refetch();
-      setCategoryId(createdCategory?.id || "");
-      toast.success("Categoria creata");
-    } catch (error) {
-      toast.error(getErrorMessage(error) || "Errore creazione categoria");
-    }
-  };
-
-  const handleSaveCategoryRename = async () => {
-    if (!editingCategory?.id) {
-      return;
-    }
-
-    const normalizedName = String(editingCategory.name || "").trim();
-    if (!normalizedName) {
-      toast.error("Nome categoria obbligatorio");
-      return;
-    }
-
-    try {
-      await updateCategoryMutation.mutate(editingCategory.id, {
-        name: normalizedName,
-      });
-      setEditingCategory(null);
-      await categoriesQuery.refetch();
-      toast.success("Salvato");
-    } catch (error) {
-      toast.error(getErrorMessage(error) || "Errore salvataggio categoria");
-    }
-  };
-
-  const handleDeleteCategory = async () => {
-    if (!deletingCategory?.id) {
-      return;
-    }
-
-    try {
-      await deleteCategoryMutation.mutate(deletingCategory.id);
-      const deletedCategoryId = deletingCategory.id;
-      setDeletingCategory(null);
-      await categoriesQuery.refetch();
-      if (deletedCategoryId === categoryId) {
-        setCategoryId("");
-      }
-      toast.success("Categoria eliminata");
-    } catch (error) {
-      if (isInUseError(error)) {
-        toast.error("Categoria in uso: elimina prima stage e progetti");
-        return;
-      }
-
-      toast.error(getErrorMessage(error) || "Errore eliminazione categoria");
-    }
-  };
-
-  const closeCreateStageForm = () => {
-    setNewStage(emptyNewStage(defaultStageColor));
-    setShowCreateStageForm(false);
+    notifyOutcome(await categoryActions.createCategory(), "Categoria creata");
   };
 
   const handleCreateStage = async (event) => {
     event.preventDefault();
-
-    if (!categoryId) {
-      toast.error("Seleziona una categoria");
-      return;
-    }
-
-    const normalizedName = newStage.name.trim();
-    if (!normalizedName) {
-      toast.error("Nome stage obbligatorio");
-      return;
-    }
-    if (newStage.isGated && !newStage.gateChecklistTemplateId) {
-      toast.error("Seleziona un template checklist per il gate");
-      return;
-    }
-    if (newStage.isGated && activeChecklistTemplates.length === 0) {
-      toast.error("Nessun template checklist attivo disponibile");
-      return;
-    }
-
-    try {
-      await createStageMutation.mutate(categoryId, {
-        name: normalizedName,
-        isClosed: Boolean(newStage.isClosed),
-        color: newStage.color || undefined,
-        isGated: Boolean(newStage.isGated),
-        gateChecklistTemplateId: newStage.isGated ? newStage.gateChecklistTemplateId || null : null,
-        autoCreateInstance: Boolean(newStage.autoCreateInstance),
-        sortOrder: localStages.length,
-      });
-      closeCreateStageForm();
-      await stagesQuery.refetch();
-      toast.success("Stage creato");
-    } catch (error) {
-      toast.error(getErrorMessage(error) || "Errore creazione stage");
-    }
+    notifyOutcome(await stageActions.createStage(), "Stage creato");
   };
 
-  const handleSaveStage = async () => {
-    if (!editingStage?.id) {
-      return;
-    }
-
-    const normalizedName = String(editingStage.name || "").trim();
-    if (!normalizedName) {
-      toast.error("Nome stage obbligatorio");
-      return;
-    }
-    if (editingStage.isGated && !editingStage.gateChecklistTemplateId) {
-      toast.error("Seleziona un template checklist per il gate");
-      return;
-    }
-
-    try {
-      await updateStageMutation.mutate(editingStage.id, {
-        name: normalizedName,
-        isClosed: Boolean(editingStage.isClosed),
-        color: editingStage.color || null,
-        isGated: Boolean(editingStage.isGated),
-        gateChecklistTemplateId: editingStage.isGated ? editingStage.gateChecklistTemplateId || null : null,
-        autoCreateInstance: Boolean(editingStage.autoCreateInstance),
-      });
-      setEditingStage(null);
-      await stagesQuery.refetch();
-      toast.success("Salvato");
-    } catch (error) {
-      toast.error(getErrorMessage(error) || "Errore salvataggio stage");
-    }
-  };
-
-  const handleDeleteStage = async () => {
-    if (!deletingStage?.id) {
-      return;
-    }
-
-    if (localStages.length <= 1) {
-      toast.error("Devi avere almeno uno stage nella categoria");
-      setDeletingStage(null);
-      return;
-    }
-
-    try {
-      await deleteStageMutation.mutate(deletingStage.id);
-      setDeletingStage(null);
-      await stagesQuery.refetch();
-      toast.success("Stage eliminato");
-    } catch (error) {
-      if (isInUseError(error)) {
-        toast.error("Stage in uso: sposta prima i progetti");
-        return;
-      }
-
-      if (isLastStageError(error)) {
-        toast.error("Devi avere almeno uno stage nella categoria");
-        return;
-      }
-
-      toast.error(getErrorMessage(error) || "Errore eliminazione stage");
-    }
-  };
-
-  const handleMoveStage = async (index, direction) => {
-    if (!categoryId || reorderStagesMutation.loading) {
-      return;
-    }
-
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= localStages.length) {
-      return;
-    }
-
-    const previousStages = [...localStages];
-    const nextStages = [...localStages];
-    const temp = nextStages[index];
-    nextStages[index] = nextStages[targetIndex];
-    nextStages[targetIndex] = temp;
-
-    setLocalStages(nextStages);
-
-    try {
-      await reorderStagesMutation.mutate(
-        categoryId,
-        nextStages.map((stage) => stage.id),
-      );
-      toast.success("Salvato", { autoClose: 1300 });
-      stagesQuery.refetch();
-    } catch (_error) {
-      setLocalStages(previousStages);
-      toast.error("Errore salvataggio ordine");
-    }
-  };
+  const handleSaveCategoryRename = async () => notifyOutcome(await categoryActions.saveRename(), "Salvato");
+  const handleDeleteCategory = async () => notifyOutcome(await categoryActions.deleteCategory(), "Categoria eliminata");
+  const handleSaveStage = async () => notifyOutcome(await stageActions.saveStage(), "Salvato");
+  const handleDeleteStage = async () => notifyOutcome(await stageActions.deleteStage(), "Stage eliminato");
+  const handleMoveStage = async (index, direction) => notifyOutcome(await stageActions.moveStage(index, direction), "Salvato", { autoClose: 1300 });
+  const handleSaveStageRules = async (stageId) => notifyOutcome(await saveRules(stageId), "Regole checklist salvate");
 
   if (categoriesQuery.loading) {
     return <LoadingState message="Caricamento categorie pipeline..." />;
@@ -351,10 +100,10 @@ const PipelineSettingsContent = ({ access }) => {
             <CategoryNameForm
               className="mt-3"
               wide
-              value={newCategoryName}
-              onChange={setNewCategoryName}
+              value={categoryActions.newCategoryName}
+              onChange={categoryActions.setNewCategoryName}
               onSubmit={handleCreateCategory}
-              creating={createCategoryMutation.loading}
+              creating={categoryActions.creating}
             />
           </Card.Body>
         </Card>
@@ -367,113 +116,82 @@ const PipelineSettingsContent = ({ access }) => {
               categories={categories}
               selectedCategoryId={categoryId}
               onSelectCategory={setCategoryId}
-              newCategoryName={newCategoryName}
-              onNewCategoryNameChange={setNewCategoryName}
+              newCategoryName={categoryActions.newCategoryName}
+              onNewCategoryNameChange={categoryActions.setNewCategoryName}
               onCreateCategory={handleCreateCategory}
-              onEditCategory={setEditingCategory}
-              onDeleteCategory={setDeletingCategory}
-              creating={createCategoryMutation.loading}
+              onEditCategory={categoryActions.setEditingCategory}
+              onDeleteCategory={categoryActions.setDeletingCategory}
+              creating={categoryActions.creating}
             />
           </Col>
 
           <Col xl={8}>
-            <Card className="card-border">
-              <Card.Header className="bg-transparent d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                <h6 className="mb-0">Stage {selectedCategory ? `- ${selectedCategory.name}` : ""}</h6>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  className="d-inline-flex align-items-center gap-2"
-                  onClick={() => setShowCreateStageForm((current) => !current)}
-                  disabled={!categoryId}
-                >
-                  <Plus size={14} />
-                  Stage
-                </Button>
-              </Card.Header>
-              <Card.Body>
-                {showCreateStageForm && (
-                  <CreateStageForm
-                    values={newStage}
-                    onChange={(patch) => setNewStage((current) => ({ ...current, ...patch }))}
-                    checklistTemplates={activeChecklistTemplates}
-                    onSubmit={handleCreateStage}
-                    onCancel={closeCreateStageForm}
-                    saving={createStageMutation.loading}
-                  />
-                )}
-
-                {stagesQuery.loading && <LoadingState message="Caricamento stage..." />}
-
-                {stagesQuery.error && <ErrorState title="Errore stage" message={getErrorMessage(stagesQuery.error)} onRetry={stagesQuery.refetch} />}
-
-                {!stagesQuery.loading && !stagesQuery.error && localStages.length === 0 && (
-                  <Alert variant="warning" className="mb-0 d-flex justify-content-between align-items-center">
-                    <span>Questa categoria non ha stage, aggiungine uno.</span>
-                    <Button type="button" variant="outline-warning" size="sm" onClick={() => setShowCreateStageForm(true)}>
-                      Aggiungi stage
-                    </Button>
-                  </Alert>
-                )}
-
-                {!stagesQuery.loading && !stagesQuery.error && localStages.length > 0 && (
-                  <StageList
-                    stages={localStages}
-                    defaultStageColor={defaultStageColor}
-                    checklistTemplateNameById={checklistTemplateNameById}
-                    checklistTemplates={activeChecklistTemplates}
-                    canManageChecklistRules={canManageStageChecklistRules}
-                    stageRulesByStageId={rulesByStageId}
-                    reordering={reorderStagesMutation.loading}
-                    onMoveStage={(index, direction) => void handleMoveStage(index, direction)}
-                    onEditStage={setEditingStage}
-                    onDeleteStage={setDeletingStage}
-                    onToggleRuleTemplate={toggleTemplate}
-                    onToggleRuleGate={toggleGate}
-                    onSaveRules={(stageId) => void handleSaveStageRules(stageId)}
-                  />
-                )}
-              </Card.Body>
-            </Card>
+            <StagesPanel
+              selectedCategoryName={selectedCategory?.name || ""}
+              canCreateStage={Boolean(categoryId)}
+              showCreateForm={stageActions.showCreateForm}
+              onToggleCreateForm={() => stageActions.setShowCreateForm((current) => !current)}
+              onOpenCreateForm={() => stageActions.setShowCreateForm(true)}
+              newStage={stageActions.newStage}
+              onNewStageChange={(patch) => stageActions.setNewStage((current) => ({ ...current, ...patch }))}
+              onSubmitCreateStage={handleCreateStage}
+              onCancelCreateStage={stageActions.closeCreateForm}
+              creatingStage={stageActions.creating}
+              loading={stagesQuery.loading}
+              errorMessage={stagesQuery.error ? getErrorMessage(stagesQuery.error) : ""}
+              onRetry={stagesQuery.refetch}
+              stages={stageActions.stages}
+              defaultStageColor={defaultStageColor}
+              checklistTemplates={activeChecklistTemplates}
+              checklistTemplateNameById={checklistTemplateNameById}
+              canManageChecklistRules={canManageStageChecklistRules}
+              stageRulesByStageId={rulesByStageId}
+              reordering={stageActions.reordering}
+              onMoveStage={(index, direction) => void handleMoveStage(index, direction)}
+              onEditStage={stageActions.setEditingStage}
+              onDeleteStage={stageActions.setDeletingStage}
+              onToggleRuleTemplate={toggleTemplate}
+              onToggleRuleGate={toggleGate}
+              onSaveRules={(stageId) => void handleSaveStageRules(stageId)}
+            />
           </Col>
         </Row>
       )}
 
       <RenameCategoryModal
-        category={editingCategory}
-        onChange={(name) => setEditingCategory((current) => ({ ...(current || {}), name }))}
-        onCancel={() => setEditingCategory(null)}
+        category={categoryActions.editingCategory}
+        onChange={(name) => categoryActions.setEditingCategory((current) => ({ ...(current || {}), name }))}
+        onCancel={() => categoryActions.setEditingCategory(null)}
         onSave={() => void handleSaveCategoryRename()}
-        saving={updateCategoryMutation.loading}
+        saving={categoryActions.renaming}
       />
 
       <ConfirmDeleteModal
-        show={Boolean(deletingCategory)}
+        show={Boolean(categoryActions.deletingCategory)}
         title="Eliminare categoria?"
         message="Questa azione puo fallire se la categoria e in uso."
-        onCancel={() => setDeletingCategory(null)}
+        onCancel={() => categoryActions.setDeletingCategory(null)}
         onConfirm={() => void handleDeleteCategory()}
-        confirming={deleteCategoryMutation.loading}
+        confirming={categoryActions.deleting}
       />
 
       <EditStageModal
-        stage={editingStage}
+        stage={stageActions.editingStage}
         checklistTemplates={activeChecklistTemplates}
         defaultColor={defaultStageColor}
-        onChange={(patch) => setEditingStage((current) => ({ ...(current || {}), ...patch }))}
-        onCancel={() => setEditingStage(null)}
+        onChange={(patch) => stageActions.setEditingStage((current) => ({ ...(current || {}), ...patch }))}
+        onCancel={() => stageActions.setEditingStage(null)}
         onSave={() => void handleSaveStage()}
-        saving={updateStageMutation.loading}
+        saving={stageActions.saving}
       />
 
       <ConfirmDeleteModal
-        show={Boolean(deletingStage)}
+        show={Boolean(stageActions.deletingStage)}
         title="Eliminare stage?"
         message="Vuoi eliminare questo stage? Questa azione non e reversibile."
-        onCancel={() => setDeletingStage(null)}
+        onCancel={() => stageActions.setDeletingStage(null)}
         onConfirm={() => void handleDeleteStage()}
-        confirming={deleteStageMutation.loading}
+        confirming={stageActions.deleting}
       />
 
       <ToastContainer position="bottom-right" theme="light" />
