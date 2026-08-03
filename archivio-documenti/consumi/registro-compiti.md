@@ -29,3 +29,4 @@
 | 2026-07-31 10:57 | Spezzatura ClientsList, giro 2 (703→476 righe) | 31 min | 23,5 | revisore×1 | -0,4 |
 | 2026-07-31 11:58 | Spezzatura ProjectPipelineSettings, giro 1 (1148→975 righe) | 1h 01m | 31,8 | esploratore×1, revisore×1 | 2,7 |
 | 2026-08-03 13:07 | Monitor consumi: report in italiano + bilancio agent calcolato | 2h 32m | 39,1 | revisore×3 | 2,4 |
+| 2026-08-03 14:36 | Spezzatura ProjectPipelineSettings, giro 2 (975→492 righe) + convergenza duplicati | 1h 22m | 42,2 | esploratore×2, revisore×2 | 12,0 |
