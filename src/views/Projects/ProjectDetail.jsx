@@ -18,19 +18,8 @@ import ProjectEditForm from '../../modules/projects/ui/detail/ProjectEditForm';
 import ProjectHeader from '../../modules/projects/ui/detail/ProjectHeader';
 import ProjectStageHistory from '../../modules/projects/ui/detail/ProjectStageHistory';
 import ErrorState from '../../modules/projects/ui/states/ErrorState';
+import { getErrorMessage } from '../../modules/projects/ui/pipelineSettings.utils';
 import { hasPermission } from '../../utils/workspaceAccess';
-
-const getErrorMessage = (error) => {
-    if (!error) {
-        return '';
-    }
-
-    if (isApiError(error)) {
-        return `${error.message} (${error.code || error.status || 'API_ERROR'})`;
-    }
-
-    return error?.message || 'Errore inatteso';
-};
 
 const ProjectNotFoundState = ({ backPath }) => (
     <div className="py-4">

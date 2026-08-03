@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, Col, Form, Row } from "react-bootstrap";
+import { Button, Card, Col, Form, Row } from "react-bootstrap";
 import { Plus } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
@@ -11,41 +11,8 @@ import QuickCreateProjectModal from "../../modules/projects/ui/modals/QuickCreat
 import EmptyState from "../../modules/projects/ui/states/EmptyState";
 import ErrorState from "../../modules/projects/ui/states/ErrorState";
 import LoadingState from "../../modules/projects/ui/states/LoadingState";
+import { getErrorMessage, sortCategories, sortStages } from "../../modules/projects/ui/pipelineSettings.utils";
 import { hasPermission } from "../../utils/workspaceAccess";
-
-const sortCategories = (categories) =>
-  [...categories].sort((left, right) => {
-    const leftOrder = Number(left?.sortOrder);
-    const rightOrder = Number(right?.sortOrder);
-    const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
-    const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
-
-    if (safeLeftOrder !== safeRightOrder) {
-      return safeLeftOrder - safeRightOrder;
-    }
-
-    return String(left?.name || "").localeCompare(String(right?.name || ""), "it");
-  });
-
-const sortStages = (stages) =>
-  [...stages].sort((left, right) => {
-    const leftOrder = Number(left?.sortOrder);
-    const rightOrder = Number(right?.sortOrder);
-    const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
-    const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
-
-    if (safeLeftOrder !== safeRightOrder) {
-      return safeLeftOrder - safeRightOrder;
-    }
-
-    return String(left?.name || "").localeCompare(String(right?.name || ""), "it");
-  });
-
-const getErrorMessage = (error) => {
-  if (!error) return "";
-  if (isApiError(error)) return `${error.message} (${error.code || error.status || "API_ERROR"})`;
-  return error?.message || "Errore inatteso";
-};
 
 const resolveProjectStageId = (project) => project?.stageId || project?.pipelineStageId || project?.stage?.id || "";
 const withProjectStageId = (project, stageId) => ({ ...project, stageId, pipelineStageId: stageId });
@@ -342,9 +309,6 @@ const ProjectsBoardContent = ({ access }) => {
       </SectionCard>
     );
   }
-
-  const projectsCount = boardProjects.length;
-  const stagesCount = stages.length;
 
   return (
     <>

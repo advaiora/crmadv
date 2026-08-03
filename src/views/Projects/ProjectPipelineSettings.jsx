@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row } from "react-bootstrap";
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown } from "lucide-react";
+import { Alert, Button, Card, Col, Row } from "react-bootstrap";
+import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import ModulePermissionGate from "../../components/guards/ModulePermissionGate";
 import { useChecklistTemplates } from "../../modules/checklists/hooks/useChecklistsQueries";
-import { listStageChecklistRules, replaceStageChecklistRules } from "../../modules/checklists/api/checklists.api";
 import {
   useCreateCategory,
   useCreateStage,
@@ -18,17 +17,20 @@ import {
   useUpdateStage,
 } from "../../modules/projects/hooks/usePipelineSettingsQueries";
 import { useSelectedPipelineCategoryId } from "../../modules/projects/hooks/useSelectedPipelineCategoryId";
+import { useStageChecklistRules } from "../../modules/projects/hooks/useStageChecklistRules";
 import EmptyState from "../../modules/projects/ui/states/EmptyState";
 import ErrorState from "../../modules/projects/ui/states/ErrorState";
 import LoadingState from "../../modules/projects/ui/states/LoadingState";
 import ConfirmDeleteModal from "../../modules/projects/ui/modals/ConfirmDeleteModal";
 import EditStageModal from "../../modules/projects/ui/modals/EditStageModal";
 import RenameCategoryModal from "../../modules/projects/ui/modals/RenameCategoryModal";
+import CategoriesPanel, { CategoryNameForm } from "../../modules/projects/ui/pipeline/CategoriesPanel";
+import CreateStageForm from "../../modules/projects/ui/pipeline/CreateStageForm";
+import StageList from "../../modules/projects/ui/pipeline/StageList";
 import {
   getErrorMessage,
   isInUseError,
   isLastStageError,
-  normalizeStageRulesPayload,
   sortCategories,
   sortStages,
 } from "../../modules/projects/ui/pipelineSettings.utils";
@@ -37,6 +39,15 @@ import "../../styles/css/project-pipeline-settings.css";
 import { readBrandingColor } from "../../lib/brandingColors";
 
 const PIPELINE_SETTINGS_PERMISSION = "projects.edit"; // TODO: replace with a dedicated pipeline-manage permission when available.
+
+const emptyNewStage = (defaultColor) => ({
+  name: "",
+  color: defaultColor,
+  isClosed: false,
+  isGated: false,
+  gateChecklistTemplateId: "",
+  autoCreateInstance: true,
+});
 
 const PipelineSettingsContent = ({ access }) => {
   const defaultStageColor = readBrandingColor("--bs-primary", "#0d6efd");
@@ -61,12 +72,7 @@ const PipelineSettingsContent = ({ access }) => {
   const [deletingCategory, setDeletingCategory] = useState(null);
 
   const [showCreateStageForm, setShowCreateStageForm] = useState(false);
-  const [newStageName, setNewStageName] = useState("");
-  const [newStageIsClosed, setNewStageIsClosed] = useState(false);
-  const [newStageColor, setNewStageColor] = useState(defaultStageColor);
-  const [newStageIsGated, setNewStageIsGated] = useState(false);
-  const [newStageGateTemplateId, setNewStageGateTemplateId] = useState("");
-  const [newStageAutoCreateInstance, setNewStageAutoCreateInstance] = useState(true);
+  const [newStage, setNewStage] = useState(() => emptyNewStage(defaultStageColor));
 
   const [editingStage, setEditingStage] = useState(null);
   const [deletingStage, setDeletingStage] = useState(null);
@@ -87,179 +93,25 @@ const PipelineSettingsContent = ({ access }) => {
 
   const selectedCategory = useMemo(() => categories.find((category) => category.id === categoryId) || null, [categories, categoryId]);
   const canManageStageChecklistRules = hasPermission(access, "checklists.manage_templates");
-  const [stageRulesByStageId, setStageRulesByStageId] = useState({});
 
-  useEffect(() => {
-    let isMounted = true;
-
-    if (!canManageStageChecklistRules) {
-      setStageRulesByStageId({});
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    if (!categoryId || localStages.length === 0) {
-      setStageRulesByStageId({});
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    const stageIds = localStages.map((stage) => stage.id);
-
-    setStageRulesByStageId((current) => {
-      const next = {};
-      stageIds.forEach((stageId) => {
-        const existing = current[stageId];
-        next[stageId] = existing || {
-          loading: true,
-          saving: false,
-          error: "",
-          rules: [],
-        };
-      });
-      return next;
-    });
-
-    Promise.all(
-      stageIds.map(async (stageId) => {
-        try {
-          const payload = await listStageChecklistRules(categoryId, stageId);
-          const items = normalizeStageRulesPayload(payload);
-          if (!isMounted) {
-            return;
-          }
-
-          setStageRulesByStageId((current) => ({
-            ...current,
-            [stageId]: {
-              loading: false,
-              saving: false,
-              error: "",
-              rules: items.map((rule) => ({
-                checklistTemplateId: rule.checklistTemplateId,
-                gateEnabled: rule.gateEnabled !== false,
-              })),
-            },
-          }));
-        } catch (error) {
-          if (!isMounted) {
-            return;
-          }
-
-          setStageRulesByStageId((current) => ({
-            ...current,
-            [stageId]: {
-              loading: false,
-              saving: false,
-              error: getErrorMessage(error),
-              rules: [],
-            },
-          }));
-        }
-      }),
-    );
-
-    return () => {
-      isMounted = false;
-    };
-  }, [canManageStageChecklistRules, categoryId, localStages]);
-
-  const updateStageRulesDraft = (stageId, updater) => {
-    setStageRulesByStageId((current) => {
-      const existing = current[stageId] || {
-        loading: false,
-        saving: false,
-        error: "",
-        rules: [],
-      };
-
-      return {
-        ...current,
-        [stageId]: updater(existing),
-      };
-    });
-  };
-
-  const handleToggleStageRuleTemplate = (stageId, templateId, checked) => {
-    updateStageRulesDraft(stageId, (current) => {
-      const hasRule = current.rules.some((rule) => rule.checklistTemplateId === templateId);
-      if (checked && !hasRule) {
-        return {
-          ...current,
-          error: "",
-          rules: [
-            ...current.rules,
-            {
-              checklistTemplateId: templateId,
-              gateEnabled: true,
-            },
-          ],
-        };
-      }
-
-      if (!checked && hasRule) {
-        return {
-          ...current,
-          error: "",
-          rules: current.rules.filter((rule) => rule.checklistTemplateId !== templateId),
-        };
-      }
-
-      return current;
-    });
-  };
-
-  const handleToggleStageRuleGate = (stageId, templateId, gateEnabled) => {
-    updateStageRulesDraft(stageId, (current) => ({
-      ...current,
-      error: "",
-      rules: current.rules.map((rule) =>
-        rule.checklistTemplateId === templateId
-          ? { ...rule, gateEnabled }
-          : rule),
-    }));
-  };
+  const { rulesByStageId, toggleTemplate, toggleGate, saveRules } = useStageChecklistRules({
+    categoryId,
+    stages: localStages,
+    enabled: canManageStageChecklistRules,
+  });
 
   const handleSaveStageRules = async (stageId) => {
-    if (!categoryId || !canManageStageChecklistRules) {
+    const { attempted, error } = await saveRules(stageId);
+    if (!attempted) {
       return;
     }
 
-    const draft = stageRulesByStageId[stageId] || {
-      rules: [],
-    };
-
-    updateStageRulesDraft(stageId, (current) => ({
-      ...current,
-      saving: true,
-      error: "",
-    }));
-
-    try {
-      const payload = await replaceStageChecklistRules(categoryId, stageId, draft.rules);
-      const items = normalizeStageRulesPayload(payload);
-
-      updateStageRulesDraft(stageId, (current) => ({
-        ...current,
-        saving: false,
-        error: "",
-        rules: items.map((rule) => ({
-          checklistTemplateId: rule.checklistTemplateId,
-          gateEnabled: rule.gateEnabled !== false,
-        })),
-      }));
-
-      toast.success("Regole checklist salvate");
-    } catch (error) {
-      updateStageRulesDraft(stageId, (current) => ({
-        ...current,
-        saving: false,
-        error: getErrorMessage(error) || "Errore salvataggio regole checklist",
-      }));
-      toast.error(getErrorMessage(error) || "Errore salvataggio regole checklist");
+    if (error) {
+      toast.error(error);
+      return;
     }
+
+    toast.success("Regole checklist salvate");
   };
 
   const handleCreateCategory = async (event) => {
@@ -332,13 +184,9 @@ const PipelineSettingsContent = ({ access }) => {
     }
   };
 
-  const resetNewStageForm = () => {
-    setNewStageName("");
-    setNewStageIsClosed(false);
-    setNewStageColor(defaultStageColor);
-    setNewStageIsGated(false);
-    setNewStageGateTemplateId("");
-    setNewStageAutoCreateInstance(true);
+  const closeCreateStageForm = () => {
+    setNewStage(emptyNewStage(defaultStageColor));
+    setShowCreateStageForm(false);
   };
 
   const handleCreateStage = async (event) => {
@@ -349,16 +197,16 @@ const PipelineSettingsContent = ({ access }) => {
       return;
     }
 
-    const normalizedName = newStageName.trim();
+    const normalizedName = newStage.name.trim();
     if (!normalizedName) {
       toast.error("Nome stage obbligatorio");
       return;
     }
-    if (newStageIsGated && !newStageGateTemplateId) {
+    if (newStage.isGated && !newStage.gateChecklistTemplateId) {
       toast.error("Seleziona un template checklist per il gate");
       return;
     }
-    if (newStageIsGated && activeChecklistTemplates.length === 0) {
+    if (newStage.isGated && activeChecklistTemplates.length === 0) {
       toast.error("Nessun template checklist attivo disponibile");
       return;
     }
@@ -366,15 +214,14 @@ const PipelineSettingsContent = ({ access }) => {
     try {
       await createStageMutation.mutate(categoryId, {
         name: normalizedName,
-        isClosed: Boolean(newStageIsClosed),
-        color: newStageColor || undefined,
-        isGated: Boolean(newStageIsGated),
-        gateChecklistTemplateId: newStageIsGated ? newStageGateTemplateId || null : null,
-        autoCreateInstance: Boolean(newStageAutoCreateInstance),
+        isClosed: Boolean(newStage.isClosed),
+        color: newStage.color || undefined,
+        isGated: Boolean(newStage.isGated),
+        gateChecklistTemplateId: newStage.isGated ? newStage.gateChecklistTemplateId || null : null,
+        autoCreateInstance: Boolean(newStage.autoCreateInstance),
         sortOrder: localStages.length,
       });
-      resetNewStageForm();
-      setShowCreateStageForm(false);
+      closeCreateStageForm();
       await stagesQuery.refetch();
       toast.success("Stage creato");
     } catch (error) {
@@ -501,29 +348,14 @@ const PipelineSettingsContent = ({ access }) => {
           <Card.Body>
             <EmptyState title="Nessuna categoria. Creane una per iniziare." description="Aggiungi una categoria pipeline per configurare gli stage." />
 
-            <Form className="mt-3" onSubmit={handleCreateCategory}>
-              <Row className="g-2">
-                <Col md={8}>
-                  <Form.Control
-                    value={newCategoryName}
-                    onChange={(event) => setNewCategoryName(event.target.value)}
-                    placeholder="Nome categoria"
-                    disabled={createCategoryMutation.loading}
-                  />
-                </Col>
-                <Col md={4}>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-100 d-inline-flex align-items-center justify-content-center gap-2"
-                    disabled={createCategoryMutation.loading}
-                  >
-                    <Plus size={14} />
-                    Categoria
-                  </Button>
-                </Col>
-              </Row>
-            </Form>
+            <CategoryNameForm
+              className="mt-3"
+              wide
+              value={newCategoryName}
+              onChange={setNewCategoryName}
+              onSubmit={handleCreateCategory}
+              creating={createCategoryMutation.loading}
+            />
           </Card.Body>
         </Card>
       )}
@@ -531,83 +363,17 @@ const PipelineSettingsContent = ({ access }) => {
       {categories.length > 0 && (
         <Row className="g-3">
           <Col xl={4}>
-            <Card className="card-border h-100">
-              <Card.Header className="bg-transparent d-flex justify-content-between align-items-center">
-                <h6 className="mb-0">Categorie</h6>
-              </Card.Header>
-              <Card.Body>
-                <ListGroup variant="flush">
-                  {categories.map((category) => (
-                    <ListGroup.Item
-                      key={category.id}
-                      as="div"
-                      role="button"
-                      tabIndex={0}
-                      active={category.id === categoryId}
-                      onClick={() => setCategoryId(category.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setCategoryId(category.id);
-                        }
-                      }}
-                      className="list-group-item-action d-flex justify-content-between align-items-center gap-2"
-                    >
-                      <span>{category.name}</span>
-                      <span className="d-flex align-items-center gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={category.id === categoryId ? "light" : "outline-secondary"}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setEditingCategory({
-                              id: category.id,
-                              name: category.name,
-                            });
-                          }}
-                        >
-                          <Pencil size={13} />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={category.id === categoryId ? "light" : "outline-danger"}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeletingCategory(category);
-                          }}
-                        >
-                          <Trash2 size={13} />
-                        </Button>
-                      </span>
-                    </ListGroup.Item>
-                  ))}
-                </ListGroup>
-
-                <Form className="mt-3" onSubmit={handleCreateCategory}>
-                  <Form.Group className="mb-2">
-                    <Form.Label className="small text-muted mb-1">Nuova categoria</Form.Label>
-                    <Form.Control
-                      value={newCategoryName}
-                      onChange={(event) => setNewCategoryName(event.target.value)}
-                      placeholder="Nome categoria"
-                      disabled={createCategoryMutation.loading}
-                    />
-                  </Form.Group>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    className="d-inline-flex align-items-center gap-2"
-                    disabled={createCategoryMutation.loading}
-                  >
-                    <Plus size={14} />
-                    Categoria
-                  </Button>
-                </Form>
-              </Card.Body>
-            </Card>
+            <CategoriesPanel
+              categories={categories}
+              selectedCategoryId={categoryId}
+              onSelectCategory={setCategoryId}
+              newCategoryName={newCategoryName}
+              onNewCategoryNameChange={setNewCategoryName}
+              onCreateCategory={handleCreateCategory}
+              onEditCategory={setEditingCategory}
+              onDeleteCategory={setDeletingCategory}
+              creating={createCategoryMutation.loading}
+            />
           </Col>
 
           <Col xl={8}>
@@ -628,118 +394,14 @@ const PipelineSettingsContent = ({ access }) => {
               </Card.Header>
               <Card.Body>
                 {showCreateStageForm && (
-                  <Card className="card-border mb-3">
-                    <Card.Body>
-                      <Form onSubmit={handleCreateStage}>
-                        <Row className="g-2">
-                          <Col md={6}>
-                            <Form.Group>
-                              <Form.Label>Nome stage</Form.Label>
-                              <Form.Control
-                                value={newStageName}
-                                onChange={(event) => setNewStageName(event.target.value)}
-                                placeholder="Nome stage"
-                                disabled={createStageMutation.loading}
-                                required
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={3}>
-                            <Form.Group>
-                              <Form.Label>Colore</Form.Label>
-                              <Form.Control
-                                type="color"
-                                value={newStageColor}
-                                onChange={(event) => setNewStageColor(event.target.value)}
-                                disabled={createStageMutation.loading}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={3}>
-                            <Form.Group className="h-100 d-flex align-items-end">
-                              <Form.Check
-                                type="switch"
-                                id="stage-is-closed"
-                                label="Chiuso"
-                                checked={newStageIsClosed}
-                                onChange={(event) => setNewStageIsClosed(event.target.checked)}
-                                disabled={createStageMutation.loading}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={4}>
-                            <Form.Group className="h-100 d-flex align-items-end">
-                              <Form.Check
-                                type="switch"
-                                id="stage-is-gated"
-                                label="Checklist gate"
-                                checked={newStageIsGated}
-                                onChange={(event) => {
-                                  setNewStageIsGated(event.target.checked);
-                                  if (!event.target.checked) {
-                                    setNewStageGateTemplateId("");
-                                  }
-                                }}
-                                disabled={createStageMutation.loading}
-                              />
-                            </Form.Group>
-                          </Col>
-                          <Col md={4}>
-                            <Form.Group>
-                              <Form.Label>Template Gate</Form.Label>
-                              <Form.Select
-                                value={newStageGateTemplateId}
-                                onChange={(event) => setNewStageGateTemplateId(event.target.value)}
-                                disabled={!newStageIsGated || createStageMutation.loading}
-                              >
-                                <option value="">Seleziona template</option>
-                                {activeChecklistTemplates.map((template) => (
-                                  <option key={template.id} value={template.id}>
-                                    {template.name}
-                                  </option>
-                                ))}
-                              </Form.Select>
-                            </Form.Group>
-                          </Col>
-                          <Col md={4}>
-                            <Form.Group className="h-100 d-flex align-items-end">
-                              <Form.Check
-                                type="switch"
-                                id="stage-autocreate-checklist"
-                                label="Auto-create instance"
-                                checked={newStageAutoCreateInstance}
-                                onChange={(event) => setNewStageAutoCreateInstance(event.target.checked)}
-                                disabled={!newStageIsGated || createStageMutation.loading}
-                              />
-                            </Form.Group>
-                          </Col>
-                        </Row>
-                        {newStageIsGated && (
-                          <Alert variant={activeChecklistTemplates.length > 0 ? "info" : "warning"} className="mt-3 mb-0 py-2">
-                            {activeChecklistTemplates.length > 0
-                              ? "Gate attivo: lo stage richiedera il completamento checklist prima del passaggio."
-                              : "Per usare il gate, crea prima almeno un template checklist attivo."}
-                          </Alert>
-                        )}
-                        <div className="d-flex justify-content-end gap-2 mt-3">
-                          <Button
-                            type="button"
-                            variant="outline-secondary"
-                            onClick={() => {
-                              resetNewStageForm();
-                              setShowCreateStageForm(false);
-                            }}
-                            disabled={createStageMutation.loading}
-                          >
-                            Annulla
-                          </Button>
-                          <Button type="submit" variant="primary" disabled={createStageMutation.loading}>
-                            {createStageMutation.loading ? "Creazione..." : "Crea stage"}
-                          </Button>
-                        </div>
-                      </Form>
-                    </Card.Body>
-                  </Card>
+                  <CreateStageForm
+                    values={newStage}
+                    onChange={(patch) => setNewStage((current) => ({ ...current, ...patch }))}
+                    checklistTemplates={activeChecklistTemplates}
+                    onSubmit={handleCreateStage}
+                    onCancel={closeCreateStageForm}
+                    saving={createStageMutation.loading}
+                  />
                 )}
 
                 {stagesQuery.loading && <LoadingState message="Caricamento stage..." />}
@@ -756,161 +418,21 @@ const PipelineSettingsContent = ({ access }) => {
                 )}
 
                 {!stagesQuery.loading && !stagesQuery.error && localStages.length > 0 && (
-                  <ListGroup variant="flush">
-                    {localStages.map((stage, index) => {
-                      const stageRuleState = stageRulesByStageId[stage.id] || {
-                        loading: false,
-                        saving: false,
-                        error: "",
-                        rules: [],
-                      };
-                      const selectedRuleByTemplateId = new Map(
-                        stageRuleState.rules.map((rule) => [rule.checklistTemplateId, rule]),
-                      );
-
-                      return (
-                        <ListGroup.Item key={stage.id} className="d-flex flex-column gap-2">
-                          <div className="d-flex justify-content-between align-items-center gap-2">
-                            <div className="d-flex align-items-center gap-2">
-                              {stage.color && (
-                                <span
-                                  style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: "50%",
-                                    backgroundColor: stage.color,
-                                    display: "inline-block",
-                                  }}
-                                />
-                              )}
-                              <span className="fw-semibold">{stage.name}</span>
-                              {stage.isClosed && <Badge bg="secondary">Chiuso</Badge>}
-                              {stage.isGated && <Badge bg="warning" text="dark">Gated</Badge>}
-                              {stage.isGated && stage.gateChecklistTemplateId && (
-                                <Badge bg="light" text="dark">
-                                  Template: {checklistTemplateNameById.get(stage.gateChecklistTemplateId) || stage.gateChecklistTemplateId}
-                                </Badge>
-                              )}
-                            </div>
-
-                            <div className="d-flex align-items-center gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline-secondary"
-                                disabled={index === 0 || reorderStagesMutation.loading}
-                                onClick={() => void handleMoveStage(index, -1)}
-                              >
-                                <ChevronUp size={14} />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline-secondary"
-                                disabled={index === localStages.length - 1 || reorderStagesMutation.loading}
-                                onClick={() => void handleMoveStage(index, 1)}
-                              >
-                                <ChevronDown size={14} />
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline-secondary"
-                                onClick={() =>
-                                  setEditingStage({
-                                    id: stage.id,
-                                    name: stage.name,
-                                    isClosed: Boolean(stage.isClosed),
-                                    color: stage.color || defaultStageColor,
-                                    isGated: Boolean(stage.isGated),
-                                    gateChecklistTemplateId: stage.gateChecklistTemplateId || "",
-                                    autoCreateInstance: stage.autoCreateInstance !== false,
-                                  })
-                                }
-                              >
-                                <Pencil size={13} />
-                              </Button>
-                              <Button type="button" size="sm" variant="outline-danger" onClick={() => setDeletingStage(stage)}>
-                                <Trash2 size={13} />
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className="border-top pt-2">
-                            <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
-                              <span className="small text-muted">Checklist rules per stage</span>
-                              {stageRuleState.saving && <span className="small text-muted">Salvataggio...</span>}
-                            </div>
-
-                            {!canManageStageChecklistRules && (
-                              <div className="small text-muted">
-                                Servono permessi `checklists.manage_templates` per modificare le regole.
-                              </div>
-                            )}
-
-                            {canManageStageChecklistRules && stageRuleState.loading && (
-                              <div className="small text-muted">Caricamento regole...</div>
-                            )}
-
-                            {canManageStageChecklistRules && !stageRuleState.loading && activeChecklistTemplates.length === 0 && (
-                              <div className="small text-muted">Nessun template checklist attivo disponibile.</div>
-                            )}
-
-                            {canManageStageChecklistRules && !stageRuleState.loading && activeChecklistTemplates.length > 0 && (
-                              <div className="d-flex flex-column gap-2">
-                                {activeChecklistTemplates.map((template) => {
-                                  const selectedRule = selectedRuleByTemplateId.get(template.id);
-                                  const selected = Boolean(selectedRule);
-                                  const gateEnabled = selectedRule?.gateEnabled !== false;
-
-                                  return (
-                                    <div key={`${stage.id}-${template.id}`} className="d-flex flex-wrap align-items-center justify-content-between gap-2">
-                                      <Form.Check
-                                        type="checkbox"
-                                        id={`stage-rule-template-${stage.id}-${template.id}`}
-                                        label={template.name}
-                                        checked={selected}
-                                        onChange={(event) =>
-                                          handleToggleStageRuleTemplate(stage.id, template.id, event.target.checked)}
-                                        disabled={stageRuleState.saving}
-                                      />
-                                      <Form.Check
-                                        type="switch"
-                                        id={`stage-rule-gate-${stage.id}-${template.id}`}
-                                        label="Gate"
-                                        checked={gateEnabled}
-                                        disabled={!selected || stageRuleState.saving}
-                                        onChange={(event) =>
-                                          handleToggleStageRuleGate(stage.id, template.id, event.target.checked)}
-                                      />
-                                    </div>
-                                  );
-                                })}
-
-                                {stageRuleState.error && (
-                                  <Alert variant="danger" className="py-2 mb-0">
-                                    {stageRuleState.error}
-                                  </Alert>
-                                )}
-
-                                <div className="d-flex justify-content-end">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline-primary"
-                                    disabled={stageRuleState.saving}
-                                    onClick={() => void handleSaveStageRules(stage.id)}
-                                  >
-                                    Salva regole
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </ListGroup.Item>
-                      );
-                    })}
-                  </ListGroup>
+                  <StageList
+                    stages={localStages}
+                    defaultStageColor={defaultStageColor}
+                    checklistTemplateNameById={checklistTemplateNameById}
+                    checklistTemplates={activeChecklistTemplates}
+                    canManageChecklistRules={canManageStageChecklistRules}
+                    stageRulesByStageId={rulesByStageId}
+                    reordering={reorderStagesMutation.loading}
+                    onMoveStage={(index, direction) => void handleMoveStage(index, direction)}
+                    onEditStage={setEditingStage}
+                    onDeleteStage={setDeletingStage}
+                    onToggleRuleTemplate={toggleTemplate}
+                    onToggleRuleGate={toggleGate}
+                    onSaveRules={(stageId) => void handleSaveStageRules(stageId)}
+                  />
                 )}
               </Card.Body>
             </Card>
@@ -972,4 +494,3 @@ const ProjectPipelineSettings = () => {
 };
 
 export default ProjectPipelineSettings;
-

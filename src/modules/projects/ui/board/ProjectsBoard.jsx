@@ -5,21 +5,8 @@ import { Button, Form } from 'react-bootstrap';
 import { useHistory } from 'react-router-dom';
 import { useWindowWidth } from '@react-hook/window-size';
 import StageColumn from './StageColumn';
+import { sortStages } from '../pipelineSettings.utils';
 import './projects-board.css';
-
-const sortStages = (stages) =>
-    [...stages].sort((left, right) => {
-        const leftOrder = Number(left?.sortOrder);
-        const rightOrder = Number(right?.sortOrder);
-        const safeLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
-        const safeRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
-
-        if (safeLeftOrder !== safeRightOrder) {
-            return safeLeftOrder - safeRightOrder;
-        }
-
-        return String(left?.name || '').localeCompare(String(right?.name || ''), 'it');
-    });
 
 const resolveProjectStageId = (project) => (
     project?.stageId

@@ -5,8 +5,11 @@ import {
   isInUseError,
   isLastStageError,
   normalizeStageRulesPayload,
+  setStageRuleGate,
   sortCategories,
   sortStages,
+  toStageRulesDraft,
+  toggleStageRuleTemplate,
 } from "./pipelineSettings.utils";
 
 describe("sortCategories / sortStages", () => {
@@ -65,5 +68,61 @@ describe("normalizeStageRulesPayload", () => {
     expect(normalizeStageRulesPayload([3])).toEqual([3]);
     expect(normalizeStageRulesPayload(null)).toEqual([]);
     expect(normalizeStageRulesPayload({ rules: [] })).toEqual([]);
+  });
+});
+
+describe("toStageRulesDraft", () => {
+  it("tiene solo i due campi della bozza e considera acceso il gate assente", () => {
+    expect(
+      toStageRulesDraft({
+        items: [
+          { checklistTemplateId: "t1", gateEnabled: false, altro: "da buttare" },
+          { checklistTemplateId: "t2" },
+          { checklistTemplateId: "t3", gateEnabled: true },
+        ],
+      }),
+    ).toEqual([
+      { checklistTemplateId: "t1", gateEnabled: false },
+      { checklistTemplateId: "t2", gateEnabled: true },
+      { checklistTemplateId: "t3", gateEnabled: true },
+    ]);
+  });
+
+  it("con payload non riconosciuto torna una bozza vuota", () => {
+    expect(toStageRulesDraft(null)).toEqual([]);
+  });
+});
+
+describe("toggleStageRuleTemplate", () => {
+  const rules = [{ checklistTemplateId: "t1", gateEnabled: false }];
+
+  it("spuntare un template lo aggiunge col gate acceso", () => {
+    expect(toggleStageRuleTemplate(rules, "t2", true)).toEqual([
+      { checklistTemplateId: "t1", gateEnabled: false },
+      { checklistTemplateId: "t2", gateEnabled: true },
+    ]);
+  });
+
+  it("togliere la spunta rimuove la regola", () => {
+    expect(toggleStageRuleTemplate(rules, "t1", false)).toEqual([]);
+  });
+
+  it("se non cambia niente torna lo stesso array, non una copia", () => {
+    expect(toggleStageRuleTemplate(rules, "t1", true)).toBe(rules);
+    expect(toggleStageRuleTemplate(rules, "t2", false)).toBe(rules);
+  });
+});
+
+describe("setStageRuleGate", () => {
+  it("cambia il gate solo della regola indicata e non muta l'array di partenza", () => {
+    const rules = [
+      { checklistTemplateId: "t1", gateEnabled: true },
+      { checklistTemplateId: "t2", gateEnabled: true },
+    ];
+    expect(setStageRuleGate(rules, "t2", false)).toEqual([
+      { checklistTemplateId: "t1", gateEnabled: true },
+      { checklistTemplateId: "t2", gateEnabled: false },
+    ]);
+    expect(rules[1].gateEnabled).toBe(true);
   });
 });
