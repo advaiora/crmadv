@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     createCategory,
     createStage,
@@ -24,14 +24,36 @@ const useListQuery = (loader, { enabled = true, deps = [] } = {}) => {
         error: null,
     }));
     const [reloadKey, setReloadKey] = useState(0);
+    const pendingRefetchesRef = useRef([]);
 
+    const settlePendingRefetches = useCallback(() => {
+        const pending = pendingRefetchesRef.current;
+        pendingRefetchesRef.current = [];
+        pending.forEach((resolve) => resolve());
+    }, []);
+
+    // La promessa di refetch si scioglie quando i dati (o l'errore) sono
+    // ARRIVATI, non quando la richiesta e' solo partita: chi fa
+    // `await refetch()` puo' contare su un elenco gia' aggiornato — e' cio'
+    // che permette di selezionare una categoria appena creata senza che la
+    // validazione della selezione la scarti perche' "non ancora in lista".
+    // Se il componente si smonta prima della risposta, la promessa resta in
+    // sospeso apposta: la continuazione non deve girare su uno stato morto.
+    // Limite noto del contratto: un refetch chiesto MENTRE un caricamento e'
+    // gia' in volo viene sciolto da QUEL caricamento (dati piu' vecchi della
+    // richiesta). Oggi nessun chiamante sovrappone azioni; se succedesse,
+    // servirebbe legare ogni resolver al proprio giro di reloadKey.
     const refetch = useCallback(() => {
-        setReloadKey((current) => current + 1);
+        return new Promise((resolve) => {
+            pendingRefetchesRef.current.push(resolve);
+            setReloadKey((current) => current + 1);
+        });
     }, []);
 
     useEffect(() => {
         if (!enabled) {
             setState(createIdleListState());
+            settlePendingRefetches();
             return undefined;
         }
 
@@ -50,6 +72,7 @@ const useListQuery = (loader, { enabled = true, deps = [] } = {}) => {
                     loading: false,
                     error: null,
                 });
+                settlePendingRefetches();
             })
             .catch((error) => {
                 if (controller.signal.aborted) {
@@ -61,10 +84,11 @@ const useListQuery = (loader, { enabled = true, deps = [] } = {}) => {
                     loading: false,
                     error,
                 });
+                settlePendingRefetches();
             });
 
         return () => controller.abort();
-    }, [enabled, loader, reloadKey, ...deps]);
+    }, [enabled, loader, reloadKey, settlePendingRefetches, ...deps]);
 
     return {
         ...state,

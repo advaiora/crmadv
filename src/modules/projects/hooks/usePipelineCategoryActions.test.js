@@ -68,6 +68,35 @@ describe('usePipelineCategoryActions', () => {
         expect(result.current.newCategoryName).toBe('');
     });
 
+    it('la selezione della nuova categoria aspetta che il refetch abbia consegnato i dati', async () => {
+        createCategory.mockResolvedValue({ id: 'c9' });
+        let consegnaElenco;
+        const categoriesQuery = { refetch: vi.fn(() => new Promise((resolve) => { consegnaElenco = resolve; })) };
+        const { result, props } = renderActions({ categoriesQuery });
+
+        act(() => result.current.setNewCategoryName('Vendite'));
+
+        let esitoPromesso;
+        act(() => {
+            esitoPromesso = result.current.createCategory();
+        });
+
+        // La mutazione e' gia' risolta ma l'elenco non e' ancora arrivato:
+        // selezionare adesso farebbe scartare l'id dalla validazione
+        // ("categoria non in lista") — e' la corsa corretta il 3/8/2026.
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        });
+        expect(categoriesQuery.refetch).toHaveBeenCalled();
+        expect(props.setCategoryId).not.toHaveBeenCalled();
+
+        await act(async () => {
+            consegnaElenco();
+            await esitoPromesso;
+        });
+        expect(props.setCategoryId).toHaveBeenCalledWith('c9');
+    });
+
     it('la creazione fallita torna il messaggio e non butta il nome scritto', async () => {
         createCategory.mockRejectedValue(new Error('rete giu'));
         const { result } = renderActions();

@@ -570,3 +570,16 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Confrontare il conteggio con un'aspettativa** (handoff, memoria, import noti): se i numeri non tornano, e' la ricerca a essere incompleta, non il progetto a essere diverso.
 - Dopo la rinomina, ri-verificare con `git grep` che il nome vecchio non compaia piu' (fuori dai documenti storici, che non si riscrivono).
 - Vale in generale: un elenco di occorrenze usato per **modifiche meccaniche di massa** va costruito con uno strumento esaustivo, e ogni discrepanza tra due giri di ricerca va spiegata prima di procedere.
+
+---
+
+## 41. Test di hook React: `await act(async () => await promessa)` va in stallo se la promessa la scioglie un effetto
+
+**Contesto:** 3/8/2026, test del contratto di `refetch` (usePipelineSettingsQueries): la promessa risolve solo quando l'EFFETTO della query ha ricevuto i dati.
+
+**Errore:** scrivere `await act(async () => { await result.current.refetch(); })`. Sembra il pattern standard, ma qui e' un **abbraccio mortale**: l'effetto che scioglie la promessa parte solo quando act flusha il lavoro, e act aspetta che il callback finisca — che a sua volta aspetta la promessa. Timeout a 15 s. Effetto collaterale peggiore: l'act rimasto appeso **corrompe l'ambiente dei test successivi dello stesso file** (`result.current` diventa `null` in un test che di suo era sano) — il secondo rosso era contagio, non un secondo bug.
+
+**Modo corretto:**
+- Spezzare in due: **innescare in un act sincrono** (`act(() => { promessa = refetch(); })` — qui React flusha subito il re-render e l'effetto parte) e **attendere in un secondo act** (`await act(async () => { await promessa; })`).
+- La regola vale per qualunque promessa la cui risoluzione dipenda da un effetto/da un re-render del componente sotto test. Se invece la scioglie un mock esterno (un resolver in mano al test), il singolo act asincrono va bene.
+- Diagnosi rapida: **un timeout secco su un await dentro act** = sospettare lo stallo, non la logica; e se i test DOPO quello rosso danno `result.current === null` senza motivo, ripartire dal primo rosso — gli altri sono contagio.
