@@ -537,3 +537,22 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Prendere il campione subito dopo un reset**, riferendolo alla finestra **appena chiusa**: la finestra del piano ha un orario di reset preciso, quella dello script e' scorrevole (ultime 5 ore) — se non si allineano, i due numeri parlano di periodi diversi.
 - Chiedere sempre **quali modelli** e **se c'erano altri progetti attivi**: senza, il campione non e' rileggibile.
 - Un campione preso con un metro non confrontabile non va cancellato ne' lasciato a inquinare la stima: si marca `"escluso": true` con il motivo nella nota (lo script lo salta). Se invece i registri sono ancora sul disco, meglio ancora: si **ricalcola** il peso col metro nuovo, e il campione torna valido. Prova che il ricalcolo e' affidabile: rifacendo il conto solo-progetto del campione del 30/7 e' uscito 56,4 contro il 57,0 registrato allora.
+
+---
+
+## 39. Una chiamata sta su PIU' righe del registro: fondere al massimo, non prendere la prima
+
+**Contesto:** qualsiasi strumento che legge i `.jsonl` di Claude Code per contare i token (il misuratore dei consumi, `scripts/agenti/consumi.mjs`). Trovato il 3/8/2026.
+
+**Errore:** una singola chiamata al modello viene annotata su **piu' righe** — il ragionamento, ogni uso di strumento, la risposta finale — tutte con lo **stesso `requestId`**, e i contatori `usage` **crescono riga dopo riga**. Lo script deduplicava tenendo la **prima** riga vista e scartando le altre. Effetti misurati su tutto lo storico:
+- **mancava il 12% dei token di uscita** (19,4 milioni contati su 22,1 reali — misura del 3/8/2026 sull'intero storico), cioe' proprio la voce piu' cara (in scala di listino l'uscita vale 5 volte l'ingresso);
+- la **risposta finale di un agent** risultava di **2-3 token** invece di qualche migliaio: nel file l'ultima riga porta il conteggio vero, la penultima (il ragionamento) e' ferma a 3. Il numero da confrontare col costo dell'agent era quindi azzerato.
+
+**Modo corretto:**
+- Raggruppare per `requestId` e tenere il **massimo** di ogni contatore (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`), non la prima riga e **nemmeno la somma**: sommare le righe darebbe 74,1 milioni di token di uscita contro i 22,1 veri, cioe' **il 236% in piu'** (le righe si ripetono, non si aggiungono).
+- Verifica rapida che la fusione sia giusta: il totale col massimo dev'essere **di poco sopra** quello della prima riga (qui +13,7%), non multiplo.
+- A volte pero' il conteggio dell'ultima riga **non viene aggiornato** e resta a 2-3 anche sul testo finale. In quel caso serve una misura di riserva: la **lunghezza del testo** diviso 4 (caratteri per token), usata dentro un `Math.max` col valore dichiarato — cosi' puo' solo correggere in difetto, mai gonfiare.
+- Corollario sui **prezzi per modello**: i nomi nei registri possono avere il suffisso della data (`claude-haiku-4-5-20251001`). Un confronto per uguaglianza non trova la chiave di listino e fa ripiegare sul prezzo di default: qui Haiku veniva pesato come Opus, **5 volte il vero**. Cercare la chiave piu' lunga di cui il nome del modello e' il prolungamento.
+- **Quando si corregge il metro, i campioni di taratura vanno ricalcolati**, non buttati (nota #38): `node scripts/agenti/consumi.mjs --finestra-a "2026-07-31T09:50Z"` ristampa il peso di una finestra passata. I due campioni sono passati da 82,3 e 154,5 a 84,3 e 156,3, e lo scarto medio della stima e' sceso da 1,5 a 1,3 punti.
+
+**Regola generale, gia' vista nella #36:** prima di fidarsi di un numero estratto dai registri, controllare **come sono fatte le righe**, non solo cosa contengono. Qui il difetto non dava nessun errore: dava un numero plausibile e sbagliato.

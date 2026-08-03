@@ -1,6 +1,6 @@
 ---
 description: Genera l'handoff di staffetta (Jacopo ⇄ Claudio) e tiene solo le ultime 3 versioni
-allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Bash(git:*), Bash(netstat:*), Bash(node scripts/agenti/consumi.mjs:*), Read, Write, Glob, Grep
+allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Bash(git:*), Bash(netstat:*), Bash(node scripts/agenti/consumi.mjs:*), Bash(npm run consumi:*), Read, Write, Glob, Grep
 ---
 
 # Genera handoff di staffetta
@@ -87,11 +87,21 @@ Regola di progetto (vedi `CLAUDE.md`, "Ciclo di vita dei dev server"): **fra una
 - Verifica alla fine che le porte siano libere.
 - **Riporta lo stato dei server nell'handoff** (nella sezione "Dove mi sono fermato"): tutti spenti, oppure quali restano accesi, su quali porte e di chi sono.
 
-### 5-bis. Se serve, chiedi la lettura dei consumi
+### 5-bis. Annota i compiti chiusi nel registro
 
-Il monitor dei consumi (`node scripts/agenti/consumi.mjs`) **non può leggere da solo la percentuale del limite dell'abbonamento**: nessun comando e nessun file locale la espongono. La impara da letture manuali.
+Per **ogni pezzo di lavoro concluso** in questa sessione, aggiungi una riga al registro per compito:
 
-Lancialo. Se riporta che la percentuale **non è disponibile** (meno di 2 campioni registrati) e la finestra in corso è **oltre la metà del picco storico**, chiedi la lettura adesso — è il momento giusto perché la finestra è carica e stai già chiudendo:
+```bash
+npm run consumi:compito -- "<nome del lavoro, es. spezzatura ClientsList giro 2>"
+```
+
+Se in sessione si sono chiusi più compiti, delimitali con `--da <ora> --a <ora>` (ore del computer), così ognuno ha il suo consumo invece di prendersi tutta la sessione. Il registro (`archivio-documenti/consumi/registro-compiti.md`) serve a confrontare lavori **simili fra loro** e capire se chiamare l'esploratore convenga: vale solo se si accumula, quindi non saltarlo. Non chiedere il permesso: fa parte della chiusura, come spegnere i server.
+
+### 5-ter. Se serve, chiedi la lettura dei consumi
+
+Il monitor dei consumi (`npm run consumi`) **non può leggere da solo la percentuale del limite dell'abbonamento**: nessun comando e nessun file locale la espongono. La impara da letture manuali.
+
+Lancialo. Se i campioni registrati in `archivio-documenti/consumi/calibrazione.json` sono **meno di 5** (soglia di `CLAUDE.md`: con 2 la stima già funziona, ma sbaglia ancora più di un punto) e la finestra in corso è **oltre la metà del picco storico**, chiedi la lettura adesso — è il momento giusto perché la finestra è carica e stai già chiudendo:
 
 > «Prima di chiudere: scrivi `/usage` nella casella dell'app e passami la percentuale che riporta. Serve a far parlare il monitor dei consumi in percentuale invece che in relativo.»
 

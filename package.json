@@ -27,7 +27,9 @@
     "test:frontend": "vitest run",
     "test:frontend:watch": "vitest",
     "security:vault-hygiene": "node scripts/security/vault-hygiene-check.mjs",
-    "mappa": "node scripts/agenti/mappa.mjs"
+    "mappa": "node scripts/agenti/mappa.mjs",
+    "consumi": "node scripts/agenti/consumi.mjs",
+    "consumi:compito": "node scripts/agenti/consumi.mjs --compito"
   },
   "dependencies": {
     "@amcharts/amcharts5": "^5.14.4",

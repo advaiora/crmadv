@@ -103,15 +103,33 @@ E **non** su codice a metà: su lavoro incompleto produce rilievi che sono artef
 ## 3. Il misuratore dei consumi
 
 ```bash
-node scripts/agenti/consumi.mjs
+npm run consumi
 ```
 
-Legge i registri che Claude Code scrive in locale per ogni sessione (`~/.claude/projects/…`) e stampa: consumo della finestra di 5 ore in corso, picco storico, sessione mediana, ripartizione del consumo, e **quanta parte è finita nei subagent**.
+Legge i registri che Claude Code scrive in locale per ogni sessione (`~/.claude/projects/…` — **tutti i progetti**, perché il limite è dell'account) e stampa, in italiano corrente: a che punto sei della finestra di 5 ore, di chi è il consumo quando lavori su più progetti, **se il team di agent si sta ripagando**, e dove finisce il consumo.
 
+- `--tecnico` → aggiunge i numeri grezzi (pesi, chiamate, ultimi agent chiamati)
 - `--json` → gli stessi dati in forma leggibile da un programma
-- `--scrivi` → aggiorna anche `archivio-documenti/consumi/registro.md` (il registro condiviso fra le due persone; senza questo flag lo script **non crea alcun file**)
+- `--scrivi` → aggiunge una riga a `archivio-documenti/consumi/registro.md` (il registro delle rilevazioni, condiviso fra le due persone)
+- `--finestra-a "2026-07-31T09:50Z"` → peso di una finestra di 5 ore già passata; serve a **ricalcolare i campioni di calibrazione** quando cambia il modo di pesare (vedi nota operativa #39)
 
-**Non manda niente da nessuna parte.** Legge file locali e stampa.
+```bash
+npm run consumi:compito -- "spezzatura ClientsList, giro 2"
+```
+
+Annota un **pezzo di lavoro concluso** in `archivio-documenti/consumi/registro-compiti.md`: durata, consumo, quali agent sono stati usati e quanto hanno fatto risparmiare. Serve a confrontare lavori **simili fra loro** (i giri di spezzatura dei file, per esempio) e capire così se chiamare l'esploratore convenga: non serve un periodo "senza agenti", perché le sessioni variano troppo per tipo di lavoro e la differenza sparirebbe nel rumore. Per difetto conta la sessione in corso; con `--da 10:30` si parte da un'ora precisa, e con `--da`/`--a` in formato ISO si annota anche un lavoro di giorni prima.
+
+**Da fare a fine sessione**, insieme all'handoff, per ogni pezzo di lavoro chiuso: il registro ha senso solo se si accumula.
+
+**Non manda niente da nessuna parte.** Legge file locali, stampa, e scrive solo i due registri qui sopra quando glielo si chiede.
+
+### Come si legge il bilancio degli agent
+
+Il conto è tutto misurato dai registri: quanto contesto un agent ha accumulato leggendo, quanto ne ha riportato indietro, quanto è costato, e quante risposte sono arrivate dopo (ognuna avrebbe riletto quel testo, se fosse rimasto in conversazione). Tre avvertenze per non leggerlo storto:
+
+- È un **tetto massimo**, non un valore prudente: in conversazione quel testo avrebbe fatto scattare la compattazione, che taglia le riletture.
+- Il **team di progetto** e gli agent di serie di Claude Code (`Explore`, `Plan`) sono contati **separatamente**: la domanda "teniamo esploratore e revisore?" si decide sui nostri.
+- Nel registro per compito consumo e risparmio hanno lo **stesso perimetro temporale**, quindi un agent chiamato in chiusura (il revisore, per contratto) risulta piccolo o negativo: le riletture che avrebbe evitato cadono nel compito dopo. Il revisore non si tiene per far risparmiare token, ma per trovare errori.
 
 Ognuno legge i propri registri, che stanno sul proprio computer. Il registro su git è ciò che rende confrontabili i numeri delle due persone.
 

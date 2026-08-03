@@ -7,7 +7,8 @@
     "3. Scrivi /usage nella casella dell'app e leggi la percentuale del limite.",
     "4. Aggiungi qui sotto una voce con i due valori e la data.",
     "5. Servono 3-5 campioni presi a livelli di carico diversi.",
-    "6. ATTENZIONE alle finestre: /usage ha una finestra propria con un orario di reset preciso; il peso dello script copre le ultime 5 ore SCORREVOLI. Il campione migliore si prende subito dopo un reset, riferendolo alla finestra appena chiusa (come il campione del 31/7)."
+    "6. ATTENZIONE alle finestre: /usage ha una finestra propria con un orario di reset preciso; il peso dello script copre le ultime 5 ore SCORREVOLI. Il campione migliore si prende subito dopo un reset, riferendolo alla finestra appena chiusa (come il campione del 31/7).",
+    "7. Se cambia il MODO di pesare (correzione di un difetto, prezzi nuovi), i campioni vecchi vanno RICALCOLATI col metro nuovo, non buttati: 'node scripts/agenti/consumi.mjs --finestra-a \"2026-07-31T09:50Z\"' stampa il peso della finestra di 5 ore che finisce a quell'ora (in UTC). Il numero di chiamate serve a confermare che la finestra sia quella giusta."
   ],
   "_campi": {
     "quando": "data e ora della lettura, formato AAAA-MM-GG HH:MM (ora locale)",
@@ -26,16 +27,16 @@
     },
     {
       "quando": "2026-07-30 17:11",
-      "peso": 82.3,
+      "peso": 84.3,
       "percentuale": 18,
-      "nota": "CORRETTO il 31/7: il peso registrato allora era 57.0 (solo questo progetto); ricalcolato account-wide fa 82.3, di cui 25.9 di un altro progetto aperto in parallelo. Il ricalcolo solo-progetto dava 56.4, cioe' combacia col 57.0 di allora: conferma che il metodo di calcolo e' giusto e che cambiava solo il perimetro. Fine sessione fase 1 riordino .jsx (commit 11bc1a3), quasi tutta Fable 5 Max. Rapporto %/peso 0.219."
+      "nota": "CORRETTO due volte. (1) Il 31/7: il peso registrato allora era 57.0 (solo questo progetto); ricalcolato account-wide fa 82.3, di cui 25.9 di un altro progetto aperto in parallelo. (2) Il 3/8: ricalcolato di nuovo a 84.3 dopo la correzione del conteggio dei token scritti dall'assistente (una chiamata sta su piu' righe del registro e si prendeva la prima invece del massimo: mancava il 12% dell'uscita). Finestra 2026-07-30 10:11-15:11 UTC, 361 chiamate. Fine sessione fase 1 riordino .jsx (commit 11bc1a3), quasi tutta Fable 5 Max. Rapporto %/peso 0.214."
     },
     {
       "quando": "2026-07-31 11:50",
-      "peso": 154.5,
+      "peso": 156.3,
       "percentuale": 30,
-      "nota": "Campione PULITO, il migliore finora: riferito alla finestra appena CHIUSA (04:50-09:50 UTC, reset alle 11:50 locali) e non a una finestra scorrevole, quindi i due perimetri temporali coincidono davvero. Partita da 0% a inizio giornata e arrivata al 30% (dato dato da Jacopo con certezza). Peso account-wide 154.5 su 456 chiamate: 90.3 questo progetto (riordino .jsx, Fable 5 Max) + 64.1 il progetto dashboard-inventario-laboratorio (Opus 4.8 e Opus 5) — cioe' il 41% del limite consumato se lo mangiava l'altro progetto. Rapporto %/peso 0.194.",
-      "nota_modelli": "Con i pesi corretti CADE il sospetto del 30/7 che l'abbonamento contasse Fable diversamente dallo script: i rapporti dei due campioni validi sono 0.219 (sessione quasi tutta Fable) e 0.194 (sessione mista Fable+Opus 4.8+Opus 5), cioe' praticamente uguali. Lo scarto che si vedeva prima era l'altro progetto non conteggiato, non il modello."
+      "nota": "Campione PULITO, il migliore finora: riferito alla finestra appena CHIUSA (04:50-09:50 UTC, reset alle 11:50 locali) e non a una finestra scorrevole, quindi i due perimetri temporali coincidono davvero. La finestra e' partita da 0% e ha raggiunto il 30% (percentuale riferita da Jacopo con certezza). Peso account-wide 156.3 su 456 chiamate, cosi' ripartito: 92.2 questo progetto (riordino .jsx, Fable 5 Max) + 64.1 il progetto dashboard-inventario-laboratorio (Opus 4.8 e Opus 5) — cioe' il 41% del limite consumato se lo mangiava l'altro progetto. RICALCOLATO il 3/8 da 154.5 a 156.3 per la correzione del conteggio dell'uscita (vedi campione precedente). Rapporto %/peso 0.192.",
+      "nota_modelli": "Con i pesi corretti CADE il sospetto del 30/7 che l'abbonamento contasse Fable diversamente dallo script: i rapporti dei due campioni validi sono 0.214 (sessione quasi tutta Fable) e 0.192 (sessione mista Fable+Opus 4.8+Opus 5), cioe' praticamente uguali. Lo scarto che si vedeva prima era l'altro progetto non conteggiato, non il modello."
     }
   ]
 }
