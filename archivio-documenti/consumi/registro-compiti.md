@@ -31,3 +31,6 @@
 | 2026-08-03 13:07 | Monitor consumi: report in italiano + bilancio agent calcolato | 2h 32m | 39,1 | revisore×3 | 2,4 |
 | 2026-08-03 14:36 | Spezzatura ProjectPipelineSettings, giro 2 (975→492 righe) + convergenza duplicati | 1h 22m | 42,2 | esploratore×2, revisore×2 | 12,0 |
 | 2026-08-03 15:07 | Spezzatura consumi.mjs in moduli (1.082→113 + 12 moduli, 48 test) | 28 min | 22,0 | revisore×1 | 0,2 |
+| 2026-08-03 15:49 | Riordino pipeline giro 3: rinomina pipeline.utils | 20 min | 9,2 | nessuno | — |
+| 2026-08-03 17:05 | Riordino pipeline giro 3: PipelineSettingsContent sotto soglia | 1h 16m | 47,4 | revisore×1 | 0,4 |
+| 2026-08-03 17:51 | Fix selezione categoria appena creata (refetch a consegna dati) | 45 min | 34,9 | revisore×1 | 0,2 |

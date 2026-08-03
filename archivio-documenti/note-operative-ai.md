@@ -583,3 +583,16 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Spezzare in due: **innescare in un act sincrono** (`act(() => { promessa = refetch(); })` — qui React flusha subito il re-render e l'effetto parte) e **attendere in un secondo act** (`await act(async () => { await promessa; })`).
 - La regola vale per qualunque promessa la cui risoluzione dipenda da un effetto/da un re-render del componente sotto test. Se invece la scioglie un mock esterno (un resolver in mano al test), il singolo act asincrono va bene.
 - Diagnosi rapida: **un timeout secco su un await dentro act** = sospettare lo stallo, non la logica; e se i test DOPO quello rosso danno `result.current === null` senza motivo, ripartire dal primo rosso — gli altri sono contagio.
+
+---
+
+## 42. Commit da PowerShell 5.1: le VIRGOLETTE DOPPIE nel messaggio spezzano l'argomento di git
+
+**Contesto:** 3/8/2026, `git commit -m @'...'@` con una here-string che conteneva `"non ancora in lista"` tra virgolette doppie.
+
+**Errore:** la here-string arriva intera a PowerShell, ma nel passaggio al comando NATIVO (git) PS 5.1 avvolge l'argomento tra doppi apici **senza fare escape di quelli interni**: le virgolette del testo chiudono l'argomento a meta' e il resto diventa pathspec (`error: pathspec 'ancora' did not match...`). Il commit non parte; il `git push` accodato dopo il `;` parte lo stesso (e per fortuna non c'era niente da pushare). Trappola subdola: con lo STESSO messaggio senza virgolette doppie il comando funziona.
+
+**Modo corretto:**
+- Per i messaggi di commit multiriga usare **`git commit -F <file>`**: messaggio scritto su file (scratchpad) con lo strumento di scrittura file, niente quoting di mezzo. Vale per qualsiasi testo lungo passato a un comando nativo.
+- In alternativa evitare del tutto le virgolette doppie nel testo (parafrasare), ma il `-F` e' l'unica via robusta.
+- Non accodare `push` al commit con `;` quando il messaggio e' complesso: se il commit fallisce, il push parte comunque (con `;` l'esito del primo comando non ferma il secondo).
