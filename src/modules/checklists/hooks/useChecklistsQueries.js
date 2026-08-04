@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   archiveChecklistTemplate,
   assignChecklistItem,
@@ -28,6 +28,89 @@ const createIdleState = (initialData) => ({
   loading: false,
   error: null,
 });
+
+// La promessa di refetch si scioglie quando i dati (o l'errore) sono
+// ARRIVATI, non quando la richiesta e' solo partita: chi fa
+// `await refetch()` puo' contare su un elenco gia' aggiornato — e' cio'
+// che permette di selezionare il memo appena creato senza che la
+// validazione della selezione lo scarti perche' "non ancora in lista".
+// Stesso contratto di usePipelineSettingsQueries (modulo projects).
+// Se il componente si smonta prima della risposta, la promessa resta in
+// sospeso apposta: la continuazione non deve girare su uno stato morto.
+// A query spenta (enabled falso) la promessa si scioglie comunque, con lo
+// stato a riposo: niente attese appese sui rami disabilitati.
+// Limite noto del contratto: un refetch chiesto MENTRE un caricamento e'
+// gia' in volo viene sciolto da QUEL caricamento (dati piu' vecchi della
+// richiesta). Oggi nessun chiamante sovrappone azioni; se succedesse,
+// servirebbe legare ogni resolver al proprio giro di reloadKey.
+const useChecklistQuery = (loader, { enabled = true, initialData = null } = {}) => {
+  const initialDataRef = useRef(initialData);
+  const [state, setState] = useState(() => ({
+    data: initialDataRef.current,
+    loading: enabled,
+    error: null,
+  }));
+  const [reloadKey, setReloadKey] = useState(0);
+  const pendingRefetchesRef = useRef([]);
+
+  const settlePendingRefetches = useCallback(() => {
+    const pending = pendingRefetchesRef.current;
+    pendingRefetchesRef.current = [];
+    pending.forEach((resolve) => resolve());
+  }, []);
+
+  const refetch = useCallback(() => {
+    return new Promise((resolve) => {
+      pendingRefetchesRef.current.push(resolve);
+      setReloadKey((current) => current + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) {
+      setState(createIdleState(initialDataRef.current));
+      settlePendingRefetches();
+      return undefined;
+    }
+
+    const controller = new AbortController();
+
+    setState((current) => ({
+      ...current,
+      loading: true,
+      error: null,
+    }));
+
+    loader({ signal: controller.signal })
+      .then((data) => {
+        setState({
+          data,
+          loading: false,
+          error: null,
+        });
+        settlePendingRefetches();
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setState({
+          data: initialDataRef.current,
+          loading: false,
+          error,
+        });
+        settlePendingRefetches();
+      });
+
+    return () => controller.abort();
+  }, [enabled, loader, reloadKey, settlePendingRefetches]);
+
+  return {
+    ...state,
+    refetch,
+  };
+};
 
 const useMutationAction = (action) => {
   const [loading, setLoading] = useState(false);
@@ -62,229 +145,42 @@ const useMutationAction = (action) => {
 };
 
 export const useChecklistTemplates = (params = {}) => {
-  const [state, setState] = useState(() => ({
-    data: [],
-    loading: true,
-    error: null,
-  }));
-  const [reloadKey, setReloadKey] = useState(0);
+  // La chiave serializzata e' l'identita' dei parametri: il loader riparte
+  // solo quando cambia davvero il contenuto, non l'oggetto letterale.
   const paramsKey = JSON.stringify(params);
+  const loader = useCallback(
+    ({ signal }) => listChecklistTemplates(JSON.parse(paramsKey ?? '{}'), { signal }),
+    [paramsKey],
+  );
 
-  const refetch = useCallback(() => {
-    setReloadKey((current) => current + 1);
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setState((current) => {
-      if (current.loading && current.error === null) {
-        return current;
-      }
-      return {
-        ...current,
-        loading: true,
-        error: null,
-      };
-    });
-
-    listChecklistTemplates(params, { signal: controller.signal })
-      .then((data) => {
-        setState({
-          data,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setState({
-          data: [],
-          loading: false,
-          error,
-        });
-      });
-
-    return () => controller.abort();
-  }, [paramsKey, reloadKey]);
-
-  return {
-    ...state,
-    refetch,
-  };
+  return useChecklistQuery(loader, { enabled: true, initialData: [] });
 };
 
 export const useChecklistTemplate = (templateId) => {
-  const [state, setState] = useState(() => createIdleState(null));
-  const [reloadKey, setReloadKey] = useState(0);
+  const loader = useCallback(
+    ({ signal }) => getChecklistTemplate(templateId, { signal }),
+    [templateId],
+  );
 
-  const refetch = useCallback(() => {
-    setReloadKey((current) => current + 1);
-  }, []);
-
-  useEffect(() => {
-    if (!templateId) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setState((current) => {
-      if (current.loading && current.error === null) {
-        return current;
-      }
-      return {
-        ...current,
-        loading: true,
-        error: null,
-      };
-    });
-
-    getChecklistTemplate(templateId, { signal: controller.signal })
-      .then((data) => {
-        setState({
-          data,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setState({
-          data: null,
-          loading: false,
-          error,
-        });
-      });
-
-    return () => controller.abort();
-  }, [templateId, reloadKey]);
-
-  if (!templateId) {
-    return {
-      ...createIdleState(null),
-      refetch,
-    };
-  }
-
-  return {
-    ...state,
-    refetch,
-  };
+  return useChecklistQuery(loader, { enabled: Boolean(templateId), initialData: null });
 };
 
 export const useProjectChecklistInstances = (projectId, { includeItems = true } = {}) => {
-  const [state, setState] = useState(() => createIdleState([]));
-  const [reloadKey, setReloadKey] = useState(0);
+  const loader = useCallback(
+    ({ signal }) => listProjectChecklistInstances(projectId, { includeItems, signal }),
+    [includeItems, projectId],
+  );
 
-  const refetch = useCallback(() => {
-    setReloadKey((current) => current + 1);
-  }, []);
-
-  useEffect(() => {
-    if (!projectId) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setState((current) => {
-      if (current.loading && current.error === null) {
-        return current;
-      }
-      return {
-        ...current,
-        loading: true,
-        error: null,
-      };
-    });
-
-    listProjectChecklistInstances(projectId, { includeItems, signal: controller.signal })
-      .then((data) => {
-        setState({
-          data,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setState({
-          data: [],
-          loading: false,
-          error,
-        });
-      });
-
-    return () => controller.abort();
-  }, [includeItems, projectId, reloadKey]);
-
-  if (!projectId) {
-    return {
-      ...createIdleState([]),
-      refetch,
-    };
-  }
-
-  return {
-    ...state,
-    refetch,
-  };
+  return useChecklistQuery(loader, { enabled: Boolean(projectId), initialData: [] });
 };
 
 export const useChecklistAssignableUsers = ({ enabled = true } = {}) => {
-  const [state, setState] = useState(() => createIdleState([]));
-  const [reloadKey, setReloadKey] = useState(0);
+  const loader = useCallback(
+    ({ signal }) => listChecklistAssignableUsers({ signal }),
+    [],
+  );
 
-  const refetch = useCallback(() => {
-    setReloadKey((current) => current + 1);
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) {
-      setState(createIdleState([]));
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setState((current) => ({
-      ...current,
-      loading: true,
-      error: null,
-    }));
-
-    listChecklistAssignableUsers({ signal: controller.signal })
-      .then((data) => {
-        setState({
-          data,
-          loading: false,
-          error: null,
-        });
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setState({
-          data: [],
-          loading: false,
-          error,
-        });
-      });
-
-    return () => controller.abort();
-  }, [enabled, reloadKey]);
-
-  return {
-    ...state,
-    refetch,
-  };
+  return useChecklistQuery(loader, { enabled, initialData: [] });
 };
 
 export const useCreateChecklistTemplate = () => useMutationAction((input) => createChecklistTemplate(input));
