@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useAgencyProjectAssets } from './assets/hooks/useAgencyProjectAssets';
 import AgencyProjectAssetsPage from './AgencyProjectAssetsPage';
@@ -180,10 +180,56 @@ describe('AgencyProjectAssetsPage', () => {
     expect(striscia.className).toBe('agency-action-strip');
   });
 
-  it('collega la casella dei competitor rapidi al suo setter', () => {
+  it('collega la casella dei competitor rapidi al suo setter, in lettura e in scrittura', () => {
     const setCompetitorUrlsText = vi.fn();
     montaCon({ competitorUrlsText: 'https://rivale.it', setCompetitorUrlsText });
 
-    expect(screen.getByLabelText('Competitor URL rapidi')).toHaveValue('https://rivale.it');
+    const casella = screen.getByLabelText('Competitor URL rapidi');
+    expect(casella).toHaveValue('https://rivale.it');
+
+    fireEvent.change(casella, { target: { value: 'https://altro.it' } });
+    expect(setCompetitorUrlsText).toHaveBeenCalledWith('https://altro.it');
+  });
+
+  it('il brief grezzo finisce nel campo giusto delle fonti', () => {
+    const updateSourceField = vi.fn();
+    montaCon({ updateSourceField });
+
+    fireEvent.change(screen.getByLabelText('Brief grezzo / note'), { target: { value: 'Nuovi appunti' } });
+
+    // Il nome del campo vive solo nella pagina: un refuso qui e il brief si
+    // scriverebbe a video senza arrivare mai al salvataggio.
+    expect(updateSourceField).toHaveBeenCalledWith('manualNotes', 'Nuovi appunti');
+  });
+
+  it('scrivere in una bozza non azzera gli altri campi della stessa bozza', () => {
+    const setCompetitorDraft = vi.fn();
+    montaCon({ competitorDraft: { name: 'Rivale', url: '', reason: 'Concorrente diretto' }, setCompetitorDraft });
+
+    fireEvent.change(screen.getByPlaceholderText('https://competitor.it'), { target: { value: 'https://rivale.it' } });
+
+    // La pagina passa una funzione di aggiornamento: si esegue per verificare
+    // che diffonda il resto della bozza invece di sostituirla.
+    const aggiorna = setCompetitorDraft.mock.calls[0][0];
+    expect(aggiorna({ name: 'Rivale', url: '', reason: 'Concorrente diretto' })).toEqual({
+      name: 'Rivale',
+      url: 'https://rivale.it',
+      reason: 'Concorrente diretto',
+    });
+  });
+
+  it('gli elenchi arrivano ai riquadri giusti, non solo quando sono vuoti', () => {
+    montaCon({
+      uploadedFiles: [{ id: 'f1', name: 'brief.pdf', size: 1024, parseStatus: 'parsed' }],
+      competitorRoster: [{ id: 'c1', name: 'Rivale spa', url: 'https://rivale.it', source: 'manual', status: 'confirmed' }],
+      competitorSearchSuggestions: [{ id: 's1', name: 'Proposto srl', url: 'https://proposto.it' }],
+    });
+
+    // Con liste vuote un nome di prop sbagliato darebbe lo stesso risultato:
+    // servono contenuti riconoscibili. `competitorRoster` e' il piu' esposto,
+    // perche' e' una rinomina rispetto all'originale.
+    expect(screen.getByText('brief.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Rivale spa')).toBeInTheDocument();
+    expect(screen.getByText('Proposto srl')).toBeInTheDocument();
   });
 });

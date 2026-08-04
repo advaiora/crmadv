@@ -75,16 +75,17 @@ describe('caricamento', () => {
     expect(result.current.sources).toBeNull();
   });
 
-  it('non espone i setter grezzi, tranne quello della casella competitor', async () => {
+  it('nasconde i setter dello stato condiviso ed espone solo quelli delle bozze', async () => {
     const { result } = await montaHook();
 
-    expect(result.current.setSources).toBeUndefined();
-    expect(result.current.setError).toBeUndefined();
-    expect(result.current.setMessage).toBeUndefined();
-    expect(result.current.setSaving).toBeUndefined();
-    expect(result.current.setDataMeta).toBeUndefined();
-    // Eccezione voluta: alimenta una casella di testo libero.
-    expect(typeof result.current.setCompetitorUrlsText).toBe('function');
+    for (const nascosto of ['setSources', 'setError', 'setMessage', 'setSaving', 'setDataMeta']) {
+      expect(result.current[nascosto]).toBeUndefined();
+    }
+    // Questi tre alimentano campi di testo libero senza una funzione
+    // dedicata: toglierli romperebbe quei campi.
+    for (const pubblico of ['setCompetitorUrlsText', 'setFileDraft', 'setCompetitorDraft']) {
+      expect(typeof result.current[pubblico]).toBe('function');
+    }
   });
 });
 

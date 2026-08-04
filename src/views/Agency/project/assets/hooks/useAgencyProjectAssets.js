@@ -49,12 +49,16 @@ export const useAgencyProjectAssets = (projectId) => {
     ? competitors.competitorSearch.suggestions
     : [];
 
-  // Come nelle sorelle Web e Ads i setter grezzi restano dentro, cosi' le
-  // funzioni degli hook restano l'unico posto in cui lo stato cambia.
+  // Restano dentro i cinque setter dello stato condiviso (`sources`, la
+  // provenienza dei dati, il salvataggio in corso, messaggio ed errore): quelli
+  // li cambiano solo le funzioni degli hook, cosi' non c'e' un secondo posto da
+  // cui possono cambiare.
   //
-  // UNICA ECCEZIONE: `setCompetitorUrlsText`, che resta pubblico perche'
-  // alimenta una casella di testo libero senza una funzione dedicata. Toglierlo
-  // per simmetria con le sorelle romperebbe quella casella.
+  // Restano invece PUBBLICI i tre setter delle bozze di form —
+  // `setCompetitorUrlsText`, `setFileDraft`, `setCompetitorDraft` — perche'
+  // alimentano campi di testo libero senza una funzione dedicata: toglierli
+  // romperebbe quei campi. Vale anche per la sorella Ads, che espone
+  // `setAdsProjectDraft` allo stesso modo.
   const {
     setSources: _setSources,
     setDataMeta: _setDataMeta,
