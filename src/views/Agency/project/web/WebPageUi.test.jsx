@@ -140,16 +140,15 @@ describe('WebPageSettingsCard', () => {
     ctaSet: { primary: 'Prenota call' },
   };
 
-  // I campi si cercano per segnaposto e per ruolo, non per etichetta: nel
-  // markup originale le Form.Label non sono agganciate ai controlli (manca
-  // controlId). E' un difetto di accessibilita' pre-esistente, non toccato in
-  // questo giro di rifattorizzazione.
-  it('mostra i valori correnti dei tre campi', () => {
+  // I campi si cercano per etichetta: e' il modo che prova anche che label e
+  // controllo siano davvero collegati (controlId sulla Form.Group), cosa che
+  // serve a chi usa uno screen reader.
+  it('mostra i valori correnti dei tre campi, cercati per etichetta', () => {
     render(<WebPageSettingsCard output={output} onFieldChange={vi.fn()} onGenerateBlock={vi.fn()} generatingBlockKey="" />);
 
-    expect(screen.getByPlaceholderText('Obiettivo pagina')).toHaveValue('Generare richieste');
-    expect(screen.getByRole('combobox')).toHaveValue('landing');
-    expect(screen.getByPlaceholderText('Es. Prenota call')).toHaveValue('Prenota call');
+    expect(screen.getByLabelText('Obiettivo pagina')).toHaveValue('Generare richieste');
+    expect(screen.getByLabelText('Tipo pagina')).toHaveValue('landing');
+    expect(screen.getByLabelText('CTA principale')).toHaveValue('Prenota call');
   });
 
   it('monta i sette pulsanti di rigenerazione per blocco', () => {

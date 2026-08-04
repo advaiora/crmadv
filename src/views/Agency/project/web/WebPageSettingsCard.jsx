@@ -20,7 +20,7 @@ const WebPageSettingsCard = ({
       <h6 className="mb-3">Impostazioni pagina</h6>
       <Row className="g-2">
         <Col md={6}>
-          <Form.Group>
+          <Form.Group controlId="web-page-goal">
             <Form.Label className="small mb-1">Obiettivo pagina</Form.Label>
             <Form.Control
               value={output.pageGoal}
@@ -30,7 +30,7 @@ const WebPageSettingsCard = ({
           </Form.Group>
         </Col>
         <Col md={3}>
-          <Form.Group>
+          <Form.Group controlId="web-page-type">
             <Form.Label className="small mb-1">Tipo pagina</Form.Label>
             <Form.Select
               value={output.pageType}
@@ -43,7 +43,7 @@ const WebPageSettingsCard = ({
           </Form.Group>
         </Col>
         <Col md={3}>
-          <Form.Group>
+          <Form.Group controlId="web-page-cta">
             <Form.Label className="small mb-1">CTA principale</Form.Label>
             <Form.Control
               value={output.ctaSet.primary}

@@ -27,6 +27,19 @@ Quando si individua un **sospetto conflitto di questo tipo**, NON procedere subi
 
 Vale per tutto il progetto, in ogni sessione. Nel dubbio, segnalare: meglio una domanda in più che disfare il lavoro dell'altro.
 
+## Le cose trovate per strada vanno nella roadmap, non nel lavoro in corso (dal 4/8/2026)
+
+Lavorando si incontrano di continuo **altre cose da sistemare o migliorare**, slegate dall'obiettivo del momento: un difetto di accessibilità, una funzione duplicata in nove file, un refuso in un ramo di codice che si stava solo leggendo, una domanda di prodotto rimasta implicita.
+
+**Non si aprono lì per lì, e non si aggiungono al lavoro in corso.** Ogni volta che se ne trova una:
+
+1. **Si apre `archivio-documenti/03-roadmap-confronto-e-build.md` e la si colloca nel punto giusto** — sotto la V di competenza se è una scelta di prodotto, sotto *"Debito tecnico / tooling (trasversale)"* se è manutenzione. Scritta in modo che chi la legge fra tre mesi capisca cos'è, dove sta e perché non è stata fatta subito (con la misura: quanti file, quali).
+2. **Si torna immediatamente all'obiettivo corrente.**
+
+Il motivo è pratico: l'obiettivo in corso costa già parecchio tempo di suo, e ogni deviazione lo allunga; ma se la cosa trovata non viene scritta da qualche parte, si perde. La roadmap è il posto dove non si perde.
+
+Vale anche per le **domande** che meritano una decisione di Jacopo o Claudio: non restano appese in chat (la chat finisce), finiscono nella roadmap con le opzioni già istruite.
+
 ## Auto-miglioramento dell'AI (note operative)
 
 Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativi già individuati e il modo corretto di procedere (es. come fare le verifiche in anteprima senza sprechi di tempo).
