@@ -39,3 +39,5 @@
 | 2026-08-03 17:05 | Riordino pipeline giro 3: PipelineSettingsContent sotto soglia | 1h 16m | 47,4 | 0,62 | revisore×1 | 0,4 |
 | 2026-08-03 17:51 | Fix selezione categoria appena creata (refetch a consegna dati) | 45 min | 34,9 | 0,78 | revisore×1 | 0,2 |
 | 2026-08-04 11:07 | Fix gemello selezione Memo + analisi architetto + suite su threads (A+B) — lavori in parallelo, non separabili; ~61 min della durata sono i 5 giri di test (18+27 min i due giri a fork falliti per worker morti, 12 min il giro verde finale) | 1h 55m | 47,4 | 0,41 | architetto×1, revisore×1 | 2,7 |
+| 2026-08-04 11:50 | Monitor consumi: colonna e righe velocità (unità/min) | 42 min | 19,1 | 0,45 | revisore×1 | -0,5 |
+| 2026-08-04 12:43 | Esclusione antivirus: applicazione, misura e note | 53 min | 12,8 | 0,24 | nessuno | — |
