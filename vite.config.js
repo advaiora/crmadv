@@ -56,6 +56,14 @@ export default defineConfig(({ mode }) => {
       // (~20s a file, antivirus): col timeout di default (5s) un test puo'
       // diventare rosso a caso sotto carico. 15s = margine, non licenza di lentezza.
       testTimeout: 15000,
+      // Worker-thread in un processo solo invece dei fork: spariscono gli
+      // avvii di node che a macchina carica non partivano proprio (4/8/2026:
+      // due giri di suite con 3 e 14 file mai avviati, "Timeout waiting for
+      // worker to respond"). NON aggiungere `isolate: false`: provato lo
+      // stesso giorno, condivide il registro moduli fra file e sdoppia i
+      // `vi.mock` per-file dei moduli API (11 rossi finti negli hook pipeline,
+      // mock mai chiamati ma esiti "riusciti").
+      pool: 'threads',
       setupFiles: ['src/test/setup.js'],
       include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
       // La libreria "vendored" @hk-gantt ha test propri in stile Jest (globali
