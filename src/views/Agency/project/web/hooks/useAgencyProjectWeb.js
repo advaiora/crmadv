@@ -1,9 +1,10 @@
 import { useAgencyAiEstimates } from "../../../../../modules/agency-os/hooks/useAgencyAiEstimates";
+import { isAiUnavailable } from "../../agencyProjectUx";
 import { buildWebMissingInputs } from "../buildWebMissingInputs";
 import { useAgencyProjectWebData } from "./useAgencyProjectWebData";
 import { useAgencyProjectWebSubProjects } from "./useAgencyProjectWebSubProjects";
 import { useAgencyProjectWebDraftGeneration } from "./useAgencyProjectWebDraftGeneration";
-import { isAiUnavailable, useAgencyProjectWebAiGeneration } from "./useAgencyProjectWebAiGeneration";
+import { useAgencyProjectWebAiGeneration } from "./useAgencyProjectWebAiGeneration";
 
 // Hook radice della pagina Web di progetto: mette insieme dati, sub-progetti,
 // bozza base e generazione AI, e calcola i due derivati che servono a piu'

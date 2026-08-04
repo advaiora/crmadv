@@ -16,6 +16,13 @@ export const readableValue = (value, fallback = EMPTY_FIELD_LABEL) => {
 
 export const hasReadableValue = (value) => readableValue(value, "") !== "";
 
+// L'AI non e' disponibile quando il server lo dichiara esplicitamente. Con
+// `aiStatus` ancora `null` (stato non ancora arrivato, o chiamata fallita)
+// NON si blocca niente: si prova, e semmai fallisce la chiamata vera.
+export const isAiUnavailable = (aiStatus) => (
+  aiStatus?.configured === false || aiStatus?.status === "not_configured"
+);
+
 export const getInputQualityTone = (missingCount) => {
   if (missingCount <= 0) {
     return { label: "Input completi", variant: "success" };

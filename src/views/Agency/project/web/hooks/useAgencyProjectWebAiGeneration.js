@@ -4,12 +4,7 @@ import {
   generateAgencyWebProjectWithAi,
 } from "../../../../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../../../../modules/agency-os/data/agencyDataSource";
-
-// L'AI non e' configurata quando il server lo dichiara esplicitamente: in quel
-// caso non si chiama l'endpoint, si spiega all'utente cosa puo' fare.
-export const isAiUnavailable = (aiStatus) => (
-  aiStatus?.configured === false || aiStatus?.status === "not_configured"
-);
+import { isAiUnavailable } from "../../agencyProjectUx";
 
 // Generazione con AI: pagina intera (`handleGenerateWithAi`) o singolo blocco
 // (`handleGenerateBlockWithAi`). Entrambe lavorano sul primo sub-progetto Web,
