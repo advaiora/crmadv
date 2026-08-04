@@ -41,3 +41,4 @@
 | 2026-08-04 11:07 | Fix gemello selezione Memo + analisi architetto + suite su threads (A+B) — lavori in parallelo, non separabili; ~61 min della durata sono i 5 giri di test (18+27 min i due giri a fork falliti per worker morti, 12 min il giro verde finale) | 1h 55m | 47,4 | 0,41 | architetto×1, revisore×1 | 2,7 |
 | 2026-08-04 11:50 | Monitor consumi: colonna e righe velocità (unità/min) | 42 min | 19,1 | 0,45 | revisore×1 | -0,5 |
 | 2026-08-04 12:43 | Esclusione antivirus: applicazione, misura e note | 53 min | 12,8 | 0,24 | nessuno | — |
+| 2026-08-04 14:59 | Blocco Agency: spezzatura AgencyProjectWebPage chiusa (890→161) + Ads estratto per tre quarti (manca la riscrittura della pagina) — una riga sola perché la finestra misurata copre entrambi; ~35 min sono giri di test | 2h 10m | 36,9 | 0,28 | esploratore×2, revisore×1 | 14,9 |
