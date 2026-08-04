@@ -106,6 +106,10 @@ export const useAgencyProjectAssetsUploadQueue = ({
     }
   };
 
+  // Svuota la coda senza caricare niente: i file trascinati per sbaglio si
+  // tolgono di mezzo, quelli gia' caricati restano nelle fonti.
+  const clearUploadQueue = () => setUploadQueue([]);
+
   return {
     uploadQueue,
     uploading,
@@ -113,6 +117,7 @@ export const useAgencyProjectAssetsUploadQueue = ({
     getInputProps,
     isDragActive,
     uploadQueuedFiles,
+    clearUploadQueue,
   };
 };
 
