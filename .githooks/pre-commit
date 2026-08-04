@@ -1,0 +1,8 @@
+#!/bin/sh
+# Rigenera la mappa progetto (archivio-documenti/mappa/, generata, non committata).
+# Forma leggera decisa il 4/8/2026 (registro in archivio-documenti/team-agenti.md):
+# sub-secondo, NON blocca mai il commit — tiene la mappa fresca anche se una
+# sessione dimentica `npm run mappa`. Attivazione: git config core.hooksPath .githooks
+if ! node scripts/agenti/mappa.mjs >/dev/null 2>&1; then
+  echo "[avviso] mappa non rigenerata (node scripts/agenti/mappa.mjs fallito): rigenerala a mano" >&2
+fi

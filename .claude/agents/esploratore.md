@@ -58,6 +58,17 @@ Quando la richiesta tocca uno di questi, segui la catena **fino in fondo** e rip
 - **Un campo nuovo sul database** → `prisma/schema.prisma`, la migrazione, il repository, il service, i tipi/uso lato frontend, e gli eventuali seed in `prisma/seed*.ts`.
 - **Un parametro nuovo su una funzione condivisa** → *tutte* le rotte che la chiamano, non solo quella su cui si sta lavorando.
 
+## Se il compito è spezzare un file (giro unico, deciso il 4/8/2026)
+
+Quando la richiesta è la spezzatura di un file-mostro, l'elenco dei punti da toccare non basta: consegna subito il **piano completo di estrazione**, così il giro si fa in una volta sola invece che in più sessioni. In aggiunta alla forma standard qui sotto, riporta:
+
+1. **Blocchi da estrarre** — per ciascuno: righe di partenza (`file.jsx:120-180`), nome e destinazione proposti secondo le convenzioni del modulo, e la natura del blocco (funzione pura, hook, sottocomponente).
+2. **Ordine di estrazione** — prima le funzioni pure, poi gli hook, poi i sottocomponenti; segnala le dipendenze fra blocchi (chi deve uscire prima di chi).
+3. **Confini** — per ogni blocco: cosa riceve (props/parametri) e cosa restituisce; lo stato che resta al padre e le callback da passare.
+4. **Test per blocco** — quale test serve a ciascun pezzo (funzione pura → casi; hook → contratto; componente → smoke test), con un esempio esistente da imitare se c'è.
+
+Il piano deve permettere di **committare per estrazione** dentro lo stesso giro: ogni blocco col suo test è un commit autonomo, così la sessione può interrompersi in qualunque punto senza perdere pezzi.
+
 ## Cosa devi restituire
 
 Testo semplice, in italiano, in questa forma. Niente preamboli.
