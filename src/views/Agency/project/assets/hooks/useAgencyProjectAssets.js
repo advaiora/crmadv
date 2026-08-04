@@ -1,6 +1,7 @@
 import { useAgencyProjectAssetsData } from "./useAgencyProjectAssetsData";
 import { useAgencyProjectAssetsUrls } from "./useAgencyProjectAssetsUrls";
 import { useAgencyProjectAssetsFiles } from "./useAgencyProjectAssetsFiles";
+import { useAgencyProjectAssetsUploadQueue } from "./useAgencyProjectAssetsUploadQueue";
 import { useAgencyProjectAssetsCompetitors } from "./useAgencyProjectAssetsCompetitors";
 
 // Hook radice della pagina Fonti e Materiali: mette insieme dati, indirizzi,
@@ -25,6 +26,12 @@ export const useAgencyProjectAssets = (projectId) => {
     setSaving: data.setSaving,
     setCompetitorUrlsText: data.setCompetitorUrlsText,
     setDataMeta: data.setDataMeta,
+  });
+
+  const uploadQueue = useAgencyProjectAssetsUploadQueue({
+    projectId,
+    setError: data.setError,
+    setMessage: data.setMessage,
     loadSources: data.loadSources,
   });
 
@@ -61,6 +68,7 @@ export const useAgencyProjectAssets = (projectId) => {
     ...datiPubblici,
     ...urls,
     ...files,
+    ...uploadQueue,
     ...competitors,
     status,
     competitorRoster,
