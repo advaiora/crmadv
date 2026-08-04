@@ -62,7 +62,14 @@ export function raccogli() {
     chiamate,
     dati: {
       generatoIl: new Date(adesso).toISOString(),
-      finestraCorrente: { ...finestra, stimaPercentuale: stima },
+      finestraCorrente: {
+        ...finestra,
+        stimaPercentuale: stima,
+        // Estremi delle chiamate dentro la finestra: servono alla velocita'
+        // (unita'/min sui minuti lavorati, non sulle 5 ore piene).
+        inizioAttivo: inFinestra.length ? inFinestra[0].t : null,
+        fineAttivo: inFinestra.length ? inFinestra[inFinestra.length - 1].t : null,
+      },
       piccoStorico: picco,
       medianaSessione,
       ultimaSessione: ultima,

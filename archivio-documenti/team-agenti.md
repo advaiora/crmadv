@@ -117,7 +117,7 @@ Legge i registri che Claude Code scrive in locale per ogni sessione (`~/.claude/
 npm run consumi:compito -- "spezzatura ClientsList, giro 2"
 ```
 
-Annota un **pezzo di lavoro concluso** in `archivio-documenti/consumi/registro-compiti.md`: durata, consumo, quali agent sono stati usati e quanto hanno fatto risparmiare. Serve a confrontare lavori **simili fra loro** (i giri di spezzatura dei file, per esempio) e capire così se chiamare l'esploratore convenga: non serve un periodo "senza agenti", perché le sessioni variano troppo per tipo di lavoro e la differenza sparirebbe nel rumore. Per difetto conta la sessione in corso; con `--da 10:30` si parte da un'ora precisa, e con `--da`/`--a` in formato ISO si annota anche un lavoro di giorni prima.
+Annota un **pezzo di lavoro concluso** in `archivio-documenti/consumi/registro-compiti.md`: durata, consumo, **velocità (unità/min = consumo/durata, dal 4/8/2026)**, quali agent sono stati usati e quanto hanno fatto risparmiare. La velocità risponde alle domande di **capacità** della finestra (rate × durata contro le 5 ore) e **non giudica gli agent** — per quello valgono risparmio e confronto a parità di compito. Serve a confrontare lavori **simili fra loro** (i giri di spezzatura dei file, per esempio) e capire così se chiamare l'esploratore convenga: non serve un periodo "senza agenti", perché le sessioni variano troppo per tipo di lavoro e la differenza sparirebbe nel rumore. Per difetto conta la sessione in corso; con `--da 10:30` si parte da un'ora precisa, e con `--da`/`--a` in formato ISO si annota anche un lavoro di giorni prima.
 
 **Da fare a fine sessione**, insieme all'handoff, per ogni pezzo di lavoro chiuso: il registro ha senso solo se si accumula.
 

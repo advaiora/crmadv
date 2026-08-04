@@ -10,8 +10,11 @@ import {
   mln,
   n0,
   n1,
+  n2,
   nomeProgettoLeggibile,
   quando,
+  unitaAlMinuto,
+  velocita,
 } from './formattazione.mjs';
 
 describe('numeri in italiano', () => {
@@ -31,6 +34,28 @@ describe('numeri in italiano', () => {
     assert.equal(durataAParole(47 * 60000), '47 min');
     assert.equal(durataAParole(82 * 60000), '1h 22m');
     assert.equal(durataAParole(120 * 60000), '2h 00m');
+  });
+
+  it('n2 usa la virgola e due decimali', () => {
+    assert.equal(n2(0.4122), '0,41');
+    assert.equal(n2(1.5), '1,50');
+  });
+});
+
+describe('velocità di consumo (unità/min)', () => {
+  it('unitaAlMinuto: unità sui minuti arrotondati (gli stessi della colonna durata)', () => {
+    assert.equal(unitaAlMinuto(47.4, 115 * 60000), 47.4 / 115);
+    // 59 secondi si stampano "1 min": anche la velocità usa quel minuto.
+    assert.equal(unitaAlMinuto(10, 59000), 10);
+    assert.equal(unitaAlMinuto(10, 29000), null);
+    assert.equal(unitaAlMinuto(10, 0), null);
+  });
+
+  it('velocita: stringa in italiano, null quando il rate non ha senso', () => {
+    assert.equal(velocita(47.4, 115 * 60000), '0,41 unità/min');
+    // Il numero dell'analisi del 4/8: 288,9 unità in 542 minuti di lavoro.
+    assert.equal(velocita(288.9, 542 * 60000), '0,53 unità/min');
+    assert.equal(velocita(5, 29000), null);
   });
 });
 

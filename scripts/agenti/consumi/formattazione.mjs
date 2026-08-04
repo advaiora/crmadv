@@ -11,6 +11,7 @@ export function nomeProgettoLeggibile(cartella) {
 
 // I decimali si scrivono con la virgola: e' un report in italiano.
 export const n1 = (x) => x.toFixed(1).replace('.', ',');
+export const n2 = (x) => x.toFixed(2).replace('.', ',');
 export const n0 = (x) => x.toFixed(0);
 export const mln = (x) => `${(x / 1e6).toFixed(2).replace('.', ',')}M`;
 
@@ -35,6 +36,25 @@ export function durataAParole(ms) {
   const min = Math.round(ms / 60000);
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}m`;
+}
+
+// La velocita' di consumo, in unita' al minuto. E' la chiave per le domande di
+// CAPACITA' della finestra — rate x durata contro le 5 ore — decisa il
+// 4/8/2026. NON si usa per giudicare gli agent: il parallelismo alza le
+// unita'/min anche quando abbassa le unita' totali del lavoro (registro
+// decisioni in team-agenti.md). Si calcola sui MINUTI ARROTONDATI, gli stessi
+// che stampa durataAParole: cosi' la cella della velocita' e la colonna della
+// durata tornano sempre l'una con l'altra, e una riga rifatta col comando
+// riproduce la cella. Sotto il mezzo minuto (durata stampata 0) niente rate.
+export function unitaAlMinuto(peso, ms) {
+  const min = Math.round(ms / 60000);
+  if (min < 1) return null;
+  return peso / min;
+}
+
+export function velocita(peso, ms) {
+  const v = unitaAlMinuto(peso, ms);
+  return v === null ? null : `${n2(v)} unità/min`;
 }
 
 // A che punto sei della finestra, detto in modo utile per decidere se attaccare

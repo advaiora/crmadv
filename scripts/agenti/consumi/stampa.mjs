@@ -16,6 +16,7 @@ import {
   n1,
   nomeProgettoLeggibile,
   quando,
+  velocita,
 } from './formattazione.mjs';
 
 // Peso della finestra di 5 ore che finisce a `fine` (un'ora passata), con la
@@ -26,6 +27,9 @@ export function stampaFinestraPassata(chiamate, fine) {
   const somma = dentro.reduce(accumula, sommaVuota());
   console.log(`Finestra ${quando(fine - FINESTRA_MS)} → ${quando(fine)} (ora del computer)`);
   console.log(`  peso ${n1(somma.peso)} su ${somma.chiamate} chiamate`);
+  const attivita = dentro.length ? dentro[dentro.length - 1].t - dentro[0].t : 0;
+  const vPassata = velocita(somma.peso, attivita);
+  if (vPassata) console.log(`  velocità ${vPassata}, su ${durataAParole(attivita)} di attività dentro la finestra`);
   const perProgetto = new Map();
   for (const c of dentro) perProgetto.set(c.progetto, (perProgetto.get(c.progetto) || 0) + c.peso);
   for (const [p, v] of [...perProgetto.entries()].sort((a, b) => b[1] - a[1])) {
@@ -54,6 +58,15 @@ export function stampaQuadro(dati, chiamate, opzioni) {
     console.log(`  Consumo pari al ${n0(frazione * 100)}% delle tue 5 ore più cariche di sempre.`);
     console.log(`  [${barra(frazione)}]`);
     console.log('  In percentuale del limite non si può ancora dire: servono 2 letture di /usage (vedi in fondo).');
+  }
+  // La velocita' si misura sui minuti fra la prima e l'ultima chiamata della
+  // finestra (attivita', pause comprese). Proiettata sulle 5 ore piene dice
+  // dove si arriva SE si continua a questo passo senza fermarsi: e' una stima
+  // prudente, NON confrontabile con la media del picco (diluita sulle 5 ore).
+  const attivo = (finestra.fineAttivo ?? 0) - (finestra.inizioAttivo ?? 0);
+  const vFinestra = velocita(finestra.peso, attivo);
+  if (vFinestra) {
+    console.log(`  Velocità: ${vFinestra}, su ${durataAParole(attivo)} di attività dentro la finestra.`);
   }
   if (dati.finestraPerProgetto.length > 1) {
     const totFin = dati.finestraPerProgetto.reduce((s, p) => s + p.peso, 0) || 1;
@@ -122,12 +135,15 @@ export function stampaQuadro(dati, chiamate, opzioni) {
 
   console.log("PER FARSI UN'IDEA");
   console.log(
-    `  Le tue 5 ore più cariche finora: ${n1(picco.peso)} unità${inLimite(picco.peso)}, il ${quando(picco.quando)}.`,
+    `  Le tue 5 ore più cariche finora: ${n1(picco.peso)} unità${inLimite(picco.peso)}, il ${quando(picco.quando)}` +
+      ` (media sulle 5 ore piene: ${velocita(picco.peso, FINESTRA_MS)}).`,
   );
   console.log(`  Una sessione tipica: ${n1(dati.medianaSessione)} unità${inLimite(dati.medianaSessione)}.`);
+  const vUltima = velocita(dati.ultimaSessione.peso, dati.ultimaSessione.fine - dati.ultimaSessione.inizio);
   console.log(
     `  L'ultima sessione di questo progetto: ${n1(dati.ultimaSessione.peso)} unità${inLimite(dati.ultimaSessione.peso)}` +
-      ` in ${durataAParole(dati.ultimaSessione.fine - dati.ultimaSessione.inizio)}, chiusa ${quando(dati.ultimaSessione.fine)}.`,
+      ` in ${durataAParole(dati.ultimaSessione.fine - dati.ultimaSessione.inizio)}${vUltima ? ` (${vUltima})` : ''},` +
+      ` chiusa ${quando(dati.ultimaSessione.fine)}.`,
   );
   console.log('');
 

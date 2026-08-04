@@ -16,6 +16,10 @@
 > revisore, che per contratto si chiama in chiusura — e che comunque non si tiene per far
 > risparmiare token, ma per trovare errori.
 >
+> La **velocità** (unità/min = consumo/durata) risponde alle domande di capacità della finestra
+> (rate × durata contro le 5 ore). NON giudica gli agent: il parallelismo alza le unità/min
+> anche quando abbassa le unità totali (registro decisioni, team-agenti.md, 4/8/2026).
+>
 > Le prime tre righe sono state **ricostruite il 3/8/2026** dai registri del 31/7, delimitando
 > i tre giri con l'ora dei rispettivi commit **al secondo** (`c2bb49d` 08:26:40Z, `05d1a24`
 > 08:57:45Z, `bbcfd62` 09:58:57Z, a partire da 07:40:00Z). I secondi contano: arrotondando al
@@ -23,14 +27,15 @@
 > stessi estremi — ed è una buona abitudine annotare gli estremi usati quando non coincidono
 > con la sessione intera.
 
-| quando | compito | durata | consumo | agenti usati | risparmio agenti |
-|---|---|---:|---:|---|---:|
-| 2026-07-31 10:26 | Spezzatura ClientsList, giro 1 (896→703 righe) | 47 min | 38,8 | esploratore×1, revisore×1 | 6,1 |
-| 2026-07-31 10:57 | Spezzatura ClientsList, giro 2 (703→476 righe) | 31 min | 23,5 | revisore×1 | -0,4 |
-| 2026-07-31 11:58 | Spezzatura ProjectPipelineSettings, giro 1 (1148→975 righe) | 1h 01m | 31,8 | esploratore×1, revisore×1 | 2,7 |
-| 2026-08-03 13:07 | Monitor consumi: report in italiano + bilancio agent calcolato | 2h 32m | 39,1 | revisore×3 | 2,4 |
-| 2026-08-03 14:36 | Spezzatura ProjectPipelineSettings, giro 2 (975→492 righe) + convergenza duplicati | 1h 22m | 42,2 | esploratore×2, revisore×2 | 12,0 |
-| 2026-08-03 15:07 | Spezzatura consumi.mjs in moduli (1.082→113 + 12 moduli, 48 test) | 28 min | 22,0 | revisore×1 | 0,2 |
-| 2026-08-03 15:49 | Riordino pipeline giro 3: rinomina pipeline.utils | 20 min | 9,2 | nessuno | — |
-| 2026-08-03 17:05 | Riordino pipeline giro 3: PipelineSettingsContent sotto soglia | 1h 16m | 47,4 | revisore×1 | 0,4 |
-| 2026-08-03 17:51 | Fix selezione categoria appena creata (refetch a consegna dati) | 45 min | 34,9 | revisore×1 | 0,2 |
+| quando | compito | durata | consumo | velocità (unità/min) | agenti usati | risparmio agenti |
+|---|---|---:|---:|---:|---|---:|
+| 2026-07-31 10:26 | Spezzatura ClientsList, giro 1 (896→703 righe) | 47 min | 38,8 | 0,83 | esploratore×1, revisore×1 | 6,1 |
+| 2026-07-31 10:57 | Spezzatura ClientsList, giro 2 (703→476 righe) | 31 min | 23,5 | 0,76 | revisore×1 | -0,4 |
+| 2026-07-31 11:58 | Spezzatura ProjectPipelineSettings, giro 1 (1148→975 righe) | 1h 01m | 31,8 | 0,52 | esploratore×1, revisore×1 | 2,7 |
+| 2026-08-03 13:07 | Monitor consumi: report in italiano + bilancio agent calcolato | 2h 32m | 39,1 | 0,26 | revisore×3 | 2,4 |
+| 2026-08-03 14:36 | Spezzatura ProjectPipelineSettings, giro 2 (975→492 righe) + convergenza duplicati | 1h 22m | 42,2 | 0,51 | esploratore×2, revisore×2 | 12,0 |
+| 2026-08-03 15:07 | Spezzatura consumi.mjs in moduli (1.082→113 + 12 moduli, 48 test) | 28 min | 22,0 | 0,79 | revisore×1 | 0,2 |
+| 2026-08-03 15:49 | Riordino pipeline giro 3: rinomina pipeline.utils | 20 min | 9,2 | 0,46 | nessuno | — |
+| 2026-08-03 17:05 | Riordino pipeline giro 3: PipelineSettingsContent sotto soglia | 1h 16m | 47,4 | 0,62 | revisore×1 | 0,4 |
+| 2026-08-03 17:51 | Fix selezione categoria appena creata (refetch a consegna dati) | 45 min | 34,9 | 0,78 | revisore×1 | 0,2 |
+| 2026-08-04 11:07 | Fix gemello selezione Memo + analisi architetto + suite su threads (A+B) — lavori in parallelo, non separabili; ~61 min della durata sono i 5 giri di test (18+27 min i due giri a fork falliti per worker morti, 12 min il giro verde finale) | 1h 55m | 47,4 | 0,41 | architetto×1, revisore×1 | 2,7 |

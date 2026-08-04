@@ -2,11 +2,13 @@
 // delle rilevazioni e il registro per compito. ATTENZIONE: i due file markdown
 // sono committati e condivisi fra le persone del progetto — il formato delle
 // righe e delle intestazioni non si cambia di una virgola, o le righe vecchie
-// diventano incoerenti con le nuove.
+// diventano incoerenti con le nuove. (Unica migrazione fatta: 4/8/2026,
+// colonna "velocità" nel registro per compito, con TUTTE le righe esistenti
+// ricalcolate nello stesso commit — è così che si migra, mai a metà.)
 import fs from 'node:fs';
 import path from 'node:path';
 import { FILE_COMPITI, FILE_REGISTRO, RADICE } from './config.mjs';
-import { durataAParole, n1, quando } from './formattazione.mjs';
+import { durataAParole, n1, n2, quando, unitaAlMinuto, velocita } from './formattazione.mjs';
 import { costoSeFosseInLinea } from './agenti.mjs';
 
 export function scriviRegistro(dati, adesso) {
@@ -87,13 +89,18 @@ export function scriviCompito(nome, dati, chiamate, da, a) {
         '> tempo**: il risparmio di un agent chiamato a fine compito risulta quindi piccolo o negativo,\n' +
         '> perché le riletture che avrebbe evitato cadono nel compito dopo. Vale soprattutto per il\n' +
         '> revisore, che per contratto si chiama in chiusura — e che comunque non si tiene per far\n' +
-        '> risparmiare token, ma per trovare errori.\n\n' +
-        '| quando | compito | durata | consumo | agenti usati | risparmio agenti |\n' +
-        '|---|---|---:|---:|---|---:|\n',
+        '> risparmiare token, ma per trovare errori.\n' +
+        '>\n' +
+        '> La **velocità** (unità/min = consumo/durata) risponde alle domande di capacità della finestra\n' +
+        '> (rate × durata contro le 5 ore). NON giudica gli agent: il parallelismo alza le unità/min\n' +
+        '> anche quando abbassa le unità totali (registro decisioni, team-agenti.md, 4/8/2026).\n\n' +
+        '| quando | compito | durata | consumo | velocità (unità/min) | agenti usati | risparmio agenti |\n' +
+        '|---|---|---:|---:|---:|---|---:|\n',
     );
   }
   const risparmioDetto = conteggiabili.length ? n1(risparmio) : '—';
-  const riga = `| ${quando(fine)} | ${nome.replace(/\|/g, '/')} | ${durataAParole(fine - inizio)} | ${n1(consumo)} | ${elencoAgenti} | ${risparmioDetto} |\n`;
+  const rate = unitaAlMinuto(consumo, fine - inizio);
+  const riga = `| ${quando(fine)} | ${nome.replace(/\|/g, '/')} | ${durataAParole(fine - inizio)} | ${n1(consumo)} | ${rate === null ? '—' : n2(rate)} | ${elencoAgenti} | ${risparmioDetto} |\n`;
   fs.appendFileSync(FILE_COMPITI, riga);
 
   console.log('');
@@ -101,6 +108,7 @@ export function scriviCompito(nome, dati, chiamate, da, a) {
   console.log(`  compito  : ${nome}`);
   console.log(`  durata   : ${durataAParole(fine - inizio)}`);
   console.log(`  consumo  : ${n1(consumo)} unità (${dentro.length} chiamate)`);
+  console.log(`  velocità : ${velocita(consumo, fine - inizio) ?? 'n.d. (durata sotto il minuto)'}`);
   console.log(`  agenti   : ${elencoAgenti}`);
   if (conteggiabili.length) console.log(`  risparmio: ${n1(risparmio)} unità`);
   if (fuoriConto > 0) {
