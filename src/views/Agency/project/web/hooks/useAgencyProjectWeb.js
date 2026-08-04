@@ -49,8 +49,22 @@ export const useAgencyProjectWeb = (projectId) => {
     ? data.project.sourceReadiness.usedSources
     : [];
 
+  // I setter grezzi (`setWebState`, `setDataMeta`, i tre dei messaggi) NON
+  // escono di qui: servono solo a cucire fra loro gli hook interni. Se
+  // uscissero, domani si potrebbe scrivere direttamente nello stato della
+  // bozza aggirando i riduttori, che smetterebbero di essere l'unico posto
+  // in cui quello stato cambia.
+  const {
+    setWebState: _setWebState,
+    setDataMeta: _setDataMeta,
+    setSaveMessage: _setSaveMessage,
+    setSaveError: _setSaveError,
+    setGenerationMessage: _setGenerationMessage,
+    ...datiPubblici
+  } = data;
+
   return {
-    ...data,
+    ...datiPubblici,
     ...subProjects,
     ...draftGeneration,
     ...aiGeneration,

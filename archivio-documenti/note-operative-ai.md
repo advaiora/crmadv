@@ -597,3 +597,31 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Per i messaggi di commit multiriga usare **`git commit -F <file>`**: messaggio scritto su file (scratchpad) con lo strumento di scrittura file, niente quoting di mezzo. Vale per qualsiasi testo lungo passato a un comando nativo.
 - In alternativa evitare del tutto le virgolette doppie nel testo (parafrasare), ma il `-F` e' l'unica via robusta.
 - Non accodare `push` al commit con `;` quando il messaggio e' complesso: se il commit fallisce, il push parte comunque (con `;` l'esito del primo comando non ferma il secondo).
+
+*(Nota: dallo strumento Bash — Git Bash, non PowerShell — la here-string `git commit -F - <<'EOF' ... EOF` funziona senza problemi, virgolette doppie comprese. Il vincolo qui sopra vale quando si passa da PowerShell.)*
+
+---
+
+## 43. Un 200 dal transform di Vite NON prova che gli import di quel modulo risolvano
+
+**Contesto:** 4/8/2026, spezzatura di `AgencyProjectWebPage.jsx` in 21 file nuovi. Per confermare che i pezzi nuovi fossero a posto ho usato la nota #11: `curl http://localhost:5173/src/.../File.jsx` su ognuno, tutti `200`.
+
+**Errore (segnalato dal revisore):** ho presentato quei `200` come prova che **i percorsi relativi degli import fossero giusti** — che era il rischio numero uno del giro, visto che i file nuovi sono scesi di una o due cartelle. Non lo provano: Vite in dev **riscrive gli specificatori** e serve il modulo; se un import punta a un file inesistente, il `200` arriva lo stesso e l'errore si manifesta sulla **richiesta successiva** (quella del file mancante), che nessuno sta guardando.
+
+**Modo corretto:**
+- Il `200` di Vite prova **solo** che il file transpila (sintassi valida). Per quello resta utile e velocissimo.
+- Per provare che gli import **risolvano**, servono: la **suite di test** (ogni modulo nuovo dev'essere importato da almeno un test — se manca, quel modulo non e' verificato da nessuno), oppure `npm run build`, oppure il controllo dei percorsi su disco.
+- Regola generale, la stessa della #30: quando si dichiara "verificato", dire **cosa** ha verificato quella prova. Una prova che copre la sintassi non copre il collegamento.
+
+---
+
+## 44. Test frontend: `@testing-library/user-event` non e' installato
+
+**Contesto:** 4/8/2026, primi test di componente nella cartella `src/views/Agency/**` (che prima era a zero test).
+
+**Errore:** scritto `import userEvent from '@testing-library/user-event'` e `await userEvent.click(...)` per default, come si fa di solito con Testing Library. Il pacchetto **non c'e'** fra le dipendenze: il file fallisce in raccolta (`Failed to resolve import`, zero test eseguiti) — un rosso che sembra grave e invece e' solo un import.
+
+**Modo corretto:**
+- La convenzione gia' in uso nel progetto e' **`.click()` diretto sull'elemento**: `screen.getByRole('button', { name: 'Elimina' }).click();` (esempio: `src/modules/projects/ui/modals/ConfirmDeleteModal.test.jsx`). Funziona e non serve `await`.
+- Per scrivere in un campo controllato da React, nei test si usa il `fireEvent`/`change` di Testing Library; **nell'anteprima** invece serve il setter nativo (nota #10).
+- Regola generale: prima di importare una libreria di comodo in un test, **guardare cosa importano i test gia' presenti**. Vale per qualsiasi cartella nuova: le convenzioni si copiano dai vicini, non dalla memoria.

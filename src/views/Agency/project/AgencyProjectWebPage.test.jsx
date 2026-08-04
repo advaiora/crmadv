@@ -21,7 +21,11 @@ vi.mock('./AgencyProjectPageTemplate', () => ({
   ),
 }));
 
-vi.mock('react-router-dom', () => ({
+// Si sostituisce SOLO useParams: il resto del router resta quello vero, cosi'
+// il giorno che un figlio non finto usa un <Link> il test non si rompe con un
+// errore che punta al posto sbagliato.
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal()),
   useParams: () => ({ projectId: 'p1' }),
 }));
 
