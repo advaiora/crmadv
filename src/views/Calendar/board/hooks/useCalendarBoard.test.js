@@ -114,6 +114,79 @@ describe('caricamento del periodo visibile', () => {
   });
 });
 
+// Navigazione e viste passano tutte per l'API del calendario montato. Nei test
+// non c'e' nessun calendario, quindi il riferimento va riempito a mano: senza,
+// queste funzioni escono alla prima riga e non verificherebbero niente.
+describe('navigazione e viste', () => {
+  const attaccaCalendarioFinto = (result) => {
+    const api = {
+      prev: vi.fn(),
+      next: vi.fn(),
+      today: vi.fn(),
+      changeView: vi.fn(),
+      view: {},
+    };
+    result.current.calendarRef.current = { getApi: () => api };
+    return api;
+  };
+
+  it('i tre comandi di navigazione arrivano al calendario', async () => {
+    const { result } = await montaConPeriodo();
+    const api = attaccaCalendarioFinto(result);
+
+    act(() => { result.current.handleCalendarNavigation('prev'); });
+    act(() => { result.current.handleCalendarNavigation('next'); });
+    act(() => { result.current.handleCalendarNavigation('today'); });
+
+    expect(api.prev).toHaveBeenCalledTimes(1);
+    expect(api.next).toHaveBeenCalledTimes(1);
+    expect(api.today).toHaveBeenCalledTimes(1);
+  });
+
+  // Un'azione sconosciuta cade su "oggi": e' il ramo finale dell'originale.
+  it('un comando sconosciuto porta a oggi', async () => {
+    const { result } = await montaConPeriodo();
+    const api = attaccaCalendarioFinto(result);
+
+    act(() => { result.current.handleCalendarNavigation('qualcosaltro'); });
+
+    expect(api.today).toHaveBeenCalledTimes(1);
+  });
+
+  // I quattro nomi che FullCalendar conosce non somigliano ai nostri: uno
+  // scambio fra due rami darebbe all'utente la vista sbagliata, in silenzio.
+  it('ogni vista si traduce nel nome che il calendario conosce', async () => {
+    const { result } = await montaConPeriodo();
+    const api = attaccaCalendarioFinto(result);
+
+    act(() => { result.current.handleViewChange('week'); });
+    expect(api.changeView).toHaveBeenLastCalledWith('timeGridWeek');
+    expect(result.current.currentView).toBe('week');
+
+    act(() => { result.current.handleViewChange('day'); });
+    expect(api.changeView).toHaveBeenLastCalledWith('timeGridDay');
+
+    act(() => { result.current.handleViewChange('list'); });
+    expect(api.changeView).toHaveBeenLastCalledWith('listWeek');
+
+    act(() => { result.current.handleViewChange('month'); });
+    expect(api.changeView).toHaveBeenLastCalledWith('dayGridMonth');
+    expect(result.current.currentView).toBe('month');
+  });
+
+  // Prima che il calendario sia montato i comandi non devono esplodere: e' il
+  // caso vero dei primi istanti della pagina.
+  it('senza calendario montato i comandi non fanno niente e non esplodono', async () => {
+    const { result } = await montaConPeriodo();
+
+    act(() => { result.current.handleCalendarNavigation('next'); });
+    act(() => { result.current.handleViewChange('week'); });
+
+    // La vista NON cambia: senza calendario il cambio si ferma prima.
+    expect(result.current.currentView).toBe('month');
+  });
+});
+
 describe('filtri per sorgente', () => {
   it('spegnendo una sorgente i suoi eventi spariscono dalla griglia', async () => {
     listCalendarEvents.mockResolvedValue({

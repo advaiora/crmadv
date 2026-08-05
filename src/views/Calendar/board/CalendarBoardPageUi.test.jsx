@@ -8,18 +8,26 @@ import CalendarGrid from './CalendarGrid';
 import CalendarEventFormModal from './CalendarEventFormModal';
 import CalendarEventDetailsModal from './CalendarEventDetailsModal';
 
-// FullCalendar si finge: montarlo davvero renderebbe il test lento e fragile, e
-// qui interessa solo che la griglia riceva le cose giuste.
+// FullCalendar si finge: montarlo davvero renderebbe il test lento e fragile.
+//
+// Il finto tiene da parte TUTTE le prop che riceve, gestori e riferimento
+// compresi. Un finto che guardasse solo i dati lascerebbe passare in silenzio
+// il guasto peggiore: un gestore scollegato (per esempio `datesSet`) non fa
+// fallire niente, ma il calendario smette di caricare gli eventi.
+let propsGriglia = null;
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, editable, selectable, height }) => (
-    <div
-      data-testid="griglia"
-      data-eventi={events.length}
-      data-modificabile={String(editable)}
-      data-selezionabile={String(selectable)}
-      data-altezza={height}
-    />
-  ),
+  default: (props) => {
+    propsGriglia = props;
+    return (
+      <div
+        data-testid="griglia"
+        data-eventi={props.events.length}
+        data-modificabile={String(props.editable)}
+        data-selezionabile={String(props.selectable)}
+        data-altezza={props.height}
+      />
+    );
+  },
 }));
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
 vi.mock('@fullcalendar/timegrid', () => ({ default: {} }));
@@ -181,6 +189,50 @@ describe('CalendarGrid', () => {
     expect(griglia).toHaveAttribute('data-modificabile', 'true');
     expect(griglia).toHaveAttribute('data-selezionabile', 'true');
     expect(griglia).toHaveAttribute('data-altezza', '700');
+  });
+
+  // Il riferimento e' quello con cui la barra in alto comanda il calendario:
+  // se non arrivasse, Today, precedente, successivo e le quattro viste
+  // smetterebbero di fare qualsiasi cosa, senza un errore.
+  it('il riferimento al calendario arriva alla griglia', () => {
+    const calendarRef = { current: null };
+    disegna({ calendarRef });
+
+    expect(propsGriglia.ref).toBe(calendarRef);
+  });
+
+  it('i cinque gestori sono collegati e chiamano il loro', () => {
+    const onDatesSet = vi.fn();
+    const onEventClick = vi.fn();
+    const onDragOrResize = vi.fn();
+    const onSelectRange = vi.fn();
+    disegna({ onDatesSet, onEventClick, onDragOrResize, onSelectRange });
+
+    propsGriglia.datesSet({ start: new Date(2026, 7, 1), end: new Date(2026, 7, 31) });
+    propsGriglia.eventClick({ event: { id: 'e1' } });
+    propsGriglia.eventDrop({ event: { id: 'e1' }, revert: vi.fn() });
+    propsGriglia.eventResize({ event: { id: 'e1' }, revert: vi.fn() });
+    propsGriglia.select({ start: new Date(2026, 7, 5), end: new Date(2026, 7, 6), allDay: true });
+
+    expect(onDatesSet).toHaveBeenCalledTimes(1);
+    expect(onEventClick).toHaveBeenCalledTimes(1);
+    // Trascinamento e ridimensionamento passano tutti e due di qui.
+    expect(onDragOrResize).toHaveBeenCalledTimes(2);
+    expect(onSelectRange).toHaveBeenCalledTimes(1);
+  });
+
+  // I due gestori che ricevono anche il permesso: se lo perdessero, si
+  // potrebbe spostare un evento (o crearne uno) senza averne il diritto.
+  it('trascinamento e selezione ricevono il permesso insieme all evento', () => {
+    const onDragOrResize = vi.fn();
+    const onSelectRange = vi.fn();
+    disegna({ onDragOrResize, onSelectRange, canEdit: false, canCreate: false });
+
+    propsGriglia.eventDrop({ event: { id: 'e1' }, revert: vi.fn() });
+    propsGriglia.select({ start: new Date(2026, 7, 5), end: new Date(2026, 7, 6), allDay: true });
+
+    expect(onDragOrResize.mock.calls[0][1]).toBe(false);
+    expect(onSelectRange.mock.calls[0][1]).toBe(false);
   });
 
   // Sotto una certa altezza la griglia diventa illeggibile: c'e' un minimo.

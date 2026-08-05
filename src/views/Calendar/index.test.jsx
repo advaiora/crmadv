@@ -20,15 +20,21 @@ vi.mock('../../modules/calendar/ui/CalendarModuleGate', () => ({
   default: ({ children }) => children({ access: { permissions: permessiFinti } }),
 }));
 
+// Il finto tiene da parte tutte le prop, gestori e riferimento compresi: e' cosi'
+// che si verifica il cablaggio fino in fondo (vedi il test dei gestori).
+let propsGriglia = null;
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, editable, selectable }) => (
-    <div
-      data-testid="griglia"
-      data-eventi={events.length}
-      data-modificabile={String(editable)}
-      data-selezionabile={String(selectable)}
-    />
-  ),
+  default: (props) => {
+    propsGriglia = props;
+    return (
+      <div
+        data-testid="griglia"
+        data-eventi={props.events.length}
+        data-modificabile={String(props.editable)}
+        data-selezionabile={String(props.selectable)}
+      />
+    );
+  },
 }));
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
 vi.mock('@fullcalendar/timegrid', () => ({ default: {} }));
@@ -110,6 +116,29 @@ describe('CalendarPage', () => {
     expect(screen.getByTestId('griglia')).toHaveAttribute('data-eventi', '1');
   });
 
+  // Il collegamento piu' delicato di tutta la pagina. Se cadesse
+  // `onDatesSet={board.handleDatesSet}`, la pagina si disegnerebbe uguale e
+  // nessun altro test si accorgerebbe di niente — ma il calendario non
+  // caricherebbe piu' un solo evento, e cambiando mese non se ne accorgerebbe
+  // nessuno finche' non lo vede un utente.
+  it('i gestori della griglia sono quelli dell hook, non altri', () => {
+    const stato = statoHook();
+    useCalendarBoard.mockReturnValue(stato);
+    montaPagina();
+
+    expect(propsGriglia.datesSet).toBe(stato.handleDatesSet);
+    expect(propsGriglia.eventClick).toBe(stato.handleEventClick);
+    expect(propsGriglia.ref).toBe(stato.calendarRef);
+
+    // Questi due passano per una funzione che aggiunge il permesso, quindi si
+    // controllano chiamandoli.
+    propsGriglia.eventDrop({ event: { id: 'e1' }, revert: vi.fn() });
+    propsGriglia.select({ start: new Date(2026, 7, 5), end: new Date(2026, 7, 6), allDay: true });
+
+    expect(stato.handleDragOrResize).toHaveBeenCalledTimes(1);
+    expect(stato.handleEventSelect).toHaveBeenCalledTimes(1);
+  });
+
   it('la griglia riceve gli eventi FILTRATI, non quelli grezzi', () => {
     useCalendarBoard.mockReturnValue(statoHook({
       events: [evento(), evento({ id: 'e2' }), evento({ id: 'e3' })],
@@ -153,9 +182,12 @@ describe('CalendarPage', () => {
   });
 
   it('il dettaglio compare solo quando c e un evento aperto', () => {
+    const { unmount } = montaPagina();
+    expect(screen.queryByText('Sala A')).not.toBeInTheDocument();
+    unmount();
+
     useCalendarBoard.mockReturnValue(statoHook({ selectedEvent: evento() }));
     montaPagina();
-
     expect(screen.getByText('Sala A')).toBeInTheDocument();
   });
 

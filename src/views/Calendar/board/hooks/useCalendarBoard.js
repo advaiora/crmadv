@@ -37,11 +37,19 @@ export const useCalendarBoard = () => {
 
   // Si prendono per nome — e non come `viewState.qualcosa` dentro l'elenco
   // delle dipendenze qui sotto, che il controllo degli hook non sa leggere.
-  // I setter di errore e salvataggio restano dentro: li usano gli hook a cui
-  // sono stati passati, la pagina non deve poterli toccare.
-  const { applyDatesSetToView, ...vista } = viewState;
+  //
+  // Quello che NON esce di qui: i setter di errore e salvataggio, i due modi
+  // di ricaricare (`loadEvents` e `reloadVisibleRange`) e il riferimento al
+  // periodo visibile. Li usano gli hook a cui sono stati passati; se la pagina
+  // potesse chiamarli, ricaricherebbe scavalcando `handleDatesSet`, che e'
+  // l'unico punto in cui vista ed eventi restano in accordo.
+  //
+  // `events` grezzi invece ESCONO apposta: alla griglia arrivano i filtrati, e
+  // avere tutti e due sotto mano e' quello che permette di dimostrarlo.
+  const { applyDatesSetToView, visibleRangeRef: _visibleRangeRef, ...vista } = viewState;
   const {
     loadEvents,
+    reloadVisibleRange: _reloadVisibleRange,
     setSaving: _setSaving,
     setError: _setError,
     ...datiEventi
