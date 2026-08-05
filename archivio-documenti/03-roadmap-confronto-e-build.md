@@ -362,6 +362,24 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 - **Mappatura schema & importazione dei dati** dal sistema legacy (continuità clienti/storico). *(NB: qui "importazione" = travaso dei dati reali dal vecchio sistema al nuovo — è cosa diversa dalle migrazioni dello schema del DB, che si fanno tracciate durante lo sviluppo.)*
 - **Hardening** sicurezza/performance, audit completo, test end-to-end.
 - Rollout progressivo + QA finale, dismissione definitiva del legacy.
+
+### 🟦 V13 — Pulizia finale dei file *(nata il 5/8/2026)*
+**Obiettivo:** chiudere il residuo del riordino, cioè i file troppo grossi che **nessuna V ha mai avuto motivo di aprire**.
+
+**Perché esiste, e perché è in coda.** Il riordino dei file grossi si fa **dentro la V che li riapre**, come suo primo passo: è la regola decisa il 5/8 (vedi *Debito tecnico* → *"Dimensione dei file: il censimento completo e chi spezza cosa"*). Ma alcuni file non li riapre nessuna V: se aspettassero un'occasione che non arriva, resterebbero fuori norma per sempre. Questa V è il loro contenitore.
+
+**Contenuto** (l'elenco vivo sta nel *Debito tecnico*, gruppo ②, ed è lì che va aggiornato quando un file esce di lista):
+- `views/WebAssets/index.jsx` (2.706 righe) — da solo vale più di una sessione.
+- `views/Authentication/SignUp/Signup/index.jsx` (920) — a meno che non lo si faccia prima, visto che è libero.
+- I **14 file** fra 500 e 800 righe del frontend.
+- I file **backend** sopra soglia che nessuna V ha toccato nel frattempo.
+- Cancellazione dei **file morti** censiti (i sei relitti del tema nella cartella Calendario, più quanto emerso strada facendo).
+
+**Regola d'ingaggio:** man mano che le V precedenti spezzano i loro file, **questa V si accorcia**. Se al momento di aprirla la lista fosse vuota, la V si chiude senza fare nulla — ed è il risultato migliore possibile, non uno spreco.
+
+**Done quando:** nessun file del codice che scriviamo noi sta sopra la soglia senza una ragione scritta.
+
+> ⚠️ **Il rischio dichiarato di questa V:** essere l'ultima, e quindi quella che non si fa mai. È il motivo per cui la pulizia **non** è stata concentrata tutta qui: qui arriva solo ciò che nessun altro momento può prendersi. Se questa V dovesse slittare all'infinito, il danno resta limitato al residuo.
 - **Onboarding leggero esteso a tutto il CRM (deciso 14 luglio 2026):** portare l'approccio "guida in-contesto" (empty state, tooltip, card dismissibili — **non** un tutorial/wizard pesante) a **tutte** le aree del prodotto, non solo alla Chat AI. Collocato qui perché ha senso solo a prodotto sostanzialmente completo (dopo la V11 — *era "dopo V9" prima del 15/7, "dopo V10" prima del 24/7*). L'onboarding **della sola chat** si fa invece dentro la V4.
 **Done quando:** tutti gli utenti operano sulla nuova piattaforma Apple-style, dati importati e verificati.
 
@@ -388,17 +406,40 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   2. **Lo "sposta su / sposta giù" disabilitato ai bordi** esiste identico in `views/Checklists/ChecklistTemplates.jsx` e in `modules/customFields/ui/CustomFieldsPage.jsx`. Due casi confermati dello stesso schema: se ne spunta un terzo, conviene un hook di riordino condiviso invece di una terza copia.
   3. **`getErrorMessage` è copiata quasi identica in una decina di file**, incluso `ProjectChecklistPanel.jsx` che consuma la stessa API. Candidato: un `src/lib/apiErrors.js`. ⚠️ Vale la trappola già annotata per questa stessa funzione: prima di accorpare, verificare che le copie siano **davvero** identiche e non varianti con comportamento diverso.
 
-- **Spezzatura dei file-mostro: quali aspettano la loro V** *(deciso da Jacopo il 5/8/2026)*. Dei file ancora sopra le 800 righe, alcuni verranno **riaperti da una V futura**: spezzarli adesso vorrebbe dire rimettere mano agli stessi file poco dopo, e per giunta tagliandoli senza sapere cosa dovranno ospitare. **Non si cancella la spezzatura: si sposta dentro quella V, come suo primo passo** — obbligatorio comunque, perché la regola di `CLAUDE.md` vieta di aggiungere funzioni a un file già sopra soglia (*"spezzare, non allungare"*).
+- **Dimensione dei file: il censimento completo e chi spezza cosa** *(deciso da Jacopo il 5/8/2026; è la fonte di verità a cui rimanda `CLAUDE.md`)*.
 
-  | File | Righe | Chi lo riaprirà | Cosa si fa |
-  |---|---|---|---|
-  | `src/views/Agency/chat/AiChatWidget.jsx` | 1.454 | **V7** (immagini di cliente/progetto allegabili in chat) e **V10** (thread di messaggistica come allegato); più l'idea "in forse" della V5 sul costo in chat | **Si aspetta.** Tutte e tre toccano il selettore degli allegati e la barra della chat, che stanno dentro questo file: sono esattamente i blocchi che si estrarrebbero |
-  | `src/modules/agency-os/data/agencyDataAdapter.js` | 2.775 | **V6** (dashboard performance) e **V7** (generazione visiva) | **Si aspetta.** Sono i due centralini dell'area Agency: ogni V che tocca Agency ci passa. Qui non è che il lavoro andrebbe buttato — vengono estesi, non riscritti — ma i confini giusti si vedono solo sapendo quali funzioni nuove dovranno ospitare |
-  | `src/modules/agency-os/api/agency.api.js` | 1.093 | idem | idem |
-  | `src/views/Authentication/SignUp/Signup/index.jsx` | 920 | **nessuna V lo nomina** (verificato sull'intera roadmap) | **Si può fare quando si vuole**, ed è il prossimo candidato naturale |
-  | `src/views/WebAssets/index.jsx` | 2.706 | la voce V7 che lo toccava (**Audit Engine SEO**) è **già fatta** il 22/7; resta solo il *"suggerimenti generati dall'AI"*, dichiarato possibile ma non pianificato | **Libero**, ma resta **per ultimo** per dimensione, come già deciso |
+  Fino a oggi il tetto di dimensione valeva **solo per il frontend** (`src/**/*.{js,jsx}`, guardrail ESLint a 500 righe). Il censimento esteso a tutte le tipologie ha mostrato che il file più grosso del progetto **non è nel frontend**: è `server/modules/agency-os/agency.service.ts`, **10.452 righe**, quasi quattro volte il più grande file React. Da qui la decisione di censire tutto e di stabilire, file per file, **chi lo spezza e quando**.
 
-  **Il criterio, per quando si ripresenterà:** non basta che una V tocchi l'area. Conta *come* la tocca — se **riscrive** i blocchi che spezzeresti, aspettare; se li **estende**, aspettare comunque conviene, perché si taglia meglio conoscendo la destinazione. Se invece nessuna V la nomina, si procede.
+  **La regola in una riga:** il codice **nuovo** nasce sotto soglia, sempre; i file **già fuori norma** elencati qui sotto sono **eccezioni deliberate**, ognuna con un momento assegnato. Non sono un arretrato da smaltire a vista, e **non vanno spezzati di iniziativa** mentre si fa altro.
+
+  **① Assegnati a una V precisa — si spezzano quando quella V li apre, come suo primo passo**
+
+  | File | Righe | Chi lo riaprirà |
+  |---|---|---|
+  | `src/views/Agency/chat/AiChatWidget.jsx` | 1.454 | **V7** (immagini allegabili in chat) o **V10** (thread di messaggistica allegabile); entrambe estendono il selettore degli allegati, che sta lì dentro |
+  | `src/modules/agency-os/data/agencyDataAdapter.js` | 2.775 | **V6** (dashboard performance) e **V7** (generazione visiva): è un centralino dell'area Agency |
+  | `src/modules/agency-os/api/agency.api.js` | 1.093 | idem |
+  | `server/modules/agency-os/agency.service.ts` | **10.452** | **V5/V6/V7** (è il motore AI). ⛔ **Da concordare con Claudio prima**: è l'area a decisioni condivise, non si tocca unilateralmente |
+
+  **② Il residuo — nessuna V li nomina: vanno alla V13 (pulizia finale)**
+
+  - `src/views/WebAssets/index.jsx` (2.706): la voce V7 che lo toccava (Audit SEO) è **già chiusa** dal 22/7. Libero, ma è il più grosso del frontend: da solo vale più di una sessione.
+  - `src/views/Authentication/SignUp/Signup/index.jsx` (920): **nessuna V lo nomina**, verificato sull'intera roadmap. È l'unico mostro che si può fare subito, ed è il prossimo candidato naturale se si vuole continuare prima della V13.
+  - **I 14 file fra 500 e 800 righe** *(erano rimasti fuori da ogni documento fino al 5/8: tracciati solo in un handoff, che sarebbe sparito con la rotazione)*: `modules/clients/ui/ClientForm.jsx` (794), `modules/checklists/ui/ProjectChecklistPanel.jsx` (768), `modules/quotes/ui/QuoteWizardForm.jsx` (749), `views/Profiles/Profile/Body.jsx` (727), `views/Team/index.jsx` (694), `views/Agency/project/AgencyProjectPerformancePage.jsx` (666), `layout/Header/TopNav.jsx` (617), `views/Quotes/QuoteDetail.jsx` (599), `views/Agency/project/AgencyProjectDiscoveryPage.jsx` (564), `views/Vault/index.jsx` (550), `modules/agency-os/ads/agencyAdsRules.js` (550), `views/Profiles/Profile/index.jsx` (538), `modules/projects/api/projects.api.js` (533), `views/WorkspaceBranding/index.jsx` (519).
+  - **I 22 file backend sopra 500 righe** diversi da `agency.service.ts` (i maggiori: `checklists.service.ts` 2.068, `agency.repository.ts` 1.800, `web-assets/repository.ts` 1.603, `web-assets/service.ts` 1.590, `workspace-agency.route.ts` 1.471, `projects.service.ts` 1.445, `dashboard.repository.ts` 1.411, `auth.route.ts` 1.396). Quelli che una V tocca seguono la regola ①; gli altri restano qui.
+
+  **③ Fuori perimetro — non si toccano, e non è una dimenticanza**
+
+  - **CSS e SCSS del tema** (`styles/css/style.css` 91.015 righe, `style-dark.css` 36.755, `scss/style.scss` 25.824, `styles/back/**`, font-awesome, bootstrap-icons, animate). Sono **codice di terze parti**, si sostituiscono in blocco aggiornando il tema: spezzarli sarebbe lavoro buttato e renderebbe l'aggiornamento più difficile. Il nostro CSS vero — i token in `styles/scss/globals.css` — è piccolo e sta bene com'è.
+  - **`prisma/schema.prisma`**: la sua lunghezza è la dimensione del dominio, non complessità da spezzare. Dividerlo non rende niente più leggibile e tocca la zona migrazioni, dove il progetto ha già sofferto.
+  - **File di test**: un test lungo ma piatto si legge benissimo; spezzarlo per soglia frammenta la storia che racconta. Già esclusi dal metro di `npm run mappa`.
+  - **File generati** (`archivio-documenti/mappa/`) e **librerie incorporate** (`src/components/@hk-gantt/**`, già esclusa ovunque).
+
+  **Il criterio, per quando la domanda si ripresenterà:** non basta che una V tocchi l'area. Conta *come* la tocca — se **riscrive** i blocchi che spezzeresti, aspettare; se li **estende**, aspettare comunque conviene, perché si taglia meglio conoscendo la destinazione. Se nessuna V la nomina, va alla V13.
+
+  **Due decisioni tecniche ancora aperte** (nessuna delle due bloccante, tutte e due da concordare con Claudio perché riguardano il backend, che è in larga parte suo):
+  1. **Se estendere il guardrail automatico al backend TypeScript.** Oggi ESLint copre solo `src/**/*.{js,jsx}` — restano fuori il backend, gli script e perfino i `.ts` del frontend. Estenderlo richiede installare **`typescript-eslint`**, cioè una dipendenza nuova. Alternativa a costo zero: farlo misurare a **`npm run mappa`**, che già gira in meno di un secondo e non aggiunge nulla.
+  2. **Quale soglia usare per il backend.** Le 500 righe sono tarate su un componente React; per un service o un repository il numero giusto è probabilmente più alto. Sceglierlo a caso produrrebbe solo rumore.
 
 - **Sei file morti nella cartella del Calendario** *(censiti il 5/8/2026)*. `src/views/Calendar/` contiene sei relitti del tema grafico Jampack che **nessuno importa**: `AddCategory.jsx`, `CalendarSidebar.jsx`, `CreateNewEvent.jsx`, `Events.jsx`, `EventsDrawer.jsx`, `SetReminder.jsx` (verificato con due giri di ricerca separati, più il censimento degli import fatto durante la spezzatura). Non fanno danno, ma ingombrano: costringono a scegliere i nomi dei file nuovi girandoci intorno — la sottocartella creata il 5/8 si chiama `board/` e **non** `events/` proprio perché su Windows avrebbe sbattuto contro `Events.jsx`. **Da cancellare in una passata di pulizia**, verificando un'ultima volta con `git grep` che nessuno li nomini. Stessa famiglia delle voci "da DISMETTERE" della Parte B.
 
@@ -422,6 +463,7 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 | **V10** | Agenda | Meet/Zoom + Calendly + reminder + thread progetto + gruppi reparto + clienti |
 | **V11** | Finance | Fatture in Cloud + time-tracking + redditività |
 | **V12** | Go-live | Importazione dati legacy + hardening + rollout |
+| **V13** | Pulizia finale | I file troppo grossi che nessuna V ha mai avuto motivo di aprire |
 
 > **Rinumerazione del 15 luglio 2026.** La **V4 è nuova** (Chat AI & Messaggistica): è nata dentro la vecchia V4 come implementazione minore e si è ingigantita fino a diventare una V a sé. Tutto ciò che seguiva **slitta di uno** (vecchia V4 → V5 … vecchia V10 → V11): si passa da 10 a **11 V**. Se in un documento o in un commit precedente al 15/7 leggi "V5", "V8", "V10", riferisciti alla **numerazione vecchia** e aggiungi uno.
 

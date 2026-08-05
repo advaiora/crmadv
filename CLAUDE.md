@@ -98,9 +98,32 @@ Il frontend è la parte più fragile del progetto (niente tipi, storicamente nie
 - **I test frontend esistono**: `npm run test:frontend` (Vitest + Testing Library; in sviluppo `npm run test:frontend:watch`). Il file di test sta **accanto al sorgente** (`X.test.js` / `X.test.jsx`). Esempi da imitare: `src/lib/brandingPalette.test.ts` (funzione pura), `src/components/ui/DetailField.test.jsx` (render di componente).
 - **Quali test lanciare, e quando** (deciso il 4/8/2026): durante il lavoro si lancia **solo la cartella toccata** (`npx vitest run src/modules/<area>` o il singolo file); la **suite intera UNA volta sola**, prima della revisione finale, **in background** — nel frattempo niente altri processi pesanti in parallelo (nota operativa #37). Un rosso **da timeout o da worker mai partito** a macchina carica non è un test rotto: si rilancia mirato il file incriminato prima di indagare il codice (solo un fallimento di asserzione è reale sempre).
 - **Il codice nuovo nasce col suo test.** Vale per helper/funzioni pure (sempre) e per i componenti quando hanno logica propria (condizioni, varianti, stati). Quando si tocca un file esistente estraendone logica, la parte estratta va coperta.
-- **Soglie di dimensione file** (guardrail ESLint, `warn`): oltre **500 righe** il lint segnala; **800** è la soglia-mostro (`npm run mappa`, §1: non si apre intero). Un warning `max-lines` significa **spezzare, non allungare**: a un file già sopra soglia non si aggiungono feature — prima si estrae qualcosa.
+- **Soglie di dimensione file:** vedi la sezione dedicata «Dimensione dei file» qui sotto — dal 5/8/2026 non riguarda più solo il frontend.
 - **I warning dei guardrail non si zittiscono** con `eslint-disable`: si leggono e si riducono. Il lint resta "blocca solo sul rosso".
 - **Per spezzare un file-mostro** (sessioni dedicate, una alla volta): `npm run mappa` → **esploratore in modalità piano di estrazione** (consegna blocchi, ordine, confini e test dell'intero giro — sezione dedicata in `.claude/agents/esploratore.md`) → si estrae tutto in **un giro solo** (deciso il 4/8/2026 per i mostri sotto le ~1.000 righe), **committando per estrazione** così la sessione può interrompersi senza perdere pezzi → verifica in anteprima → **revisore una volta sola, a giro completo** → commit di chiusura. Mai rifattorizzare un mostro "di passaggio" mentre si fa altro.
+
+## Dimensione dei file (dal 5/8/2026 vale per tutto il codice, non solo per il frontend)
+
+**Le soglie.** Oltre **500 righe** un file va spezzato; **800** è la soglia-mostro (`npm run mappa`, §1: non si apre intero). Un avviso `max-lines` significa **spezzare, non allungare**: a un file già sopra soglia **non si aggiungono funzioni** — prima si estrae qualcosa.
+
+**Cosa copre.** Il codice che scriviamo noi: frontend (`src/**`, JavaScript e TypeScript) e backend (`server/**`). ⚠️ Il **controllo automatico** però oggi vede solo `src/**/*.{js,jsx}`: il backend è fuori, e se estenderlo sia il caso è una decisione ancora aperta (serve una dipendenza nuova) — motivo e alternative in roadmap. Quindi sul backend la soglia vale come **regola di lavoro**, non come avviso del lint: va tenuta a mente, non aspettata dallo strumento.
+
+**Cosa NON copre, di proposito** — e non è una dimenticanza: CSS e SCSS del **tema Jampack** (sono di terze parti, si sostituiscono in blocco), `prisma/schema.prisma` (la sua lunghezza è il dominio, non complessità), i **file di test** (un test lungo ma piatto si legge benissimo), i file **generati** e le librerie **incorporate**.
+
+### ⚠️ Esistono file fuori norma, ed è voluto: non "sistemarli" di iniziativa
+
+Nel progetto ci sono **file che sforano la soglia e che restano così apposta**, ognuno con un momento già assegnato in cui verrà spezzato. **Non sono un arretrato da smaltire appena lo si nota.**
+
+Questo vale in particolare quando si lavora ad altro e ci si imbatte in uno di quei file: **non è il momento di spezzarlo**, esattamente come per qualsiasi altra cosa trovata per strada (vedi la sezione apposita). Trovarne molti fuori norma **non significa che il progetto sia in disordine**, né che la regola sia disattesa: significa che la loro pulizia è stata **pianificata altrove**.
+
+**L'elenco puntuale — quali file, quante righe, e chi li spezzerà — sta in `archivio-documenti/03-roadmap-confronto-e-build.md`**, sezione *"Debito tecnico / tooling"*, voce **«Dimensione dei file: il censimento completo e chi spezza cosa»**. È lì, e solo lì, che l'elenco va letto e aggiornato quando un file esce di lista: tenerne una seconda copia qui vorrebbe dire ritrovarsi presto con due liste che si contraddicono.
+
+In sintesi, i tre destini possibili di un file fuori norma:
+1. **Assegnato a una V** → lo spezza quella V, come suo **primo passo**, prima di aggiungerci qualsiasi cosa.
+2. **Nessuna V lo tocca** → va alla **V13 (pulizia finale)**.
+3. **Fuori perimetro** (tema, schema, test, generati) → non si tocca affatto.
+
+**Per il codice nuovo, invece, nessuna eccezione:** quello che si scrive da oggi in poi nasce sotto soglia. Le eccezioni qui sopra riguardano solo il già esistente, e sono a scadenza.
 
 ## Dev server e database — una sola sessione accesa per volta
 
