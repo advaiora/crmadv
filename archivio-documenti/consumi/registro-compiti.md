@@ -45,3 +45,4 @@
 | 2026-08-04 15:47 | Spezzatura AgencyProjectAdsPage - riscrittura pagina (ultimo passo) | 42 min | 9,6 | 0,23 | revisore×1 | -0,8 |
 | 2026-08-05 10:57 | spezzatura AgencySettingsPage 739->83 | 1h 41m | 28,5 | 0,28 | esploratore×2, revisore×1 | 5,2 |
 | 2026-08-05 12:13 | spezzatura ChecklistTemplates 877->127 | 2h 56m | 55,9 | 0,32 | esploratore×7, revisore×1 | 16,1 |
+| 2026-08-05 14:12 | Chiusura giro Memo Operativi (revisore + rilievi) e spezzatura Calendar 807-120 | 1h 51m | 46,3 | 0,42 | revisore×2 | 6,2 |
