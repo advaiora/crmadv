@@ -39,6 +39,11 @@ export const useChecklistTemplateRecordActions = ({
   const [editingTemplateName, setEditingTemplateName] = useState('');
   const [editingTemplateDescription, setEditingTemplateDescription] = useState('');
 
+  // La bozza si riempie SOLO quando cambia il memo aperto, non a ogni arrivo di
+  // dati dal server. Il lint segnala la dipendenza incompleta (lo faceva anche
+  // sull'originale, stessa riga): e' voluta. Mettendo l'intero `data` fra le
+  // dipendenze, ogni ricaricamento — e ce n'e' uno dopo ogni azione sugli step
+  // — riscriverebbe i due campi cancellando quello che l'utente sta digitando.
   React.useEffect(() => {
     if (!selectedTemplateQuery.data) {
       return;
