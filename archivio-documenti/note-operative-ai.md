@@ -639,3 +639,36 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Il viewport forzato va bene per **guardare** un layout (screenshot, lettura della struttura), non per cliccare.
 - **Un click che il tool dichiara "eseguito" non e' un click andato a segno.** Prima di sospettare del codice, verificare che l'effetto atteso ci sia (un conteggio di elementi prima/dopo costa una riga) e, se manca, sospettare **prima** la geometria della pane. Stessa famiglia della #43: dire sempre *cosa* prova la prova che si sta usando.
 - Corollario utile: `read_page` restituisce **solo gli elementi vicini alla porzione visibile**. Un elemento piu' in basso non compare nell'albero e `find` non lo trova: bisogna scorrere e rileggere. Non e' un difetto della pagina.
+
+---
+
+## 46. I DEV SERVER ACCESI bastano a far fallire l'avvio dei worker dei test — e sembra un difetto del file nuovo
+
+**Contesto:** 5/8/2026, spezzatura di `views/Calendar/index.jsx`. Con i due dev server accesi (Vite sulla 5173 e API `tsx watch` sulla 4000, avviati per la verifica dal vivo della pagina precedente) ho lanciato i test del primo file estratto.
+
+**Errore:** il file falliva con `Failed to start threads worker ... Timeout waiting for worker to respond`, **zero test eseguiti**, e — questo e' il punto — **quattro volte di fila, sempre a 60 secondi netti**. La nota #37 dice "rosso da avvio = rilanciare mirato, non indagare il codice", ma dice anche che e' un fenomeno *a macchina carica*, quindi occasionale. Quattro fallimenti identici e riproducibili non sembrano piu' un caso: sembrano un difetto deterministico del file nuovo, e si comincia a cercarlo dentro il file (che era sano).
+
+**Modo corretto — due mosse che costano poco e chiudono la diagnosi in un colpo:**
+- **Un test gia' esistente come CONTROLLO** (`npx vitest run src/lib/brandingPalette.test.ts`): se passa, l'ambiente non e' morto del tutto; se fallisce anche quello, e' l'ambiente e basta.
+- **Un file minimo nella stessa cartella** (tre righe, `expect(1+1).toBe(2)`), poi lo **stesso contenuto del file sospetto sotto un altro nome**: se il contenuto gira sotto un nome diverso, il file non ha niente che non va — e infatti, appena toccato, il file originale e' partito e ha dato **29/29 verdi**.
+
+**La causa vera, e la regola che ne segue:** con i due dev server accesi i worker non partono in tempo (misurato lo stesso giorno: **3 file su 4 falliti in avvio** con i server accesi; **tutti partiti** appena spenti). Quindi: **prima di lanciare i test, spegnere i dev server** — non sono "un po' di carico in piu'", sono la differenza fra una suite che gira e una che non parte. Vale in particolare quando si alterna verifica in anteprima e test nello stesso giro di lavoro, che e' esattamente il ritmo delle sessioni di spezzatura.
+
+**Corollario sul giudizio:** un fallimento *riproducibile* non e' automaticamente un fallimento *reale*. Se la causa e' ambientale ma l'ambiente non cambia fra un tentativo e l'altro, il sintomo si ripresenta identico e imita alla perfezione un difetto deterministico. Prima di dare la caccia al codice, cambiare **una** variabile per volta (il nome del file, il carico della macchina) e guardare cosa si muove.
+
+---
+
+## 47. La console dell'anteprima conserva gli errori di ricarica VECCHI: sembrano difetti del codice attuale
+
+**Contesto:** 5/8/2026, stessa sessione. Finita la spezzatura del Calendario, riaccendo i dev server per la verifica dal vivo. La pagina resta bianca e in console c'e' `ReferenceError: Calendar is not defined` — il nome vecchio del componente, che avevo rinominato in `CalendarPage`.
+
+**Errore:** prenderlo per un difetto del codice appena committato. Non lo era: l'errore veniva da un **hot-reload avvenuto ore prima**, quando il file era a meta' rinomina e i dev server erano ancora accesi. Lo strumento che legge la console restituisce **tutta la storia della scheda**, non solo l'ultimo caricamento, e quel messaggio continuava a ricomparire identico a ogni lettura.
+
+**Il segnale che lo smaschera** e' nell'errore stesso: l'URL portava `?t=1785928556727`, cioe' il marcatore temporale di un hot-update. **Stesso `?t=` a ogni rilettura = messaggio vecchio, congelato.** Se fosse un errore del caricamento in corso, quel numero cambierebbe.
+
+**Modo corretto:**
+- Prima di indagare il codice, **verificare la sorgente vera**: `curl` sul transform di Vite del file (nota #11 per l'host giusto) e guardare se il modulo servito contiene davvero il nome incriminato. Nel mio caso serviva `CalendarPage`, correttissimo — l'errore era un fantasma.
+- Per ripartire pulito, un `location.reload()` **non basta**: un hot-update fallito lascia il modulo in uno stato da cui la pagina non si riprende. Serve un indirizzo nuovo (`location.href = '<pagina>?fresh=' + Date.now()`), e dopo quello la console torna pulita.
+- **Regola pratica generale:** i file si modificano **a dev server spenti**. Salvare mezza rinomina con Vite acceso produce un hot-update fallito che sporca la scheda per il resto della sessione — oltre a rallentare i test (nota #46).
+
+**Una prova utile che invece si prende proprio dalla rete:** per un giro di spezzatura, l'elenco delle richieste mostra che **tutti** i file nuovi sono stati chiesti e serviti (qui 11 su 11, a 200), e questo prova che la catena degli import risolve davvero — cosa che il `200` sul singolo file NON prova (nota #43). Guardarla dopo un giro di estrazione costa una chiamata e chiude un rischio intero.
