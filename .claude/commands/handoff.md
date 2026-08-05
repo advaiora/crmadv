@@ -1,17 +1,18 @@
 ---
-description: Genera l'handoff di staffetta (Jacopo ⇄ Claudio) e tiene solo le ultime 3 versioni
+description: Genera l'handoff di fine sessione per chi riprende (di norma la sessione successiva della stessa persona; al cambio turno, l'altra) e tiene solo le ultime 3 versioni
 allowed-tools: Bash(date:*), Bash(ls:*), Bash(rm:*), Bash(git:*), Bash(netstat:*), Bash(node scripts/agenti/consumi.mjs:*), Bash(npm run consumi:*), Read, Write, Glob, Grep
 ---
 
 # Genera handoff di staffetta
 
-Sei a fine sessione di lavoro su questo progetto. Devi scrivere il **documento di staffetta** (handoff) che permetterà all'altra persona — **Jacopo** (lavora lun-ven) o **Claudio** (lavora nel weekend) — di riprendere il lavoro esattamente da dove è stato interrotto.
+Sei a fine sessione di lavoro su questo progetto. Devi scrivere il **documento di staffetta** (handoff) che permetterà a **chi riprende** di ripartire esattamente da dove il lavoro è stato interrotto.
 
 ## Contesto del metodo di lavoro (importante)
 
-- Si lavora **uno alla volta**, come in una staffetta: chi finisce passa il testimone all'altro.
+- Si lavora **uno alla volta**, come in una staffetta: chi finisce passa il testimone.
 - Si pusha **sempre su `main`**, niente branch (salvo test straordinari). I push sono frequenti, quindi si può sempre tornare indietro.
-- **L'handoff è l'unico vero raccordo** fra le due persone. Deve bastare da solo, senza bisogno di chiedere spiegazioni.
+- **L'handoff è l'unico vero raccordo fra una sessione e la successiva, chiunque la riprenda.** Deve bastare da solo, senza bisogno di chiedere spiegazioni.
+- ⚠️ **Chi riprende NON è necessariamente l'altra persona, e di norma non lo è.** L'handoff serve in due modi: (a) passare il testimone all'**altra persona** quando cambia il turno — **Jacopo** lun-ven, **Claudio** sab-dom; (b) permettere alla **stessa persona** di riprendere il proprio lavoro giorni dopo, in una sessione nuova che non ricorda nulla di quella precedente. Poiché **Jacopo sviluppa la maggior parte del tempo**, il caso ordinario è **Jacopo → Jacopo**: scrivere l'handoff pensando solo a Claudio è un errore, e produce un documento che dà per scontate proprio le cose che servono a chi continua.
 
 ## Regole di scrittura dell'handoff (NON negoziabili)
 
@@ -56,7 +57,7 @@ Crea il file in `archivio-documenti/handoff/handoff-<data-ora>.md` usando **esat
 # Handoff — staffetta del <data leggibile, es. 30 giugno 2026, ore 15:30>
 
 **Scritto da:** <Jacopo o Claudio — se non è chiaro, chiedi o deducilo dal giorno della settimana: lun-ven = Jacopo, sab-dom = Claudio>
-**Per chi riprende:** <l'altra persona>
+**Per chi riprende:** <la sessione successiva — di norma la stessa persona; l'altra solo se il turno cambia. Non darlo per scontato: nel dubbio scrivi "la prossima sessione (Jacopo, o Claudio nel weekend)">
 
 ## Cosa ho fatto
 <Elenco chiaro e sintetico di ciò che è stato fatto in questa sessione. Frasi semplici. Per ogni cosa, spiega in una riga il "perché" se non è ovvio. Se hai toccato dei file, dì quali e cosa fanno in parole povere. NON inserire qui spiegazioni didattiche o "cose imparate" su come funziona la programmazione: solo lavoro svolto e modifiche concrete.>

@@ -12,7 +12,7 @@ Due persone, **a staffetta** (una alla volta):
 
 1. **Si lavora uno alla volta** e si passa il testimone con l'handoff.
 2. **Si pusha sempre su `main`**, niente branch (salvo test straordinari). I push sono frequenti, quindi si può sempre tornare indietro.
-3. **L'handoff è l'unico raccordo** tra le due persone. A fine sessione si genera con il comando `/handoff` (scrive in `archivio-documenti/handoff/`, tiene solo le ultime 3 versioni). Si legge sempre per primo il file più recente.
+3. **L'handoff è l'unico raccordo fra una sessione e la successiva** — *chiunque* la riprenda. Serve in due modi, e il secondo è il più frequente: (a) passare il testimone **all'altra persona**, quando il turno cambia; (b) permettere **alla stessa persona** di riprendere il proprio lavoro giorni dopo, in una sessione nuova che non ricorda nulla. Poiché Jacopo sviluppa la maggior parte del tempo, il caso ordinario è **Jacopo → Jacopo**: scrivere l'handoff pensando solo a Claudio è un errore. A fine sessione si genera con il comando `/handoff` (scrive in `archivio-documenti/handoff/`, tiene solo le ultime 3 versioni). Si legge sempre per primo il file più recente.
 4. La **fonte di verità del prodotto** è `archivio-documenti/02-brief-operativo-definitivo-bibbia.md` (la "bibbia"); la roadmap di sviluppo è `archivio-documenti/03-roadmap-confronto-e-build.md`.
 
 ## Regola sui conflitti tra le due persone (IMPORTANTE)
