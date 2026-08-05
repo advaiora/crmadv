@@ -625,3 +625,17 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - La convenzione gia' in uso nel progetto e' **`.click()` diretto sull'elemento**: `screen.getByRole('button', { name: 'Elimina' }).click();` (esempio: `src/modules/projects/ui/modals/ConfirmDeleteModal.test.jsx`). Funziona e non serve `await`.
 - Per scrivere in un campo controllato da React, nei test si usa il `fireEvent`/`change` di Testing Library; **nell'anteprima** invece serve il setter nativo (nota #10).
 - Regola generale: prima di importare una libreria di comodo in un test, **guardare cosa importano i test gia' presenti**. Vale per qualsiasi cartella nuova: le convenzioni si copiano dai vicini, non dalla memoria.
+
+---
+
+## 45. Anteprima: forzare il viewport piu' grande della finestra vera fa atterrare i click NEL POSTO SBAGLIATO
+
+**Contesto:** 5/8/2026, verifica dal vivo della pagina Fonti e Materiali. La pane dell'anteprima e' **piccola** (viewport nativo misurato: 558x307). Per vedere il layout desktop ho forzato `resize_window` a 1280x900.
+
+**Errore:** con il viewport forzato piu' grande della finestra reale, la pagina viene **scalata**: le coordinate che `computer` calcola dal riferimento dell'elemento non corrispondono piu' a dove quell'elemento sta davvero sullo schermo. Due click su "Aggiungi URL" (uno dalla striscia, uno dal riquadro) sono stati riportati come eseguiti — `left_click at (369, 450) [ref_58]` — **senza produrre nessun effetto**. Il sospetto naturale, sbagliato, e' stato che il collegamento pagina→hook non funzionasse: sono andato a rileggere l'hook degli URL cercando un difetto che non c'era.
+
+**Modo corretto:**
+- Per **provare le interazioni**, lavorare al **viewport nativo** (`resize_window` con `preset: "desktop"`, che lo riporta alla dimensione vera della pane). Subito dopo, lo stesso click sullo stesso pulsante ha aggiunto la riga.
+- Il viewport forzato va bene per **guardare** un layout (screenshot, lettura della struttura), non per cliccare.
+- **Un click che il tool dichiara "eseguito" non e' un click andato a segno.** Prima di sospettare del codice, verificare che l'effetto atteso ci sia (un conteggio di elementi prima/dopo costa una riga) e, se manca, sospettare **prima** la geometria della pane. Stessa famiglia della #43: dire sempre *cosa* prova la prova che si sta usando.
+- Corollario utile: `read_page` restituisce **solo gli elementi vicini alla porzione visibile**. Un elemento piu' in basso non compare nell'albero e `find` non lo trova: bisogna scorrere e rileggere. Non e' un difetto della pagina.
