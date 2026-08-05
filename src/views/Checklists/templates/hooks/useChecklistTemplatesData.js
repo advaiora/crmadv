@@ -66,7 +66,6 @@ export const useChecklistTemplatesData = (access) => {
     canCreateTemplate,
     canDeleteTemplate,
     templatesQuery,
-    assignableUsersQuery,
     selectedTemplateQuery,
     selectedTemplateId,
     setSelectedTemplateId,

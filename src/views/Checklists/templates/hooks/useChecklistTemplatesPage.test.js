@@ -87,7 +87,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   listChecklistTemplates.mockResolvedValue([memo()]);
   getChecklistTemplate.mockResolvedValue(memoConStep());
-  listChecklistAssignableUsers.mockResolvedValue([{ id: 'u1', name: 'Giulia' }]);
+  // La forma vera che arriva dal server e' { userId, name, email }
+  // (server/modules/checklists/checklists.service.ts): il menu assegnatario
+  // legge `userId`, non `id`.
+  listChecklistAssignableUsers.mockResolvedValue([{ userId: 'u1', name: 'Giulia' }]);
   createChecklistTemplate.mockResolvedValue(memo({ id: 't9', name: 'Nuovo memo' }));
   updateChecklistTemplate.mockResolvedValue(memo());
   archiveChecklistTemplate.mockResolvedValue(memo({ isArchived: true }));
@@ -356,10 +359,16 @@ describe('archiviazione ed eliminazione', () => {
     vi.stubGlobal('confirm', vi.fn(() => true));
     const { result } = await montaHook();
     await waitFor(() => expect(result.current.selectedTemplateQuery.data?.isArchived).toBe(true));
+    // Il finto server deve comportarsi da server: dopo l'eliminazione il memo
+    // non c'e' piu' nella lista ricaricata. Lasciandocelo, l'effetto che tiene
+    // stabile la selezione lo riaprirebbe subito e l'azzeramento — che il
+    // codice fa davvero — resterebbe invisibile al test.
+    listChecklistTemplates.mockResolvedValue([]);
 
     lancia(() => result.current.handleDeleteTemplatePermanently());
 
     await waitFor(() => expect(deleteChecklistTemplatePermanently).toHaveBeenCalledWith('t1'));
+    await waitFor(() => expect(result.current.selectedTemplateId).toBe(''));
   });
 });
 
@@ -441,6 +450,38 @@ describe('step del memo', () => {
     lancia(() => result.current.handleReorderItem('i1', 1));
 
     await waitFor(() => expect(reorderChecklistTemplateItems).toHaveBeenCalledWith('t1', ['i2', 'i1']));
+  });
+
+  // I due test che seguono difendono un'asimmetria VOLUTA, di quelle che un
+  // riordino successivo "uniformerebbe" per pulizia: aggiungere, salvare ed
+  // eliminare uno step ricaricano anche l'elenco dei memo a sinistra (li'
+  // cambia il conteggio degli step), mentre spostarne uno ricarica solo il memo
+  // aperto, perche' l'ordine quel conteggio non lo cambia.
+  it('aggiungere uno step ricarica anche l elenco dei memo', async () => {
+    const { result } = await montaHook();
+    await waitFor(() => expect(result.current.selectedTemplateQuery.data?.id).toBe('t1'));
+    const elencoPrima = listChecklistTemplates.mock.calls.length;
+    act(() => result.current.setNewItemTitle('Nuovo step'));
+
+    lancia(() => result.current.handleCreateItem(evento()));
+
+    await waitFor(() => expect(createChecklistTemplateItem).toHaveBeenCalled());
+    await waitFor(() => expect(listChecklistTemplates.mock.calls.length).toBeGreaterThan(elencoPrima));
+  });
+
+  it('spostare uno step NON ricarica l elenco dei memo', async () => {
+    const { result } = await montaHook();
+    await waitFor(() => expect(result.current.selectedTemplateQuery.data?.id).toBe('t1'));
+    const elencoPrima = listChecklistTemplates.mock.calls.length;
+    const dettaglioPrima = getChecklistTemplate.mock.calls.length;
+
+    lancia(() => result.current.handleReorderItem('i1', 1));
+
+    await waitFor(() => expect(reorderChecklistTemplateItems).toHaveBeenCalled());
+    // Si aspetta che il ricaricamento del memo aperto sia AVVENUTO: senza,
+    // "l'elenco non e' stato ricaricato" passerebbe solo perche' e' presto.
+    await waitFor(() => expect(getChecklistTemplate.mock.calls.length).toBeGreaterThan(dettaglioPrima));
+    expect(listChecklistTemplates.mock.calls.length).toBe(elencoPrima);
   });
 
   it('ai bordi non chiama il server', async () => {

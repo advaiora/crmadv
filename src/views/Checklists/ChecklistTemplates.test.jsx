@@ -33,7 +33,6 @@ const statoHook = (overrides = {}) => ({
   canCreateTemplate: true,
   canDeleteTemplate: true,
   templatesQuery: { data: [memo()], loading: false, error: null, refetch: vi.fn() },
-  assignableUsersQuery: { data: [], loading: false, error: null, refetch: vi.fn() },
   selectedTemplateQuery: { data: dettaglio(), loading: false, error: null, refetch: vi.fn() },
   selectedTemplateId: 't1',
   setSelectedTemplateId: vi.fn(),
@@ -86,9 +85,11 @@ const statoHook = (overrides = {}) => ({
   ...overrides,
 });
 
+const accessFinto = { permissions: ['checklists.manage_templates'] };
+
 const montaPagina = () => render(
   <MemoryRouter>
-    <ChecklistTemplatesContent access={{ permissions: ['checklists.manage_templates'] }} />
+    <ChecklistTemplatesContent access={accessFinto} />
   </MemoryRouter>,
 );
 
@@ -111,6 +112,15 @@ describe('ChecklistTemplatesContent', () => {
     expect(conteggiInCima(container)).toEqual(['1 memo', '2 step totali']);
     expect(screen.getByRole('heading', { name: 'Memo' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Dettaglio Memo' })).toBeInTheDocument();
+  });
+
+  // L'unica riga di logica rimasta nella pagina: se `access` non arrivasse
+  // all'hook, i permessi risulterebbero vuoti e chi puo' gestire i memo si
+  // ritroverebbe la pagina in sola lettura, senza nessun errore che lo dica.
+  it('passa i permessi all hook', () => {
+    montaPagina();
+
+    expect(useChecklistTemplatesPage).toHaveBeenCalledWith(accessFinto);
   });
 
   // I conteggi in cima leggono i DERIVATI, non l'elenco grezzo: se si
@@ -192,6 +202,67 @@ describe('ChecklistTemplatesContent', () => {
     expect(stato.handleReorderItem).toHaveBeenCalledWith('i1', 1);
     expect(stato.handleDeleteItem).toHaveBeenCalledWith('i1');
     expect(stato.handleCreateItem).toHaveBeenCalledTimes(1);
+  });
+
+  // Il percorso della riga in modifica attraversa tre passaggi di prop
+  // (dettaglio -> elenco step -> riga): un refuso in una chiave del pacchetto
+  // passerebbe il lint e i test dei singoli pezzi, e il tasto Salva della riga
+  // smetterebbe di fare qualsiasi cosa in silenzio.
+  it('la riga in modifica e collegata fino al salvataggio', () => {
+    let bozzaAggiornata = null;
+    const stato = statoHook({
+      editingItem: { id: 'i1', title: 'Primo step', description: '', isRequired: true },
+      // La riga cambia la bozza passando una FUNZIONE. Qui si fa come il vero
+      // setState: la si esegue subito, mentre l'evento e' ancora vivo.
+      // Eseguirla piu' tardi (dai `mock.calls`) leggerebbe il campo gia'
+      // ripristinato da React al valore vecchio, perche' e' un campo
+      // controllato e lo stato finto non cambia mai.
+      setEditingItem: vi.fn((aggiorna) => {
+        bozzaAggiornata = typeof aggiorna === 'function'
+          ? aggiorna({ id: 'i1', title: 'Primo step', description: '' })
+          : aggiorna;
+      }),
+    });
+    useChecklistTemplatesPage.mockReturnValue(stato);
+    montaPagina();
+
+    fireEvent.change(screen.getByDisplayValue('Primo step'), { target: { value: 'Step rivisto' } });
+    screen.getByRole('button', { name: 'Salva' }).click();
+
+    expect(bozzaAggiornata).toMatchObject({ title: 'Step rivisto' });
+    expect(stato.handleSaveItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('mentre lo step si salva il tasto Salva della riga e spento', () => {
+    useChecklistTemplatesPage.mockReturnValue(statoHook({
+      editingItem: { id: 'i1', title: 'Primo step' },
+      updateItemMutation: { loading: true },
+    }));
+    montaPagina();
+
+    expect(screen.getByRole('button', { name: 'Salva' })).toBeDisabled();
+  });
+
+  // Le due facce di servizio della colonna di destra. Senza test, una
+  // condizione invertita mostrerebbe una scheda vuota al posto del caricamento
+  // o dell'errore, e niente fallirebbe.
+  it('mentre il dettaglio si carica lo dice', () => {
+    useChecklistTemplatesPage.mockReturnValue(statoHook({
+      selectedTemplateQuery: { data: null, loading: true, error: null, refetch: vi.fn() },
+    }));
+    montaPagina();
+
+    expect(screen.getByText(/Caricamento dettaglio memo/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dettaglio Memo' })).not.toBeInTheDocument();
+  });
+
+  it('se il dettaglio non arriva mostra l errore del server', () => {
+    useChecklistTemplatesPage.mockReturnValue(statoHook({
+      selectedTemplateQuery: { data: null, loading: false, error: new Error('Memo non trovato'), refetch: vi.fn() },
+    }));
+    montaPagina();
+
+    expect(screen.getByText('Memo non trovato')).toBeInTheDocument();
   });
 
   it('le persone assegnabili arrivano al form del nuovo step', () => {
