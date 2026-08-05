@@ -42,11 +42,15 @@ const montaHook = async () => {
   return risultato;
 };
 
+// `clearAllMocks` azzera le chiamate ma NON le implementazioni: senza
+// reimpostare anche `saveAgencyRuntimeSettings`, un `mockRejectedValue` messo
+// da un test sopravvive a quelli dopo, che falliscono con un errore ereditato.
 beforeEach(() => {
   vi.clearAllMocks();
   getAgencyCompetitorSearchSettings.mockResolvedValue({ status: 'not_configured', provider: 'none', message: 'Nessun provider.' });
   getAgencyAiStatus.mockResolvedValue({ configured: true, provider: 'openai', model: 'gpt-4o-mini' });
   getAgencyRuntimeSettings.mockResolvedValue(impostazioni());
+  saveAgencyRuntimeSettings.mockResolvedValue(impostazioni());
 });
 
 afterEach(() => {

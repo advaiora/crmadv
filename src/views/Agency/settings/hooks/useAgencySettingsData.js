@@ -116,6 +116,11 @@ export const useAgencySettingsData = () => {
     }));
   };
 
+  // `runtimeSettings` resta pubblico anche se nessun riquadro lo disegna: e' lo
+  // stato grezzo arrivato dal server, ed e' da li' che si vede se il
+  // caricamento e' finito. Il catalogo completo `availableModels` invece NON
+  // esce: fuori servono solo i derivati (`activeModels`, `selectedModelOption`)
+  // e la scelta passa da `selectAiModel`.
   return {
     competitorSearchSettings,
     aiStatus,
@@ -130,7 +135,6 @@ export const useAgencySettingsData = () => {
     storageReady,
     aiApiKeyConfigured,
     anthropicApiKeyConfigured,
-    availableModels,
     activeProviders,
     activeModels,
     selectedModelOption,

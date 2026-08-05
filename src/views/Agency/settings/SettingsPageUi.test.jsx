@@ -250,6 +250,19 @@ describe('SettingsAiProviderCard', () => {
     expect(screen.getByRole('button', { name: 'Salvataggio...' })).toBeDisabled();
   });
 
+  // Il "sto salvando" deve arrivare anche al pannello sotto: se quella prop si
+  // perdesse, la cancellazione chiavi resterebbe cliccabile durante un
+  // salvataggio in corso, e le due chiamate al server si accavallerebbero —
+  // con la cancellazione che puo' azzerare una chiave appena salvata.
+  it('mentre salva blocca anche la cancellazione chiavi nel pannello sotto', () => {
+    render(<SettingsAiProviderCard {...cardGenitrice({
+      saveState: { status: 'saving', message: 'In corso...' },
+      anthropicApiKeyConfigured: true,
+    })} />);
+
+    expect(screen.getByRole('button', { name: /Cancella permanentemente/ })).toBeDisabled();
+  });
+
   it('inoltra invio del form e aggiornamento dello stato', () => {
     const props = cardGenitrice();
     render(<SettingsAiProviderCard {...props} />);
@@ -266,8 +279,11 @@ describe('cataloghi di sola lettura', () => {
   it('i tipi di progetto elencano chiave e descrizione', () => {
     render(<SettingsProjectTypesCard />);
 
-    expect(screen.getByText('Project types disponibili')).toBeInTheDocument();
-    expect(screen.getAllByText(/\|/).length).toBeGreaterThan(0);
+    expect(screen.getByText('Website')).toBeInTheDocument();
+    expect(screen.getByText('Landing Page')).toBeInTheDocument();
+    expect(screen.getByText('Ecommerce')).toBeInTheDocument();
+    expect(screen.getByText(/^website \| /)).toBeInTheDocument();
+    expect(screen.getByText(/^ecommerce \| /)).toBeInTheDocument();
   });
 
   it('gli scope mostrano anche lo stato dei dettagli tecnici', () => {
