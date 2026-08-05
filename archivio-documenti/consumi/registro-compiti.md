@@ -43,3 +43,5 @@
 | 2026-08-04 12:43 | Esclusione antivirus: applicazione, misura e note | 53 min | 12,8 | 0,24 | nessuno | — |
 | 2026-08-04 14:59 | Blocco Agency: spezzatura AgencyProjectWebPage chiusa (890→161) + Ads estratto per tre quarti (manca la riscrittura della pagina) — una riga sola perché la finestra misurata copre entrambi; ~35 min sono giri di test | 2h 10m | 36,9 | 0,28 | esploratore×2, revisore×1 | 14,9 |
 | 2026-08-04 15:47 | Spezzatura AgencyProjectAdsPage - riscrittura pagina (ultimo passo) | 42 min | 9,6 | 0,23 | revisore×1 | -0,8 |
+| 2026-08-05 10:57 | spezzatura AgencySettingsPage 739->83 | 1h 41m | 28,5 | 0,28 | esploratore×2, revisore×1 | 5,2 |
+| 2026-08-05 12:13 | spezzatura ChecklistTemplates 877->127 | 2h 56m | 55,9 | 0,32 | esploratore×7, revisore×1 | 16,1 |
