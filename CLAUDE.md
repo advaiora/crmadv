@@ -14,6 +14,7 @@ Due persone, **a staffetta** (una alla volta):
 2. **Si pusha sempre su `main`**, niente branch (salvo test straordinari). I push sono frequenti, quindi si può sempre tornare indietro.
 3. **L'handoff è l'unico raccordo fra una sessione e la successiva** — *chiunque* la riprenda. Serve in due modi, e il secondo è il più frequente: (a) passare il testimone **all'altra persona**, quando il turno cambia; (b) permettere **alla stessa persona** di riprendere il proprio lavoro giorni dopo, in una sessione nuova che non ricorda nulla. Poiché Jacopo sviluppa la maggior parte del tempo, il caso ordinario è **Jacopo → Jacopo**: scrivere l'handoff pensando solo a Claudio è un errore. A fine sessione si genera con il comando `/handoff` (scrive in `archivio-documenti/handoff/`, tiene solo le ultime 3 versioni). Si legge sempre per primo il file più recente.
 4. La **fonte di verità del prodotto** è `archivio-documenti/02-brief-operativo-definitivo-bibbia.md` (la "bibbia"); la roadmap di sviluppo è `archivio-documenti/03-roadmap-confronto-e-build.md`.
+5. **Se l'utente si allontana dal PC** e vuole che il lavoro prosegua senza di lui, lancia `/vado` (`/vado 2h`, `/vado tutto`). Il lavoro avanza **a pezzi committabili** — il tempo non taglia un pezzo, decide solo se cominciarne un altro — con commit e push a ogni pezzo chiuso. Ciò che richiede una sua decisione non viene deciso: viene **parcheggiato con le opzioni già istruite** e presentato al rientro in `archivio-documenti/rapporto-al-rientro.md`. Non è un handoff e non tocca la cartella degli handoff: sono due cose diverse (l'handoff chiude una sessione, il rapporto al rientro riprende una conversazione ancora aperta).
 
 ## Regola sui conflitti tra le due persone (IMPORTANTE)
 
@@ -147,6 +148,8 @@ Se durante la sessione serve una migrazione, si ferma l'API, si migra, si riacce
 ## Colori e temi (chiaro/scuro) — regola d'oro
 
 Il tema è un sistema globale a token (variabili CSS) in `src/styles/scss/globals.css`. Sviluppando qualsiasi pagina/componente: **usa sempre i token `var(--…)` o i componenti Bootstrap standard, mai colori scritti a mano** (`#hex`/`rgb`/`rgba`), nemmeno negli stili inline in JSX. Così chiaro e scuro funzionano da soli, senza ritocchi pagina per pagina. Riferimento completo dei token: `archivio-documenti/design-system-temi.md`. Controlli automatici sui moduli: `npm run lint:css` (file CSS) e `npm run lint:colors` (stili inline in JSX).
+
+**Unica eccezione: i blocchi `@media print`** *(messa per iscritto il 6/8/2026, prima era solo prassi)*. Lì i colori si scrivono a mano ed è giusto così: i token seguono chiaro/scuro, quindi stampando da tema scuro darebbero un foglio nero. La stampa vuole nero su bianco sempre, indipendentemente dal tema a schermo. Vale **solo** dentro `@media print` — e va accompagnata da un commento che dica perché, altrimenti la revisione successiva la segnala di nuovo come violazione.
 
 ## Design "Apple-style" — la bussola
 
