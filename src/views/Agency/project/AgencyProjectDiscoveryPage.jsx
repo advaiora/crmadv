@@ -370,8 +370,8 @@ const AgencyProjectDiscoveryPage = () => {
   if (isLoading) {
     return (
       <AgencyProjectPageTemplate
-        title="Discovery Progetto AI"
-        subtitle="Discovery guidata del progetto Agency."
+        title="Brief"
+        subtitle="Il brief del progetto, ricostruito dalle fonti e rigenerabile."
         dataMeta={dataMeta}
       >
         <p className="mb-0 text-muted small">Caricamento Discovery in corso...</p>
@@ -381,8 +381,8 @@ const AgencyProjectDiscoveryPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Discovery Progetto AI"
-      subtitle="Brief operativo aggiornabile dalle fonti progetto."
+      title="Brief"
+      subtitle="Il brief del progetto, ricostruito dalle fonti e rigenerabile."
       dataMeta={dataMeta}
     >
       <div className="d-flex justify-content-between align-items-center mb-3">

@@ -166,8 +166,8 @@ const AgencyProjectOverviewPage = () => {
   if (loading || !brain || !project) {
     return (
       <AgencyProjectPageTemplate
-        title="Overview progetto"
-        subtitle="Panoramica operativa del progetto Agency."
+        title="Panoramica"
+        subtitle="Panoramica operativa del progetto."
         dataMeta={dataMeta}
       >
         <p className="mb-0 text-muted small">Caricamento overview progetto...</p>
@@ -177,8 +177,8 @@ const AgencyProjectOverviewPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Overview progetto"
-      subtitle="Stato, prossima azione, checklist e segnali principali del progetto Agency."
+      title="Panoramica"
+      subtitle="Stato, prossima azione, checklist e segnali principali del progetto."
       dataMeta={dataMeta}
       project={project}
     >

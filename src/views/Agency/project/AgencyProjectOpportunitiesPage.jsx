@@ -41,8 +41,8 @@ const AgencyProjectOpportunitiesPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Opportunita Progetto AI"
-      subtitle="Opportunity Engine v2 con ordinamento per score, priorita e motivazioni leggibili."
+      title="Opportunita"
+      subtitle="Ordinate per punteggio e priorita, ognuna con il motivo per cui e' stata proposta."
       dataMeta={dataMeta}
     >
       <div className="row g-2 mb-3">

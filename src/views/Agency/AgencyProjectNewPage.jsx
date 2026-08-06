@@ -153,7 +153,7 @@ const AgencyProjectNewPage = () => {
 
       history.push(`/agency/projects/${encodeURIComponent(project.id)}/overview`);
     } catch (error) {
-      setSubmitError(error?.message || "Impossibile creare il progetto Agency.");
+      setSubmitError(error?.message || "Impossibile creare il progetto.");
     } finally {
       setSubmitting(false);
     }
@@ -161,8 +161,8 @@ const AgencyProjectNewPage = () => {
 
   return (
     <AgencyPageShell
-      title="Nuovo progetto Agency"
-      subtitle="Creazione operativa del progetto base prima di entrare nei moduli AI."
+      title="Nuovo progetto"
+      subtitle="I dati di base del progetto, prima di entrare nei moduli AI."
       breadcrumbs={[
         { label: "Produzione AI", to: "/agency/projects" },
         { label: "Nuovo progetto" },

@@ -58,8 +58,8 @@ const AgencyProjectTasksPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Tasks Progetto AI"
-      subtitle="Task engine base Agency con filtri minimi per reparto e stato."
+      title="Task"
+      subtitle="Le cose da fare sul progetto, filtrabili per reparto e stato."
       dataMeta={dataMeta}
     >
       <div className="d-flex flex-wrap gap-2 align-items-end mb-3">

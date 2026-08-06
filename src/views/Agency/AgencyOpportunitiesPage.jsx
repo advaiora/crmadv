@@ -70,7 +70,7 @@ const AgencyOpportunitiesPage = () => {
   return (
     <AgencyPageShell
       title="Opportunita"
-      subtitle="Vista globale Opportunity Engine v2 con filtri minimi per priorita, tipo, categoria e progetto."
+      subtitle="Le opportunita di tutti i progetti, con i filtri per priorita, tipo, categoria e progetto."
       dataMeta={dataMeta}
       breadcrumbs={[
         { label: "Produzione AI", to: "/agency/projects" },
