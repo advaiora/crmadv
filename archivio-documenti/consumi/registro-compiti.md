@@ -47,3 +47,4 @@
 | 2026-08-05 12:13 | spezzatura ChecklistTemplates 877->127 | 2h 56m | 55,9 | 0,32 | esploratore×7, revisore×1 | 16,1 |
 | 2026-08-05 14:12 | Chiusura giro Memo Operativi (revisore + rilievi) e spezzatura Calendar 807-120 | 1h 51m | 46,3 | 0,42 | revisore×2 | 6,2 |
 | 2026-08-05 15:20 | Decisioni di metodo: censimento dimensione file di tutte le tipologie, nascita V13, correzione regola handoff | 1h 05m | 16,2 | 0,25 | nessuno | — |
+| 2026-08-06 11:16 | Re-naming aree fase A (Piattaforma, Produzione AI, Pipeline) + fusione Diagnosis in Da risolvere | 1h 45m | 21,5 | 0,20 | esploratore×1 | -0,6 |

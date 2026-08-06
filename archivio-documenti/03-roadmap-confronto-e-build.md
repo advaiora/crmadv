@@ -487,6 +487,15 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   - **Brain → si elimina**: non aggiunge nulla a Overview (prossima azione, qualità, segnali) e riusa i dati di Diagnosis.
   - **Reports tecnici → si assorbe nel Report** come vista alternativa: è la versione interna dello stesso documento, non una scheda a sé.
 
+    ⚠️ **Requisito d'integrazione, posto da Jacopo il 6/8/2026 dopo aver guardato il comportamento attuale.** Oggi il pulsante "Report tecnico" dentro il Report cliente **porta a un'altra pagina**: l'utente si ritrova in una vista che visivamente non dice più di essere dentro "Report", e la scheda Report in cima **si spegne**. La fusione deve togliere esattamente questo effetto. Tre condizioni, tutte obbligatorie:
+    1. **La scheda "Report" resta accesa** anche mentre si guarda la vista tecnica: l'utente deve continuare a percepire di essere in quell'area.
+    2. **Si può sempre tornare alla vista generale** con un pulsante esplicito, non col tasto indietro del browser.
+    3. La vista tecnica **si presenta come una vista dentro Report**, non come una pagina a sé.
+
+    **Come ottenerlo, concretamente:** la vista alternativa deve vivere **sullo stesso percorso** (`/reports/client`) distinguendosi con un parametro in coda all'indirizzo (per esempio `?vista=tecnica`), **non** con un percorso diverso. Il motivo è meccanico: `AgencyProjectPageTemplate` decide quale scheda illuminare confrontando il **percorso** (`location.pathname === entry.path`); con un percorso diverso la scheda si spegne per forza, con un parametro in coda resta accesa da sola. Il parametro serve anche a tenere i collegamenti diretti funzionanti (i due link in `AgencyReportsPage.jsx` che oggi puntano alla scheda tecnica).
+
+    **Vale come regola generale, non solo qui:** ogni volta che una scheda ne assorbe un'altra come "vista alternativa", le tre condizioni sopra valgono uguali. ✅ La fusione **Diagnosis → Da risolvere** (fatta il 5/8) le rispetta già per costruzione, perché i contenuti stanno *dentro* la stessa pagina e non c'è nessuna navigazione: non va ritoccata.
+
   **③ La barra delle schede si riorganizza in gruppi.** Oggi sono otto pulsanti in fila piatta più un pieghevole "Diagnosi e strumenti tecnici": la fila non dice né l'ordine né la natura delle cose. Struttura decisa (proposta di Jacopo, rivista insieme):
 
   ```
@@ -507,6 +516,26 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   - **Memory sta in "Conoscenza"** e completa la terna: *Fonti* è quello che dai all'AI, *Discovery* quello che ne ha capito, *Memory* quello che si ricorda e ha prodotto.
   - **Il collegamento visivo va solo fra Fonti e Discovery**, dove la dipendenza è reale (c'è già un semaforo che blocca se le fonti non sono pronte). Incatenare anche gli altri comunicherebbe un obbligo inesistente — Web e Ads sono paralleli — e appesantirebbe: la bussola è "Apple a sottrazione", lo spazio separa meglio dei bordi.
   - ⚠️ **Da verificare sul telefono:** undici pulsanti in quattro gruppi vanno a capo su schermo stretto. E **prima di toccare l'aspetto si legge `design-linguaggio-apple-web.md`**, come da regola.
+
+  **④ I nomi finali delle schede, decisi il 5/8/2026.** Da applicare tutti insieme quando si riscrive la barra.
+
+  | Oggi | Diventa | Nota |
+  |---|---|---|
+  | Overview | **Panoramica** | Parola già usata nella Dashboard ("Panoramica operativa del workspace"): riusarla crea abitudine |
+  | Fonti | **Fonti** *(invariata)* | — |
+  | Discovery | **Brief** | Non è un'invenzione: il pulsante d'azione della scheda dice già *"Rigenera brief"* e lo stato interno si chiama già `brief` |
+  | Memory | **Memoria** | — |
+  | Web | **Contenuti Web** | Tiene "Web" (Jacopo ci teneva) e si mette in parallelo a "Campagne ADS": entrambe dicono *cosa produci + su quale canale* |
+  | Ads | **Campagne ADS** | "ADS" esplicito così quando arriveranno le campagne email di Brevo si chiameranno "Campagne Email marketing" senza ambiguità |
+  | Performance | **Performance** *(invariata)* | Valutata "Risultati", scartata: Jacopo preferisce il termine corrente |
+  | Report | **Report** *(invariata)* | Ora è libero e non ambiguo, visto che il report tecnico viene assorbito |
+  | Alert | **Da risolvere** | Vale **anche** per la voce Alert di Produzione AI: si rinominano insieme (vedi ①) |
+  | Task | **Task** *(invariata)* | — |
+  | Opportunità | **Opportunità** *(invariata)* | — |
+
+  **Intestazioni dei quattro gruppi — visibili a schermo** (scelta di Jacopo: aiutano l'utente, con un trattamento grafico leggero): **Conoscenza · Produzione · Risultati · Priorità**. Sono quattro parole singole dello stesso registro; "Misura e consegna" e "Segnali" erano le versioni iniziali, scartate perché la prima rompeva la simmetria e la seconda non convinceva. "Priorità" riusa il vocabolario della Dashboard (sezione *"Priorità operative"*), con l'attrito noto e accettato che gli elementi dentro hanno una loro priorità individuale.
+
+  **Come renderle:** intestazioni piccole, in maiuscoletto e colore tenue — devono guidare senza competere coi pulsanti. Leggere `design-linguaggio-apple-web.md` prima di fissare misure e spaziature.
 
   **❌ Alternative scartate, con la ragione (per non riproporle):**
   - **"AI Lab"** *(piaceva a Jacopo, scartata il 5/8 dopo verifica)* — **"Lab" è l'abbreviazione naturale di "Laboratorio", che è un reparto aziendale vero**, nominato nella bibbia (`02-brief-operativo-definitivo-bibbia.md` righe 13, 53, 100: *"Laboratorio (Stampa)"*, elencato fra i reparti accanto a Web/Marketing/Social/Grafica) e destinato a diventare un modulo in **V8**. Avremmo avuto *"AI Lab"* e *"Laboratorio"* nello stesso menu: la stessa parola in due lingue per due cose diverse — cioè **esattamente l'ambiguità "Progetti / Progetti Agency" appena rimossa**. Restava la strada di rinominare il reparto in "Stampa", ma è una modifica al **documento fondativo su un nome aziendale**: non si fa dentro un giro di re-naming di etichette. ⚠️ Se un domani si volesse davvero "AI Lab", il prerequisito è **quella** decisione, da prendere con Claudio.
