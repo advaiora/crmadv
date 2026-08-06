@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SimpleBar from 'simplebar-react';
-import { AlignLeft, Bell, LogOut, Settings } from 'react-feather';
+import { AlignLeft, Bell, Globe, LogOut, Settings } from 'react-feather';
 import { Button, Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { connect } from 'react-redux';
 import { Link, useHistory, useLocation } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import HkBadge from '../../components/@hk-badge/@hk-badge';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
-import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
+import { fetchWorkspaceAccess, hasModuleEnabled, hasPermission, isPlatformAdmin } from '../../utils/workspaceAccess';
 import { apiPost } from '../../utils/apiClient';
 import { useSession } from '../../hooks/useSession';
 import { resetGoogleIdentitySession } from '../../utils/googleIdentity';
@@ -202,6 +202,9 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const workspace = navbarData?.workspace;
     const branding = navbarData?.branding;
     const canManageBranding = permissions.includes('branding.manage');
+    // Super Admin di piattaforma: non e' un permesso RBAC ma un flag di identita'
+    // sull'utente, quindi si legge con isPlatformAdmin e non da `permissions`.
+    const canUsePlatformConsole = isPlatformAdmin(navbarData);
     const canViewMessaging = hasModuleEnabled(navbarData, MESSAGING_MODULE_KEY)
         && hasPermission(navbarData, MESSAGING_PERMISSIONS.view);
     const onMessagingPage = location.pathname.startsWith('/apps/email');
@@ -412,6 +415,33 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
                                 >
                                     <span className="icon">
                                         <span className="feather-icon"><Settings /></span>
+                                    </span>
+                                </Button>
+                            </Nav.Item>
+                        )}
+
+                        {/* Piattaforma: unica area FUORI da ogni workspace, visibile ai soli
+                            Super Admin. Sta qui e non nella sidebar perche' si usa di rado —
+                            spostata il 5/8/2026. Resta cercabile da Ctrl+K (vedi SidebarMenu.jsx).
+                            ⚠️ NON aggiungere qui la classe `app-topnav-settings-item` che ha il
+                            pulsante Branding qui sopra: quella classe nasconde l'elemento sotto i
+                            576px (globals.css). Sul pulsante Branding va bene, perche' e' una
+                            scorciatoia a una pagina che resta comunque nel menu; qui invece questo
+                            e' l'UNICO ingresso all'area, e nasconderlo la renderebbe irraggiungibile
+                            da telefono (la voce non e' piu' in sidebar, e Ctrl+K sotto i 576px e'
+                            a sua volta nascosto). */}
+                        {canUsePlatformConsole && (
+                            <Nav.Item>
+                                <Button
+                                    as={Link}
+                                    to="/settings/platform-console"
+                                    variant="flush-dark"
+                                    className="btn-icon btn-rounded flush-soft-hover topnav-action-btn"
+                                    title="Piattaforma — workspace e consumi AI"
+                                    aria-label="Apri Piattaforma — workspace e consumi AI"
+                                >
+                                    <span className="icon">
+                                        <span className="feather-icon"><Globe /></span>
                                     </span>
                                 </Button>
                             </Nav.Item>

@@ -1226,7 +1226,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
             {!aiConfigured && (
               <div className="ai-chat-notice">
                 <strong>AI non configurata.</strong> Puoi scrivere nella chat; per le risposte dell&rsquo;assistente
-                serve una chiave in Impostazioni Agency.
+                serve una chiave in Impostazioni AI.
               </div>
             )}
             {budgetNotice && <div className="ai-chat-notice">{budgetNotice}</div>}

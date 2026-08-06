@@ -40,7 +40,7 @@ const AssetsCompetitorsCard = ({
           <div>
             <h6 className="mb-1">Competitor</h6>
             <p className="small text-muted mb-0">
-              Aggiungi competitor manualmente oppure usa la ricerca automatica quando e attiva in Impostazioni Agency.
+              Aggiungi competitor manualmente oppure usa la ricerca automatica quando e attiva in Impostazioni AI.
             </p>
           </div>
           <Button size="sm" variant="outline-primary" onClick={onRunSearch} disabled={searching}>
@@ -134,7 +134,7 @@ const AssetsCompetitorsCard = ({
             {elenco.length === 0 && (
               <tr>
                 <td colSpan={5} className="small text-muted">
-                  Nessun competitor strutturato. Aggiungili manualmente o configura la ricerca online in Impostazioni Agency.
+                  Nessun competitor strutturato. Aggiungili manualmente o configura la ricerca online in Impostazioni AI.
                 </td>
               </tr>
             )}

@@ -36,8 +36,7 @@ const AgencyAlertsPage = () => {
       subtitle="Priorita operative da risolvere nei progetti Agency."
       dataMeta={dataMeta}
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
+        { label: "Produzione AI", to: "/agency/projects" },
         { label: "Alert" },
       ]}
     >

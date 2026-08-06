@@ -445,6 +445,99 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
 - **Il controllo dei nomi duplicati delle checklist è più severo lato client che lato server** *(notato il 5/8/2026)*. `ChecklistTemplates.jsx` rifiuta un nome che differisce solo per maiuscole/minuscole, mentre il vincolo del database (`ChecklistTemplate @@unique([workspaceId, name])`) è verosimilmente sensibile alle maiuscole: quindi due memo "Onboarding" e "onboarding" il database li accetterebbe, l'interfaccia no. **È il comportamento attuale e va lasciato com'è finché non si decide.** La domanda da chiudere è di prodotto, non tecnica: *i nomi dei memo devono distinguersi per maiuscole o no?* Se la risposta è no, il posto giusto per il controllo è il server (oggi non è stato verificato se lo faccia: il service è un file da 2.000 righe non aperto). Se è sì, va tolto il pre-controllo dal client.
 
+- **Un pulsante della barra superiore è senza etichetta accessibile** *(notato il 5/8/2026 verificando la barra a varie larghezze)*. Nella barra in alto, **il selettore del tema** (`ThemeSwitcher`, reso da `src/layout/Header/TopNav.jsx` dentro `app-topnav-theme-item`) è l'unico pulsante privo sia di `aria-label` sia di `title`: chi usa uno screen reader sente soltanto *"pulsante"* e non sa cosa fa, e nei test non è raggiungibile per etichetta. **Tutti i suoi vicini ce l'hanno** e seguono già la convenzione "Apri …" (ricerca rapida, chat, branding, notifiche, menu utente, Piattaforma), quindi il rimedio è una riga sola e coerente con l'esistente — probabilmente in `src/utils/theme-provider/theme-switcher.jsx`, dove il pulsante è costruito. **Preesistente**, non introdotto dal re-naming. Stessa famiglia della voce sulle etichette dei form non collegate: è la parte "pulsanti-icona" dello stesso problema.
+
+- **La ricerca rapida (Ctrl+K) non controlla il flag Super Admin** *(trovato il 5/8/2026 dall'esploratore, preparando lo spostamento della Console piattaforma)*. `src/components/command-palette/CommandPalette.jsx` costruisce le destinazioni "Vai a" iterando **direttamente** l'array `SidebarMenu`, ma la sua funzione di filtro `canAccessEntry` (righe 25-33) guarda solo `requiredModule` e `requiredPermission`: **non guarda mai `requirePlatformAdmin`**. Risultato: **qualunque utente loggato, anche non Super Admin, digitando in Ctrl+K si vede suggerire "Console piattaforma"** — cosa che nella sidebar vera non succede, perché lì il controllo c'è (`menuUtils.js:56-59`, `canRenderMenuEntry`). **Non è un buco di sicurezza**: la pagina si difende da sola (`PlatformConsole.jsx:18-41` mostra *"Questa area è riservata ai Super Admin di piattaforma"*) e il backend ha un guard dedicato. È un **suggerimento di navigazione che non dovrebbe comparire**, e una **seconda funzione di filtro divergente** dalla prima — due liste che decidono la stessa cosa in modo diverso, cioè il classico difetto che peggiora col tempo. **Il rimedio naturale** è far usare a CommandPalette lo stesso `canRenderMenuEntry` di `menuUtils.js` invece della propria copia. ⚠️ Diventa più rilevante se si decide di lasciare voci nell'array `SidebarMenu` **solo** per renderle cercabili da Ctrl+K (è il caso della Console piattaforma dal 5/8): in quello scenario la palette diventa l'unica via d'accesso, e il filtro sbagliato si vede di più.
+
+- **Re-naming delle aree: prima le etichette (A), poi i nomi tecnici (B)** *(aperto il 5/8/2026 con Jacopo; è l'attività che aspettava la chiusura del riordino file)*.
+
+  **Perché esiste.** I nomi attuali non si capiscono da soli: **"Agency"** non fa intuire che lì c'è la base operativa delle funzioni AI legate a clienti e progetti; **"Discovery"** è oscuro. Richiesta esplicita di Jacopo fin dall'handoff del 30/7: rivedere ogni etichetta perché sia riconoscibile a colpo d'occhio.
+
+  **Il lavoro è diviso in due, e la divisione è voluta:**
+  - **A — le etichette visibili** (il testo che si legge a schermo). Basso rischio: si cambia `label`, non `path`. Ottiene da solo tutto l'obiettivo UX. **In corso dal 5/8/2026.**
+  - **B — i nomi tecnici** (URL/rotte, nomi dei file, cartella-modulo `agency-os`, chiavi dei permessi). **Non serve alla UX**, ma Jacopo lo vuole comunque **per un motivo pratico e dichiarato**: mentre sviluppa, l'assistente gli cita continuamente URL e percorsi di file — se quelli restano coi vecchi nomi mentre l'interfaccia ne mostra di nuovi, si lavora con due vocabolari in testa e ci si confonde. **Va fatto, va solo collocato.**
+
+  **⚠️ Il metodo di A, richiesto da Jacopo e da rispettare (non è una preferenza estetica: serve a decidere con cognizione).** Per **ogni** area candidata al re-naming:
+  1. **Jacopo indica** l'area che vuole rinominare — guida lui, "a naso", guardando il CRM in prima persona.
+  2. **L'assistente spiega** *prima* di proporre: a cosa serve quell'area, quali funzioni la guidano e — **soprattutto** — come e cosa ci dovrebbe fare l'utente.
+  3. **Si aspetta la conferma di Jacopo** di aver compreso.
+  4. **Solo allora** l'assistente propone un **ventaglio** di nomi possibili per quell'area.
+
+  Mai invertire l'ordine (nomi prima della spiegazione): il nome giusto si sceglie sapendo cosa fa l'area, non a intuito sul suono.
+
+  ⚠️ **Il revisore è spento per tutta la fase A** (deciso da Jacopo il 5/8/2026, dopo il primo giro): sono cambi di etichetta e di collocazione, e la revisione a ogni tappa rallentava troppo rispetto a quanto rende. **Non è una dimenticanza** — chi legge il registro dei compiti non si stupisca di non trovarla. La verifica in anteprima resta, e il revisore torna obbligatorio in **fase B** (che tocca URL, file e permessi, dove sbagliare costa davvero).
+
+  **✅ Decisioni già prese (5/8/2026) — fase A, sole etichette, nessun URL toccato:**
+
+  | Prima | Adesso | Note |
+  |---|---|---|
+  | **Console piattaforma** (voce in cima alla sidebar) | **Piattaforma** | Non è più una voce di menu: è un'**icona nella barra superiore**. La voce resta nell'array `SidebarMenu.jsx` col nome lungo *"Piattaforma — workspace e consumi AI"* perché è da lì che la ricerca rapida (Ctrl+K) la pesca. |
+  | **Agency** | **Produzione AI** | Dice le due cose che mancavano: che **si produce** (non si consulta) e che lo si fa **con l'AI**. |
+  | **Progetti** (gruppo Operatività) | **Pipeline** | Con dentro **Bacheca** (era *"Board"*, inglese residuo del tema) e **Impostazioni** (era *"Impostazioni Pipeline"*, ripetitivo sotto un genitore già chiamato Pipeline). |
+
+  **Perché la coppia "Produzione AI" / "Pipeline" e non due nomi qualsiasi:** è un **solo `model Project`** — Agency e Operatività sono **due finestre sullo stesso record** (il progetto ha perfino due stati distinti, `statusAgency` e la fase di pipeline). Chiamarli entrambi "progetti" faceva credere che ci fossero due archivi. Il criterio adottato è quindi: **si nomina l'attività, non l'entità** — dove *produci* vs dove *vedi a che punto sei*.
+
+  **✅ Le schede dentro un progetto — tre decisioni prese il 5/8/2026.** ⚠️ **Attenzione: queste vanno oltre il re-naming.** Le prime due comportano cancellare, unire e promuovere pagine, la terza rifà la barra delle schede: è **lavoro di struttura**, con rischio di regressione vero, non un cambio di etichetta.
+
+  **① Alert: il doppione è corretto, non è un difetto.** La scheda *Alert* dentro il progetto e la voce *Alert* di Produzione AI chiamano **la stessa funzione** (`getAgencyProjectAlerts`): senza argomenti dà tutti gli alert, con `projectId` li filtra su quel progetto. Stessa fonte, stesso mestiere, due ampiezze — quindi **non** è il caso "Progetti / Progetti Agency" (dove la stessa parola copriva due mestieri diversi e quindi mentiva). Se si rinomina, **si rinominano tutti e due insieme e allo stesso modo**. La ragione per cambiarlo non è l'ambiguità ma la precisione: il sottotitolo dice *"segnali da risolvere **prima** di generare output o consegnare al cliente"*, cioè sono **impedimenti**, non notifiche ignorabili. Patto con Jacopo: se nessuna alternativa convince, **si tiene "Alert"**.
+
+  **② Le quattro schede nascoste: deciso il destino di ognuna.** Erano visibili solo con `import.meta.env.DEV` — cioè un **interruttore di compilazione, non un permesso**: in produzione non le vedeva **nessuno, nemmeno un Super Admin**; solo chi gira `npm run dev`. Non erano abbozzi (leggono dati veri), ma **finestre sul funzionamento interno dell'AI**, e tre delle quattro si sovrapponevano ad altre. Il perché fossero nascoste **non era scritto da nessuna parte** — né commento né roadmap.
+  - **Memory → si promuove e diventa visibile.** È l'unica che dà qualcosa di suo: *cosa sa l'AI del progetto e cosa ha già prodotto*. In un'area dove l'AI scrive per te, poterlo guardare è una questione di fiducia.
+  - **Diagnosis → si assorbe dentro Alert**, che fa già quel mestiere ("cosa risolvere prima di generare/consegnare").
+  - **Brain → si elimina**: non aggiunge nulla a Overview (prossima azione, qualità, segnali) e riusa i dati di Diagnosis.
+  - **Reports tecnici → si assorbe nel Report** come vista alternativa: è la versione interna dello stesso documento, non una scheda a sé.
+
+  **③ La barra delle schede si riorganizza in gruppi.** Oggi sono otto pulsanti in fila piatta più un pieghevole "Diagnosi e strumenti tecnici": la fila non dice né l'ordine né la natura delle cose. Struttura decisa (proposta di Jacopo, rivista insieme):
+
+  ```
+  ┌──────────────── OVERVIEW ────────────────┐   ← largo, sopra, domina gli altri
+  CONOSCENZA           PRODUZIONE      MISURA E CONSEGNA
+  Fonti → Discovery    Web · Ads       Performance · Report
+  Memory
+  ──────────────────────────────────────────────────────
+  QUELLO CHE IL SISTEMA TI SEGNALA
+  Alert · Task · Opportunità
+  ```
+
+  Le ragioni, che servono a chi dovrà difendere questa forma:
+  - **I primi tre gruppi sono una catena** (prepari → produci → misuri e consegni) e si leggono da sinistra a destra nell'ordine vero delle cose.
+  - **Report sta con Performance, non con la produzione:** si nutre di quei numeri. Metterlo prima farebbe leggere all'occhio un ordine che contraddice quello reale. *(Correzione alla proposta iniziale di Jacopo.)*
+  - **Task non è monitoraggio:** Performance è *guardare*, Task è *fare*. Task, Alert e Opportunità sono invece parenti stretti — **sono le tre cose che il motore a regole genera da solo** dal tipo di progetto e dallo scope. Oggi sono trattate in modo incoerente (Task primaria, le altre due relegate fra le secondarie). *(Correzione alla proposta iniziale.)*
+  - **Il quarto gruppo è staccato apposta:** non è una fase da attraversare, è quello che la macchina dice mentre lavori.
+  - **Memory sta in "Conoscenza"** e completa la terna: *Fonti* è quello che dai all'AI, *Discovery* quello che ne ha capito, *Memory* quello che si ricorda e ha prodotto.
+  - **Il collegamento visivo va solo fra Fonti e Discovery**, dove la dipendenza è reale (c'è già un semaforo che blocca se le fonti non sono pronte). Incatenare anche gli altri comunicherebbe un obbligo inesistente — Web e Ads sono paralleli — e appesantirebbe: la bussola è "Apple a sottrazione", lo spazio separa meglio dei bordi.
+  - ⚠️ **Da verificare sul telefono:** undici pulsanti in quattro gruppi vanno a capo su schermo stretto. E **prima di toccare l'aspetto si legge `design-linguaggio-apple-web.md`**, come da regola.
+
+  **❌ Alternative scartate, con la ragione (per non riproporle):**
+  - **"AI Lab"** *(piaceva a Jacopo, scartata il 5/8 dopo verifica)* — **"Lab" è l'abbreviazione naturale di "Laboratorio", che è un reparto aziendale vero**, nominato nella bibbia (`02-brief-operativo-definitivo-bibbia.md` righe 13, 53, 100: *"Laboratorio (Stampa)"*, elencato fra i reparti accanto a Web/Marketing/Social/Grafica) e destinato a diventare un modulo in **V8**. Avremmo avuto *"AI Lab"* e *"Laboratorio"* nello stesso menu: la stessa parola in due lingue per due cose diverse — cioè **esattamente l'ambiguità "Progetti / Progetti Agency" appena rimossa**. Restava la strada di rinominare il reparto in "Stampa", ma è una modifica al **documento fondativo su un nome aziendale**: non si fa dentro un giro di re-naming di etichette. ⚠️ Se un domani si volesse davvero "AI Lab", il prerequisito è **quella** decisione, da prendere con Claudio.
+  - **"Studio AI"** — in italiano *"lo studio"* significa anche **lo studio professionale, l'azienda**: ripeterebbe il peccato di "Agency" (far credere che sia una sezione *sull'agenzia* invece del posto dove si lavora).
+  - **"Laboratorio"** — stessa collisione di "AI Lab".
+  - Qualsiasi nome con **"Clienti"** per l'area Piattaforma — sbatte contro l'area **Clienti** del CRM.
+
+  **🔸 Aperto, da chiudere:** due sottovoci contengono ancora la parola **"Agency"** — *"Progetti Agency"* e *"Impostazioni Agency"* — e la seconda si trascina dietro **una decina di messaggi visibili nell'interfaccia** che la citano (del tipo *"…configura la chiave in Impostazioni Agency"*, in `useAgencyProjectWebAiGeneration.js`, `assetsCompetitorHelpers.js`, `AssetsCompetitorsCard.jsx`, `ProjectAiSourcesPanel.jsx`, `agencyDataAdapter.js`, `AiChatWidget.jsx`) più un test che verifica il titolo di pagina (`AgencySettingsPage.test.jsx:86`). Finché non si decide, nel menu resta una parola che non esiste più altrove.
+
+  **Le candidate proposte dall'assistente il 5/8 — da ri-proporre a Jacopo quando avrà finito il suo giro "a naso"**, per quelle che non avrà toccato di suo (è una richiesta esplicita: non devono perdersi):
+  - **`Agency`** — il caso n°1: non dice che è la base operativa AI su clienti/progetti.
+  - **`Discovery`** — il caso n°2: oscuro.
+  - **`Diagnosis` / `Brain` / `Memory`** — gergo inglese in mezzo a tab italiane (`Brain` e `Memory` compaiono **solo in sviluppo**).
+  - **`Web Assets`** (area CRM) **vs la tab `Web`** del progetto: due "Web" diversi.
+  - **`Progetti`** (Operatività, il kanban) **vs `Progetti Agency`**: due "Progetti" diversi.
+  - **`Vault`** — inglese.
+
+  **L'inventario di ciò che si legge a schermo** (rilevato il 5/8 su mappa fresca, serve come base di lavoro):
+  - *Menu laterale:* Console piattaforma · Dashboard · **Agency** (→ Progetti Agency, Alert, Opportunità, Report, Impostazioni Agency) · Clienti · Team · Preventivi · Web Assets · Vault · Progetti · Memo Operativi · Calendario · Messaggi · Ruoli e permessi · Reparti · Audit · Profilo — in `src/layout/Sidebar/SidebarMenu.jsx`.
+  - *Tab dentro un progetto Agency:* Overview · Fonti · Discovery · Web · Ads · Performance · Report · Task, più Opportunità · Alert · Diagnosis · Reports tecnici · Brain · Memory (le ultime quattro solo in sviluppo) — in `src/views/Agency/project/AgencyProjectPageTemplate.jsx`.
+
+  **Quanto costa B, misurato il 5/8:** `Agency` compare in **oltre 60 file** di `src/`, `Discovery` in **28**. Il costo **cresce col tempo**: la sola fase di riordino ha generato 165 file nuovi in `src/`, molti col nome vecchio dentro. Più si aspetta, più superficie c'è da rinominare — è l'argomento principale per **non** parcheggiare B in fondo.
+
+  **Dove collocare B — raccomandazione dell'assistente, da confermare con Jacopo.** Conviene spezzarlo:
+  - **B1 — frontend (URL/rotte, nomi file e cartelle di `src/`):** è roba nostra, meccanica, senza decisioni di prodotto una volta che A ha fissato il vocabolario. Va fatto **subito dopo A** (stessa sessione se regge, altrimenti la successiva): è il pezzo che risolve davvero il problema di Jacopo, ed è quello che rincara aspettando.
+  - **B2 — backend e permessi** (cartella-modulo `server/modules/agency-os/`, chiavi permesso tipo `projects.view`, eventuali righe `Permission` a database): ⛔ **da concordare con Claudio prima**, è area a decisioni condivise, e toccare le chiavi dei permessi può comportare una **migrazione**. Non si fa unilateralmente.
+
+  ⚠️ **Da verificare quando si aprirà il piano di B** (l'esploratore è obbligatorio, si tocca l'area Agency): se esistono **percorsi salvati a database** che si romperebbero cambiando gli URL — sospetti principali le **Scorciatoie** utente (`/settings/shortcuts`) e la **Console piattaforma**. Un URL cambiato a codice è banale; un URL cambiato che vive anche come dato salvato è un'altra cosa.
+
+  **⚠️ Nota anti-conflitto per chi riprende:** B **non** è "pulizia da fare quando capita" e **non** va anticipato di iniziativa mentre si fa altro — vale la regola generale delle cose trovate per strada. Ha un motivo suo e un momento suo.
+
 ---
 
 ## Sintesi visiva della progressione

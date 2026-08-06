@@ -16,12 +16,11 @@ const AgencySettingsPage = () => {
 
   return (
     <AgencyPageShell
-      title="Impostazioni Agency"
-      subtitle="Configurazione operativa Agency AI OS derivata da cataloghi, runtime server e regole di sicurezza."
+      title="Impostazioni AI"
+      subtitle="Chiavi AI, consumi e budget, più i cataloghi che guidano il lavoro sui progetti."
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
-        { label: "Impostazioni Agency" },
+        { label: "Produzione AI", to: "/agency/projects" },
+        { label: "Impostazioni AI" },
       ]}
     >
       <Row className="g-3">

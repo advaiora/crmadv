@@ -5,7 +5,7 @@ import { getAgencyAiUsage } from "../../modules/agency-os/data/agencyDataAdapter
 // Rendiconto consumi AI del workspace (V4 — cost control): totali, dettaglio per
 // dipendente, per funzione e per progetto, ultime chiamate, con filtri periodo/
 // utente/modello/funzione/progetto. È la versione per-workspace della panoramica
-// cross-workspace della Console piattaforma. Vive in Impostazioni Agency, accanto
+// cross-workspace della Console piattaforma. Vive in Impostazioni AI, accanto
 // al Budget AI (budget = controllo, questo = monitoraggio). Accesso super-admin
 // di workspace.
 

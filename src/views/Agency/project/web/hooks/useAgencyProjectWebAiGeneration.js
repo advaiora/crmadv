@@ -31,7 +31,7 @@ export const useAgencyProjectWebAiGeneration = ({
       return;
     }
     if (isAiUnavailable(aiStatus)) {
-      setGenerationMessage("AI non configurata lato server. Puoi usare la bozza base oppure completare la configurazione in Impostazioni Agency.");
+      setGenerationMessage("AI non configurata lato server. Puoi usare la bozza base oppure completare la configurazione in Impostazioni AI.");
       return;
     }
 
@@ -64,7 +64,7 @@ export const useAgencyProjectWebAiGeneration = ({
       return;
     }
     if (isAiUnavailable(aiStatus)) {
-      setGenerationMessage("AI non configurata lato server. Puoi usare le azioni bozza base oppure completare la configurazione in Impostazioni Agency.");
+      setGenerationMessage("AI non configurata lato server. Puoi usare le azioni bozza base oppure completare la configurazione in Impostazioni AI.");
       return;
     }
 

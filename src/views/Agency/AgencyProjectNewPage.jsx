@@ -164,8 +164,7 @@ const AgencyProjectNewPage = () => {
       title="Nuovo progetto Agency"
       subtitle="Creazione operativa del progetto base prima di entrare nei moduli AI."
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
+        { label: "Produzione AI", to: "/agency/projects" },
         { label: "Nuovo progetto" },
       ]}
     >

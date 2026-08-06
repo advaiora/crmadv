@@ -91,8 +91,7 @@ const AgencyReportsPage = () => {
       subtitle="Vista globale Reporting v1 con snapshot per progetto, criticita sintetiche e filtri minimi."
       dataMeta={dataMeta}
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
+        { label: "Produzione AI", to: "/agency/projects" },
         { label: "Report AI" },
       ]}
     >

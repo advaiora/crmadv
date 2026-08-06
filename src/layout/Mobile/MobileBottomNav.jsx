@@ -36,7 +36,7 @@ const PRIMARY_ITEMS = [
     },
     {
         key: 'projects',
-        label: 'Progetti',
+        label: 'Pipeline',
         path: '/projects',
         icon: Shield,
         requiredModule: 'projects',

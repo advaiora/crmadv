@@ -1175,7 +1175,7 @@ export const searchAgencyProjectCompetitors = async (projectId, options = {}) =>
         providerStatus: "not_configured",
         realSearch: false,
         suggestions: [],
-        message: "Ricerca automatica non configurata. Inserisci competitor manualmente o configura un provider in Impostazioni Agency.",
+        message: "Ricerca automatica non configurata. Inserisci competitor manualmente o configura un provider in Impostazioni AI.",
       },
       AGENCY_DATA_SOURCE.MOCK,
     );

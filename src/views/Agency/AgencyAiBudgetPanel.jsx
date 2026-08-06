@@ -5,7 +5,7 @@ import { getAgencyAiBudgets, saveAgencyAiBudgets } from "../../modules/agency-os
 // Config del budget AI giornaliero (V4 — cost control). Default del workspace +
 // override per dipendente. Il limite in USD è il tetto di spesa AI al giorno per
 // utente; 0 = nessun limite. La spesa odierna è mostrata accanto a ogni dipendente.
-// Vive in Impostazioni Agency (accesso super-admin di workspace).
+// Vive in Impostazioni AI (accesso super-admin di workspace).
 
 const formatUsd = (value) => `$${Number(value || 0).toFixed(2)}`;
 

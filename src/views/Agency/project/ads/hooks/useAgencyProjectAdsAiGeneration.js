@@ -19,7 +19,7 @@ export const useAgencyProjectAdsAiGeneration = ({
 
   const handleGenerateAdsAssetWithAi = async (assetKey) => {
     if (isAiUnavailable(aiStatus)) {
-      setRuntimeMessage("AI non configurata lato server. Puoi usare le bozze base oppure completare la configurazione in Impostazioni Agency.");
+      setRuntimeMessage("AI non configurata lato server. Puoi usare le bozze base oppure completare la configurazione in Impostazioni AI.");
       return;
     }
 

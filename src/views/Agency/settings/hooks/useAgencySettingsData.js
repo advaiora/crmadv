@@ -6,7 +6,7 @@ import {
 } from "../../../../modules/agency-os/data/agencyDataAdapter";
 import { buildRuntimeForm } from "../settingsFormHelpers";
 
-// Dati e derivati della pagina Impostazioni Agency.
+// Dati e derivati della pagina Impostazioni AI.
 //
 // `runtimeSettings` e `runtimeForm` vanno SEMPRE aggiornati insieme: il form e'
 // ricostruito dalle impostazioni con `buildRuntimeForm`, e il server le

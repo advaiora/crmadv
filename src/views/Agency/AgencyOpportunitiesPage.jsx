@@ -73,8 +73,7 @@ const AgencyOpportunitiesPage = () => {
       subtitle="Vista globale Opportunity Engine v2 con filtri minimi per priorita, tipo, categoria e progetto."
       dataMeta={dataMeta}
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
+        { label: "Produzione AI", to: "/agency/projects" },
         { label: "Opportunita" },
       ]}
     >

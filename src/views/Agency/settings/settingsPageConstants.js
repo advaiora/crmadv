@@ -1,4 +1,4 @@
-// Costanti della pagina Impostazioni Agency: cataloghi di sola lettura mostrati
+// Costanti della pagina Impostazioni AI: cataloghi di sola lettura mostrati
 // in fondo alla pagina (ruoli del team, moduli attivi), mappe fra stato ed
 // etichetta e opzioni dei menu a tendina.
 // Estratte da AgencySettingsPage.jsx nel giro di spezzatura del 5/8/2026.

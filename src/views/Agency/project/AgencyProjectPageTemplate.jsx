@@ -156,8 +156,7 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
       subtitle={subtitle}
       dataMeta={dataMeta}
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
+        { label: "Produzione AI", to: "/agency/projects" },
         ...(projectClientLabel ? [{ label: projectClientLabel, to: "/apps/clients" }] : []),
         { label: projectDisplayName, to: projectOverviewPath },
         { label: title },

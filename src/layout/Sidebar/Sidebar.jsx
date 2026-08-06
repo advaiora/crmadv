@@ -21,7 +21,10 @@ const Sidebar = ({ navCollapsed, toggleCollapsedNav }) => {
 
     const menuGroups = useMemo(
         () =>
-            SidebarMenu.filter((group) => group.group !== 'Documentation')
+            // "Piattaforma" resta nell'array del menu ma NON si disegna qui: il suo
+            // ingresso e' l'icona nella barra superiore (TopNav). Va lasciata nei dati
+            // perche' la ricerca rapida (Ctrl+K) li legge — motivo in SidebarMenu.jsx.
+            SidebarMenu.filter((group) => group.group !== 'Documentation' && group.group !== 'Piattaforma')
                 .map((group) => ({
                     ...group,
                     contents: filterMenuEntries(group.contents, access),

@@ -170,7 +170,7 @@ const ProjectAiSourcesPanel = ({ projectId }) => {
       const chunks = result?.chunks ?? 0;
       if (indexed === 0) {
         setFeedback(
-          'Nessuna fonte indicizzata. Verifica che la chiave OpenAI sia configurata in Impostazioni Agency.',
+          'Nessuna fonte indicizzata. Verifica che la chiave OpenAI sia configurata in Impostazioni AI.',
         );
       } else {
         setFeedback(`Indicizzate ${indexed}/${total} fonti (${chunks} blocchi totali).`);

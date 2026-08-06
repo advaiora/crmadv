@@ -1,12 +1,23 @@
 import * as Icons from "tabler-icons-react";
 
 export const SidebarMenu = [
+  // ⚠️ Questo gruppo NON si disegna nella sidebar (deciso il 5/8/2026): il suo
+  // ingresso e' l'icona nella barra superiore (TopNav), perche' e' l'unica area
+  // che sta FUORI da ogni workspace e si usa di rado — non merita il primo posto
+  // del menu. La voce pero' resta qui, e non va cancellata: la ricerca rapida
+  // (Ctrl+K) costruisce le sue destinazioni leggendo QUESTO array, quindi
+  // toglierla la farebbe sparire anche da li', cioe' dall'unica via testuale per
+  // raggiungere l'area. L'esclusione dal disegno sta in Sidebar.jsx.
+  // Il nome e' lungo apposta: nella sidebar non si legge (la voce non si disegna),
+  // ma rende l'area trovabile cercando "workspace", "consumi" o "AI" e non solo
+  // "piattaforma". ⚠️ Non allungarlo oltre: la ricerca rapida questo nome lo MOSTRA
+  // come testo della riga, quindi e' una riga visibile, non una semplice chiave.
   {
     group: "Piattaforma",
     contents: [
       {
         id: "platform_console",
-        name: "Console piattaforma",
+        name: "Piattaforma — workspace e consumi AI",
         icon: <Icons.World />,
         path: "/settings/platform-console",
         requirePlatformAdmin: true,
@@ -26,14 +37,14 @@ export const SidebarMenu = [
       },
       {
         id: "main_agency",
-        name: "Agency",
+        name: "Produzione AI",
         icon: <Icons.Briefcase />,
         path: "/agency/projects",
         requiredModule: "projects",
         requiredPermission: "projects.view",
         childrens: [
           {
-            name: "Progetti Agency",
+            name: "Progetti",
             path: "/agency/projects",
             requiredPermission: "projects.view",
             grp_name: "apps",
@@ -57,7 +68,7 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
-            name: "Impostazioni Agency",
+            name: "Impostazioni AI",
             path: "/agency/settings",
             requiredPermission: "modules.manage",
             grp_name: "apps",
@@ -191,20 +202,20 @@ export const SidebarMenu = [
     contents: [
       {
         id: "ops_projects",
-        name: "Progetti",
+        name: "Pipeline",
         icon: <Icons.LayoutKanban />,
         path: "/projects",
         requiredModule: "projects",
         requiredPermission: "projects.view",
         childrens: [
           {
-            name: "Board",
+            name: "Bacheca",
             path: "/projects",
             grp_name: "apps",
           },
 
           {
-            name: "Impostazioni Pipeline",
+            name: "Impostazioni",
             path: "/projects/settings/pipeline",
             requiredPermission: "projects.edit",
             grp_name: "apps",

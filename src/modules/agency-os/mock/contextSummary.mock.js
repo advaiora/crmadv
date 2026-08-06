@@ -13,7 +13,7 @@ export const getMockContextSummary = ({
   opportunities,
 }) => {
   const baseText = CONTEXT_SUMMARY_BY_PROJECT_TYPE[projectType?.key]
-    || "Progetto Agency AI OS in configurazione standard.";
+    || "Progetto in configurazione standard.";
   const purchasedCount = Array.isArray(scopePurchased)
     ? scopePurchased.filter((entry) => entry.purchased).length
     : 0;

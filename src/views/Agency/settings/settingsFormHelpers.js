@@ -1,4 +1,4 @@
-// Funzioni pure della pagina Impostazioni Agency: il mappatore che porta le
+// Funzioni pure della pagina Impostazioni AI: il mappatore che porta le
 // impostazioni del server nella bozza del form, e il messaggio informativo che
 // riassume quali provider sono configurati.
 // Estratte da AgencySettingsPage.jsx nel giro di spezzatura del 5/8/2026.

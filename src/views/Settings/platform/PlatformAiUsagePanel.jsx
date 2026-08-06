@@ -26,7 +26,7 @@ const getErrorMessage = (error, fallback) => error?.message || fallback;
 // Panoramica cross-workspace dei consumi AI della Console piattaforma: totali
 // complessivi, aggregato per workspace e configurazione AI di ogni workspace.
 // Il DETTAGLIO (per utente, per funzione, ultime chiamate) vive nel rendiconto
-// per-workspace dentro Impostazioni Agency.
+// per-workspace dentro Impostazioni AI.
 const PlatformAiUsagePanel = () => {
   const [aiUsage, setAiUsage] = useState(null);
   const [aiConfig, setAiConfig] = useState([]);

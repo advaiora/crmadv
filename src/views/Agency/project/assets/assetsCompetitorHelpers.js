@@ -45,16 +45,16 @@ export const mergeCompetitorsFromUrls = (competitors, urls) => {
 export const getFriendlyCompetitorSearchMessage = (result) => {
   const rawMessage = String(result?.message || "").trim();
   if (result?.providerStatus === "configured_error") {
-    return rawMessage || "Ricerca online configurata, ma il servizio non ha risposto correttamente. Verifica chiave, modello e limiti API in Impostazioni Agency.";
+    return rawMessage || "Ricerca online configurata, ma il servizio non ha risposto correttamente. Verifica chiave, modello e limiti API in Impostazioni AI.";
   }
   if (result?.providerStatus === "configured_timeout") {
-    return rawMessage || "La ricerca online ha richiesto troppo tempo. Riprova tra poco o scegli un modello piu veloce in Impostazioni Agency.";
+    return rawMessage || "La ricerca online ha richiesto troppo tempo. Riprova tra poco o scegli un modello piu veloce in Impostazioni AI.";
   }
   if (result?.providerStatus === "configured" && !result?.realSearch) {
     return rawMessage || "Ricerca competitor configurata lato server.";
   }
   if (!result?.realSearch) {
-    return "Ricerca automatica non configurata. Puoi inserire competitor manualmente oppure configurare la ricerca online in Impostazioni Agency.";
+    return "Ricerca automatica non configurata. Puoi inserire competitor manualmente oppure configurare la ricerca online in Impostazioni AI.";
   }
   return rawMessage || "Ricerca competitor completata.";
 };

@@ -108,12 +108,11 @@ const AgencyProjectsListPage = () => {
 
   return (
     <AgencyPageShell
-      title="Progetti AI"
-      subtitle="Lista operativa dei progetti Agency AI OS."
+      title="Progetti"
+      subtitle="I progetti su cui stai lavorando con l'AI."
       breadcrumbs={[
-        { label: "Dashboard", to: "/dashboard" },
-        { label: "Agency", to: "/agency/projects" },
-        { label: "Progetti AI" },
+        { label: "Produzione AI", to: "/agency/projects" },
+        { label: "Progetti" },
       ]}
       dataMeta={dataMeta}
     >

@@ -83,7 +83,7 @@ describe('AgencySettingsPage', () => {
   it('mostra titolo, card principale e i quattro cataloghi', () => {
     render(<AgencySettingsPage />);
 
-    expect(screen.getByRole('heading', { name: 'Impostazioni Agency', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Impostazioni AI', level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'AI e Ricerca Competitor' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Project types disponibili' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Scope acquistabile' })).toBeInTheDocument();

@@ -2,7 +2,7 @@ import { useAgencySettingsData } from "./useAgencySettingsData";
 import { useAgencySettingsSave } from "./useAgencySettingsSave";
 import { useAgencySettingsClearKeys } from "./useAgencySettingsClearKeys";
 
-// Hook radice della pagina Impostazioni Agency: mette insieme i dati con i loro
+// Hook radice della pagina Impostazioni AI: mette insieme i dati con i loro
 // derivati, il salvataggio e la cancellazione delle chiavi.
 //
 // Le due azioni ricevono i setter dei dati per parametro: `saveState` e' uno

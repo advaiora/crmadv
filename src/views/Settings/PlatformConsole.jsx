@@ -12,7 +12,8 @@ const TABS = {
   ai: 'ai',
 };
 
-// Guscio della Console piattaforma: intestazione + navigazione a due sotto-pagine
+// Guscio dell'area Piattaforma (era "Console piattaforma" fino al 5/8/2026):
+// intestazione + navigazione a due sotto-pagine
 // (Gestione workspace & accessi / Consumi & costi AI). Ogni pannello carica i
 // propri dati in autonomia, così la console resta leggera e non troppo densa.
 const PlatformConsole = () => {
@@ -45,7 +46,7 @@ const PlatformConsole = () => {
       <div className="mb-4">
         <h3 className="mb-1 d-flex align-items-center gap-2">
           <ShieldCheck size={22} />
-          Console piattaforma
+          Piattaforma
         </h3>
         <p className="text-muted mb-0">
           Gestione globale dei workspace e monitoraggio dei consumi AI, al di sopra dei singoli workspace.

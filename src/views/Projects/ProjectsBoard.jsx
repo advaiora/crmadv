@@ -418,8 +418,8 @@ const ProjectsBoard = () => {
           {/* Page header */}
           <div className="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-2 mb-3">
             <div>
-              <h3 className="mb-1 fw-semibold fs-4">Progetti</h3>
-              <p className="text-muted mb-0 small">Board operativa per categoria</p>
+              <h3 className="mb-1 fw-semibold fs-4">Bacheca</h3>
+              <p className="text-muted mb-0 small">Vista operativa per categoria</p>
             </div>
           </div>
 
