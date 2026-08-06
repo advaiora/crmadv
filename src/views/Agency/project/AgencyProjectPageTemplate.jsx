@@ -5,20 +5,15 @@ import AgencyPageShell from "../AgencyPageShell";
 import AgencyDataSourceBadge from "../AgencyDataSourceBadge";
 import AgencySourceReadinessPanel from "./AgencySourceReadinessPanel";
 
-// Le schede "secondarie" che si vedono comunque, in ogni ambiente. Le altre
-// restano visibili solo in sviluppo — `import.meta.env.DEV` e' un interruttore di
-// compilazione, non un permesso: in produzione non le vede nessuno, nemmeno un
-// Super Admin.
-//
-// "memory" e' entrata qui il 6/8/2026 (roadmap, decisione ②): delle quattro schede
-// nascoste e' l'unica che dava qualcosa di suo — cosa sa l'AI del progetto e cosa
-// ha gia' prodotto — e in un'area dove l'AI scrive al posto tuo, poterlo guardare
-// e' una questione di fiducia.
-//
-// L'elenco sta in un posto solo apposta: prima le stesse due chiavi erano scritte
-// a mano in tre punti diversi di questo file, e promuovere una scheda voleva dire
-// ricordarsi di toccarli tutti e tre.
-const ALWAYS_VISIBLE_SECONDARY = ["opportunities", "alerts", "memory"];
+// I tre gruppi che formano la catena del lavoro. Il quarto (le priorita') sta
+// staccato sotto e non fa parte della catena: vedi il commento sulle schede.
+const SECTION_GROUPS = [
+  { key: "conoscenza", title: "Conoscenza" },
+  { key: "produzione", title: "Produzione" },
+  { key: "risultati", title: "Risultati" },
+];
+
+const PRIORITY_GROUP = { key: "priorita", title: "Priorita" };
 
 const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: projectOverride, children }) => {
   const { projectId } = useParams();
@@ -34,25 +29,41 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
   const projectOverviewPath = normalizedProjectId === "-"
     ? "/agency/projects"
     : `${projectRootPath}/overview`;
+  // Le schede sono raggruppate per quello che ci fai dentro, non per importanza
+  // tecnica (roadmap, decisione ③). I primi tre gruppi sono una catena e si
+  // leggono da sinistra a destra nell'ordine vero del lavoro — prepari, produci,
+  // misuri e consegni. Il quarto sta staccato perche' non e' una fase da
+  // attraversare: e' quello che il sistema ti segnala mentre lavori.
+  //
+  // Niente scheda "Chat" (tolta il 15/7/2026, spec 4-ter §3): la chat del progetto
+  // vive nel popup, che si espande a tutto schermo ed e' raggiungibile da ogni
+  // pagina — non solo da dentro il progetto. Partecipanti, azzeramento e
+  // scioglimento del gruppo sono stati spostati li' prima di togliere la scheda.
+  //
+  // Tolte il 6/8/2026 "Diagnosis", "Reports tecnici" e "Brain": le prime due sono
+  // confluite dentro "Da risolvere" e "Report", la terza non aggiungeva nulla alla
+  // Panoramica. Le loro rotte esistono ancora come rimandi (RouteList.jsx).
   const workspaceSections = [
-    { key: "overview", label: "Overview", path: projectOverviewPath, group: "primary" },
-    { key: "assets", label: "Fonti", path: `${projectRootPath}/assets`, group: "primary" },
-    { key: "discovery", label: "Discovery", path: `${projectRootPath}/discovery`, group: "primary" },
-    // Niente scheda "Chat" (tolta il 15/7/2026, spec 4-ter §3): la chat del progetto
-    // vive nel popup, che si espande a tutto schermo ed e' raggiungibile da ogni
-    // pagina — non solo da dentro il progetto. Partecipanti, azzeramento e
-    // scioglimento del gruppo sono stati spostati li' prima di togliere la scheda.
-    { key: "web", label: "Web", path: `${projectRootPath}/web`, group: "primary" },
-    { key: "ads", label: "Ads", path: `${projectRootPath}/ads`, group: "primary" },
-    { key: "performance", label: "Performance", path: `${projectRootPath}/performance`, group: "primary" },
-    { key: "reports-client", label: "Report", path: `${projectRootPath}/reports/client`, group: "primary" },
-    { key: "tasks", label: "Task", path: `${projectRootPath}/tasks`, group: "primary" },
-    { key: "opportunities", label: "Opportunita", path: `${projectRootPath}/opportunities`, group: "secondary" },
-    { key: "alerts", label: "Alert", path: `${projectRootPath}/alerts`, group: "secondary" },
-    // Tolte il 6/8/2026 "Diagnosis", "Reports tecnici" e "Brain": le prime due sono
-    // confluite dentro "Alert" e "Report", la terza non aggiungeva nulla alla
-    // Panoramica. Le loro rotte esistono ancora come rimandi (RouteList.jsx).
-    { key: "memory", label: "Memory", path: `${projectRootPath}/memory`, group: "secondary" },
+    { key: "overview", label: "Panoramica", path: projectOverviewPath, group: "overview" },
+
+    { key: "assets", label: "Fonti", path: `${projectRootPath}/assets`, group: "conoscenza" },
+    // `chainedToPrevious` disegna una freccetta fra Fonti e Brief: e' l'unico
+    // legame reale della barra (senza fonti pronte il brief si blocca, e c'e' gia'
+    // un semaforo che lo dice). Incatenare anche gli altri comunicherebbe un
+    // obbligo che non esiste — Contenuti Web e Campagne ADS sono paralleli.
+    { key: "discovery", label: "Brief", path: `${projectRootPath}/discovery`, group: "conoscenza", chainedToPrevious: true },
+    { key: "memory", label: "Memoria", path: `${projectRootPath}/memory`, group: "conoscenza" },
+
+    { key: "web", label: "Contenuti Web", path: `${projectRootPath}/web`, group: "produzione" },
+    { key: "ads", label: "Campagne ADS", path: `${projectRootPath}/ads`, group: "produzione" },
+
+    // Report sta con Performance, non con la produzione: si nutre di quei numeri.
+    { key: "performance", label: "Performance", path: `${projectRootPath}/performance`, group: "risultati" },
+    { key: "reports-client", label: "Report", path: `${projectRootPath}/reports/client`, group: "risultati" },
+
+    { key: "alerts", label: "Da risolvere", path: `${projectRootPath}/alerts`, group: "priorita" },
+    { key: "tasks", label: "Task", path: `${projectRootPath}/tasks`, group: "priorita" },
+    { key: "opportunities", label: "Opportunita", path: `${projectRootPath}/opportunities`, group: "priorita" },
   ];
 
   React.useEffect(() => {
@@ -120,20 +131,20 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
     : sourceStatus === "partial"
       ? "text-bg-warning"
       : "text-bg-danger";
-  const visibleWorkspaceSections = workspaceSections.filter((entry) => {
-    if (entry.group !== "secondary") {
-      return true;
-    }
-    if (ALWAYS_VISIBLE_SECONDARY.includes(entry.key)) {
-      return true;
-    }
-    return import.meta.env.DEV;
-  });
-  const activeSection = visibleWorkspaceSections.find((entry) => {
+  // ⚠️ La scheda accesa si decide guardando SOLO il percorso, mai la coda
+  // dell'indirizzo: e' cio' che permette a "Report" di ospitare due viste
+  // (`?vista=tecnica`) restando accesa. C'e' un test che lo impedisce di rompere.
+  // Prima questa stessa condizione era scritta due volte, qui e nel disegno del
+  // link: bastava correggerne una per far divergere le due.
+  const isSectionActive = (entry) => {
     const isOverviewAliasActive = entry.key === "overview"
       && (location.pathname === projectOverviewPath || location.pathname === projectRootPath);
     return location.pathname === entry.path || isOverviewAliasActive;
-  });
+  };
+  const activeSection = workspaceSections.find(isSectionActive);
+  // La Panoramica sta sopra tutte e larga: e' il punto di ingresso del progetto,
+  // non una scheda in fila con le altre.
+  const overviewSection = workspaceSections.find((entry) => entry.group === "overview");
   const primaryAction = sourceStatus !== "ready"
     ? { label: "Completa fonti", path: `${projectRootPath}/assets` }
     : activeSection?.key === "discovery"
@@ -150,20 +161,41 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
       : sourceStatus === "partial"
         ? "Confidence: media"
         : "Confidence: bassa";
+  // Le schede non attive sono neutre tenui, non bottoni con il contorno grigio:
+  // un outline spento su undici pulsanti disegnerebbe undici scatole che
+  // competono con i dati (design-linguaggio-apple-web.md §6.1 e §7.1). Un solo
+  // accento per vista: ce l'ha la scheda accesa.
   const renderNavigationLink = (entry) => {
-    const isOverviewAliasActive = entry.key === "overview"
-      && (location.pathname === projectOverviewPath || location.pathname === projectRootPath);
-    const isActive = location.pathname === entry.path || isOverviewAliasActive;
+    const isActive = isSectionActive(entry);
     return (
       <Link
         key={entry.key}
         to={entry.path}
-        className={`btn btn-sm ${isActive ? "btn-primary" : "btn-outline-secondary"}`}
+        className={`agency-project-tab${isActive ? " is-active" : ""}`}
+        aria-current={isActive ? "page" : undefined}
       >
         {entry.label}
       </Link>
     );
   };
+
+  const renderGroup = (group) => (
+    <div key={group.key} className="agency-project-tabs-group">
+      <div className="agency-project-tabs-heading">{group.title}</div>
+      <div className="agency-project-tabs-row">
+        {workspaceSections
+          .filter((entry) => entry.group === group.key)
+          .map((entry) => (entry.chainedToPrevious
+            ? (
+              <React.Fragment key={entry.key}>
+                <span className="agency-project-tabs-arrow" aria-hidden="true">→</span>
+                {renderNavigationLink(entry)}
+              </React.Fragment>
+            )
+            : renderNavigationLink(entry)))}
+      </div>
+    </div>
+  );
 
   return (
     <AgencyPageShell
@@ -200,18 +232,31 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
         </div>
       </div>
 
-      <div className="mb-3">
-        <div className="d-flex flex-wrap gap-2 mb-2">
-          {workspaceSections.filter((entry) => entry.group === "primary").map(renderNavigationLink)}
-          {visibleWorkspaceSections
-            .filter((entry) => entry.group === "secondary" && ALWAYS_VISIBLE_SECONDARY.includes(entry.key))
-            .map(renderNavigationLink)}
+      {/* Qui stava una fila piatta di undici pulsanti, piu' un pieghevole
+          "Diagnosi e strumenti tecnici" che nascondeva le schede di sviluppo.
+          Riscritta il 6/8/2026 (roadmap, decisione ③): la fila non diceva ne'
+          l'ordine ne' la natura delle cose. */}
+      <nav className="agency-project-tabs mb-3" aria-label="Sezioni del progetto">
+        {overviewSection && (
+          <Link
+            to={overviewSection.path}
+            className={`agency-project-tab agency-project-tab-wide${isSectionActive(overviewSection) ? " is-active" : ""}`}
+            aria-current={isSectionActive(overviewSection) ? "page" : undefined}
+          >
+            {overviewSection.label}
+          </Link>
+        )}
+
+        <div className="agency-project-tabs-chain">
+          {SECTION_GROUPS.map(renderGroup)}
         </div>
-        {/* Qui stava il pieghevole "Diagnosi e strumenti tecnici". E' sparito il
-            6/8/2026 insieme alle tre schede che conteneva: senza di loro non
-            aveva piu' niente da mostrare, e un blocco che non si disegna mai e'
-            solo codice che il prossimo non osa toccare. */}
-      </div>
+
+        {/* Staccato dai tre di sopra con lo spazio, non con una linea: non e' una
+            fase della catena, e' quello che il sistema ti segnala mentre lavori. */}
+        <div className="agency-project-tabs-signals">
+          {renderGroup(PRIORITY_GROUP)}
+        </div>
+      </nav>
 
       {project?.sourceReadiness && location.pathname !== `${projectRootPath}/assets` && (
         <AgencySourceReadinessPanel readiness={project.sourceReadiness} compact />

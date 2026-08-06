@@ -32,8 +32,8 @@ const AgencyAlertsPage = () => {
 
   return (
     <AgencyPageShell
-      title="Alert"
-      subtitle="Priorita operative da risolvere nei progetti Agency."
+      title="Da risolvere"
+      subtitle="Cosa sistemare nei progetti prima di generare contenuti o consegnare al cliente."
       dataMeta={dataMeta}
       breadcrumbs={[
         { label: "Produzione AI", to: "/agency/projects" },

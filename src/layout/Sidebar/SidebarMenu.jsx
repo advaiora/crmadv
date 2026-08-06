@@ -50,7 +50,10 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
-            name: "Alert",
+            // Stesso nome della scheda dentro il progetto: sono la stessa cosa a
+            // due ampiezze diverse (tutti i progetti / uno solo), quindi si
+            // rinominano insieme (roadmap, decisione ①).
+            name: "Da risolvere",
             path: "/agency/alerts",
             requiredPermission: "dashboard.view",
             grp_name: "apps",

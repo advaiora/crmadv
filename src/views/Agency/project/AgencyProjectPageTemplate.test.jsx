@@ -42,9 +42,9 @@ const renderSuPercorso = (indirizzo) => render(
   </MemoryRouter>,
 );
 
-// La scheda accesa e' un Link con la classe `btn-primary`; le altre hanno
-// `btn-outline-secondary`.
-const schedaAccesa = (etichetta) => screen.getByText(etichetta).className.includes('btn-primary');
+// La scheda accesa si riconosce da `aria-current="page"` — che e' anche cio' che
+// sente chi usa un lettore di schermo, non solo una classe CSS.
+const schedaAccesa = (etichetta) => screen.getByText(etichetta).getAttribute('aria-current') === 'page';
 
 describe('scheda attiva nella barra del progetto', () => {
   it('accende "Report" sul suo percorso', () => {
@@ -76,7 +76,45 @@ describe('scheda attiva nella barra del progetto', () => {
   });
 });
 
-describe('scheda Memory promossa', () => {
+describe('barra a quattro gruppi', () => {
+  it('mostra le quattro intestazioni', () => {
+    renderSuPercorso(PERCORSO_REPORT);
+
+    ['Conoscenza', 'Produzione', 'Risultati', 'Priorita'].forEach((titolo) => {
+      expect(screen.getByText(titolo)).toBeInTheDocument();
+    });
+  });
+
+  it('mette la Panoramica sopra le altre, larga', () => {
+    renderSuPercorso(PERCORSO_REPORT);
+
+    expect(screen.getByText('Panoramica').className).toContain('agency-project-tab-wide');
+  });
+
+  it('usa i nomi decisi, non piu\' quelli in gergo', () => {
+    renderSuPercorso(PERCORSO_REPORT);
+
+    ['Fonti', 'Brief', 'Memoria', 'Contenuti Web', 'Campagne ADS', 'Performance', 'Report', 'Da risolvere', 'Task', 'Opportunita']
+      .forEach((etichetta) => expect(screen.getByText(etichetta)).toBeInTheDocument());
+  });
+
+  it('le vecchie etichette non compaiono piu\' da nessuna parte', () => {
+    renderSuPercorso(PERCORSO_REPORT);
+
+    ['Overview', 'Discovery', 'Memory', 'Ads', 'Alert', 'Diagnosis', 'Reports tecnici', 'Brain']
+      .forEach((etichetta) => expect(screen.queryByText(etichetta)).not.toBeInTheDocument());
+  });
+
+  it('accende una sola scheda per volta', () => {
+    // Un solo accento per vista: se se ne accendessero due, l'utente non saprebbe
+    // dove si trova.
+    renderSuPercorso(PERCORSO_REPORT);
+
+    expect(document.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+  });
+});
+
+describe('scheda Memoria promossa', () => {
   it('sta nella barra principale, non nel pieghevole tecnico', () => {
     // Promossa il 6/8/2026: era visibile solo in sviluppo, cioe' in produzione non
     // la vedeva nessuno. Il test guarda DOVE sta, non solo che esista: dentro il
@@ -84,7 +122,7 @@ describe('scheda Memory promossa', () => {
     // nascosta, e la promozione non avrebbe ottenuto niente.
     renderSuPercorso(PERCORSO_REPORT);
 
-    const memoria = screen.getByText('Memory');
+    const memoria = screen.getByText('Memoria');
     expect(memoria).toBeInTheDocument();
     expect(memoria.closest('details')).toBeNull();
   });
@@ -92,7 +130,7 @@ describe('scheda Memory promossa', () => {
   it('si accende quando ci si trova sul suo percorso', () => {
     renderSuPercorso('/agency/projects/p1/memory');
 
-    expect(schedaAccesa('Memory')).toBe(true);
+    expect(schedaAccesa('Memoria')).toBe(true);
   });
 });
 
