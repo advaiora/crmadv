@@ -10,6 +10,7 @@ import {
   getAgencyProjectWorkingContext,
 } from "../../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSource";
+import { visibleActiveModules } from "../../../modules/agency-os/brain/moduleVisibility";
 import { sortAgencyOpportunities } from "../../../modules/agency-os/opportunities/opportunityPresentation";
 import AgencyOpportunityList from "../opportunities/AgencyOpportunityList";
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
@@ -115,9 +116,7 @@ const AgencyProjectOverviewPage = () => {
   );
 
   const topAlerts = Array.isArray(brain?.suggestedAlerts) ? brain.suggestedAlerts.slice(0, 3) : [];
-  const activeModules = Array.isArray(project?.activeModules)
-    ? project.activeModules.filter((entry) => entry.active)
-    : [];
+  const activeModules = visibleActiveModules(project?.activeModules);
   const purchasedScope = Object.entries(project?.scopePurchased || {})
     .filter(([, purchased]) => Boolean(purchased))
     .map(([key]) => SCOPE_LABEL_MAP[key] || key);

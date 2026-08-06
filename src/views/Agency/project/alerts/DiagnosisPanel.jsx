@@ -4,6 +4,7 @@ import {
   formatReportLabel,
   getReportBadgeClass,
 } from "../../../../modules/agency-os/reports/reportPresentation";
+import { visibleActiveModules } from "../../../../modules/agency-os/brain/moduleVisibility";
 import { formatDateTime, readableValue } from "../agencyProjectUx";
 import { IssueList, ModuleSignalList } from "./DiagnosisLists";
 
@@ -91,7 +92,7 @@ const DiagnosisPanel = ({ diagnosis, loading, busy, message, error, onReload, on
                 Scope: {(input?.scopePurchased || []).filter((entry) => entry.purchased).map((entry) => entry.label).join(" | ") || "Nessuno"}
               </div>
               <div className="small text-muted">
-                Moduli attivi: {(input?.activeModules || []).filter((entry) => entry.active).length}
+                Moduli attivi: {visibleActiveModules(input?.activeModules).length}
               </div>
               <div className="small text-muted">Report: {formatReportLabel(input?.report?.reportStatus)}</div>
             </Card.Body>

@@ -1,4 +1,5 @@
 import React from "react";
+import { visibleActiveModules } from "../../../../modules/agency-os/brain/moduleVisibility";
 import { readableValue } from "../agencyProjectUx";
 
 // Pannello "Qualita input" della pagina Ads: i requisiti minimi prima del
@@ -17,7 +18,7 @@ const AdsInputQualityPanel = ({ input, linkedLanding }) => (
     <div className="small mb-2"><strong>Target:</strong> {readableValue(input.discovery.sections.target)}</div>
     <div className="small mb-2"><strong>Offerta:</strong> {readableValue(input.discovery.sections.offer)}</div>
     <div className="small mb-2">
-      <strong>Moduli attivi:</strong> {readableValue(input.activeModules.filter((item) => item.active).map((item) => item.label))}
+      <strong>Moduli attivi:</strong> {readableValue(visibleActiveModules(input.activeModules).map((item) => item.label))}
     </div>
     <div className="small"><strong>Landing/Web:</strong> {linkedLanding}</div>
   </div>

@@ -5,6 +5,7 @@ import {
   formatReportLabel,
   getReportBadgeClass,
 } from "../../../../modules/agency-os/reports/reportPresentation";
+import { visibleModules } from "../../../../modules/agency-os/brain/moduleVisibility";
 import AgencyOpportunityList from "../../opportunities/AgencyOpportunityList";
 import AgencyProjectPageTemplate from "../AgencyProjectPageTemplate";
 import { formatDateTime, readableValue } from "../agencyProjectUx";
@@ -115,12 +116,12 @@ const TechnicalReportView = ({ projectId }) => {
 
   const output = report?.output;
   const input = report?.input;
-  const activeModulesCount = Array.isArray(output?.moduleStatus)
-    ? output.moduleStatus.filter((entry) => entry.active).length
-    : 0;
-  const coveredModulesCount = Array.isArray(output?.moduleStatus)
-    ? output.moduleStatus.filter((entry) => entry.active || entry.included || entry.suggested).length
-    : 0;
+  // I conteggi guardano gli stessi moduli che si disegnano sotto: contarne uno
+  // che non compare farebbe sembrare un difetto quello che e' solo un filtro.
+  const shownModules = visibleModules(output?.moduleStatus);
+  const activeModulesCount = shownModules.filter((entry) => entry.active).length;
+  const coveredModulesCount = shownModules
+    .filter((entry) => entry.active || entry.included || entry.suggested).length;
 
   return (
     <AgencyProjectPageTemplate title="Report" subtitle={SUBTITLE} dataMeta={technicalReport.dataMeta}>
@@ -206,12 +207,12 @@ const TechnicalReportView = ({ projectId }) => {
             <Card.Body className="d-flex flex-column gap-2">
               <div className="fw-semibold">Stato moduli</div>
               <div className="d-flex flex-wrap gap-2">
-                {(output?.moduleStatus || []).map((entry) => (
+                {shownModules.map((entry) => (
                   <span key={entry.key} className={`badge ${getReportBadgeClass("reportStatus", entry.status === "active" ? "ready" : entry.status === "included" ? "partial" : "draft")}`}>
                     {entry.label}: {formatReportLabel(entry.status)}
                   </span>
                 ))}
-                {(!output?.moduleStatus || output.moduleStatus.length === 0) && (
+                {shownModules.length === 0 && (
                   <span className="small text-muted">Nessun modulo disponibile.</span>
                 )}
               </div>

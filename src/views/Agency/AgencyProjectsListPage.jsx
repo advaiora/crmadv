@@ -3,6 +3,7 @@ import { Alert, Badge, Button, Spinner, Table } from "react-bootstrap";
 import { Link, useHistory } from "react-router-dom";
 import { getAgencyProjects } from "../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../modules/agency-os/data/agencyDataSource";
+import { visibleActiveModules } from "../../modules/agency-os/brain/moduleVisibility";
 import AgencyPageShell from "./AgencyPageShell";
 import AgencyDataSourceBadge from "./AgencyDataSourceBadge";
 import { rowActivationProps } from "../../utils/rowActivation";
@@ -173,9 +174,7 @@ const AgencyProjectsListPage = () => {
             </thead>
             <tbody>
               {projects.map((project) => {
-                const activeModules = Array.isArray(project.activeModules)
-                  ? project.activeModules.filter((entry) => entry.active)
-                  : [];
+                const activeModules = visibleActiveModules(project.activeModules);
 
                 return (
                   <tr
