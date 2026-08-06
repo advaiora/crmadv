@@ -672,3 +672,20 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - **Regola pratica generale:** i file si modificano **a dev server spenti**. Salvare mezza rinomina con Vite acceso produce un hot-update fallito che sporca la scheda per il resto della sessione — oltre a rallentare i test (nota #46).
 
 **Una prova utile che invece si prende proprio dalla rete:** per un giro di spezzatura, l'elenco delle richieste mostra che **tutti** i file nuovi sono stati chiesti e serviti (qui 11 su 11, a 200), e questo prova che la catena degli import risolve davvero — cosa che il `200` sul singolo file NON prova (nota #43). Guardarla dopo un giro di estrazione costa una chiamata e chiude un rischio intero.
+
+---
+
+## 48. Non modificare i file mentre la suite gira: il rosso e' una corsa, non un difetto
+
+**Contesto:** suite di test lanciata in background (che qui dura minuti) mentre si continua a lavorare sugli stessi file.
+
+**Errore:** il 6/8/2026 e' successo due volte nella stessa sessione. Vitest legge i file **quando arriva a eseguirli**, non quando parte: se nel frattempo un file e' a meta' modifica, il test fallisce su uno stato che non e' mai esistito davvero. La prima volta ha riportato *"8 test falliti"* su `AgencyProjectPageTemplate.jsx` mentre stavo riscrivendo la barra delle schede — il file in quel momento usava una variabile non ancora definita. Sembra un difetto vero e invita a indagare il codice, che invece era (o stava per essere) corretto.
+
+**Come si riconosce, in un colpo:** confronta l'**ora di inizio** del giro (`Start at` nell'uscita di vitest) con quando hai toccato i file. Se il giro e' partito **prima** dell'ultima modifica, il risultato non vale. Secondo indizio: fallisce **solo** il file su cui stavi lavorando, e tutti gli altri passano.
+
+**Modo corretto:**
+- Lanciare la suite **quando il pezzo e' finito**, non "intanto che continuo". L'attesa e' reale (5-6 minuti sull'area Agency) ma rilanciare a vuoto costa uguale.
+- Se serve davvero lavorare in parallelo, lavorare su **file che il giro non tocca** (documenti, roadmap, note) — mai sul codice sotto test.
+- Non correggere niente in base a un giro sporcato: **rilanciare** e leggere quello nuovo.
+
+**Da non confondere** con la nota #46 (worker mai partito a macchina carica): li' il messaggio parla di *"Failed to start threads worker"* / timeout e non c'entra il contenuto dei file; qui invece l'errore e' un vero errore di esecuzione del componente, solo su uno stato transitorio.
