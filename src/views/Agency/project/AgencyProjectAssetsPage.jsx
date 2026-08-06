@@ -30,7 +30,7 @@ const AgencyProjectAssetsPage = () => {
     return (
       <AgencyProjectPageTemplate
         title="Fonti"
-        subtitle="URL, brief e materiali usati dai moduli Agency."
+        subtitle="URL, brief e materiali usati dai moduli AI del progetto."
         dataMeta={assets.dataMeta}
       >
         <p className="mb-0 text-muted small">Caricamento fonti progetto...</p>
@@ -43,7 +43,7 @@ const AgencyProjectAssetsPage = () => {
   return (
     <AgencyProjectPageTemplate
       title="Fonti"
-      subtitle="URL, note, file e competitor usati come base dai moduli Agency."
+      subtitle="URL, note, file e competitor usati come base dai moduli AI del progetto."
       dataMeta={assets.dataMeta}
     >
       <AssetsActionsBar

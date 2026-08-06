@@ -127,7 +127,7 @@ describe('useAgencyProjectWeb — salvataggio', () => {
     });
 
     expect(saveAgencyProjectWeb).toHaveBeenCalledWith('p1', { output: expect.objectContaining({ pageType: 'landing' }) });
-    expect(result.current.saveMessage).toBe('Output Web salvato nel layer Agency.');
+    expect(result.current.saveMessage).toBe('Output Web salvato sul server.');
     expect(result.current.saving).toBe(false);
   });
 
@@ -139,7 +139,7 @@ describe('useAgencyProjectWeb — salvataggio', () => {
       await result.current.handleSave();
     });
 
-    expect(result.current.saveMessage).toMatch(/salvato localmente/);
+    expect(result.current.saveMessage).toMatch(/salvato solo su questo dispositivo/);
   });
 });
 

@@ -77,7 +77,7 @@ const AgencyProjectMemoryPage = () => {
       setContext(nextContext);
       setDataMeta(readAgencyDataMeta(nextContext));
     } catch (_error) {
-      setError("Memoria progetto non disponibile. Riprova o verifica lo stato del backend Agency.");
+      setError("Memoria progetto non disponibile. Riprova o verifica lo stato del server.");
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ const AgencyProjectMemoryPage = () => {
   return (
     <AgencyProjectPageTemplate
       title="Memoria"
-      subtitle="Contesto unico usato dai moduli Agency e storico sintetico delle generazioni."
+      subtitle="Contesto unico usato dai moduli AI del progetto e storico sintetico delle generazioni."
       dataMeta={dataMeta}
     >
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">

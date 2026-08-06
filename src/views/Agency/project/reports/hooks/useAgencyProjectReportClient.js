@@ -54,8 +54,8 @@ export const useAgencyProjectReportClient = (projectId) => {
       setReport(saved);
       setDataMeta(readAgencyDataMeta(saved));
       setSaveMessage(saved.persisted
-        ? "Report cliente salvato nel layer Agency."
-        : "Report cliente salvato localmente: il backend Agency non ha confermato la persistenza.");
+        ? "Report cliente salvato sul server."
+        : "Report cliente salvato solo su questo dispositivo: il server non ha confermato il salvataggio.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Salvataggio report cliente non riuscito.");
     } finally {
@@ -85,7 +85,7 @@ export const useAgencyProjectReportClient = (projectId) => {
       setDataMeta(readAgencyDataMeta(regenerated));
       setRuntimeMessage(regenerated.persisted
         ? "Report cliente rigenerato e persistito."
-        : "Report cliente rigenerato localmente: il backend Agency non ha confermato la persistenza.");
+        : "Report cliente rigenerato solo su questo dispositivo: il server non ha confermato il salvataggio.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Rigenerazione report cliente non riuscita.");
     } finally {

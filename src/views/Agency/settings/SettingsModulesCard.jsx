@@ -6,7 +6,7 @@ import { MODULES } from "./settingsPageConstants";
 const SettingsModulesCard = () => (
   <Card className="card-border h-100">
     <Card.Body>
-      <h6 className="mb-3">Moduli Agency attivi</h6>
+      <h6 className="mb-3">Moduli attivi</h6>
       <div className="d-flex flex-wrap gap-2 mb-3">
         {MODULES.map((entry) => (
           <Badge key={entry} bg="light" text="dark" className="border">

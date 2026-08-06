@@ -799,7 +799,7 @@ const buildFallbackTaskList = (projectId) => {
       id: `fallback-task-${normalizedProjectId}-1`,
       projectId: normalizedProjectId,
       title: "Allineare roadmap operativa e milestone progetto",
-      description: "Task fallback in assenza di persistenza Agency.",
+      description: "Task di ripiego: il server non ha restituito i task del progetto.",
       teamRole: "marketing_strategy_pm",
       priority: "high",
       status: "todo",

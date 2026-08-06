@@ -88,7 +88,7 @@ const AgencyProjectsListPage = () => {
         if (!cancelled) {
           setProjects([]);
           setDataMeta(null);
-          setError(nextError?.message || "Impossibile caricare i progetti Agency.");
+          setError(nextError?.message || "Impossibile caricare i progetti.");
         }
       })
       .finally(() => {
@@ -140,7 +140,7 @@ const AgencyProjectsListPage = () => {
       {loading && (
         <div className="d-flex align-items-center gap-2 text-muted small">
           <Spinner animation="border" size="sm" />
-          Caricamento progetti Agency...
+          Caricamento progetti...
         </div>
       )}
 

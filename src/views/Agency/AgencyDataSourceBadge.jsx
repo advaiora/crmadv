@@ -18,7 +18,7 @@ const AgencyDataSourceBadge = ({ meta }) => {
   return (
     <span
       className="badge text-bg-light border ms-2"
-      title={reason || "Agency data source"}
+      title={reason || "Origine dei dati"}
     >
       Source: {sourceLabel}
     </span>

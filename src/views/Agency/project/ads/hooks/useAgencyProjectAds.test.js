@@ -155,7 +155,7 @@ describe('useAgencyProjectAds — salvataggio', () => {
     });
 
     expect(saveAgencyProjectAds).toHaveBeenCalledWith('p1', { output: expect.objectContaining({ channelScope: 'both' }) });
-    expect(result.current.saveMessage).toBe('Output Ads salvato nel layer Agency.');
+    expect(result.current.saveMessage).toBe('Output Ads salvato sul server.');
   });
 
   it('un salvataggio rimasto locale si vede anche nella completezza', async () => {
@@ -166,7 +166,7 @@ describe('useAgencyProjectAds — salvataggio', () => {
       await result.current.handleSave();
     });
 
-    expect(result.current.saveMessage).toMatch(/salvato localmente/);
+    expect(result.current.saveMessage).toMatch(/salvato solo su questo dispositivo/);
     expect(result.current.completeness.label).toBe('bozza locale');
   });
 });

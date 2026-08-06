@@ -55,8 +55,8 @@ export const useAgencyProjectReportTechnical = (projectId) => {
       setReport(saved);
       setDataMeta(readAgencyDataMeta(saved));
       setSaveMessage(saved.persisted
-        ? "Snapshot report salvata nel layer Agency."
-        : "Snapshot report salvata localmente per indisponibilita temporanea del layer Agency.");
+        ? "Snapshot report salvata sul server."
+        : "Snapshot report salvata solo su questo dispositivo: il server non e raggiungibile in questo momento.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Salvataggio report non riuscito.");
     } finally {
@@ -68,7 +68,7 @@ export const useAgencyProjectReportTechnical = (projectId) => {
     // Si chiede conferma solo se uno snapshot c'e' gia': rigenerare sovrascrive.
     if (report?.output?.generatedAt) {
       const shouldProceed = window.confirm(
-        "Rigenerare lo snapshot report usando i dati correnti dei moduli Agency?",
+        "Rigenerare lo snapshot report usando i dati correnti dei moduli del progetto?",
       );
       if (!shouldProceed) {
         return;
@@ -86,7 +86,7 @@ export const useAgencyProjectReportTechnical = (projectId) => {
       setDataMeta(readAgencyDataMeta(regenerated));
       setRuntimeMessage(regenerated.persisted
         ? "Snapshot report rigenerata dai dati correnti e persistita."
-        : "Snapshot report rigenerata localmente per indisponibilita temporanea del layer Agency.");
+        : "Snapshot report rigenerata solo su questo dispositivo: il server non e raggiungibile in questo momento.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Rigenerazione report non riuscita.");
     } finally {

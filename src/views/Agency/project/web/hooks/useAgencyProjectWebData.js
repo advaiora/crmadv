@@ -77,8 +77,8 @@ export const useAgencyProjectWebData = (projectId) => {
       setWebState(saved);
       setDataMeta(readAgencyDataMeta(saved));
       setSaveMessage(saved.persisted
-        ? "Output Web salvato nel layer Agency."
-        : "Output Web salvato localmente per indisponibilita temporanea del layer Agency.");
+        ? "Output Web salvato sul server."
+        : "Output Web salvato solo su questo dispositivo: il server non e raggiungibile in questo momento.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Salvataggio modulo Web non riuscito.");
     } finally {

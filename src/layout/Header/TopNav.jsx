@@ -119,6 +119,7 @@ const resolveMobilePageTitle = (pathname) => {
     }
 
     if (pathname.startsWith('/dashboard')) return 'Dashboard';
+    if (pathname.startsWith('/agency')) return 'Produzione AI';
     if (pathname.startsWith('/apps/clients')) return 'Clienti';
     if (pathname.startsWith('/projects')) return 'Progetti';
     if (pathname.startsWith('/apps/quotes')) return 'Preventivi';
@@ -131,7 +132,7 @@ const resolveMobilePageTitle = (pathname) => {
     if (pathname.startsWith('/pages/profile')) return 'Profilo';
     if (pathname.startsWith('/settings')) return 'Impostazioni';
 
-    return 'Agency OS';
+    return 'CRM';
 };
 
 const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {

@@ -88,7 +88,7 @@ describe('AgencySettingsPage', () => {
     expect(screen.getByRole('heading', { name: 'Project types disponibili' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Scope acquistabile' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ruoli team' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Moduli Agency attivi' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Moduli attivi' })).toBeInTheDocument();
   });
 
   // I due pannelli dei consumi sono per chi puo' gestire: montarli sempre

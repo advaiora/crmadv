@@ -88,8 +88,8 @@ export const useAgencyProjectAdsData = (projectId) => {
       setAdsState(saved);
       setDataMeta(readAgencyDataMeta(saved));
       setSaveMessage(saved.persisted
-        ? "Output Ads salvato nel layer Agency."
-        : "Output Ads salvato localmente per indisponibilita temporanea del layer Agency.");
+        ? "Output Ads salvato sul server."
+        : "Output Ads salvato solo su questo dispositivo: il server non e raggiungibile in questo momento.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Salvataggio modulo Ads non riuscito.");
     } finally {
