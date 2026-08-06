@@ -16,6 +16,24 @@ export const readableValue = (value, fallback = EMPTY_FIELD_LABEL) => {
 
 export const hasReadableValue = (value) => readableValue(value, "") !== "";
 
+// Data e ora leggibili in italiano, con ripiego sul valore grezzo se non e' una data.
+// ⚠️ Questa e' la copia BUONA: la stessa funzione esiste duplicata in nove file
+// dell'area (censita in roadmap → Debito tecnico → "formatDateTime copiata identica
+// in nove file"). Il codice nuovo usa questa; le nove vanno accorpate qui quando si
+// aprira' quella voce — verificando prima che siano davvero identiche e non varianti.
+export const formatDateTime = (value) => {
+  if (!value) {
+    return EMPTY_FIELD_LABEL;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString("it-IT");
+};
+
 // L'AI non e' disponibile quando il server lo dichiara esplicitamente. Con
 // `aiStatus` ancora `null` (stato non ancora arrivato, o chiamata fallita)
 // NON si blocca niente: si prova, e semmai fallisce la chiamata vera.
