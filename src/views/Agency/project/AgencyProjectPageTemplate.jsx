@@ -5,6 +5,21 @@ import AgencyPageShell from "../AgencyPageShell";
 import AgencyDataSourceBadge from "../AgencyDataSourceBadge";
 import AgencySourceReadinessPanel from "./AgencySourceReadinessPanel";
 
+// Le schede "secondarie" che si vedono comunque, in ogni ambiente. Le altre
+// restano visibili solo in sviluppo — `import.meta.env.DEV` e' un interruttore di
+// compilazione, non un permesso: in produzione non le vede nessuno, nemmeno un
+// Super Admin.
+//
+// "memory" e' entrata qui il 6/8/2026 (roadmap, decisione ②): delle quattro schede
+// nascoste e' l'unica che dava qualcosa di suo — cosa sa l'AI del progetto e cosa
+// ha gia' prodotto — e in un'area dove l'AI scrive al posto tuo, poterlo guardare
+// e' una questione di fiducia.
+//
+// L'elenco sta in un posto solo apposta: prima le stesse due chiavi erano scritte
+// a mano in tre punti diversi di questo file, e promuovere una scheda voleva dire
+// ricordarsi di toccarli tutti e tre.
+const ALWAYS_VISIBLE_SECONDARY = ["opportunities", "alerts", "memory"];
+
 const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: projectOverride, children }) => {
   const { projectId } = useParams();
   const location = useLocation();
@@ -109,7 +124,7 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
     if (entry.group !== "secondary") {
       return true;
     }
-    if (entry.key === "opportunities" || entry.key === "alerts") {
+    if (ALWAYS_VISIBLE_SECONDARY.includes(entry.key)) {
       return true;
     }
     return import.meta.env.DEV;
@@ -189,15 +204,15 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
         <div className="d-flex flex-wrap gap-2 mb-2">
           {workspaceSections.filter((entry) => entry.group === "primary").map(renderNavigationLink)}
           {visibleWorkspaceSections
-            .filter((entry) => entry.group === "secondary" && (entry.key === "opportunities" || entry.key === "alerts"))
+            .filter((entry) => entry.group === "secondary" && ALWAYS_VISIBLE_SECONDARY.includes(entry.key))
             .map(renderNavigationLink)}
         </div>
-        {visibleWorkspaceSections.some((entry) => entry.group === "secondary" && entry.key !== "opportunities" && entry.key !== "alerts") && (
+        {visibleWorkspaceSections.some((entry) => entry.group === "secondary" && !ALWAYS_VISIBLE_SECONDARY.includes(entry.key)) && (
           <details className="small">
             <summary className="text-muted" style={{ cursor: "pointer" }}>Diagnosi e strumenti tecnici</summary>
             <div className="d-flex flex-wrap gap-2 mt-2">
               {visibleWorkspaceSections
-                .filter((entry) => entry.group === "secondary" && entry.key !== "opportunities" && entry.key !== "alerts")
+                .filter((entry) => entry.group === "secondary" && !ALWAYS_VISIBLE_SECONDARY.includes(entry.key))
                 .map(renderNavigationLink)}
             </div>
           </details>

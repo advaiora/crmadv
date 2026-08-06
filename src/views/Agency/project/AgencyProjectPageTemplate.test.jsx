@@ -76,6 +76,26 @@ describe('scheda attiva nella barra del progetto', () => {
   });
 });
 
+describe('scheda Memory promossa', () => {
+  it('sta nella barra principale, non nel pieghevole tecnico', () => {
+    // Promossa il 6/8/2026: era visibile solo in sviluppo, cioe' in produzione non
+    // la vedeva nessuno. Il test guarda DOVE sta, non solo che esista: dentro il
+    // pieghevole "Diagnosi e strumenti tecnici" sarebbe raggiungibile ma di fatto
+    // nascosta, e la promozione non avrebbe ottenuto niente.
+    renderSuPercorso(PERCORSO_REPORT);
+
+    const memoria = screen.getByText('Memory');
+    expect(memoria).toBeInTheDocument();
+    expect(memoria.closest('details')).toBeNull();
+  });
+
+  it('si accende quando ci si trova sul suo percorso', () => {
+    renderSuPercorso('/agency/projects/p1/memory');
+
+    expect(schedaAccesa('Memory')).toBe(true);
+  });
+});
+
 describe('pannello sulla qualita delle fonti', () => {
   it('lo disegna il template, una volta sola', async () => {
     // E' il motivo per cui la vista tecnica del Report ha smesso di disegnarselo:
