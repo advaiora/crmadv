@@ -21,9 +21,11 @@ export const hasReadableValue = (value) => readableValue(value, "") !== "";
 // dell'area (censita in roadmap → Debito tecnico → "formatDateTime copiata identica
 // in nove file"). Il codice nuovo usa questa; le nove vanno accorpate qui quando si
 // aprira' quella voce — verificando prima che siano davvero identiche e non varianti.
-export const formatDateTime = (value) => {
+// Il `fallback` esiste perche' non tutte le copie dicevano "Da completare": il report
+// cliente diceva "Non disponibile", ed e' un testo che l'utente legge (6/8/2026).
+export const formatDateTime = (value, fallback = EMPTY_FIELD_LABEL) => {
   if (!value) {
-    return EMPTY_FIELD_LABEL;
+    return fallback;
   }
 
   const parsed = new Date(value);
