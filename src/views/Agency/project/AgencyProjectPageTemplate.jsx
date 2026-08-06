@@ -49,9 +49,9 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
     { key: "tasks", label: "Task", path: `${projectRootPath}/tasks`, group: "primary" },
     { key: "opportunities", label: "Opportunita", path: `${projectRootPath}/opportunities`, group: "secondary" },
     { key: "alerts", label: "Alert", path: `${projectRootPath}/alerts`, group: "secondary" },
-    { key: "diagnosis", label: "Diagnosis", path: `${projectRootPath}/diagnosis`, group: "secondary" },
-    { key: "reports", label: "Reports tecnici", path: `${projectRootPath}/reports`, group: "secondary" },
-    { key: "brain", label: "Brain", path: `${projectRootPath}/brain`, group: "secondary" },
+    // Tolte il 6/8/2026 "Diagnosis", "Reports tecnici" e "Brain": le prime due sono
+    // confluite dentro "Alert" e "Report", la terza non aggiungeva nulla alla
+    // Panoramica. Le loro rotte esistono ancora come rimandi (RouteList.jsx).
     { key: "memory", label: "Memory", path: `${projectRootPath}/memory`, group: "secondary" },
   ];
 
@@ -207,16 +207,10 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
             .filter((entry) => entry.group === "secondary" && ALWAYS_VISIBLE_SECONDARY.includes(entry.key))
             .map(renderNavigationLink)}
         </div>
-        {visibleWorkspaceSections.some((entry) => entry.group === "secondary" && !ALWAYS_VISIBLE_SECONDARY.includes(entry.key)) && (
-          <details className="small">
-            <summary className="text-muted" style={{ cursor: "pointer" }}>Diagnosi e strumenti tecnici</summary>
-            <div className="d-flex flex-wrap gap-2 mt-2">
-              {visibleWorkspaceSections
-                .filter((entry) => entry.group === "secondary" && !ALWAYS_VISIBLE_SECONDARY.includes(entry.key))
-                .map(renderNavigationLink)}
-            </div>
-          </details>
-        )}
+        {/* Qui stava il pieghevole "Diagnosi e strumenti tecnici". E' sparito il
+            6/8/2026 insieme alle tre schede che conteneva: senza di loro non
+            aveva piu' niente da mostrare, e un blocco che non si disegna mai e'
+            solo codice che il prossimo non osa toccare. */}
       </div>
 
       {project?.sourceReadiness && location.pathname !== `${projectRootPath}/assets` && (

@@ -9,15 +9,12 @@ import AgencySettingsPage from "../views/Agency/AgencySettingsPage";
 import AgencyProjectAdsPage from "../views/Agency/project/AgencyProjectAdsPage";
 import AgencyProjectAlertsPage from "../views/Agency/project/AgencyProjectAlertsPage";
 import AgencyProjectAssetsPage from "../views/Agency/project/AgencyProjectAssetsPage";
-import AgencyProjectBrainPage from "../views/Agency/project/AgencyProjectBrainPage";
 import AgencyProjectClientReportPage from "../views/Agency/project/AgencyProjectClientReportPage";
 import AgencyProjectDiscoveryPage from "../views/Agency/project/AgencyProjectDiscoveryPage";
-import AgencyProjectDiagnosisPage from "../views/Agency/project/AgencyProjectDiagnosisPage";
 import AgencyProjectMemoryPage from "../views/Agency/project/AgencyProjectMemoryPage";
 import AgencyProjectOpportunitiesPage from "../views/Agency/project/AgencyProjectOpportunitiesPage";
 import AgencyProjectOverviewPage from "../views/Agency/project/AgencyProjectOverviewPage";
 import AgencyProjectPerformancePage from "../views/Agency/project/AgencyProjectPerformancePage";
-import AgencyProjectReportsPage from "../views/Agency/project/AgencyProjectReportsPage";
 import AgencyProjectTasksPage from "../views/Agency/project/AgencyProjectTasksPage";
 import AgencyProjectWebPage from "../views/Agency/project/AgencyProjectWebPage";
 import Calendar from "../views/Calendar";
@@ -66,10 +63,27 @@ import LockScreen from "../views/Authentication/LockScreen";
 import ResetPassword from "../views/Authentication/ResetPassword";
 import Error404 from "../views/Authentication/Error404/Error404";
 import Error503 from "../views/Authentication/Error503/Error503";
+import { AGENCY_REMOVED_ROUTES, sostituisciCoda } from "./agencyRemovedRoutes";
 
 const AgencyProjectOverviewRedirect = ({ match }) => (
     <Redirect to={`${match.url}/overview`} />
 );
+
+// Le tre schede tolte il 6/8/2026 (Diagnosis, Brain, Reports tecnici): al posto
+// delle pagine restano dei rimandi, cosi' chi ha un segnalibro vecchio atterra dove
+// il contenuto e' finito invece di trovare una pagina che non c'e'.
+// Le destinazioni e il perche' stanno in agencyRemovedRoutes.js.
+const rimandoPerCodaRimossa = (coda, destinazione) => {
+    const Rimando = ({ match }) => (
+        <Redirect to={sostituisciCoda(match.url, coda, destinazione)} />
+    );
+    return Rimando;
+};
+
+const [diagnosisRimossa, brainRimossa, reportsRimossa] = AGENCY_REMOVED_ROUTES;
+const AgencyProjectDiagnosisRedirect = rimandoPerCodaRimossa(diagnosisRimossa.coda, diagnosisRimossa.destinazione);
+const AgencyProjectBrainRedirect = rimandoPerCodaRimossa(brainRimossa.coda, brainRimossa.destinazione);
+const AgencyProjectReportsRedirect = rimandoPerCodaRimossa(reportsRimossa.coda, reportsRimossa.destinazione);
 
 export const routes = [
 
@@ -102,12 +116,12 @@ export const routes = [
     { path: 'agency/projects/:projectId', exact: true, component: AgencyProjectOverviewRedirect },
     { path: 'agency/projects/:projectId/overview', exact: true, component: AgencyProjectOverviewPage },
     { path: 'agency/projects/:projectId/discovery', exact: true, component: AgencyProjectDiscoveryPage },
-    { path: 'agency/projects/:projectId/diagnosis', exact: true, component: AgencyProjectDiagnosisPage },
-    { path: 'agency/projects/:projectId/brain', exact: true, component: AgencyProjectBrainPage },
+    { path: 'agency/projects/:projectId/diagnosis', exact: true, component: AgencyProjectDiagnosisRedirect },
+    { path: 'agency/projects/:projectId/brain', exact: true, component: AgencyProjectBrainRedirect },
     { path: 'agency/projects/:projectId/web', exact: true, component: AgencyProjectWebPage },
     { path: 'agency/projects/:projectId/ads', exact: true, component: AgencyProjectAdsPage },
     { path: 'agency/projects/:projectId/alerts', exact: true, component: AgencyProjectAlertsPage },
-    { path: 'agency/projects/:projectId/reports', exact: true, component: AgencyProjectReportsPage },
+    { path: 'agency/projects/:projectId/reports', exact: true, component: AgencyProjectReportsRedirect },
     { path: 'agency/projects/:projectId/reports/client', exact: true, component: AgencyProjectClientReportPage },
     { path: 'agency/projects/:projectId/performance', exact: true, component: AgencyProjectPerformancePage },
     { path: 'agency/projects/:projectId/opportunities', exact: true, component: AgencyProjectOpportunitiesPage },
