@@ -226,7 +226,7 @@ const buildRuleBasedActiveModules = (projectType, scopePurchased) => {
   return [
     {
       key: "discovery",
-      label: "Discovery",
+      label: "Brief",
       included: true,
       suggested: false,
       active: true,
@@ -240,21 +240,21 @@ const buildRuleBasedActiveModules = (projectType, scopePurchased) => {
     },
     {
       key: "web",
-      label: "Web",
+      label: "Contenuti Web",
       included: webIncluded,
       suggested: isWebsiteProject && !webIncluded,
       active: webIncluded || isWebsiteProject,
     },
     {
       key: "ads",
-      label: "Ads",
+      label: "Campagne ADS",
       included: adsIncluded,
       suggested: isAdsProject && !adsIncluded,
       active: adsIncluded || isAdsProject,
     },
     {
       key: "reports",
-      label: "Reports",
+      label: "Report",
       included: reportingPurchased,
       suggested: !reportingPurchased,
       active: reportingPurchased,
@@ -268,21 +268,21 @@ const buildRuleBasedActiveModules = (projectType, scopePurchased) => {
     },
     {
       key: "memory",
-      label: "Memory",
+      label: "Memoria",
       included: true,
       suggested: false,
       active: true,
     },
     {
       key: "assets",
-      label: "Assets",
+      label: "Fonti",
       included: assetsIncluded,
       suggested: (isWebsiteProject || isAdsProject) && !assetsIncluded,
       active: assetsIncluded || isWebsiteProject || isAdsProject,
     },
     {
       key: "tasks",
-      label: "Tasks",
+      label: "Task",
       included: true,
       suggested: false,
       active: true,
