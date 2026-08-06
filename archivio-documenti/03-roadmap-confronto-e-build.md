@@ -559,7 +559,40 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   - **"Laboratorio"** — stessa collisione di "AI Lab".
   - Qualsiasi nome con **"Clienti"** per l'area Piattaforma — sbatte contro l'area **Clienti** del CRM.
 
-  **🔸 Aperto, da chiudere:** due sottovoci contengono ancora la parola **"Agency"** — *"Progetti Agency"* e *"Impostazioni Agency"* — e la seconda si trascina dietro **una decina di messaggi visibili nell'interfaccia** che la citano (del tipo *"…configura la chiave in Impostazioni Agency"*, in `useAgencyProjectWebAiGeneration.js`, `assetsCompetitorHelpers.js`, `AssetsCompetitorsCard.jsx`, `ProjectAiSourcesPanel.jsx`, `agencyDataAdapter.js`, `AiChatWidget.jsx`) più un test che verifica il titolo di pagina (`AgencySettingsPage.test.jsx:86`). Finché non si decide, nel menu resta una parola che non esiste più altrove.
+  ✅ **Chiuso il 6/8/2026** *(era: due sottovoci contenevano ancora "Agency" — "Progetti Agency" e "Impostazioni Agency" — con una decina di messaggi che le citavano)*. Le sottovoci si chiamano **Progetti** e **Impostazioni AI**, e i messaggi che rimandavano a *"Impostazioni Agency"* sono stati riscritti: verificato, nel codice quella stringa non esiste più.
+
+  ---
+
+  ### ✅ La coda della fase A — chiusa il 6/8/2026 (quattro commit)
+
+  **Il problema che ha chiuso.** La fase A aveva rinominato le **etichette delle schede**, ma non i testi *dentro* le pagine. Risultato: l'interfaccia si contraddiceva da sola — la scheda diceva *Brief* e il pulsante sotto diceva *"Salva Discovery"*. Non erano nomi nuovi da scegliere: erano i nomi già decisi il 5/8, applicati a metà. Per questo è stato eseguito senza ripassare dal metodo "spiega prima, proponi poi" (che serve a **scegliere** un nome, non ad applicarne uno già scelto).
+
+  1. **`05e36f7` — "Discovery" sparisce dai testi.** Pulsante di salvataggio, schermata di caricamento, messaggio d'errore, voce della checklist in Panoramica, card *"Brief nel contesto"* in Memoria, colonna "Modulo" dello storico AI, e i messaggi che le generazioni AI mostrano a fine lavoro. Cambiata anche la frase di sintesi del contesto (*"Discovery aggiornata"* → *"Brief aggiornato"*) **nelle due copie che la producono**, frontend e backend.
+  2. **`c020a1e` — il titolo della pagina dice il nome della scheda.** Sei disallineamenti: *Contenuti Web*/"Web", *Campagne ADS*/"Ads", *Fonti*/"Fonti e Materiali", *Memoria*/"Memoria e log AI", *Report*/"Report AI", e la briciola di pane di *Da risolvere* rimasta "Alert". Tolto anche un *"Reporting v1"* sfuggito alla ripulitura del gergo.
+  3. **`929d064` — l'ultima "Agency" letta dall'utente.** Undici punti. ⚠️ **Uno non era nell'inventario e vale la pena saperlo:** sul **telefono** la barra in cima a *ogni* pagina dell'area diceva **"Agency OS"**, perché in `TopNav.jsx` non esisteva un caso per `/agency` e si cadeva sul valore di ripiego. Aggiunto il caso; il ripiego ora è un neutro "CRM". Nei messaggi di salvataggio è sparito anche il gergo *"layer"* e *"backend"*: dicono **"sul server"** e **"solo su questo dispositivo"**.
+  4. **`a960965` — le voci di "Moduli attivi".** Erano rimaste Discovery, Web, Ads, Reports, Memory, Assets, Tasks, Diagnosis; ora dicono i nomi delle schede. Cambiate le **due copie insieme** (backend `agency.service.ts` e frontend `agencyBrainRules.js`).
+
+  **⚠️ Due cose da sapere prima di rimetterci mano.**
+
+  - **Quelle etichette non sono solo testo a schermo:** l'elenco dei moduli attivi **finisce nel contesto passato all'AI** quando genera Contenuti Web e Campagne ADS. Se un domani si cambiano ancora, si cambiano **in entrambe le copie**, o le due sorgenti divergono in silenzio.
+  - **"Agency Brain" è rimasta apposta.** È l'unica voce che l'utente non vede (la vista la filtra, e c'è un test che presidia il filtro): rinominarla darebbe **zero** in interfaccia cambiando solo ciò che legge l'AI.
+
+  **Perché non è servito toccare i dati di test** *(domanda di Jacopo, verificata il 6/8)*. L'etichetta è salvata a database (colonna `moduleLabel` di `ProjectActiveModule`) **ma non è mai definitiva**: `syncProjectActiveModules` la ricalcola dalle regole e la **riscrive sopra** alla riga esistente (aggiornamento su `projectId + moduleKey`, quindi niente doppioni), e viene chiamata alla creazione del progetto e **all'apertura della Panoramica**. Verificato sull'API coi progetti demo: rispondono già coi nomi nuovi. *Unica sfumatura:* la colonna "Moduli attivi" dell'**elenco progetti** legge il dato salvato senza passare dalla Panoramica, quindi un progetto mai aperto mostrerebbe lì la parola vecchia fino alla prima apertura.
+
+  **🔸 Trovato strada facendo, da collocare:** le due copie della lista moduli non divergono solo nelle etichette — **il frontend non ha la voce `diagnosis`, il backend sì** (9 moduli contro 8). Non produce danno visibile oggi (comanda il backend), ma è la stessa lista in due versioni diverse: va riconciliata quando si tocca quell'area.
+
+  ---
+
+  ### 🔸 Fase A — quello che resta, raccolto il 6/8/2026
+
+  Inventario dell'area Produzione AI battuto per intero dall'esploratore (72 file, ~10.900 righe). Questi **richiedono una decisione di Jacopo**, quindi non sono stati toccati. Vale il metodo: si spiega l'area, si aspetta conferma, poi si propongono i nomi.
+
+  - **① Gli stati mostrati in inglese crudo — il più visibile di tutti.** In testa a **ogni** scheda di progetto c'è un badge che dice letteralmente `Stato: discovery` (minuscolo, il valore grezzo del database) — `AgencyProjectPageTemplate.jsx:248`, `AgencyProjectOverviewPage.jsx:305,308`. Nelle select per cambiare stato a una pagina o a una campagna si leggono `draft`, `in_progress`, `review`, `approved` (`WebSubProjectsCard.jsx:82-84`, `AdsCampaignsCard.jsx:95-97`). E in tutta l'area Report/Diagnosi/Opportunità ci sono due funzioni che **non traducono, capitalizzano soltanto** (`reportPresentation.js:15-25`, `opportunityPresentation.js:15-26`): escono *Draft, Ready, Partial, In Progress, On Hold, Critical, Commercial, Strategic*. Nello stesso prodotto gli stati degli Alert e delle Fonti sono invece tradotti bene (`alertsConstants.js`, `assetsPageConstants.js`) — quindi non è una scelta, è una dimenticanza. Serve decidere il vocabolario italiano degli stati.
+  - **② Il Report tecnico ha quattro card interamente in inglese:** *Project Snapshot*, *Top Alert*, *Top Opportunities*, *Top Tasks*, *Next Steps* (`TechnicalReportView.jsx:191,240,248,260,269`), in una pagina per il resto tutta italiana.
+  - **③ Le Impostazioni AI mostrano chiavi tecniche interne all'utente:** badge con scritto `sources/assets`, `client_report`, `landing_page` (`SettingsModulesCard.jsx`, `SettingsProjectTypesCard.jsx`, `SettingsTeamRolesCard.jsx`, `SettingsScopeSourcesCard.jsx`), un campo con dentro `{"discovery.generateBrief":"gpt-4o-mini"}` (`SettingsAiLimitsPanel.jsx:114`), e il filtro "Funzione" dei consumi che elenca `discovery.generateBrief`, `web.generateBlock` (`AgencyAiUsagePanel.jsx`). ⚠️ Qui la domanda **non è solo il nome: è se quella roba vada mostrata**. Stessa famiglia: l'avviso *"Applica la migration Agency runtime settings"* (`SettingsAiProviderCard.jsx:88`), che è l'ultima "Agency" rimasta a schermo — lasciata perché riscriverla farebbe perdere l'unica informazione utile che dà.
+  - **④ Le opzioni non tradotte nei menu a tendina:** obiettivi campagna *Sales/Traffic/Awareness* (`adsPageConstants.js:12-17`), filtro opportunità *Critical/Improvement/Commercial/Strategic* (`AgencyOpportunitiesPage.jsx:112-115`), tipo pagina *Service Page/Ecommerce Lite* (`webPageConstants.js:9-10`), e lo scope acquistato con dentro ancora `Diagnosis` (`agencyProjectsModel.js:51-58`, duplicato in `AgencyProjectOverviewPage.jsx:18-26`).
+  - **⑤ Parole isolate da tradurre o spiegare:** *Stage* (`AgencyOpportunityList.jsx:68`), *Working context* (`AgencyProjectMemoryPage.jsx:103`), *Context summary* (`AgencyProjectOverviewPage.jsx:348`), *Source* come colonna dell'elenco progetti, *append-only* in un messaggio di conferma (`AgencyProjectPerformancePage.jsx:232`), *Hook*, *Ad Groups*, *RSA Ideas* nelle campagne, e in Performance il termine **"carnè"** per i set di metriche salvati — desueto, non lo capisce nessuno.
+  - **⑥ Le due aree della lista originale, mai riproposte:** **`Vault`** e **`Web Assets`** (richiesta esplicita di Jacopo che non si perdessero).
 
   **Le candidate proposte dall'assistente il 5/8 — da ri-proporre a Jacopo quando avrà finito il suo giro "a naso"**, per quelle che non avrà toccato di suo (è una richiesta esplicita: non devono perdersi):
   - **`Agency`** — il caso n°1: non dice che è la base operativa AI su clienti/progetti.
@@ -568,6 +601,8 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   - **`Web Assets`** (area CRM) **vs la tab `Web`** del progetto: due "Web" diversi.
   - **`Progetti`** (Operatività, il kanban) **vs `Progetti Agency`**: due "Progetti" diversi.
   - **`Vault`** — inglese.
+
+  ✅ **Aggiornamento 6/8/2026:** di questa lista restano aperte **solo `Vault` e `Web Assets`** (riportate al punto ⑥ qui sopra). Tutte le altre sono state chiuse: `Agency`→Produzione AI, `Discovery`→Brief, `Memory`→Memoria, `Diagnosis` e `Brain` non esistono più come schede, `Progetti Agency`→Progetti.
 
   **L'inventario di ciò che si legge a schermo** (rilevato il 5/8 su mappa fresca, serve come base di lavoro):
   - *Menu laterale:* Console piattaforma · Dashboard · **Agency** (→ Progetti Agency, Alert, Opportunità, Report, Impostazioni Agency) · Clienti · Team · Preventivi · Web Assets · Vault · Progetti · Memo Operativi · Calendario · Messaggi · Ruoli e permessi · Reparti · Audit · Profilo — in `src/layout/Sidebar/SidebarMenu.jsx`.
