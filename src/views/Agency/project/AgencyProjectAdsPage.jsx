@@ -34,7 +34,7 @@ const AgencyProjectAdsPage = () => {
   if (ads.loading || !ads.adsState) {
     return (
       <AgencyProjectPageTemplate
-        title="Ads"
+        title="Campagne ADS"
         subtitle="Workspace campagne per Google, Meta e checklist operative."
         dataMeta={ads.dataMeta}
       >
@@ -47,7 +47,7 @@ const AgencyProjectAdsPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Ads"
+      title="Campagne ADS"
       subtitle="Crea campagne collegate a landing, brief, target e offerta."
       dataMeta={ads.dataMeta}
     >

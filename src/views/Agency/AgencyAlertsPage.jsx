@@ -37,7 +37,7 @@ const AgencyAlertsPage = () => {
       dataMeta={dataMeta}
       breadcrumbs={[
         { label: "Produzione AI", to: "/agency/projects" },
-        { label: "Alert" },
+        { label: "Da risolvere" },
       ]}
     >
       <div className="d-flex flex-column gap-2">

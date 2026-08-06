@@ -29,7 +29,7 @@ const AgencyProjectAssetsPage = () => {
   if (assets.loading || !assets.sources) {
     return (
       <AgencyProjectPageTemplate
-        title="Fonti e Materiali"
+        title="Fonti"
         subtitle="URL, brief e materiali usati dai moduli Agency."
         dataMeta={assets.dataMeta}
       >
@@ -42,7 +42,7 @@ const AgencyProjectAssetsPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Fonti e Materiali"
+      title="Fonti"
       subtitle="URL, note, file e competitor usati come base dai moduli Agency."
       dataMeta={assets.dataMeta}
     >

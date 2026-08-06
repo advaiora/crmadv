@@ -49,7 +49,7 @@ const AgencyProjectWebPage = () => {
   if (web.loading || !web.webState) {
     return (
       <AgencyProjectPageTemplate
-        title="Web"
+        title="Contenuti Web"
         subtitle="Workspace per creare landing e pagine collegate a fonti, Brief e obiettivi progetto."
         dataMeta={web.dataMeta}
       >
@@ -62,7 +62,7 @@ const AgencyProjectWebPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Web"
+      title="Contenuti Web"
       subtitle="Scegli una pagina, controlla la qualita input, genera una bozza e rivedi preview e copy."
       dataMeta={web.dataMeta}
     >

@@ -94,7 +94,7 @@ const AgencyProjectMemoryPage = () => {
 
   return (
     <AgencyProjectPageTemplate
-      title="Memoria e log AI"
+      title="Memoria"
       subtitle="Contesto unico usato dai moduli Agency e storico sintetico delle generazioni."
       dataMeta={dataMeta}
     >

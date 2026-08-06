@@ -87,12 +87,12 @@ const AgencyReportsPage = () => {
 
   return (
     <AgencyPageShell
-      title="Report AI"
-      subtitle="Vista globale Reporting v1 con snapshot per progetto, criticita sintetiche e filtri minimi."
+      title="Report"
+      subtitle="Lo stato dei report di tutti i progetti, con le criticita principali e i filtri per trovarli."
       dataMeta={dataMeta}
       breadcrumbs={[
         { label: "Produzione AI", to: "/agency/projects" },
-        { label: "Report AI" },
+        { label: "Report" },
       ]}
     >
       <div className="row g-2 mb-3">
