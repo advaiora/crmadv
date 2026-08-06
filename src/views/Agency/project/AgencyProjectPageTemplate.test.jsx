@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AgencyProjectPageTemplate from './AgencyProjectPageTemplate';
+import { getAgencyProjectWorkingContext } from '../../../modules/agency-os/data/agencyDataAdapter';
 
 // Questo test presidia la regola su cui poggia la fusione del 6/8/2026: la scheda
 // attiva si decide guardando SOLO il percorso, ignorando la coda dell'indirizzo.
@@ -111,6 +112,65 @@ describe('barra a quattro gruppi', () => {
     renderSuPercorso(PERCORSO_REPORT);
 
     expect(document.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+  });
+});
+
+describe('pallini sulle voci di Priorita', () => {
+  it('accende un pallino per ogni voce che ha qualcosa in sospeso', async () => {
+    // I tre elenchi arrivano dal contesto di lavoro, che la barra carica gia' per
+    // la testata: i pallini non costano nessuna chiamata in piu'.
+    getAgencyProjectWorkingContext.mockResolvedValueOnce({
+      alerts: [{ id: 'a1', severity: 'critical', status: 'open' }],
+      tasks: [{ id: 't1', priority: 'high', status: 'todo' }],
+      opportunities: [{ id: 'o1', status: 'open' }],
+    });
+
+    renderSuPercorso(PERCORSO_REPORT);
+
+    // Il testo per i lettori di schermo e' la prova che il pallino non comunica
+    // con il solo colore.
+    expect(await screen.findByText(/1 segnalazione da risolvere/)).toBeInTheDocument();
+    expect(screen.getByText(/1 task importante da chiudere/)).toBeInTheDocument();
+    expect(screen.getByText(/1 opportunita da valutare/)).toBeInTheDocument();
+  });
+
+  it('senza niente in sospeso i pallini restano, ma spenti', async () => {
+    // Il pallino spento non sparisce: se sparisse, l'assenza di segnale si
+    // confonderebbe con "questa voce non ha pallini", e la barra si sposterebbe
+    // ogni volta che un segnale si accende.
+    getAgencyProjectWorkingContext.mockResolvedValueOnce({
+      alerts: [{ id: 'a1', status: 'resolved' }],
+      tasks: [{ id: 't1', priority: 'low', status: 'todo' }],
+      opportunities: [],
+    });
+
+    renderSuPercorso(PERCORSO_REPORT);
+
+    await screen.findByText('Progetto Demo');
+    expect(document.querySelectorAll('.agency-project-tab-dot')).toHaveLength(3);
+    expect(document.querySelectorAll('.agency-project-tab-dot-off')).toHaveLength(3);
+    // Niente da annunciare a chi usa un lettore di schermo quando non c'e' nulla.
+    expect(screen.queryByText(/da risolvere$/)).not.toBeInTheDocument();
+  });
+
+  it('i pallini stanno solo sulle tre voci di Priorita', async () => {
+    renderSuPercorso(PERCORSO_REPORT);
+
+    await screen.findByText('Progetto Demo');
+    expect(document.querySelectorAll('.agency-project-tab-dot')).toHaveLength(3);
+  });
+
+  it('il testo sta sulla voce, non sul pallino (un bersaglio da 7px non si prende)', async () => {
+    getAgencyProjectWorkingContext.mockResolvedValueOnce({
+      alerts: [{ id: 'a1', severity: 'critical', status: 'open' }],
+      tasks: [],
+      opportunities: [],
+    });
+
+    renderSuPercorso(PERCORSO_REPORT);
+
+    const voce = await screen.findByText('Da risolvere');
+    expect(voce.closest('a')).toHaveAttribute('title', '1 segnalazione da risolvere');
   });
 });
 

@@ -99,17 +99,36 @@
   gap: var(--space-4);
 }
 
+/* Tre colonne UGUALI, non tre blocchi affiancati e centrati come insieme: i gruppi
+   hanno larghezze diverse (Conoscenza ha tre voci, gli altri due), quindi centrare
+   il blocco intero lasciava il gruppo di mezzo spostato rispetto al centro della
+   pagina — e la sua intestazione non tornava sotto "Panoramica". Con tre colonne
+   uguali il centro di quella di mezzo coincide con il centro della barra per
+   costruzione, qualunque cosa ci sia dentro. */
 .agency-project-tabs-chain {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4) var(--space-6);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-inline: auto;
+  max-width: 960px;
+  width: 100%;
 }
 
 .agency-project-tabs-group {
+  align-items: center;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  padding: 0 var(--space-5);
+}
+
+/* Separatori verticali sottili fra un gruppo e l'altro. Il documento di design
+   (§3.3) chiede di separare con lo spazio prima che con le linee: qui la linea
+   e' stata voluta da Jacopo il 6/8/2026 dopo aver visto la barra dal vivo, e con
+   le intestazioni centrate aiuta davvero a capire dove finisce un gruppo. Resta
+   una hairline a bassa opacita' (§6.1), non un bordo pieno. */
+.agency-project-tabs-chain .agency-project-tabs-group + .agency-project-tabs-group {
+  border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 /* Maiuscoletto tenue: deve guidare senza competere con i pulsanti
@@ -135,18 +154,30 @@
   opacity: 0.65;
 }
 
+/* Il quarto gruppo: a capo rispetto agli altri tre, e centrato come loro. */
 .agency-project-tabs-signals {
+  display: flex;
+  justify-content: center;
   margin-top: var(--space-2);
 }
 
+/* ⚠️ I `color` di questo blocco portano `!important` per una ragione precisa, non
+   per pigrizia: in globals.css c'e'
+     a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(.navbar-brand)
+   che vale 0,5,1 di specificita' e imporrebbe il colore dei LINK a queste schede.
+   Finche' la barra usava `class="btn btn-sm"` era esclusa da quel `:not(.btn)`;
+   togliendo l'aspetto bottone ci e' finita dentro, e il 6/8/2026 la scheda attiva
+   e' risultata blu su blu, quasi illeggibile. Battere 0,5,1 con la sola
+   specificita' richiederebbe selettori peggiori del problema. */
 .agency-project-tab {
   align-items: center;
   background: transparent;
   border-radius: var(--radius-sm);
-  color: var(--muted-foreground);
+  color: var(--muted-foreground) !important;
   display: inline-flex;
   font-size: var(--text-sm);
   font-weight: 500;
+  gap: 6px;
   min-height: 34px;
   padding: 0 12px;
   text-decoration: none;
@@ -157,14 +188,72 @@
 .agency-project-tab:hover,
 .agency-project-tab:focus-visible {
   background: var(--muted);
-  color: var(--foreground);
+  color: var(--foreground) !important;
 }
 
 /* Un solo accento per vista: ce l'ha la scheda accesa, e nessun altro. */
 .agency-project-tab.is-active {
   background: var(--primary);
-  color: var(--primary-foreground);
+  color: var(--primary-foreground) !important;
   font-weight: 600;
+}
+
+/* I pallini delle voci di "Priorita": rosso se c'e' qualcosa che non va, giallo
+   se c'e' qualcosa da chiudere, verde se e' emerso qualcosa di buono. Il colore
+   da solo non basta a comunicare (chi non li distingue non vedrebbe niente):
+   accanto a ogni pallino c'e' un testo per i lettori di schermo, e il conteggio
+   compare passando il mouse. */
+.agency-project-tab-dot {
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+  height: 7px;
+  width: 7px;
+}
+
+.agency-project-tab-dot-danger {
+  background: var(--danger);
+}
+
+.agency-project-tab-dot-warning {
+  background: var(--warning);
+}
+
+.agency-project-tab-dot-success {
+  background: var(--success);
+}
+
+/* Pallino spento: c'e' ma non dice niente. Deve leggersi come "controllato, non
+   c'e' nulla", non sparire — se sparisse, l'assenza si confonderebbe con "questa
+   voce non ha pallini" e la barra si sposterebbe a ogni accensione. */
+.agency-project-tab-dot-off {
+  background: color-mix(in srgb, var(--muted-foreground) 35%, transparent);
+}
+
+/* Sulla scheda accesa il pallino sta su fondo accento: un anello sottile lo
+   stacca invece di lasciarlo annegare. */
+.agency-project-tab.is-active .agency-project-tab-dot {
+  box-shadow: 0 0 0 1.5px var(--primary-foreground);
+}
+
+/* Le voci di "Priorita" hanno un'estetica loro: pastiglie con un fondo appena
+   accennato. Non sono sezioni da attraversare come le altre, sono segnali - e si
+   devono distinguere a colpo d'occhio anche quando nessun pallino e' acceso. */
+.agency-project-tabs-group-priorita .agency-project-tab {
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  min-height: 30px;
+  padding: 0 14px;
+}
+
+.agency-project-tabs-group-priorita .agency-project-tab:hover,
+.agency-project-tabs-group-priorita .agency-project-tab:focus-visible {
+  background: var(--muted);
+}
+
+.agency-project-tabs-group-priorita .agency-project-tab.is-active {
+  background: var(--primary);
 }
 
 .agency-project-tab-wide {
@@ -177,15 +266,26 @@
 
 .agency-project-tab-wide:not(.is-active) {
   background: var(--muted);
-  color: var(--foreground);
+  color: var(--foreground) !important;
 }
 
-/* Su schermo stretto i quattro gruppi si incolonnano invece di spezzarsi male:
-   undici pulsanti su una riga sola non ci stanno comunque. */
-@media (max-width: 575.98px) {
+/* Su schermo stretto i gruppi si incolonnano invece di spezzarsi male: undici
+   pulsanti su una riga sola non ci stanno comunque. Incolonnati, il separatore
+   verticale non separerebbe piu' niente — diventa orizzontale. */
+@media (max-width: 767.98px) {
   .agency-project-tabs-chain {
-    flex-direction: column;
     gap: var(--space-3);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agency-project-tabs-group {
+    padding: 0;
+  }
+
+  .agency-project-tabs-chain .agency-project-tabs-group + .agency-project-tabs-group {
+    border-left: 0;
+    border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    padding-top: var(--space-3);
   }
 }
 

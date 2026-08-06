@@ -4,6 +4,7 @@ import { getAgencyProject, getAgencyProjectWorkingContext } from "../../../modul
 import AgencyPageShell from "../AgencyPageShell";
 import AgencyDataSourceBadge from "../AgencyDataSourceBadge";
 import AgencySourceReadinessPanel from "./AgencySourceReadinessPanel";
+import { EMPTY_SIGNAL_LABEL, SIGNAL_TONE, buildSectionSignals, describeSignal } from "./projectSignals";
 
 // I tre gruppi che formano la catena del lavoro. Il quarto (le priorita') sta
 // staccato sotto e non fa parte della catena: vedi il commento sulle schede.
@@ -145,6 +146,9 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
   // La Panoramica sta sopra tutte e larga: e' il punto di ingresso del progetto,
   // non una scheda in fila con le altre.
   const overviewSection = workspaceSections.find((entry) => entry.group === "overview");
+  // I pallini sulle voci di "Priorita". Il contesto di lavoro lo carichiamo gia'
+  // per la testata: contiene le tre liste, quindi non costa nessuna chiamata in piu'.
+  const sectionSignals = React.useMemo(() => buildSectionSignals(workingContext), [workingContext]);
   const primaryAction = sourceStatus !== "ready"
     ? { label: "Completa fonti", path: `${projectRootPath}/assets` }
     : activeSection?.key === "discovery"
@@ -167,20 +171,45 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
   // accento per vista: ce l'ha la scheda accesa.
   const renderNavigationLink = (entry) => {
     const isActive = isSectionActive(entry);
+    // Il pallino esiste solo sulle tre voci di "Priorita", e c'e' SEMPRE: acceso
+    // se qualcosa aspetta, spento altrimenti. Cosi' l'assenza di segnale si legge
+    // come "non c'e' niente" invece che come "qui non e' previsto niente", e la
+    // barra non si sposta quando un segnale si accende.
+    const hasDot = Boolean(SIGNAL_TONE[entry.key]);
+    const signalCount = sectionSignals[entry.key] || 0;
+    const signalText = signalCount > 0
+      ? describeSignal(entry.key, signalCount)
+      : EMPTY_SIGNAL_LABEL[entry.key];
     return (
       <Link
         key={entry.key}
         to={entry.path}
         className={`agency-project-tab${isActive ? " is-active" : ""}`}
         aria-current={isActive ? "page" : undefined}
+        // Il testo sta sulla voce intera, non sul pallino: un bersaglio da 7px
+        // col mouse non lo si prende.
+        title={hasDot ? signalText : undefined}
       >
         {entry.label}
+        {hasDot && (
+          <>
+            <span
+              className={`agency-project-tab-dot ${signalCount > 0
+                ? `agency-project-tab-dot-${SIGNAL_TONE[entry.key]}`
+                : "agency-project-tab-dot-off"}`}
+              aria-hidden="true"
+            />
+            {/* Un pallino colorato comunica con il solo colore: chi non li
+                distingue, o usa un lettore di schermo, deve sentirlo detto. */}
+            {signalCount > 0 && <span className="visually-hidden">{`, ${signalText}`}</span>}
+          </>
+        )}
       </Link>
     );
   };
 
   const renderGroup = (group) => (
-    <div key={group.key} className="agency-project-tabs-group">
+    <div key={group.key} className={`agency-project-tabs-group agency-project-tabs-group-${group.key}`}>
       <div className="agency-project-tabs-heading">{group.title}</div>
       <div className="agency-project-tabs-row">
         {workspaceSections
