@@ -174,7 +174,7 @@ const AgencyReportsPage = () => {
             className="border rounded-3 p-3 row-clickable row-clickable-hover"
             aria-label={`Vai al report di ${entry.projectName}`}
             {...rowActivationProps(() =>
-              history.push(`/agency/projects/${encodeURIComponent(entry.projectId)}/reports`),
+              history.push(`/agency/projects/${encodeURIComponent(entry.projectId)}/reports/client`),
             )}
           >
             <div className="d-flex flex-column gap-2">
@@ -223,7 +223,7 @@ const AgencyReportsPage = () => {
               </div>
 
               <div>
-                <Link to={`/agency/projects/${encodeURIComponent(entry.projectId)}/reports`}>
+                <Link to={`/agency/projects/${encodeURIComponent(entry.projectId)}/reports/client?vista=tecnica`}>
                   Vai al report progetto
                 </Link>
                 {" | "}

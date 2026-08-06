@@ -428,15 +428,15 @@ const AgencyProjectOverviewPage = () => {
 
         <div className="col-12 col-xl-4">
           <OverviewCard
-            title="Diagnosis"
+            title="Da risolvere"
             action={(
-              <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/diagnosis`} size="sm" variant="outline-secondary">
+              <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/alerts`} size="sm" variant="outline-secondary">
                 Apri
               </Button>
             )}
           >
             <p className="mb-1 text-muted small">
-              {diagnosis?.output?.diagnosisSummary || "Diagnosis non ancora generata."}
+              {diagnosis?.output?.diagnosisSummary || "Analisi dei punti deboli non ancora generata."}
             </p>
             <div className="small text-muted">
               Priorita: {diagnosis?.output?.interventionPriority || "Non disponibile"} - Confidence: {diagnosis?.output?.confidenceLevel || "Non disponibile"}
@@ -446,9 +446,9 @@ const AgencyProjectOverviewPage = () => {
 
         <div className="col-12 col-xl-4">
           <OverviewCard
-            title="Reporting"
+            title="Report"
             action={(
-              <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/reports`} size="sm" variant="outline-secondary">
+              <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/reports/client?vista=tecnica`} size="sm" variant="outline-secondary">
                 Apri
               </Button>
             )}
