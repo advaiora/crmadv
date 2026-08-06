@@ -169,11 +169,11 @@ const getDiscoveryAlerts = (formState) => {
   }, 0);
 
   if (emptyCount >= 3) {
-    alerts.push("Almeno 3 sezioni discovery sono incomplete.");
+    alerts.push("Almeno 3 sezioni del brief sono incomplete.");
   }
 
   if (alerts.length === 0) {
-    alerts.push("Nessun alert bloccante in questa bozza discovery.");
+    alerts.push("Nessuna segnalazione bloccante in questa bozza di brief.");
   }
 
   return alerts;
@@ -234,7 +234,7 @@ const AgencyProjectDiscoveryPage = () => {
       })
       .catch(() => {
         if (!cancelled) {
-          setSaveError("Impossibile caricare Discovery dal backend. Puoi riprovare: i dati gia visibili restano nella schermata.");
+          setSaveError("Impossibile caricare il Brief dal server. Puoi riprovare: i dati gia visibili restano nella schermata.");
         }
       })
       .finally(() => {
@@ -357,11 +357,11 @@ const AgencyProjectDiscoveryPage = () => {
       setLastUpdatedAt(savedDiscovery.lastUpdatedAt || new Date().toISOString());
       setSaveMessage(
         savedDiscovery.persisted
-          ? "Discovery salvata su data layer Agency."
-          : "Discovery salvata localmente: il salvataggio backend non e disponibile.",
+          ? "Brief salvato sul server."
+          : "Brief salvato solo su questo dispositivo: il salvataggio sul server non e disponibile.",
       );
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Salvataggio Discovery non riuscito.");
+      setSaveError(error instanceof Error ? error.message : "Salvataggio del Brief non riuscito.");
     } finally {
       setIsSaving(false);
     }
@@ -374,7 +374,7 @@ const AgencyProjectDiscoveryPage = () => {
         subtitle="Il brief del progetto, ricostruito dalle fonti e rigenerabile."
         dataMeta={dataMeta}
       >
-        <p className="mb-0 text-muted small">Caricamento Discovery in corso...</p>
+        <p className="mb-0 text-muted small">Caricamento del Brief in corso...</p>
       </AgencyProjectPageTemplate>
     );
   }
@@ -414,7 +414,7 @@ const AgencyProjectDiscoveryPage = () => {
             onClick={handleSave}
             disabled={isSaving}
           >
-            {isSaving ? "Salvataggio..." : "Salva Discovery"}
+            {isSaving ? "Salvataggio..." : "Salva Brief"}
           </Button>
         </div>
       </div>

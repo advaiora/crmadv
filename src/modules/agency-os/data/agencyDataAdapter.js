@@ -575,7 +575,7 @@ const buildDiscoveryBrief = (sections, notes) => {
 
 const buildDiscoveryContextSummary = (sections) => {
   const completedSections = Object.values(sections).filter((value) => String(value || "").trim()).length;
-  return `Discovery aggiornata. Sezioni completate: ${completedSections}/8. Obiettivo: ${sections.projectGoal || "da definire"}.`;
+  return `Brief aggiornato. Sezioni completate: ${completedSections}/8. Obiettivo: ${sections.projectGoal || "da definire"}.`;
 };
 
 const normalizeDiscoverySections = (sections) => {

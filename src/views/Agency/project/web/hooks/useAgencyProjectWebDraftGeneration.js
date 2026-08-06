@@ -65,7 +65,7 @@ export const useAgencyProjectWebDraftGeneration = ({
     });
 
     setWebState((current) => applyGeneratedCopy(current, generatedCopy));
-    announce("Copy base generato dai dati disponibili. Completa Discovery e Fonti per renderlo piu specifico.");
+    announce("Copy base generato dai dati disponibili. Completa il Brief e le Fonti per renderlo piu specifico.");
   };
 
   const handleGenerateWireframe = () => {

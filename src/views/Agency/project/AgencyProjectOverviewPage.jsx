@@ -52,12 +52,12 @@ const buildNextAction = (projectId, sourceReadiness, brain) => {
       title: "Rigenera brief da fonti",
       description: "Trasforma le fonti progetto in un brief operativo aggiornato.",
       to: `/agency/projects/${encodedProjectId}/discovery`,
-      label: "Apri Discovery",
+      label: "Apri il Brief",
     };
   }
   return {
     title: "Crea un asset operativo",
-    description: "Passa a Web o Ads per creare landing, pagine o campagne collegate alle fonti.",
+    description: "Passa a Contenuti Web o Campagne ADS per creare landing, pagine o campagne collegate alle fonti.",
     to: `/agency/projects/${encodedProjectId}/web`,
     label: "Crea landing",
   };
@@ -265,17 +265,17 @@ const AgencyProjectOverviewPage = () => {
                 action={<Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/assets`} size="sm" variant="outline-secondary">Apri</Button>}
               />
               <ChecklistItem
-                label="Discovery"
+                label="Brief"
                 done={Boolean(brain?.contextSummary)}
                 action={<Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/discovery`} size="sm" variant="outline-secondary">Apri</Button>}
               />
               <ChecklistItem
-                label="Web"
+                label="Contenuti Web"
                 done={Boolean(report?.output?.webSummary?.status === "ready" || report?.input?.web?.available)}
                 action={<Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/web`} size="sm" variant="outline-secondary">Apri</Button>}
               />
               <ChecklistItem
-                label="Ads"
+                label="Campagne ADS"
                 done={Boolean(report?.output?.adsSummary?.status === "ready" || report?.input?.ads?.available)}
                 action={<Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/ads`} size="sm" variant="outline-secondary">Apri</Button>}
               />

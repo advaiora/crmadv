@@ -1684,10 +1684,10 @@ const buildDiscoveryContextSummary = (sections: DiscoverySections) => {
     .map(([key]) => DISCOVERY_SECTION_LABELS[key as keyof DiscoverySections]);
 
   if (missingSections.length === 0) {
-    return `Discovery aggiornata. Sezioni completate: ${completedSections.length}/8. Obiettivo: ${sections.projectGoal || 'da definire'}.`;
+    return `Brief aggiornato. Sezioni completate: ${completedSections.length}/8. Obiettivo: ${sections.projectGoal || 'da definire'}.`;
   }
 
-  return `Discovery aggiornata. Sezioni completate: ${completedSections.length}/8. Mancano: ${missingSections.join(', ')}. Obiettivo: ${sections.projectGoal || 'da definire'}.`;
+  return `Brief aggiornato. Sezioni completate: ${completedSections.length}/8. Mancano: ${missingSections.join(', ')}. Obiettivo: ${sections.projectGoal || 'da definire'}.`;
 };
 
 const sanitizeDiscoveryText = (value: string, fallback: string) => {

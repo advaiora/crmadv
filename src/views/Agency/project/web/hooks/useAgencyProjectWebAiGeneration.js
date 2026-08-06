@@ -48,7 +48,7 @@ export const useAgencyProjectWebAiGeneration = ({
       setWebState(generated);
       setDataMeta(readAgencyDataMeta(generated));
       setGenerationMessage(generated.aiGeneration?.generated
-        ? "Output Web generato con AI usando fonti e Discovery progetto."
+        ? "Output Web generato con AI usando fonti e Brief del progetto."
         : generated.aiGeneration?.message || "Generazione AI non eseguita.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Generazione Web AI non riuscita.");
@@ -83,7 +83,7 @@ export const useAgencyProjectWebAiGeneration = ({
       const wasCached = Boolean(generated.aiGeneration?.cacheHit);
       setGenerationMessage(wasCached
         ? "Blocco Web aggiornato riusando un risultato gia disponibile: nessuna nuova chiamata AI."
-        : "Blocco Web rigenerato con AI usando fonti, Discovery e contesto progetto.");
+        : "Blocco Web rigenerato con AI usando fonti, Brief e contesto progetto.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Rigenerazione del blocco Web non riuscita.");
     } finally {

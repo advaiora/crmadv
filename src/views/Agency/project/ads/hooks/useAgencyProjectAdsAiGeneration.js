@@ -38,7 +38,7 @@ export const useAgencyProjectAdsAiGeneration = ({
       const wasCached = Boolean(generated.aiGeneration?.cacheHit);
       setRuntimeMessage(wasCached
         ? "Asset Ads aggiornato riusando un risultato gia disponibile: nessuna nuova chiamata AI."
-        : "Asset Ads rigenerato con AI usando fonti, Discovery e output Web disponibili.");
+        : "Asset Ads rigenerato con AI usando fonti, Brief e output Web disponibili.");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Rigenerazione asset Ads non riuscita.");
     } finally {

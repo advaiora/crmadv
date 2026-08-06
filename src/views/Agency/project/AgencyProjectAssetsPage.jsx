@@ -18,7 +18,7 @@ import { ASSETS_WORKFLOW_STEPS } from "./assets/assetsPageConstants";
 // pagine sorelle qui i rami sono due, non tre: o le fonti bastano, o no.
 const buildNextAction = (status) => (
   status === "ready"
-    ? "Rigenera Discovery o passa a Web/Ads con fonti aggiornate."
+    ? "Rigenera il Brief o passa a Contenuti Web / Campagne ADS con fonti aggiornate."
     : "Completa almeno URL principale, note iniziali e un materiale o competitor confermato."
 );
 
@@ -79,7 +79,7 @@ const AgencyProjectAssetsPage = () => {
                 : <><i className="bi bi-stars me-1" aria-hidden="true" />Cerca competitor</>}
             </Button>
             <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/discovery`} size="sm" variant="primary">
-              Apri Discovery
+              Apri il Brief
             </Button>
           </AgencyNextActionStrip>
         </Col>

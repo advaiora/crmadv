@@ -55,9 +55,9 @@ const collectAiHistory = (context) => {
     });
   };
 
-  addEntries("Discovery", context?.discovery?.aiHistory);
-  addEntries("Web", context?.web?.output?.aiHistory);
-  addEntries("Ads", context?.ads?.output?.aiHistory);
+  addEntries("Brief", context?.discovery?.aiHistory);
+  addEntries("Contenuti Web", context?.web?.output?.aiHistory);
+  addEntries("Campagne ADS", context?.ads?.output?.aiHistory);
 
   return entries.sort((a, b) => String(b.generatedAt || "").localeCompare(String(a.generatedAt || "")));
 };
@@ -113,7 +113,7 @@ const AgencyProjectMemoryPage = () => {
         <div className="border rounded-3 p-3 agency-tile">
           <h6 className="mb-1">Memoria non ancora disponibile</h6>
           <p className="mb-2 text-muted small">
-            Aggiungi fonti o rigenera Discovery per creare un contesto operativo riutilizzabile.
+            Aggiungi fonti o rigenera il Brief per creare un contesto operativo riutilizzabile.
           </p>
           <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/assets`} size="sm" variant="primary">
             Aggiungi fonti
@@ -169,12 +169,12 @@ const AgencyProjectMemoryPage = () => {
 
           <div className="col-12 col-xl-6">
             <div className="border rounded-3 p-3 h-100 agency-tile">
-              <h6 className="mb-2">Discovery nel contesto</h6>
+              <h6 className="mb-2">Brief nel contesto</h6>
               <p className="small text-muted mb-2">
-                {context.discovery?.contextSummary || "Discovery non ancora sintetizzata."}
+                {context.discovery?.contextSummary || "Brief non ancora sintetizzato."}
               </p>
               <Button as={Link} to={`/agency/projects/${encodeURIComponent(projectId)}/discovery`} size="sm" variant="outline-primary">
-                Apri Discovery
+                Apri il Brief
               </Button>
             </div>
           </div>
@@ -209,7 +209,7 @@ const AgencyProjectMemoryPage = () => {
 
               {aiHistory.length === 0 ? (
                 <p className="small text-muted mb-0">
-                  Nessuna generazione AI registrata. Usa Discovery, Web o Ads per produrre il primo output.
+                  Nessuna generazione AI registrata. Usa Brief, Contenuti Web o Campagne ADS per produrre il primo output.
                 </p>
               ) : (
                 <div className="table-responsive">

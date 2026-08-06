@@ -128,7 +128,7 @@ describe('AgencyProjectAssetsPage', () => {
 
   it('con fonti pronte propone il passo successivo, altrimenti chiede di completarle', () => {
     montaCon({ status: 'ready' });
-    expect(screen.getByText(/Rigenera Discovery o passa a Web\/Ads/)).toBeInTheDocument();
+    expect(screen.getByText(/Rigenera il Brief o passa a Contenuti Web \/ Campagne ADS/)).toBeInTheDocument();
 
     montaCon({ status: 'partial' });
     expect(screen.getByText(/Completa almeno URL principale/)).toBeInTheDocument();

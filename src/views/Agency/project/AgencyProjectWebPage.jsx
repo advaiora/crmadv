@@ -50,7 +50,7 @@ const AgencyProjectWebPage = () => {
     return (
       <AgencyProjectPageTemplate
         title="Web"
-        subtitle="Workspace per creare landing e pagine collegate a fonti, Discovery e obiettivi progetto."
+        subtitle="Workspace per creare landing e pagine collegate a fonti, Brief e obiettivi progetto."
         dataMeta={web.dataMeta}
       >
         <p className="mb-0 text-muted small">Caricamento modulo Web...</p>
