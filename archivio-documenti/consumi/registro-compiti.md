@@ -52,3 +52,4 @@
 | 2026-08-06 15:18 | Re-naming fase A: barra a quattro gruppi, pallini di priorita e rifiniture | 1h 31m | 37,8 | 0,42 | nessuno | — |
 | 2026-08-07 11:39 | Re-naming fase A: coda + gruppo B completo | 20h 07m | 82,8 | 0,07 | esploratore×1, revisore×2 | 39,6 |
 | 2026-08-07 13:58 | Re-naming fase A: gruppo B completo + revisione | 22h 26m | 94,5 | 0,07 | esploratore×1, revisore×2 | 44,8 |
+| 2026-08-07 18:13 | Fase A2 re-naming: modulo permessi Produzione AI + italianizzazione catalogo | 3h 10m | 73,8 | 0,39 | esploratore×1, revisore×2 | 25,3 |
