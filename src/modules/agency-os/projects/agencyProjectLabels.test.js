@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { toPriorityLabel, toStatusLabel } from './agencyProjectLabels';
+import { toPriorityLabel, toStatusLabel, toWorkStatusLabel } from './agencyProjectLabels';
 
 describe('toStatusLabel', () => {
   it('traduce i sette stati previsti', () => {
@@ -50,5 +50,23 @@ describe('toPriorityLabel', () => {
   it('senza valore dice "n/a"', () => {
     expect(toPriorityLabel('')).toBe('n/a');
     expect(toPriorityLabel(null)).toBe('n/a');
+  });
+});
+
+describe('toWorkStatusLabel', () => {
+  it('traduce i quattro stati di lavorazione di pagine e campagne', () => {
+    expect(toWorkStatusLabel('draft')).toBe('Bozza');
+    expect(toWorkStatusLabel('in_progress')).toBe('In corso');
+    expect(toWorkStatusLabel('review')).toBe('In revisione');
+    expect(toWorkStatusLabel('approved')).toBe('Approvato');
+  });
+
+  it('uno stato sconosciuto si mostra com\'e\', cosi la tendina non si svuota', () => {
+    expect(toWorkStatusLabel('published')).toBe('published');
+  });
+
+  it('senza valore dice "n/a"', () => {
+    expect(toWorkStatusLabel('')).toBe('n/a');
+    expect(toWorkStatusLabel(null)).toBe('n/a');
   });
 });

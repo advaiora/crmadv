@@ -229,7 +229,7 @@ const AgencyProjectPerformancePage = () => {
   };
 
   const handleDeleteSnapshot = async (snapshotId) => {
-    if (!window.confirm("Eliminare questa rilevazione? Lo storico e' append-only, l'azione non e' reversibile.")) {
+    if (!window.confirm("Eliminare questa rilevazione? Lo storico si puo' solo aggiungere: l'azione non si annulla.")) {
       return;
     }
     try {
@@ -569,7 +569,7 @@ const AgencyProjectPerformancePage = () => {
                 </div>
 
                 <div className="d-flex flex-wrap align-items-center gap-2">
-                  <span className="small text-muted">Set (carnè):</span>
+                  <span className="small text-muted">Selezioni salvate:</span>
                   {metricSets.length === 0 && (
                     <span className="small text-muted fst-italic">nessuno salvato</span>
                   )}

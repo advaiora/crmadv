@@ -1,6 +1,7 @@
 import React from "react";
 import { Button, Card, Col, Form, Row } from "react-bootstrap";
 import { readableValue } from "../agencyProjectUx";
+import { toWorkStatusLabel } from "../../../../modules/agency-os/projects/agencyProjectLabels";
 import { ADS_PROJECT_CHANNELS, ADS_PROJECT_STATUSES } from "./adsPageConstants";
 
 // Card "Campagne Ads": il form per crearne una e l'elenco di quelle esistenti.
@@ -93,7 +94,7 @@ const AdsCampaignsCard = ({
                   onChange={(event) => onUpdateStatus(entry.id, event.target.value)}
                 >
                   {ADS_PROJECT_STATUSES.map((status) => (
-                    <option key={status} value={status}>{status}</option>
+                    <option key={status} value={status}>{toWorkStatusLabel(status)}</option>
                   ))}
                 </Form.Select>
                 <Button type="button" size="sm" variant="outline-secondary" onClick={() => onOpenCampaign(entry)}>

@@ -65,7 +65,7 @@ const AgencyOpportunityList = ({
                   <div>
                     <div className="fw-semibold">{entry.title}</div>
                     <div className="small text-muted">
-                      Stage: {entry.stage} | Stato: {formatOpportunityLabel(entry.status)}
+                      Fase: {entry.stage} | Stato: {formatOpportunityLabel(entry.status)}
                       {typeof entry.estimatedValue === "number" ? ` | Valore stimato: EUR ${entry.estimatedValue}` : ""}
                       {showProjectLink && entry.projectId ? ` | Progetto: ${entry.projectId}` : ""}
                     </div>

@@ -100,7 +100,7 @@ const AgencyProjectMemoryPage = () => {
     >
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div className="small text-muted">
-          {loading ? "Caricamento memoria..." : "Working context progetto aggiornato dal backend."}
+          {loading ? "Caricamento memoria..." : "Contesto di lavoro del progetto aggiornato dal server."}
         </div>
         <Button type="button" size="sm" variant="outline-primary" onClick={loadContext} disabled={loading}>
           Aggiorna memoria

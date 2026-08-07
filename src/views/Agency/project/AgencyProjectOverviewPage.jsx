@@ -13,18 +13,15 @@ import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSo
 import { visibleActiveModules } from "../../../modules/agency-os/brain/moduleVisibility";
 import { sortAgencyOpportunities } from "../../../modules/agency-os/opportunities/opportunityPresentation";
 import { toPriorityLabel, toStatusLabel } from "../../../modules/agency-os/projects/agencyProjectLabels";
+import { AGENCY_PROJECT_SCOPE_OPTIONS } from "../../../modules/agency-os/projects/agencyProjectsModel";
 import AgencyOpportunityList from "../opportunities/AgencyOpportunityList";
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
 
-const SCOPE_LABEL_MAP = {
-  website: "Sito web",
-  landing_page: "Landing page",
-  google_ads: "Google Ads",
-  meta_ads: "Meta Ads",
-  seo: "SEO",
-  reporting: "Reporting",
-  diagnosis: "Diagnosis",
-};
+// Le etichette dello scope arrivano dal catalogo unico: qui c'era una seconda
+// copia, che era gia' andata fuori sincrono (diceva "Reporting" e "Diagnosis").
+const SCOPE_LABEL_MAP = Object.fromEntries(
+  AGENCY_PROJECT_SCOPE_OPTIONS.map((entry) => [entry.key, entry.label]),
+);
 
 const SOURCE_STATUS_VARIANT = {
   missing: "danger",
@@ -346,7 +343,7 @@ const AgencyProjectOverviewPage = () => {
 
         <div className="col-12 col-xl-6">
           <OverviewCard title="Sintesi contesto">
-            <p className="mb-0 text-muted">{brain.contextSummary || "Context summary non disponibile."}</p>
+            <p className="mb-0 text-muted">{brain.contextSummary || "Sintesi del contesto non disponibile."}</p>
           </OverviewCard>
         </div>
 

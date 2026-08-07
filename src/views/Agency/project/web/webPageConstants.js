@@ -6,8 +6,8 @@ export const PAGE_TYPE_OPTIONS = [
   { value: "landing", label: "Landing" },
   { value: "website", label: "Sito" },
   { value: "homepage", label: "Homepage" },
-  { value: "service_page", label: "Service Page" },
-  { value: "ecommerce_lite", label: "Ecommerce Lite" },
+  { value: "service_page", label: "Pagina servizio" },
+  { value: "ecommerce_lite", label: "Ecommerce base" },
 ];
 
 export const WEB_PROJECT_TYPES = [

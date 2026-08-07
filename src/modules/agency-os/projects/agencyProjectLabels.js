@@ -29,6 +29,15 @@ const PRIORITY_LABELS = {
   urgent: "Urgente",
 };
 
+// Lo stato di lavorazione di una pagina web o di una campagna. Nei menu a
+// tendina si leggevano le chiavi grezze: "draft", "in_progress", "review".
+const WORK_STATUS_LABELS = {
+  draft: "Bozza",
+  in_progress: "In corso",
+  review: "In revisione",
+  approved: "Approvato",
+};
+
 export const toStatusLabel = (value) => {
   const normalized = normalize(value);
   return STATUS_LABELS[normalized] || normalized || "n/a";
@@ -37,4 +46,9 @@ export const toStatusLabel = (value) => {
 export const toPriorityLabel = (value) => {
   const normalized = normalize(value);
   return PRIORITY_LABELS[normalized] || normalized || "n/a";
+};
+
+export const toWorkStatusLabel = (value) => {
+  const normalized = normalize(value);
+  return WORK_STATUS_LABELS[normalized] || normalized || "n/a";
 };

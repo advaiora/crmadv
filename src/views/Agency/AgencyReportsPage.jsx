@@ -206,7 +206,7 @@ const AgencyReportsPage = () => {
                 <span>Alert: {entry.topAlerts?.length || 0}</span>
                 <span>Opp: {entry.topOpportunities?.length || 0}</span>
                 <span>Task: {entry.topTasks?.length || 0}</span>
-                <span>Source: {formatReportLabel(entry.dataSourceSummary?.dominantSource)}</span>
+                <span>Origine dati: {formatReportLabel(entry.dataSourceSummary?.dominantSource)}</span>
                 {entry.hasClientReport && (
                   <span>Cliente: {formatDateTime(entry.clientReportUpdatedAt)}</span>
                 )}

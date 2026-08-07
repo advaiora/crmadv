@@ -109,10 +109,10 @@ const AgencyOpportunitiesPage = () => {
           <Form.Label className="small mb-1">Tipo</Form.Label>
           <Form.Select size="sm" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
             <option value="all">Tutti i tipi</option>
-            <option value="critical">Critical</option>
-            <option value="improvement">Improvement</option>
-            <option value="commercial">Commercial</option>
-            <option value="strategic">Strategic</option>
+            <option value="critical">Critica</option>
+            <option value="improvement">Miglioramento</option>
+            <option value="commercial">Commerciale</option>
+            <option value="strategic">Strategica</option>
           </Form.Select>
         </div>
 

@@ -54,8 +54,8 @@ export const AGENCY_PROJECT_SCOPE_OPTIONS = [
   { key: "google_ads", label: "Google Ads" },
   { key: "meta_ads", label: "Meta Ads" },
   { key: "seo", label: "SEO" },
-  { key: "reporting", label: "Reporting" },
-  { key: "diagnosis", label: "Diagnosis" },
+  { key: "reporting", label: "Report" },
+  { key: "diagnosis", label: "Diagnosi" },
 ];
 
 const PROJECT_TYPE_BY_KEY = new Map(

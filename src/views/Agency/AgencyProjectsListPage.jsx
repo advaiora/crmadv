@@ -131,7 +131,7 @@ const AgencyProjectsListPage = () => {
                 <th>Priorita</th>
                 <th>Moduli attivi</th>
                 <th>Ultimo aggiornamento</th>
-                <th>Source</th>
+                <th>Origine dati</th>
                 <th className="text-end">Azioni</th>
               </tr>
             </thead>
