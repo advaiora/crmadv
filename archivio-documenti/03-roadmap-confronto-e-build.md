@@ -414,6 +414,9 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   5. **`projects.move_stage` non è controllato in interfaccia:** il trascinamento delle schede nel kanban si può tentare sempre, e fallisce lato server. Non è un buco di sicurezza, è un pulsante che mente.
   6. **La Produzione AI non c'è nella barra in basso del telefono** (`src/layout/Mobile/MobileBottomNav.jsx`), che invece elenca Dashboard, Clienti, Pipeline, Messaggi, Team, Preventivi, Siti, Credenziali, Calendario, Audit. È l'area principale del prodotto: probabilmente una dimenticanza, ma è una scelta di prodotto (lo spazio là sotto è poco) e va decisa da Jacopo.
   7. **`prisma/seed.ts` reimplementa la stessa logica di `workspace-bootstrap.ts`** per popolare moduli e permessi dal catalogo. Oggi entrambe leggono il catalogo, quindi aggiungere voci non richiede di toccarle — ma sono due implementazioni parallele della stessa cosa, e una delle due prima o poi resterà indietro.
+  8. **I pulsanti che fanno spendere l'AI non controllano il permesso `ai_production.generate`.** Le otto chiamate in `src/modules/agency-os/api/agency.api.js` partono da pulsanti sempre visibili. Non è una regressione — prima serviva `projects.edit` e nemmeno quello era controllato — ma ora che *«modificare senza poter far spendere»* è una configurazione sensata, quei pulsanti mostrano il 403 a chi non può generare. Va chiuso quando si passa su quelle pagine, nascondendo o disabilitando il pulsante come si è fatto per la scansione SEO.
+  9. **`projects.view_all` è l'ultimo prestito rimasto nell'area Produzione AI:** decide se una persona vede tutti i progetti o solo quelli del suo reparto (`agency.service.ts`), e non ha un gemello `ai_production.view_all`. Coerente col passato e non rotto, ma se un domani si vorrà separare la visibilità delle due aree, serve la voce corrispondente.
+  10. **Le rotte della Produzione AI non hanno un test tabellare** che verifichi «questa rotta chiede quel permesso», mentre i Siti in gestione ce l'hanno (`workspace-web-assets.route.test.ts`). Sono 63 punti classificati a mano: è il posto dove un test costerebbe poco e varrebbe molto. Il file rotta però non accetta dipendenze iniettate come quello dei Siti, quindi va prima predisposto — motivo per cui non è stato fatto insieme all'audit.
 
 - **Dimensione dei file: il censimento completo e chi spezza cosa** *(deciso da Jacopo il 5/8/2026; è la fonte di verità a cui rimanda `CLAUDE.md`)*.
 
@@ -678,7 +681,30 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
   ---
 
-  ### 🔜 Fase A2 — «Ruoli e permessi»: italianizzare **e completare** *(decisa il 7/8/2026, si fa PRIMA della fase B)*
+  ### ✅ Fase A2 — «Ruoli e permessi»: eseguita per intero il 7/8/2026
+
+  **Com'è andata, in breve.** L'audit non ha trovato "qualche voce mancante": ha trovato che **un'area intera non esisteva nel catalogo**. La Produzione AI — una novantina di rotte su dieci sotto-aree — girava tutta sui permessi della Pipeline, e cinque rotte (impostazioni AI, budget, consumi) scavalcavano il catalogo con un controllo scritto a mano sul *nome* del ruolo. Il modulo `seo`, viceversa, esisteva da sempre con quattro permessi che **nessuna rotta controllava**.
+
+  **Cosa è stato fatto** (commit `7465f12` per la struttura, più il commit dei nomi):
+  - **Nuovo modulo `ai_production` = «Produzione AI»**, con cinque permessi: *vedere · modificare · far generare all'AI · impostazioni AI · budget e consumi*. Scelta di Jacopo fra tre opzioni, con l'indicazione esplicita di **non moltiplicare le voci**: il catalogo passa da 15 moduli a 16 e da 70 voci a 75, non una di più. La separazione che conta è **`generate`**, l'unico permesso che autorizza a spendere: prima far generare un contenuto all'AI chiedeva lo stesso permesso di rinominare una scheda nel kanban.
+  - **Nove rotte hanno `generate`**, e sono esattamente quelle che chiamano un provider: le quattro del Brief, la ricerca competitor, i due generatori di contenuti web, il copy Ads e **la mappatura Excel** (quest'ultima trovata dalla revisione: non è nell'elenco delle funzioni stimabili, ma chiama l'AI e scrive un costo). Report, diagnosi, sync di alert/opportunità/task ed Excel *commit* sono rule-based: restano su `edit`.
+  - **La chat è passata sotto il modulo nuovo.** Stava sotto `projects` per ripiego dichiarato a commento — *«l'area Agency non ha un modulo suo»* — e quel motivo è venuto meno.
+  - **SEO agganciato:** le due rotte chiedono `seo.view`/`seo.run_scan`, e il modulo non nasce più spento (era un interruttore che non spegneva niente).
+  - **I nomi visibili sono allineati al menu** (pezzo ②): *Vault → Credenziali, Web → Siti in gestione, Projects → Pipeline, Checklists → Memo Operativi, Departments → Reparti*, e tutte le ~70 descrizioni dei permessi riscritte in italiano, con quelle dei ruoli di sistema. Restano inglesi *SEO, Ads, Brief, Dashboard, Team, Branding, Audit*: sono i termini veri del mestiere. Un test presidia il ritorno del vocabolario vecchio.
+  - **⚠️ I NOMI dei ruoli non sono stati toccati, `Viewer` compreso.** `Role.name` è la chiave con cui il bootstrap fa l'upsert: rinominarne uno non lo rinomina, ne crea un secondo e lascia il primo con le persone ancora attaccate. Se un giorno si vorranno italianizzare serve una migrazione dedicata — **è l'unica cosa della fase A2 rimasta volutamente in inglese**.
+
+  **La migrazione `20260807120000_ai_production_module`** (solo dati, nessun cambio di schema) porta l'eredità completa: chi poteva fare una cosa ieri la può fare oggi, **ruoli personalizzati compresi** — che la risincronizzazione automatica non tocca mai. Applicata e verificata sul database di sviluppo: Admin correttamente **senza** impostazioni e budget, Manager con `generate`, Operativo e Viewer in sola lettura.
+
+  **Verificato dal vivo, e risolve un dubbio che era scritto qui:** i nomi nuovi **si propagano da soli**. `ensureRbacCatalog` gira dentro `ensureWorkspaceSystemRoles`, che è chiamata a ogni `/auth/me` — quindi basta un caricamento del frontend e i moduli a database hanno già il nome nuovo. Non serve nessun intervento manuale sui workspace esistenti.
+
+  **Le tre regole permanenti sono in `CLAUDE.md`** (sezione *«Come nasce una cosa nuova: il nome e il permesso»*): il permesso nasce col codice, **i ruoli predefiniti si aggiornano insieme al permesso — migrazione compresa, e il costo della migrazione non è una scusa per rimandare** (indicazione esplicita di Jacopo), il nome nasce italiano.
+
+  **Quello che la revisione ha lasciato aperto** è nella voce *«Quello che l'audit dei permessi ha trovato fuori dal suo perimetro»*, sopra in questa stessa sezione: in particolare i **pulsanti di generazione non ancora protetti in interfaccia** (punto 8) e il **test tabellare mancante sulle rotte dell'area** (punto 10).
+
+  **Un effetto collaterale accettato, da sapere:** con cinque permessi soli, `ai_production.edit` assorbe anche ciò che prima chiedeva `projects.create` e `projects.delete`. In pratica un ruolo personalizzato che avesse `edit` ma non `delete` guadagna la cancellazione degli snapshot di performance e dei set di metriche. Non riguarda la spesa AI e non tocca i ruoli di sistema; è il prezzo della scelta di non moltiplicare le voci, ed è scritto qui perché sia una scelta e non una sorpresa.
+
+  <details>
+  <summary>Il piano originale della fase A2, come era stato scritto prima di eseguirlo</summary>
 
   > ⚠️ **Questa voce sostituisce la "fase C" scritta poche ore prima nella stessa giornata**, che collocava il solo catalogo dei moduli in coda a tutto. Jacopo ha corretto: il lavoro è più largo di quel catalogo e **precede** la fase B. Se in un vecchio commit o handoff si legge "fase C — per ultima", è quella la versione superata.
   >
@@ -705,6 +731,8 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   - **I nomi vengono copiati nel database.** C'è una riscrittura automatica (`tx.module.upsert` in `workspace-bootstrap.ts:314`, che aggiorna `name` sulla chiave), **ma non parte a ogni avvio**: gira dentro `ensureWorkspaceSystemRoles`, cioè quando si crea un workspace o si rifanno i ruoli di sistema. È il **contrario** del caso dei moduli di progetto, dove bastava aprire la Panoramica. Va quindi verificato come far ripassare quella riscrittura sui workspace già esistenti, o i nomi vecchi resteranno a schermo.
   - **Nulla è rotto oggi** sul fronte dei nomi: il legame fra nome e modulo passa dalla `key`, non dal `name`. Le voci **mancanti** (pezzo ①) sono invece un buco vero, non un'incoerenza estetica.
   - Il catalogo dei permessi sta nello stesso file (`rbac-catalog.ts:150-170` circa, voci del tipo `vault.view_list`, `vault.reveal`): è lì che si vede quali azioni un ruolo può compiere, ed è lì che si misura cosa manca.
+
+  </details>
 
   **Dove collocare B — raccomandazione dell'assistente, da confermare con Jacopo.** Conviene spezzarlo:
   - **B1 — frontend (URL/rotte, nomi file e cartelle di `src/`):** è roba nostra, meccanica, senza decisioni di prodotto una volta che A ha fissato il vocabolario. Va fatto **subito dopo A** (stessa sessione se regge, altrimenti la successiva): è il pezzo che risolve davvero il problema di Jacopo, ed è quello che rincara aspettando.

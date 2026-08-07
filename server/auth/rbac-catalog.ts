@@ -101,101 +101,117 @@ export type SystemRoleDefinition = {
   permissions: PermissionSelection;
 };
 
+// ⚠️ 'name' e 'description' NON sono nomi interni: la pagina "Ruoli e permessi" e la
+// pagina "Gestione moduli" li stampano tali e quali. Vanno quindi scritti come li
+// leggerebbe chi lavora in agenzia, e — regola della fase A2 — devono dire ESATTAMENTE
+// il nome che quella voce ha nel menu: se il menu dice "Credenziali", qui non si scrive
+// "Vault". Dove il termine inglese e' quello vero del mestiere (SEO, Ads, Brief) resta
+// inglese: allineare non vuol dire tradurre tutto.
 export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
-  { key: 'modules', name: 'Module Registry', isCore: true, description: 'Module registry' },
-  { key: 'branding', name: 'Branding', isCore: true, description: 'Branding module' },
-  { key: 'audit', name: 'Audit', isCore: true, description: 'Audit module' },
-  { key: DASHBOARD_MODULE_KEY, name: 'Dashboard', isCore: true, description: 'Operational dashboard module' },
-  { key: TEAM_MODULE_KEY, name: 'Team', isCore: false, description: 'Team module' },
-  { key: 'departments', name: 'Departments', isCore: false, description: 'Departments module' },
-  { key: 'clients', name: 'Clients', isCore: false, description: 'Clients module' },
-  { key: 'projects', name: 'Projects', isCore: false, description: 'Projects module' },
+  { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
+  // "Branding" resta inglese: e' il termine del mestiere, ed e' gia' il nome della
+  // pagina e della voce nel profilo. Tradurlo qui creerebbe due nomi per la stessa cosa.
+  { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
+  { key: 'audit', name: 'Audit', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
+  { key: DASHBOARD_MODULE_KEY, name: 'Dashboard', isCore: true, description: 'Panoramica operativa del workspace' },
+  { key: TEAM_MODULE_KEY, name: 'Team', isCore: false, description: 'Persone del workspace, inviti e ruoli' },
+  { key: 'departments', name: 'Reparti', isCore: false, description: "Reparti dell'agenzia e assegnazione delle persone" },
+  { key: 'clients', name: 'Clienti', isCore: false, description: "Anagrafica dei clienti dell'agenzia" },
+  { key: 'projects', name: 'Pipeline', isCore: false, description: 'Bacheca operativa dei progetti per stato di avanzamento' },
   {
     key: AI_PRODUCTION_MODULE_KEY,
     name: 'Produzione AI',
     isCore: false,
     description: "Area di produzione assistita dall'AI: Brief, Fonti, Contenuti Web, Ads, Report, Performance e chat AI",
   },
-  { key: 'checklists', name: 'Checklists', isCore: false, description: 'Checklists module' },
-  { key: 'calendar', name: 'Calendar', isCore: false, description: 'Calendar module' },
-  { key: 'quotes', name: 'Quotes', isCore: false, description: 'Quotes module' },
-  { key: 'web', name: 'Web', isCore: false, description: 'Web module' },
-  { key: 'vault', name: 'Vault', isCore: false, description: 'Vault module' },
-  { key: 'seo', name: 'SEO', isCore: false, description: 'SEO module' },
-  { key: MESSAGES_MODULE_KEY, name: 'Messages', isCore: false, description: 'Internal messaging module' },
+  { key: 'checklists', name: 'Memo Operativi', isCore: false, description: 'Modelli di controllo e loro svolgimento sui progetti' },
+  { key: 'calendar', name: 'Calendario', isCore: false, description: 'Appuntamenti e scadenze' },
+  { key: 'quotes', name: 'Preventivi', isCore: false, description: "Preventivi ai clienti, dai modelli all'invio" },
+  { key: 'web', name: 'Siti in gestione', isCore: false, description: "Siti dei clienti in carico all'agenzia: versioni, pubblicazione, stato di salute" },
+  { key: 'vault', name: 'Credenziali', isCore: false, description: 'Cassaforte degli accessi dei clienti: username, password, URL' },
+  { key: 'seo', name: 'SEO', isCore: false, description: 'Scansione e report SEO dei siti in gestione' },
+  { key: MESSAGES_MODULE_KEY, name: 'Messaggi', isCore: false, description: 'Messaggistica interna fra le persone del workspace' },
 ] as const;
 
 export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
-  { key: 'modules.manage', moduleKey: 'modules', description: 'Manage workspace modules' },
-  { key: 'branding.manage', moduleKey: 'branding', description: 'Manage workspace branding' },
-  { key: 'audit.view', moduleKey: 'audit', description: 'View audit logs' },
-  { key: DASHBOARD_PERMISSIONS.view, moduleKey: DASHBOARD_MODULE_KEY, description: 'View operational dashboard' },
+  { key: 'modules.manage', moduleKey: 'modules', description: 'Accendere e spegnere i moduli del workspace' },
+  { key: 'branding.manage', moduleKey: 'branding', description: 'Modificare logo, colori e nome del workspace' },
+  { key: 'audit.view', moduleKey: 'audit', description: 'Consultare il registro di chi ha fatto cosa e quando' },
+  { key: DASHBOARD_PERMISSIONS.view, moduleKey: DASHBOARD_MODULE_KEY, description: 'Vedere la Dashboard operativa' },
 
-  // Legacy role-management permissions still used by existing routes.
-  { key: 'roles.view', moduleKey: TEAM_MODULE_KEY, description: 'View workspace roles' },
-  { key: 'roles.manage', moduleKey: TEAM_MODULE_KEY, description: 'Manage workspace roles' },
-  { key: 'roles.assign', moduleKey: TEAM_MODULE_KEY, description: 'Assign roles to workspace users' },
+  // Permessi storici sulla gestione dei ruoli: restano perche' le rotte li usano.
+  { key: 'roles.view', moduleKey: TEAM_MODULE_KEY, description: 'Vedere i ruoli del workspace e i loro permessi' },
+  { key: 'roles.manage', moduleKey: TEAM_MODULE_KEY, description: 'Creare, modificare ed ELIMINARE i ruoli, e cambiare i loro permessi' },
+  // ⚠️ Questa e team.roles_assign si somigliano ma governano due strade diverse:
+  // qui la pagina "Ruoli e permessi", la' la scheda della persona nel Team. Le
+  // descrizioni devono dire DA DOVE si agisce, o chi concede l'una credendo di
+  // concedere l'altra si ritrova un 403 senza capire perche'.
+  { key: 'roles.assign', moduleKey: TEAM_MODULE_KEY, description: 'Assegnare i ruoli dalla pagina Ruoli e permessi' },
 
-  { key: TEAM_PERMISSIONS.view, moduleKey: TEAM_MODULE_KEY, description: 'View team members' },
-  { key: TEAM_PERMISSIONS.invite, moduleKey: TEAM_MODULE_KEY, description: 'Invite team members' },
-  { key: TEAM_PERMISSIONS.edit, moduleKey: TEAM_MODULE_KEY, description: 'Edit team members' },
-  { key: TEAM_PERMISSIONS.deactivate, moduleKey: TEAM_MODULE_KEY, description: 'Deactivate team members' },
-  { key: TEAM_PERMISSIONS.rolesAssign, moduleKey: TEAM_MODULE_KEY, description: 'Assign team roles' },
+  { key: TEAM_PERMISSIONS.view, moduleKey: TEAM_MODULE_KEY, description: 'Vedere le persone del team' },
+  { key: TEAM_PERMISSIONS.invite, moduleKey: TEAM_MODULE_KEY, description: 'Invitare nuove persone nel workspace' },
+  { key: TEAM_PERMISSIONS.edit, moduleKey: TEAM_MODULE_KEY, description: 'Modificare i dati delle persone del team' },
+  { key: TEAM_PERMISSIONS.deactivate, moduleKey: TEAM_MODULE_KEY, description: 'Disattivare una persona del team' },
+  { key: TEAM_PERMISSIONS.rolesAssign, moduleKey: TEAM_MODULE_KEY, description: 'Cambiare il ruolo di una persona del team' },
 
-  { key: 'departments.view', moduleKey: 'departments', description: 'View departments' },
-  { key: 'departments.manage', moduleKey: 'departments', description: 'Create, edit and delete departments' },
-  { key: 'departments.assign', moduleKey: 'departments', description: 'Assign users to departments' },
+  { key: 'departments.view', moduleKey: 'departments', description: 'Vedere i reparti' },
+  { key: 'departments.manage', moduleKey: 'departments', description: 'Creare, modificare ed eliminare reparti' },
+  { key: 'departments.assign', moduleKey: 'departments', description: 'Assegnare le persone ai reparti' },
 
-  { key: 'clients.view', moduleKey: 'clients', description: 'View clients' },
-  { key: 'clients.create', moduleKey: 'clients', description: 'Create clients' },
-  { key: 'clients.edit', moduleKey: 'clients', description: 'Edit clients' },
-  { key: 'clients.delete', moduleKey: 'clients', description: 'Delete clients' },
-  { key: 'projects.view', moduleKey: 'projects', description: 'View projects' },
-  { key: 'projects.view_all', moduleKey: 'projects', description: 'View all workspace projects (bypass department/assignment scoping)' },
-  { key: 'projects.create', moduleKey: 'projects', description: 'Create projects' },
-  { key: 'projects.edit', moduleKey: 'projects', description: 'Edit projects' },
-  { key: 'projects.delete', moduleKey: 'projects', description: 'Delete projects' },
-  { key: 'projects.move_stage', moduleKey: 'projects', description: 'Move projects between stages' },
-  { key: 'checklists.view', moduleKey: 'checklists', description: 'View checklists' },
-  { key: 'checklists.manage_templates', moduleKey: 'checklists', description: 'Manage checklist templates' },
-  // Legacy granular permissions still accepted by existing APIs.
-  { key: 'checklists.create', moduleKey: 'checklists', description: 'Create checklist templates' },
-  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Edit checklist templates and items' },
-  { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archive checklist templates and delete items' },
-  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Complete checklist instance items' },
-  { key: 'checklists.assign', moduleKey: 'checklists', description: 'Assign checklist items to workspace users' },
-  { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Override checklist gates' },
-  { key: 'calendar.view', moduleKey: 'calendar', description: 'View calendar events' },
-  { key: 'calendar.create', moduleKey: 'calendar', description: 'Create calendar events' },
-  { key: 'calendar.edit', moduleKey: 'calendar', description: 'Edit calendar events' },
-  { key: 'calendar.delete', moduleKey: 'calendar', description: 'Delete calendar events' },
-  { key: 'quotes.view', moduleKey: 'quotes', description: 'View quotes' },
-  { key: 'quotes.create', moduleKey: 'quotes', description: 'Create quotes' },
-  { key: 'quotes.edit', moduleKey: 'quotes', description: 'Edit quotes' },
-  { key: 'quotes.delete', moduleKey: 'quotes', description: 'Delete quotes' },
-  { key: 'quotes.send', moduleKey: 'quotes', description: 'Send quotes' },
-  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Accept quotes' },
-  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Manage quote templates' },
-  { key: 'web.view', moduleKey: 'web', description: 'View web assets' },
-  { key: 'web.create', moduleKey: 'web', description: 'Create web assets' },
-  { key: 'web.edit', moduleKey: 'web', description: 'Edit web assets' },
-  { key: 'web.delete', moduleKey: 'web', description: 'Delete web assets' },
-  { key: 'web.publish', moduleKey: 'web', description: 'Publish or unpublish web assets' },
-  { key: 'web.unpublish', moduleKey: 'web', description: 'Unpublish web assets' },
-  { key: 'web.version.create', moduleKey: 'web', description: 'Create web asset versions' },
-  { key: 'web.version.rollback', moduleKey: 'web', description: 'Rollback web asset versions' },
-  { key: 'vault.view_list', moduleKey: 'vault', description: 'View vault item list' },
-  { key: 'vault.create', moduleKey: 'vault', description: 'Create vault items' },
-  { key: 'vault.edit', moduleKey: 'vault', description: 'Edit vault items' },
-  { key: 'vault.reveal', moduleKey: 'vault', description: 'Reveal vault secrets' },
-  { key: 'vault.delete', moduleKey: 'vault', description: 'Delete vault items' },
-  { key: 'vault.manage_settings', moduleKey: 'vault', description: 'Manage vault workspace settings' },
-  { key: 'seo.view', moduleKey: 'seo', description: 'View SEO data' },
-  { key: 'seo.run_scan', moduleKey: 'seo', description: 'Run SEO scans' },
-  { key: 'seo.export', moduleKey: 'seo', description: 'Export SEO reports' },
-  { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Manage SEO settings' },
-  { key: 'messages.view', moduleKey: MESSAGES_MODULE_KEY, description: 'View internal messages' },
-  { key: 'messages.send', moduleKey: MESSAGES_MODULE_KEY, description: 'Send internal messages' },
+  { key: 'clients.view', moduleKey: 'clients', description: 'Vedere i clienti' },
+  { key: 'clients.create', moduleKey: 'clients', description: 'Creare clienti' },
+  { key: 'clients.edit', moduleKey: 'clients', description: 'Modificare i clienti' },
+  { key: 'clients.delete', moduleKey: 'clients', description: 'Eliminare clienti' },
+  { key: 'projects.view', moduleKey: 'projects', description: 'Vedere i progetti della Pipeline' },
+  { key: 'projects.view_all', moduleKey: 'projects', description: "Vedere TUTTI i progetti del workspace, anche quelli di altri reparti o non assegnati" },
+  { key: 'projects.create', moduleKey: 'projects', description: 'Creare progetti' },
+  { key: 'projects.edit', moduleKey: 'projects', description: 'Modificare i progetti' },
+  { key: 'projects.delete', moduleKey: 'projects', description: 'Eliminare progetti' },
+  { key: 'projects.move_stage', moduleKey: 'projects', description: 'Spostare un progetto fra le colonne della bacheca' },
+  { key: 'checklists.view', moduleKey: 'checklists', description: 'Vedere i memo operativi' },
+  { key: 'checklists.manage_templates', moduleKey: 'checklists', description: 'Creare, modificare e archiviare i modelli di memo' },
+  // ⚠️ Le tre chiavi che seguono NON sono controllate da nessuna rotta: le mutazioni
+  // sui modelli passano tutte da manage_templates. Restano nel catalogo per non
+  // toglierle a chi le ha, ma oggi non governano niente (annotato in roadmap).
+  { key: 'checklists.create', moduleKey: 'checklists', description: 'Creare modelli di memo (in disuso: vale manage_templates)' },
+  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Modificare modelli di memo (in disuso: vale manage_templates)' },
+  { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archiviare modelli di memo (in disuso: vale manage_templates)' },
+  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Spuntare le voci di un memo in corso' },
+  { key: 'checklists.assign', moduleKey: 'checklists', description: 'Assegnare le voci di un memo alle persone' },
+  { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Far avanzare un progetto anche con un memo non completato' },
+  { key: 'calendar.view', moduleKey: 'calendar', description: 'Vedere gli appuntamenti' },
+  { key: 'calendar.create', moduleKey: 'calendar', description: 'Creare appuntamenti' },
+  { key: 'calendar.edit', moduleKey: 'calendar', description: 'Modificare gli appuntamenti' },
+  { key: 'calendar.delete', moduleKey: 'calendar', description: 'Eliminare appuntamenti' },
+  { key: 'quotes.view', moduleKey: 'quotes', description: 'Vedere i preventivi' },
+  { key: 'quotes.create', moduleKey: 'quotes', description: 'Creare preventivi' },
+  { key: 'quotes.edit', moduleKey: 'quotes', description: 'Modificare i preventivi' },
+  { key: 'quotes.delete', moduleKey: 'quotes', description: 'Eliminare preventivi' },
+  { key: 'quotes.send', moduleKey: 'quotes', description: 'Inviare un preventivo al cliente' },
+  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Registrare che il cliente ha accettato un preventivo' },
+  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Gestire i modelli di preventivo' },
+  { key: 'web.view', moduleKey: 'web', description: 'Vedere i siti in gestione' },
+  { key: 'web.create', moduleKey: 'web', description: 'Aggiungere un sito in gestione' },
+  { key: 'web.edit', moduleKey: 'web', description: 'Modificare i siti in gestione' },
+  { key: 'web.delete', moduleKey: 'web', description: 'Eliminare un sito in gestione' },
+  { key: 'web.publish', moduleKey: 'web', description: 'Pubblicare un sito' },
+  { key: 'web.unpublish', moduleKey: 'web', description: 'Togliere un sito dalla pubblicazione' },
+  { key: 'web.version.create', moduleKey: 'web', description: 'Salvare una nuova versione di un sito' },
+  { key: 'web.version.rollback', moduleKey: 'web', description: 'Riportare un sito a una versione precedente' },
+  { key: 'vault.view_list', moduleKey: 'vault', description: "Vedere l'elenco delle credenziali (senza le password)" },
+  { key: 'vault.create', moduleKey: 'vault', description: 'Aggiungere credenziali' },
+  { key: 'vault.edit', moduleKey: 'vault', description: 'Modificare le credenziali' },
+  { key: 'vault.reveal', moduleKey: 'vault', description: 'Mostrare in chiaro le password salvate: il permesso piu delicato del CRM' },
+  { key: 'vault.delete', moduleKey: 'vault', description: 'Eliminare credenziali' },
+  { key: 'vault.manage_settings', moduleKey: 'vault', description: 'Gestire le impostazioni della cassaforte' },
+  { key: 'seo.view', moduleKey: 'seo', description: 'Consultare i report SEO di un sito' },
+  { key: 'seo.run_scan', moduleKey: 'seo', description: 'Lanciare una scansione SEO' },
+  // ⚠️ Le due che seguono non sono ancora controllate da nessuna rotta: esportazione
+  // e impostazioni SEO non esistono come funzioni (previste piu avanti, vedi roadmap).
+  { key: 'seo.export', moduleKey: 'seo', description: 'Esportare i report SEO (funzione non ancora disponibile)' },
+  { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Gestire le impostazioni SEO (funzione non ancora disponibile)' },
+  { key: 'messages.view', moduleKey: MESSAGES_MODULE_KEY, description: 'Leggere i messaggi interni' },
+  { key: 'messages.send', moduleKey: MESSAGES_MODULE_KEY, description: 'Scrivere messaggi interni' },
 
   { key: AI_PRODUCTION_PERMISSIONS.view, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Vedere i progetti di Produzione AI e i loro contenuti' },
   { key: AI_PRODUCTION_PERMISSIONS.edit, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Creare e modificare progetti, contenuti, report e dati di performance' },
@@ -203,22 +219,28 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: AI_PRODUCTION_PERMISSIONS.manageSettings, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Gestire le impostazioni AI: provider, chiavi, modelli e tipi di progetto' },
   { key: AI_PRODUCTION_PERMISSIONS.manageBudget, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Gestire i budget AI e consultare il rendiconto dei consumi' },
 
-  { key: CHAT_PERMISSIONS.view, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'View AI chat sessions and their history' },
-  { key: CHAT_PERMISSIONS.use, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Write in the AI chat: send messages (spends AI budget), invite, attach, clear' },
-  { key: CHAT_PERMISSIONS.moderate, moduleKey: AI_PRODUCTION_MODULE_KEY, description: "Moderate AI chat groups: remove members, take over and disband, without reading the messages" },
+  { key: CHAT_PERMISSIONS.view, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Leggere le chat AI di cui si fa parte, e il loro storico' },
+  { key: CHAT_PERMISSIONS.use, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Scrivere nella chat AI: inviare (consuma budget), invitare, allegare, azzerare' },
+  { key: CHAT_PERMISSIONS.moderate, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Moderare i gruppi di chat altrui: togliere persone e sciogliere il gruppo, senza leggerne i messaggi' },
 ] as const;
 
+// ⚠️ I NOMI dei ruoli non si toccano, nemmeno 'Viewer' che e' inglese: `name` e' la
+// chiave con cui il bootstrap fa l'upsert (`workspaceId_name`), quindi rinominarne uno
+// non lo rinomina — ne crea un secondo e lascia il primo orfano, con le persone ancora
+// attaccate a quello vecchio. Se un giorno si vorranno italianizzare, servira' una
+// migrazione dedicata. Le DESCRIZIONI invece sono solo testo mostrato, e sono in
+// italiano dal 7/8/2026.
 export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   {
     name: SYSTEM_ROLE_NAME.superadmin,
-    description: 'Full control over workspace and permissions',
+    description: 'Controllo completo del workspace, dei permessi e della spesa AI',
     isSuperadmin: true,
     userRole: 'superadmin',
     permissions: 'all',
   },
   {
     name: SYSTEM_ROLE_NAME.admin,
-    description: 'High-privilege workspace administrator',
+    description: 'Amministra il workspace, tranne moduli, ruoli e spesa AI',
     isSuperadmin: false,
     userRole: 'admin',
     // Superadmin is the only role that can manage modules and role/permission assignments.
@@ -245,7 +267,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   },
   {
     name: SYSTEM_ROLE_NAME.manager,
-    description: 'Manage operational workflows (projects/checklists/quotes/web)',
+    description: 'Guida il lavoro operativo: progetti, memo, preventivi, siti e Produzione AI',
     isSuperadmin: false,
     userRole: 'manager',
     permissions: [
@@ -305,7 +327,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   },
   {
     name: SYSTEM_ROLE_NAME.operativo,
-    description: 'Operational contributor with limited edit permissions',
+    description: 'Lavora sui progetti con permessi di modifica limitati',
     isSuperadmin: false,
     userRole: 'operativo',
     permissions: [
@@ -340,7 +362,7 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   },
   {
     name: SYSTEM_ROLE_NAME.viewer,
-    description: 'Read-only access',
+    description: 'Sola lettura: consulta senza modificare niente',
     isSuperadmin: false,
     userRole: 'viewer',
     permissions: [

@@ -90,6 +90,55 @@ test('RBAC catalog: impostazioni AI e budget restano fuori dall Admin, solo Supe
   assert.equal(excluded.has(AI_PRODUCTION_PERMISSIONS.manageBudget), true);
 });
 
+// Nomi e descrizioni del catalogo NON sono testo interno: la pagina "Ruoli e permessi"
+// li stampa tali e quali. Dal 7/8/2026 dicono il nome che l'area ha nel menu.
+test('RBAC catalog: nomi e descrizioni non usano il vocabolario vecchio', () => {
+  // Parole che il re-naming ha sostituito: se ricompaiono qui, la pagina dei permessi
+  // torna a chiamare le aree in un modo e il menu in un altro. Non sono nell'elenco i
+  // termini tenuti apposta in inglese (SEO, Ads, Brief, Dashboard, Team, Branding).
+  const vocabolarioVecchio = [
+    'Vault',
+    'Web Assets',
+    'Agency',
+    'Discovery',
+    'Checklists',
+    'Departments',
+    'Quotes',
+    'Messages',
+    'Clients',
+  ];
+
+  const testi = [
+    ...SYSTEM_MODULE_CATALOG.flatMap((entry) => [entry.name, entry.description]),
+    ...SYSTEM_PERMISSION_CATALOG.map((entry) => entry.description),
+  ];
+
+  for (const testo of testi) {
+    for (const parola of vocabolarioVecchio) {
+      assert.equal(
+        testo.includes(parola),
+        false,
+        `"${testo}" contiene "${parola}", che il re-naming ha sostituito`,
+      );
+    }
+  }
+});
+
+test('RBAC catalog: ogni voce ha un nome e una descrizione da mostrare', () => {
+  for (const entry of SYSTEM_MODULE_CATALOG) {
+    assert.equal(entry.name.trim().length > 0, true, `modulo ${entry.key} senza nome`);
+    assert.equal(entry.description.trim().length > 0, true, `modulo ${entry.key} senza descrizione`);
+  }
+
+  for (const entry of SYSTEM_PERMISSION_CATALOG) {
+    assert.equal(
+      entry.description.trim().length > 0,
+      true,
+      `permesso ${entry.key} senza descrizione: nella pagina si leggerebbe una riga vuota`,
+    );
+  }
+});
+
 test('RBAC catalog: ogni permesso punta a un modulo che esiste davvero', () => {
   const moduleKeys = new Set(SYSTEM_MODULE_CATALOG.map((moduleEntry) => moduleEntry.key));
 

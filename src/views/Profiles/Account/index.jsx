@@ -6,8 +6,12 @@ import { toggleCollapsedNav } from '../../../redux/action/Theme';
 import { useWorkspaceAccess } from '../../../hooks/useWorkspaceAccess';
 
 const MODULE_ROUTES = {
+  dashboard: '/dashboard',
   clients: '/apps/clients',
+  team: '/apps/team',
+  departments: '/settings/departments',
   quotes: '/apps/quotes',
+  web: '/apps/web-assets',
   vault: '/apps/vault',
   projects: '/projects',
   ai_production: '/agency/projects',
@@ -19,9 +23,19 @@ const MODULE_ROUTES = {
   audit: '/audit',
 };
 
+// ⚠️ Terza copia dei nomi dei moduli, dopo il catalogo backend (rbac-catalog.ts) e il
+// menu (SidebarMenu.jsx): quando un'area viene rinominata vanno aggiornate tutte e tre,
+// o la stessa cosa si chiama in due modi a due click di distanza. Deve coprire OGNI
+// modulo del catalogo: le chiavi mancanti non danno errore, ricadono sul ripiego che
+// stampa la chiave grezza — cosi' l'utente leggeva "web" invece di "Siti in gestione".
 const MODULE_LABELS = {
+  dashboard: 'Dashboard',
   clients: 'Clienti',
+  team: 'Team',
+  departments: 'Reparti',
   quotes: 'Preventivi',
+  web: 'Siti in gestione',
+  seo: 'SEO',
   vault: 'Credenziali',
   projects: 'Pipeline',
   ai_production: 'Produzione AI',
