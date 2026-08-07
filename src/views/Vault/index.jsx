@@ -34,7 +34,7 @@ const maskValue = (value) => {
 const isVaultLockedError = (error) => error?.code === 'VAULT_LOCKED' || error?.status === 423;
 
 const getErrorMessage = (error, fallback = 'Operazione non riuscita.') => {
-    if (isVaultLockedError(error)) return 'Vault bloccato. Sblocca il workspace per continuare.';
+    if (isVaultLockedError(error)) return 'Credenziali bloccate. Sblocca il workspace per continuare.';
     if (error?.status === 401) return 'Sessione non valida.';
     if (error?.status === 403) return 'Permesso negato.';
     if (error?.status === 404) return 'Risorsa non trovata.';
@@ -304,7 +304,7 @@ const VaultWorkspace = ({ access }) => {
             }
 
             if (vaultPassword.trim().length < 8) {
-                setVaultGateError('La password Vault deve avere almeno 8 caratteri.');
+                setVaultGateError('La password deve avere almeno 8 caratteri.');
                 return;
             }
 
@@ -330,7 +330,7 @@ const VaultWorkspace = ({ access }) => {
             setVaultConfirmPassword('');
             await loadItems();
         } catch (unlockError) {
-            setVaultGateError(getErrorMessage(unlockError, 'Sblocco Vault non riuscito.'));
+            setVaultGateError(getErrorMessage(unlockError, 'Sblocco non riuscito.'));
         } finally {
             setVaultGateBusy(false);
         }
@@ -356,7 +356,7 @@ const VaultWorkspace = ({ access }) => {
             <div className="container-fluid vault-page-container">
                 <div className="vault-page-shell pt-4 d-flex align-items-center text-muted">
                     <Spinner animation="border" size="sm" className="me-2" />
-                    Verifica stato Vault workspace...
+                    Verifica stato delle Credenziali...
                 </div>
             </div>
         );
@@ -372,22 +372,22 @@ const VaultWorkspace = ({ access }) => {
                             <Card.Body className="p-4">
                                 <div className="d-flex align-items-center mb-3">
                                     <ShieldCheck size={18} className="me-2" />
-                                    <h5 className="mb-0">Vault Workspace Password</h5>
+                                    <h5 className="mb-0">Password del workspace</h5>
                                 </div>
                                 <p className="text-muted mb-3">
                                     {vaultExists
-                                        ? 'Il Vault e bloccato. Inserisci la password workspace per accedere ai dati.'
-                                        : 'Il Vault non e ancora configurato. Crea la password condivisa del workspace.'}
+                                        ? 'Le Credenziali sono bloccate. Inserisci la password del workspace per accedere ai dati.'
+                                        : 'Le Credenziali non sono ancora configurate. Crea la password condivisa del workspace.'}
                                 </p>
                                 {!vaultExists && !canManageSettings && (
                                     <Alert variant="warning" className="py-2">
-                                        Solo un utente con permesso di gestione Vault puo configurare la password iniziale.
+                                        Solo un utente con permesso di gestione delle Credenziali puo configurare la password iniziale.
                                         Contatta un admin del workspace.
                                     </Alert>
                                 )}
                                 {vaultGateError && <Alert variant="danger" className="py-2">{vaultGateError}</Alert>}
                                 <Form onSubmit={onVaultGateSubmit}>
-                                    <Form.Label>Password Vault Workspace</Form.Label>
+                                    <Form.Label>Password del workspace</Form.Label>
                                     <Form.Control
                                         type="password"
                                         autoComplete="current-password"
@@ -428,7 +428,7 @@ const VaultWorkspace = ({ access }) => {
             <div className="vault-page-shell pt-3">
                 <div className="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
                     <div>
-                        <h3 className="mb-1">Vault</h3>
+                        <h3 className="mb-1">Credenziali</h3>
                         <p className="text-muted mb-0">Lista metadata separata dal reveal dei segreti.</p>
                     </div>
                     <div className="d-flex gap-2">

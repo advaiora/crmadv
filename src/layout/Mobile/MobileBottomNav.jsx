@@ -69,14 +69,14 @@ const MORE_ITEMS = [
     },
     {
         key: 'web-assets',
-        label: 'Web Assets',
+        label: 'Siti',
         path: '/apps/web-assets',
         requiredModule: 'web',
         requiredPermission: 'web.view',
     },
     {
         key: 'vault',
-        label: 'Vault',
+        label: 'Credenziali',
         path: '/apps/vault',
         requiredModule: 'vault',
         requiredPermission: 'vault.view_list',

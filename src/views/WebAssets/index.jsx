@@ -1158,7 +1158,7 @@ const WebAssetsPage = () => {
             <div className="pt-3">
               <div className="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
                 <div>
-                  <h3 className="mb-1">Web Asset Management</h3>
+                  <h3 className="mb-1">Siti in gestione</h3>
                   <p className="text-muted mb-0">Gestisci Website, Web App ed Ecommerce collegati al CRM.</p>
                 </div>
                 <div className="d-flex gap-2">

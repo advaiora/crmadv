@@ -8,7 +8,7 @@ const QA_LINKS = [
     { label: 'Progetti', path: '/projects' },
     { label: 'Messaggi', path: '/apps/email' },
     { label: 'Preventivi', path: '/apps/quotes' },
-    { label: 'Web Assets', path: '/apps/web-assets' },
+    { label: 'Siti in gestione', path: '/apps/web-assets' },
     { label: 'Vault', path: '/apps/vault' },
     { label: 'Team', path: '/apps/team' },
     { label: 'Calendario', path: '/apps/calendar' },

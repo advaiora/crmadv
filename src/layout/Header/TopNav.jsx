@@ -30,11 +30,11 @@ const ACTION_LABELS = {
     'clients.create': 'Cliente creato',
     'clients.update': 'Cliente aggiornato',
     'clients.delete': 'Cliente eliminato',
-    'vault.create': 'Segreto Vault creato',
-    'vault.edit': 'Segreto Vault aggiornato',
-    'vault.delete': 'Segreto Vault eliminato',
-    'vault.reveal': 'Segreto Vault visualizzato',
-    'vault.reveal_denied': 'Reveal Vault negato',
+    'vault.create': 'Credenziale creata',
+    'vault.edit': 'Credenziale aggiornata',
+    'vault.delete': 'Credenziale eliminata',
+    'vault.reveal': 'Credenziale visualizzata',
+    'vault.reveal_denied': 'Visualizzazione credenziale negata',
     'roles.assign': 'Ruolo assegnato',
     'roles.update': 'Ruolo aggiornato',
     'roles.create': 'Ruolo creato',
@@ -126,8 +126,8 @@ const resolveMobilePageTitle = (pathname) => {
     if (pathname.startsWith('/apps/team')) return 'Team';
     if (pathname.startsWith('/apps/email')) return 'Messaggi';
     if (pathname.startsWith('/apps/calendar')) return 'Calendario';
-    if (pathname.startsWith('/apps/vault')) return 'Vault';
-    if (pathname.startsWith('/apps/web-assets')) return 'Web Assets';
+    if (pathname.startsWith('/apps/vault')) return 'Credenziali';
+    if (pathname.startsWith('/apps/web-assets')) return 'Siti in gestione';
     if (pathname.startsWith('/audit')) return 'Audit';
     if (pathname.startsWith('/pages/profile')) return 'Profilo';
     if (pathname.startsWith('/settings')) return 'Impostazioni';

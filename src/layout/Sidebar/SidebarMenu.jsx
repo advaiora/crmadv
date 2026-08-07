@@ -168,14 +168,14 @@ export const SidebarMenu = [
       },
       {
         id: "crm_web_assets",
-        name: "Web Assets",
+        name: "Siti in gestione",
         icon: <Icons.Code />,
         path: "/apps/web-assets",
         requiredModule: "web",
         requiredPermission: "web.view",
         childrens: [
           {
-            name: "Web Asset Management",
+            name: "Siti in gestione",
             path: "/apps/web-assets",
             requiredPermission: "web.view",
             grp_name: "apps",
@@ -184,14 +184,14 @@ export const SidebarMenu = [
       },
       {
         id: "crm_vault",
-        name: "Vault",
+        name: "Credenziali",
         icon: <Icons.Lock />,
         path: "/apps/vault",
         requiredModule: "vault",
         requiredPermission: "vault.view_list",
         childrens: [
           {
-            name: "Vault",
+            name: "Credenziali",
             path: "/apps/vault",
             requiredPermission: "vault.view_list",
             grp_name: "apps",

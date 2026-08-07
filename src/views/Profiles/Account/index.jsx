@@ -21,7 +21,7 @@ const MODULE_ROUTES = {
 const MODULE_LABELS = {
   clients: 'Clienti',
   quotes: 'Preventivi',
-  vault: 'Vault',
+  vault: 'Credenziali',
   projects: 'Progetti',
   checklists: 'Memo Operativi',
   calendar: 'Calendario',
