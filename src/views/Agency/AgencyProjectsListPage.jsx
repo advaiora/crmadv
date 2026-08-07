@@ -4,6 +4,7 @@ import { Link, useHistory } from "react-router-dom";
 import { getAgencyProjects } from "../../modules/agency-os/data/agencyDataAdapter";
 import { readAgencyDataMeta } from "../../modules/agency-os/data/agencyDataSource";
 import { visibleActiveModules } from "../../modules/agency-os/brain/moduleVisibility";
+import { toPriorityLabel, toStatusLabel } from "../../modules/agency-os/projects/agencyProjectLabels";
 import AgencyPageShell from "./AgencyPageShell";
 import AgencyDataSourceBadge from "./AgencyDataSourceBadge";
 import { rowActivationProps } from "../../utils/rowActivation";
@@ -25,44 +26,6 @@ const formatDateTime = (value) => {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
-};
-
-const toStatusLabel = (value) => {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
-  switch (normalized) {
-    case "discovery":
-      return "Discovery";
-    case "planning":
-      return "Planning";
-    case "production":
-      return "Production";
-    case "review":
-      return "Review";
-    case "live":
-      return "Live";
-    case "paused":
-      return "Paused";
-    case "archived":
-      return "Archived";
-    default:
-      return normalized || "n/a";
-  }
-};
-
-const toPriorityLabel = (value) => {
-  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
-  switch (normalized) {
-    case "low":
-      return "Bassa";
-    case "medium":
-      return "Media";
-    case "high":
-      return "Alta";
-    case "urgent":
-      return "Urgente";
-    default:
-      return normalized || "n/a";
-  }
 };
 
 const AgencyProjectsListPage = () => {

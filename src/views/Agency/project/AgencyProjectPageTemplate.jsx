@@ -244,9 +244,9 @@ const AgencyProjectPageTemplate = ({ title, subtitle, dataMeta, project: project
             <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
               <h5 className="mb-0">{projectDisplayName}</h5>
               <span className={`badge ${sourceBadgeClass}`}>{sourceLabel}</span>
-              {project?.statusAgency && (
-                <span className="badge text-bg-light border">Stato: {project.statusAgency}</span>
-              )}
+              {/* Lo stato del progetto non compare qui: nasce sempre "discovery" e non
+                  esiste un modo per cambiarlo, quindi diceva la stessa cosa a tutti.
+                  Resta nell'elenco progetti e nei filtri dei Report. */}
               <span className="badge text-bg-light border">{confidenceLabel}</span>
             </div>
             <div className="small text-muted">

@@ -12,6 +12,7 @@ import {
 import { readAgencyDataMeta } from "../../../modules/agency-os/data/agencyDataSource";
 import { visibleActiveModules } from "../../../modules/agency-os/brain/moduleVisibility";
 import { sortAgencyOpportunities } from "../../../modules/agency-os/opportunities/opportunityPresentation";
+import { toPriorityLabel, toStatusLabel } from "../../../modules/agency-os/projects/agencyProjectLabels";
 import AgencyOpportunityList from "../opportunities/AgencyOpportunityList";
 import AgencyProjectPageTemplate from "./AgencyProjectPageTemplate";
 
@@ -302,10 +303,10 @@ const AgencyProjectOverviewPage = () => {
                 {project.projectType?.label || "Tipo non definito"}
               </Badge>
               <Badge bg="light" text="dark" className="border">
-                Stato: {project.statusAgency}
+                Stato: {toStatusLabel(project.statusAgency)}
               </Badge>
               <Badge bg="light" text="dark" className="border">
-                Priorita: {project.priorityAgency}
+                Priorita: {toPriorityLabel(project.priorityAgency)}
               </Badge>
             </div>
             <div className="small text-muted mb-1">

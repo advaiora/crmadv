@@ -161,7 +161,9 @@ describe('AgencyProjectWebPage', () => {
     const handleSave = vi.fn();
     montaCon({ handleSave });
 
-    screen.getByRole('button', { name: 'Salva Contenuti Web' }).click();
+    // "Salva" e' il pulsante della striscia; quello della barra azioni si
+    // chiama "Salva Contenuti Web", ed e' un altro bottone.
+    screen.getByRole('button', { name: 'Salva' }).click();
 
     expect(handleSave).toHaveBeenCalledTimes(1);
   });
