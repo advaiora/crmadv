@@ -689,3 +689,24 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 - Non correggere niente in base a un giro sporcato: **rilanciare** e leggere quello nuovo.
 
 **Da non confondere** con la nota #46 (worker mai partito a macchina carica): li' il messaggio parla di *"Failed to start threads worker"* / timeout e non c'entra il contenuto dei file; qui invece l'errore e' un vero errore di esecuzione del componente, solo su uno stato transitorio.
+
+---
+
+## 49. I dizionari di traduzione si scrivono leggendo l'enum, non a memoria
+
+**Contesto:** giro di re-naming del 7/8/2026. Andavano tradotte in italiano le parole che il server manda come chiavi inglesi (stati, gravita, priorita) e che finivano a schermo cosi' com'erano.
+
+**Errore:** ho scritto i dizionari **elencando i valori che mi aspettavo**, invece di andare a leggere `prisma/schema.prisma`. Il risultato sembrava giusto — i test passavano, la suite intera era verde — ma:
+- per le opportunita avevo messo `accepted`, `rejected`, `in_progress`, `done`: **quattro valori che il backend non puo' produrre**;
+- mancava `open`, che e' il **default dell'enum**, cioe' il valore piu' frequente in assoluto. Ogni riga continuava a leggersi *"Stato: Open"*: esattamente il difetto che il commit dichiarava di aver risolto;
+- gravita degli alert, stati dei task e priorita restavano inglesi nel Report, mentre erano gia' tradotti bene nella scheda Da risolvere. **Lo stesso alert si leggeva "Da gestire / Alta" in un punto e "Open / High" a due click di distanza.**
+
+**Perche' i test non l'hanno preso:** li avevo scritti sullo stesso elenco sbagliato. Un test che verifica il dizionario contro se stesso passa sempre. **La suite verde non dice niente sulla completezza di una mappa** — dice solo che il codice fa quello che il test si aspetta.
+
+**Modo corretto:**
+1. Prima di scrivere una mappa chiave→etichetta, **aprire la fonte di verita**: `prisma/schema.prisma` per gli enum, il motore a regole per gli stati scritti come stringa libera. Costa un `grep`.
+2. **Citare i valori nel commento** del file, con il nome dell'enum: chi ci ripassa vede subito da dove vengono e se sono ancora quelli.
+3. **Scrivere i test sugli enum**, non sul dizionario appena scritto: se un domani l'enum cambia, il test si rompe. E' l'unico modo perche' il test abbia valore.
+4. **Prima di crearne una nuova, cercare se una mappa completa esiste gia'.** Qui ce n'era una giusta (`alertsConstants.js`) e ne ho aggiunta una quarta parziale accanto. La domanda da farsi e' *"chi altro traduce questa stessa parola?"*, non *"come la traduco qui"*.
+
+**Vale per qualsiasi mappa costruita a mano** su valori che nascono altrove: etichette di stato, permessi, chiavi di moduli, nomi di funzione. Il segnale d'allarme e' scrivere un oggetto letterale senza aver appena guardato la sorgente.

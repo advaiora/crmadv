@@ -601,7 +601,22 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
   - **"Modelli per funzione"** (`SettingsAiLimitsPanel.jsx`) è l'unico campo dove la chiave **è il valore da digitare**: nasconderla romperebbe la funzione. Il testo d'aiuto ora dice a cosa serve e affianca a ogni chiave il suo nome leggibile.
   - **L'avviso sullo storage non pronto** (`SettingsAiProviderCard.jsx`) continua a nominare la migrazione `agency runtime settings`, perché è l'unica informazione azionabile che dà; è stato riscritto il contorno.
 
-  **🔸 Un debito nuovo, creato da questo giro:** le etichette delle funzioni AI ora esistono **in due copie** — `src/modules/agency-os/ai/aiFunctionLabels.js` e `AGENCY_AI_ESTIMATABLE_FUNCTIONS` in `agency.service.ts`. C'è un avviso scritto in testa al file frontend, ma se un domani si aggiunge una funzione AI vanno toccate entrambe o stime e consumi chiameranno la stessa cosa in due modi.
+  **🔸 Un debito nuovo, creato da questo giro:** le etichette delle funzioni AI esistono **in due copie** — `src/modules/agency-os/ai/aiFunctionLabels.js` e `AGENCY_AI_ESTIMATABLE_FUNCTIONS` in `agency.service.ts`. C'è un avviso scritto in testa al file frontend, ma se un domani si aggiunge una funzione AI vanno toccate entrambe o stime e consumi chiameranno la stessa cosa in due modi. *(Una terza copia scritta a mano nel testo d'aiuto è stata eliminata il 7/8: ora quell'elenco si costruisce dalla stessa sorgente.)*
+
+  #### ⚠️ La revisione del 7/8 ha trovato un errore che i test non potevano prendere — `d9b4245`
+
+  **Vale la pena leggerlo prima di scrivere un'altra mappa di traduzione.** I due dizionari del commit `4bf2635` erano stati scritti **elencando i valori attesi, invece di leggere `prisma/schema.prisma`**. Suite verde, test verdi, e sotto:
+  - per le opportunità c'erano `accepted`, `rejected`, `in_progress`, `done` — **quattro valori che il backend non può produrre** — e mancava **`open`, il default dell'enum**: ogni riga continuava a leggersi *"Stato: Open"*, cioè il difetto che il commit dichiarava chiuso;
+  - gravità degli alert, stati dei task e priorità restavano inglesi nel Report mentre erano già tradotti bene nella scheda *Da risolvere*: **lo stesso alert si leggeva "Da gestire / Alta" in un punto e "Open / High" a due click**;
+  - una mappa completa e giusta esisteva già (`alertsConstants.js`) e ne era stata aggiunta **una quarta parziale** accanto.
+
+  I test non l'hanno preso perché **erano scritti sullo stesso elenco sbagliato**: un test che verifica un dizionario contro se stesso passa sempre. Il metodo corretto è in `note-operative-ai.md` §49.
+
+  **Come è stato chiuso:** il vocabolario è ora **uno solo** — `src/modules/agency-os/labels/agencyStatusLabels.js` — costruito sugli enum veri, che sono **citati nel commento** del file; `formatReportLabel` e `formatOpportunityLabel` ci delegano invece di tenere copie. Il test è scritto sugli enum, quindi si rompe se l'enum cambia. Aggiunta anche `toImpactLabel` perché *"Impatto"* è maschile e dal dizionario generale usciva *"Impatto: Alta"*.
+
+  ⚠️ **Non è un disallineamento, non "correggerlo":** `strategic` vale **"Strategica"** per un'opportunità e **"Strategico"** per un alert. I sostantivi hanno genere diverso, la concordanza è giusta così.
+
+  **Sistemate insieme le altre copie che divergevano:** le etichette scope **nel backend** (`agency.service.ts:1585-1590`) dicevano ancora *Reporting/Diagnosis* ed erano proprio quelle che finiscono nei documenti generati e nel contesto passato all'AI; l'elenco *"Moduli attivi"* delle Impostazioni era diventato leggibile ma **diceva il falso** (conteneva voci che moduli non sono, ometteva Memoria); e *"Vault"* era rimasto in cinque punti — fra cui **la riga immediatamente sotto** a quella rinominata nello stesso commit.
 
   <details>
   <summary>L'elenco originale delle sei voci, con i riferimenti file:riga (utile se una va ripresa)</summary>
