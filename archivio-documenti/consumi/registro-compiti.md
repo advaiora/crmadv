@@ -50,3 +50,4 @@
 | 2026-08-06 11:16 | Re-naming aree fase A (Piattaforma, Produzione AI, Pipeline) + fusione Diagnosis in Da risolvere | 1h 45m | 21,5 | 0,20 | esploratore×1 | -0,6 |
 | 2026-08-06 13:46 | Re-naming: rimozione tre schede + rimandi + gergo dai titoli (lavoro in autonomia /vado) | 55 min | 23,2 | 0,42 | esploratore×1 | -0,4 |
 | 2026-08-06 15:18 | Re-naming fase A: barra a quattro gruppi, pallini di priorita e rifiniture | 1h 31m | 37,8 | 0,42 | nessuno | — |
+| 2026-08-07 11:39 | Re-naming fase A: coda + gruppo B completo | 20h 07m | 82,8 | 0,07 | esploratore×1, revisore×2 | 39,6 |

@@ -667,6 +667,27 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
   **Quanto costa B, misurato il 5/8:** `Agency` compare in **oltre 60 file** di `src/`, `Discovery` in **28**. Il costo **cresce col tempo**: la sola fase di riordino ha generato 165 file nuovi in `src/`, molti col nome vecchio dentro. Più si aspetta, più superficie c'è da rinominare — è l'argomento principale per **non** parcheggiare B in fondo.
 
+  ---
+
+  ### 🔚 Fase C — il catalogo dei moduli in «Ruoli e permessi» *(decisa il 7/8/2026, si fa PER ULTIMA)*
+
+  **Cos'è.** Il CRM è fatto a moduli (Clienti, Team, Progetti, Calendario, Credenziali…) e il sistema dei permessi ha bisogno di un elenco scritto di quali moduli esistono, per poter dire *"il ruolo X può vedere il modulo Y"*. Quell'elenco sta in `server/auth/rbac-catalog.ts:80-95` e i suoi nomi si leggono **nella pagina Ruoli e permessi**. Oggi sono tutti in inglese:
+
+  > Team · Departments · Clients · Projects · Checklists · Calendar · Quotes · Web · Vault · SEO · Messages
+
+  **⚠️ La regola decisa da Jacopo, che vale più della traduzione:** ogni voce del catalogo dev'essere **identica al nome deciso durante il re-naming** — *in italiano o in inglese, a seconda di cosa si è deciso per quella voce*. Non è «traduciamo tutto»: è «allineiamo tutto». Se un'area è rimasta con un nome inglese perché quello era giusto, il catalogo deve dire quel nome inglese. La tendenza generale di Jacopo è comunque verso l'italiano.
+
+  **Perché si fa per ultima, dopo A e dopo B.** Due ragioni, la seconda è quella che decide:
+  1. Il catalogo copre **tutto il CRM**, comprese aree che il re-naming non ha ancora toccato: allinearlo prima vorrebbe dire allinearlo a nomi non ancora decisi.
+  2. **Ogni voce ha sia il nome visibile sia la chiave** (`{ key: 'vault', name: 'Vault' }`), e la **fase B tocca proprio le chiavi dei permessi**. Farlo prima di B significherebbe rimetterci mano due volte. Facendolo per ultimo si sistema in un colpo solo, con la certezza che niente si muove più.
+
+  **Quello che già si sa, per chi lo eseguirà:**
+  - Due voci hanno già il loro nome deciso: `vault` → **Credenziali**, `web` → **Siti in gestione** (fase A, 7/8/2026).
+  - ⚠️ **`projects` va guardato con attenzione:** nel menu esistono ora **Pipeline** (l'operatività, il kanban) e **Produzione AI**, che sono due finestre sullo stesso `model Project`. Va deciso a quale delle due corrisponde il modulo — o se il modulo le copre entrambe, nel qual caso serve un nome che valga per tutte e due.
+  - **Non si tocca una voce sola.** Tradurne una lascerebbe una parola italiana in mezzo a dieci inglesi, che si legge come una svista invece che come una scelta.
+  - **I nomi vengono copiati nel database.** C'è una riscrittura automatica (`tx.module.upsert` in `workspace-bootstrap.ts:314`, che aggiorna `name` sulla chiave), **ma non parte a ogni avvio**: gira dentro `ensureWorkspaceSystemRoles`, cioè quando si crea un workspace o si rifanno i ruoli di sistema. È il **contrario** del caso dei moduli di progetto, dove bastava aprire la Panoramica. Quindi va verificato come far ripassare quella riscrittura sui workspace già esistenti, o i nomi vecchi resteranno a schermo.
+  - **Nulla è rotto oggi:** il legame fra nome e modulo passa dalla `key`, non dal `name`. È solo un'incoerenza di lettura, e la pagina la vedono solo gli amministratori.
+
   **Dove collocare B — raccomandazione dell'assistente, da confermare con Jacopo.** Conviene spezzarlo:
   - **B1 — frontend (URL/rotte, nomi file e cartelle di `src/`):** è roba nostra, meccanica, senza decisioni di prodotto una volta che A ha fissato il vocabolario. Va fatto **subito dopo A** (stessa sessione se regge, altrimenti la successiva): è il pezzo che risolve davvero il problema di Jacopo, ed è quello che rincara aspettando.
   - **B2 — backend e permessi** (cartella-modulo `server/modules/agency-os/`, chiavi permesso tipo `projects.view`, eventuali righe `Permission` a database): ⛔ **da concordare con Claudio prima**, è area a decisioni condivise, e toccare le chiavi dei permessi può comportare una **migrazione**. Non si fa unilateralmente.
