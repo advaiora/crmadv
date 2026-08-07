@@ -123,7 +123,7 @@ Applicato più volte nel corso della conversazione (Panoramica come sintesi vs. 
 - **Il costo cresce con ogni V successiva che si costruisce sopra l'ancoraggio sbagliato**: il residuo V5 stesso (Discovery su RAG reale), la V6 (Reportistica — un "report del cliente" è la richiesta più naturale del mondo), la V7 (generazione visiva — le creatività vivono naturalmente sotto il cliente), la V8 (Lab — valida contro le Fonti, che si spostano). Più si aspetta, più consumatori dell'ancoraggio sbagliato si accumulano.
 - **Assorbe e chiude una decisione già parcheggiata il 22/7/2026**: la migrazione delle fonti *legacy* dal blob `ProjectMemory.sourcesJson` dentro `ProjectSource`, sospesa perché le domande aperte allora (come de-duplicare, se i competitor diventano fonti, come trattare i file senza testo integrale) dipendono in parte da come si struttura l'ancoraggio nuovo. **Ordine corretto:** prima si scioglie l'ambiguità `Project.clientId` vs `ProjectClient` (di fatto già risolta dalla decisione §2.5), poi la regola di precedenza (§2.2–2.3), poi si sposta l'ancora, **solo allora** si esegue la migrazione legacy parcheggiata — così si fa una volta sola, nella forma giusta.
 
-**⛔ Nota di metodo, da rispettare:** questo lavoro tocca `server/modules/agency-os/agency.service.ts` (10.452 righe), già segnato in roadmap come "area a decisioni condivise, non si tocca unilateralmente" rispetto a Claudio. Per la regola già in memoria ("Jacopo ha piena autorità decisionale in sessione"), questo non blocca la decisione — ma va comunque segnalato con trasparenza nell'handoff, come per ogni altra modifica di quell'area.
+**✅ Nota di metodo, risolta:** questo lavoro tocca `server/modules/agency-os/agency.service.ts` (10.452 righe), area che la roadmap segna come "a decisioni condivise, non si tocca unilateralmente" rispetto a Claudio. **Confermato da Jacopo il 7/8/2026: approvazione piena di Claudio su tutto quanto pianificato in questo documento** — l'elemento bloccante non si applica qui. Resta comunque buona norma segnalarlo nell'handoff, non per chiedere il permesso ma per tenere allineato chi riprende la sessione nel weekend.
 
 ### 4.2 UX-A (pulizia strutturale del menu, indipendente dal futuro) → presto, a sé
 Include: il nuovo gruppo Impostazioni, Reparti spostato con Team, gli strumenti di sviluppo tolti dal menu utente, le azioni trasformate in pulsanti invece che voci di navigazione (§3.3). **Non dipende da nessuna decisione futura** — può partire appena c'è spazio nel calendario di lavoro.
@@ -143,9 +143,8 @@ La **Fase B del re-naming** (già in roadmap: URL/rotte tecniche, nomi file, car
 ## 5. Esplicitamente aperto o rimandato
 
 - **L'importazione dei clienti veri dell'agenzia** (§2.7) — riguarda la V12, non questo blocco. Da riproporre quando quella V si apre.
-- **Il posto di Memo Operativi dentro "Impostazioni"** (§3.2) — segnalata come la mossa meno solida delle sei nel riordino menu; da confermare o correggere osservando l'uso reale.
 - **Il criterio popup/linguetta** (§3.4) — applicato con coerenza ma mai formalizzato come regola scritta a sé; se in futuro genera un caso ambiguo, va deciso lì, non qui.
-- **Le tre decisioni sul backend già in roadmap** (chi spezza `agency.service.ts`, se estendere il controllo dimensione al backend, quale soglia) restano invariate da questa conversazione — non toccate, non richiamate se non per la nota di metodo al §4.1.
+- **Le tre decisioni sul backend già in roadmap** (chi spezza `agency.service.ts`, se estendere il controllo dimensione al backend, quale soglia) restano invariate da questa conversazione — non toccate, non richiamate se non per la nota di approvazione al §4.1.
 
 ---
 
@@ -161,7 +160,7 @@ La **Fase B del re-naming** (già in roadmap: URL/rotte tecniche, nomi file, car
 | 6 | Dove si scrive il ritratto cliente | Area propria e indipendente sul cliente (non solo promozione da progetto) |
 | 7 | Dati di test esistenti | Nessuna migrazione necessaria; i clienti veri sono un tema V12 a sé |
 | 8 | Struttura pagina cliente | Dossier completo a schede + Panoramica sintetica; moduli satellite restano anche a sé |
-| 9 | Riordino menu laterale | Da 15 a 9 righe di primo livello (dettaglio §3.2) |
+| 9 | Riordino menu laterale | Da 15 a 10 righe di primo livello (dettaglio §3.2) |
 | 10 | "Nuovo Cliente"/"Nuovo Preventivo" nel menu | Da rimuovere (ridondanti); decisione presa, esecuzione in coda |
 
 **Collocazione in roadmap:** arricchimento cliente → chiusura V5; pulizia menu indipendente → presto, a sé; riordino gerarchico completo (dossier + assorbimento moduli) → primo blocco V12.
