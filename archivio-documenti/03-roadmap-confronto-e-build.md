@@ -583,16 +583,37 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
   ---
 
-  ### 🔸 Fase A — quello che resta, raccolto il 6/8/2026
+  ### ✅ Fase A — chiusa per intero il 7/8/2026
 
-  Inventario dell'area Produzione AI battuto per intero dall'esploratore (72 file, ~10.900 righe). Questi **richiedono una decisione di Jacopo**, quindi non sono stati toccati. Vale il metodo: si spiega l'area, si aspetta conferma, poi si propongono i nomi.
+  L'elenco qui sotto era il residuo raccolto il 6/8 dall'esploratore (72 file, ~10.900 righe battuti). **Tutte e sei le voci sono state eseguite il 7/8**, dopo che Jacopo ha deciso ① e ③ e ha dato via libera sul resto (*«traduci quelle opportune e mantieni quelle altrettanto opportune da mantenere»*). Suite intera verde al primo colpo: **67 file, 810 test**. Tipi a 233 = baseline.
+
+  | Voce | Commit | Cosa è stato fatto |
+  |---|---|---|
+  | ① Stati in inglese | `7cf5cd9` | Badge via dalla testata; funzioni di traduzione estratte in `agencyProjectLabels.js` col loro test |
+  | ② Report tecnico | `4bf2635` | Cinque card tradotte **+ la radice**: `formatReportLabel` e `formatOpportunityLabel` non traducevano affatto |
+  | ④⑤ Tendine e parole isolate | `745be46` | Stati di lavorazione, tipi di opportunità, tipi di pagina, scope, *Stage / Working context / append-only / carnè* |
+  | ③ Impostazioni AI | `b363804` | Via le chiavi tecniche da pastiglie, cataloghi e rendiconto consumi |
+  | ⑥ Vault, Web Assets | `75131ef` | → Credenziali, Siti in gestione |
+
+  **⚠️ Cosa è stato MANTENUTO in inglese, e perché non va "sistemato" in futuro.** *Hook, Headline, Primary text, Keyword, Sitelink/callout, Ad Groups, RSA Ideas* e gli obiettivi di campagna (*Lead generation, Sales, Traffic, Awareness*). **Non sono gergo nostro: sono i nomi veri delle cose dentro Google Ads e Meta**, quelli che si leggono nelle piattaforme. Tradurli renderebbe il CRM più italiano e meno usabile da chi ci lavora. Indicazione esplicita di Jacopo su *Awareness*, estesa per coerenza a tutta la famiglia.
+
+  **⚠️ Due punti restano tecnici perché devono esserlo** *(non sono dimenticanze)*:
+  - **"Modelli per funzione"** (`SettingsAiLimitsPanel.jsx`) è l'unico campo dove la chiave **è il valore da digitare**: nasconderla romperebbe la funzione. Il testo d'aiuto ora dice a cosa serve e affianca a ogni chiave il suo nome leggibile.
+  - **L'avviso sullo storage non pronto** (`SettingsAiProviderCard.jsx`) continua a nominare la migrazione `agency runtime settings`, perché è l'unica informazione azionabile che dà; è stato riscritto il contorno.
+
+  **🔸 Un debito nuovo, creato da questo giro:** le etichette delle funzioni AI ora esistono **in due copie** — `src/modules/agency-os/ai/aiFunctionLabels.js` e `AGENCY_AI_ESTIMATABLE_FUNCTIONS` in `agency.service.ts`. C'è un avviso scritto in testa al file frontend, ma se un domani si aggiunge una funzione AI vanno toccate entrambe o stime e consumi chiameranno la stessa cosa in due modi.
+
+  <details>
+  <summary>L'elenco originale delle sei voci, con i riferimenti file:riga (utile se una va ripresa)</summary>
 
   - **① Gli stati mostrati in inglese crudo — il più visibile di tutti.** In testa a **ogni** scheda di progetto c'è un badge che dice letteralmente `Stato: discovery` (minuscolo, il valore grezzo del database) — `AgencyProjectPageTemplate.jsx:248`, `AgencyProjectOverviewPage.jsx:305,308`. Nelle select per cambiare stato a una pagina o a una campagna si leggono `draft`, `in_progress`, `review`, `approved` (`WebSubProjectsCard.jsx:82-84`, `AdsCampaignsCard.jsx:95-97`). E in tutta l'area Report/Diagnosi/Opportunità ci sono due funzioni che **non traducono, capitalizzano soltanto** (`reportPresentation.js:15-25`, `opportunityPresentation.js:15-26`): escono *Draft, Ready, Partial, In Progress, On Hold, Critical, Commercial, Strategic*. Nello stesso prodotto gli stati degli Alert e delle Fonti sono invece tradotti bene (`alertsConstants.js`, `assetsPageConstants.js`) — quindi non è una scelta, è una dimenticanza. Serve decidere il vocabolario italiano degli stati.
   - **② Il Report tecnico ha quattro card interamente in inglese:** *Project Snapshot*, *Top Alert*, *Top Opportunities*, *Top Tasks*, *Next Steps* (`TechnicalReportView.jsx:191,240,248,260,269`), in una pagina per il resto tutta italiana.
   - **③ Le Impostazioni AI mostrano chiavi tecniche interne all'utente:** badge con scritto `sources/assets`, `client_report`, `landing_page` (`SettingsModulesCard.jsx`, `SettingsProjectTypesCard.jsx`, `SettingsTeamRolesCard.jsx`, `SettingsScopeSourcesCard.jsx`), un campo con dentro `{"discovery.generateBrief":"gpt-4o-mini"}` (`SettingsAiLimitsPanel.jsx:114`), e il filtro "Funzione" dei consumi che elenca `discovery.generateBrief`, `web.generateBlock` (`AgencyAiUsagePanel.jsx`). ⚠️ Qui la domanda **non è solo il nome: è se quella roba vada mostrata**. Stessa famiglia: l'avviso *"Applica la migration Agency runtime settings"* (`SettingsAiProviderCard.jsx:88`), che è l'ultima "Agency" rimasta a schermo — lasciata perché riscriverla farebbe perdere l'unica informazione utile che dà.
   - **④ Le opzioni non tradotte nei menu a tendina:** obiettivi campagna *Sales/Traffic/Awareness* (`adsPageConstants.js:12-17`), filtro opportunità *Critical/Improvement/Commercial/Strategic* (`AgencyOpportunitiesPage.jsx:112-115`), tipo pagina *Service Page/Ecommerce Lite* (`webPageConstants.js:9-10`), e lo scope acquistato con dentro ancora `Diagnosis` (`agencyProjectsModel.js:51-58`, duplicato in `AgencyProjectOverviewPage.jsx:18-26`).
   - **⑤ Parole isolate da tradurre o spiegare:** *Stage* (`AgencyOpportunityList.jsx:68`), *Working context* (`AgencyProjectMemoryPage.jsx:103`), *Context summary* (`AgencyProjectOverviewPage.jsx:348`), *Source* come colonna dell'elenco progetti, *append-only* in un messaggio di conferma (`AgencyProjectPerformancePage.jsx:232`), *Hook*, *Ad Groups*, *RSA Ideas* nelle campagne, e in Performance il termine **"carnè"** per i set di metriche salvati — desueto, non lo capisce nessuno.
-  - ✅ **⑥ Le due aree della lista originale — CHIUSO il 7/8/2026.** Vedi la tabella qui sotto.
+  - ✅ **⑥ Le due aree della lista originale — CHIUSO il 7/8/2026.** Vedi la scheda qui sotto.
+
+  </details>
 
   #### ✅ `Vault` → **Credenziali** e `Web Assets` → **Siti in gestione** (7/8/2026)
 
