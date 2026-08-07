@@ -9084,9 +9084,15 @@ export const agencyService = {
     return this.getAiBudgets(input.workspaceId);
   },
 
+  // canManage = puo' modificare le impostazioni (provider, chiavi, modelli).
+  // canManageBudget = puo' vedere il rendiconto consumi e cambiare i tetti di spesa.
+  // Sono due permessi distinti dal 7/8/2026: la pagina deve poter mostrare i pannelli
+  // del budget a chi ha il secondo anche se non ha il primo, e nasconderli a chi ha
+  // solo il primo — altrimenti si vedono due pannelli che rispondono 403.
   async getAgencyRuntimeSettings(input: {
     workspaceId: string;
     canManage: boolean;
+    canManageBudget?: boolean;
   }) {
     const [ai, competitorSearch, runtimeConfig] = await Promise.all([
       this.getAgencyAiStatus(input.workspaceId),
@@ -9096,6 +9102,7 @@ export const agencyService = {
 
     return {
       canManage: input.canManage,
+      canManageBudget: input.canManageBudget ?? input.canManage,
       storageReady: runtimeConfig.storageReady,
       ai: {
         enabled: ai.enabled,

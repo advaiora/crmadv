@@ -47,3 +47,46 @@ describe('SidebarMenu — la voce Piattaforma', () => {
     expect(name).toContain('ai');
   });
 });
+
+// Il 7/8/2026 l'area Produzione AI ha smesso di prendere in prestito modulo e
+// permessi dalla Pipeline. Il difetto che questi test presidiano e' subdolo: un
+// permesso qui che non combacia con quello che il server chiede non rompe niente
+// a vista — mostra la voce, e il 403 arriva solo a chi ci clicca. Prima di questo
+// giro due voci chiedevano 'dashboard.view' e una 'modules.manage'.
+describe('SidebarMenu — Produzione AI e Pipeline non si scambiano i permessi', () => {
+  const findEntry = (path) =>
+    SidebarMenu.flatMap((group) => group.contents).find((entry) => entry.path === path);
+
+  const produzioneAi = () => findEntry('/agency/projects');
+  const pipeline = () => findEntry('/projects');
+
+  it('la voce principale chiede il modulo e il permesso della Produzione AI', () => {
+    expect(produzioneAi().requiredModule).toBe('ai_production');
+    expect(produzioneAi().requiredPermission).toBe('ai_production.view');
+  });
+
+  it('tutte le sue sottovoci chiedono un permesso della Produzione AI', () => {
+    for (const child of produzioneAi().childrens) {
+      const chiavi = Array.isArray(child.requiredPermission)
+        ? child.requiredPermission
+        : [child.requiredPermission];
+
+      for (const chiave of chiavi) {
+        expect(chiave.startsWith('ai_production.')).toBe(true);
+      }
+    }
+  });
+
+  it('Impostazioni AI si apre a chi governa la spesa, non solo a chi configura', () => {
+    // I due pannelli dentro la pagina seguono permessi diversi: chi ha solo il
+    // budget deve poterci arrivare, o riceve un permesso che non puo' esercitare.
+    const impostazioni = produzioneAi().childrens.find((child) => child.path === '/agency/settings');
+    expect(impostazioni.requiredPermission).toContain('ai_production.manage_settings');
+    expect(impostazioni.requiredPermission).toContain('ai_production.manage_budget');
+  });
+
+  it('la Pipeline resta sui permessi suoi: e\' un\'altra area, non la stessa', () => {
+    expect(pipeline().requiredModule).toBe('projects');
+    expect(pipeline().requiredPermission).toBe('projects.view');
+  });
+});

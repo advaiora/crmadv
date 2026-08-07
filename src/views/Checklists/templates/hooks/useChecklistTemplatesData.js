@@ -20,10 +20,15 @@ import { filterVisibleTemplates, sumTemplateItems } from '../templatesPureFuncti
 // render, mai tenuti in uno stato proprio, altrimenti dopo un ricaricamento
 // resterebbero indietro.
 export const useChecklistTemplatesData = (access) => {
-  const canManageTemplates = hasPermission(access, 'checklists.manage_templates')
-    || hasPermission(access, 'checklists.edit');
-  const canCreateTemplate = canManageTemplates || hasPermission(access, 'checklists.create');
-  const canDeleteTemplate = canManageTemplates || hasPermission(access, 'checklists.delete');
+  // Solo 'checklists.manage_templates': era in OR con checklists.edit / .create /
+  // .delete, che nel catalogo esistono ma NESSUNA rotta del server controlla — le
+  // mutazioni sui modelli chiedono tutte manage_templates. Chi avesse ricevuto le
+  // tre chiavi da sole vedeva i pulsanti e prendeva un 403 al salvataggio: un
+  // permesso apparente. (Audit del 7/8/2026; le tre chiavi restano nel catalogo,
+  // sono segnate in roadmap fra le voci senza rotta.)
+  const canManageTemplates = hasPermission(access, 'checklists.manage_templates');
+  const canCreateTemplate = canManageTemplates;
+  const canDeleteTemplate = canManageTemplates;
 
   const templatesQuery = useChecklistTemplates();
   const assignableUsersQuery = useChecklistAssignableUsers({ enabled: canManageTemplates });

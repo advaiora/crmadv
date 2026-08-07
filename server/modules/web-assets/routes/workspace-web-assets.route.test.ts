@@ -3,7 +3,7 @@ import test from 'node:test';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { audit } from '../../../audit/audit.js';
 import { forbidden } from '../../../core/errors.js';
-import { type WebAssetsPermissionKey, WEB_ASSETS_PERMISSIONS } from '../policies.js';
+import { type WebAssetsPermissionKey, SEO_PERMISSIONS, WEB_ASSETS_PERMISSIONS } from '../policies.js';
 import { webAssetsService } from '../service.js';
 import {
   buildWorkspaceWebAssetsRoute,
@@ -148,6 +148,7 @@ type EnsureWebAssetsAccessFn = (
 
 const createTestApp = async (input: {
   ensureWebAssetsAccessFn?: EnsureWebAssetsAccessFn;
+  ensureSeoAccessFn?: EnsureWebAssetsAccessFn;
   requirePermissionFn?: (userId: string, workspaceId: string, permissionKey: string) => Promise<void>;
   webAssetsServiceApi?: typeof webAssetsService;
   auditLogFn?: typeof audit.log;
@@ -160,6 +161,14 @@ const createTestApp = async (input: {
       workspace: { id: 'workspace-1' },
     }));
 
+  // Le due rotte SEO hanno un cancello proprio (permessi seo.*): senza un finto anche
+  // per quello si finirebbe sul cancello vero, che va a database.
+  const ensureSeoAccessFn = input.ensureSeoAccessFn
+    ?? (async () => ({
+      user: { id: 'user-1' },
+      workspace: { id: 'workspace-1' },
+    }));
+
   const requirePermissionFn = input.requirePermissionFn ?? (async () => undefined);
   const webAssetsServiceApi = input.webAssetsServiceApi ?? buildMockWebAssetsService();
   const auditLogFn = input.auditLogFn ?? (async () => undefined);
@@ -167,6 +176,7 @@ const createTestApp = async (input: {
   await app.register(
     buildWorkspaceWebAssetsRoute({
       ensureWebAssetsAccessFn,
+      ensureSeoAccessFn: ensureSeoAccessFn as never,
       requirePermissionFn,
       webAssetsServiceApi,
       auditLogFn,
@@ -189,6 +199,15 @@ test('web-assets routes request expected permission for each endpoint', async ()
   try {
     app = await createTestApp({
       ensureWebAssetsAccessFn: async (_request, permissionKey) => {
+        requestedPermissions.push(permissionKey);
+        return {
+          user: { id: 'user-1' },
+          workspace: { id: 'workspace-1' },
+        } as never;
+      },
+      // Registrato nello stesso elenco: cosi' la sequenza attesa qui sotto dice
+      // anche QUALE cancello ha risposto, non solo con che permesso.
+      ensureSeoAccessFn: async (_request, permissionKey) => {
         requestedPermissions.push(permissionKey);
         return {
           user: { id: 'user-1' },
@@ -299,8 +318,8 @@ test('web-assets routes request expected permission for each endpoint', async ()
         WEB_ASSETS_PERMISSIONS.publish,
         WEB_ASSETS_PERMISSIONS.view,
         WEB_ASSETS_PERMISSIONS.edit,
-        WEB_ASSETS_PERMISSIONS.view,
-        WEB_ASSETS_PERMISSIONS.edit,
+        SEO_PERMISSIONS.view,
+        SEO_PERMISSIONS.runScan,
         WEB_ASSETS_PERMISSIONS.view,
         WEB_ASSETS_PERMISSIONS.edit,
         WEB_ASSETS_PERMISSIONS.edit,

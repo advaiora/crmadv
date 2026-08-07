@@ -33,12 +33,36 @@ export const TEAM_MODULE_KEY = 'team';
 export const DASHBOARD_MODULE_KEY = 'dashboard';
 export const MESSAGES_MODULE_KEY = 'messages';
 
+// Il modulo dell'area "Produzione AI" (7/8/2026, fase A2 del re-naming). Prima non
+// esisteva: le sue ~90 rotte — Brief, Fonti, Contenuti Web, Ads, Report, Alert,
+// Opportunita', Task, Performance — giravano tutte sui permessi di 'projects', cioe'
+// quelli della Pipeline. Conseguenze: far generare un contenuto all'AI (che SPENDE)
+// chiedeva lo stesso permesso di rinominare una scheda nel kanban, e non si poteva
+// dare a un ruolo la Pipeline senza dargli anche la Produzione AI.
+//   La chiave resta in inglese come le altre quindici: la fase B decidera' in blocco
+//   se e come italianizzarle. Il nome che l'utente legge e' gia' italiano.
+export const AI_PRODUCTION_MODULE_KEY = 'ai_production';
+
+// I cinque permessi dell'area. La separazione che conta e' 'generate': e' l'unica
+// azione che consuma il budget AI dell'agenzia, ed e' lo stesso principio gia'
+// applicato alla chat (view separato da use).
+export const AI_PRODUCTION_PERMISSIONS = {
+  view: 'ai_production.view',
+  edit: 'ai_production.edit',
+  generate: 'ai_production.generate',
+  manageSettings: 'ai_production.manage_settings',
+  manageBudget: 'ai_production.manage_budget',
+} as const;
+
+export type AiProductionPermissionKey =
+  (typeof AI_PRODUCTION_PERMISSIONS)[keyof typeof AI_PRODUCTION_PERMISSIONS];
+
 // Permessi della Chat AI (15/7/2026). Prima la chat girava tutta su 'projects.view':
 // inviare un messaggio — che SPENDE SOLDI — chiedeva lo stesso permesso della sola
 // lettura, e nessun ruolo poteva moderare un gruppo altrui. Modellati sul precedente
 // di 'messages' (view/send), che e' lo stesso problema: consultare != scrivere.
-// Stanno sotto il modulo 'projects' perche' e' quello che le rotte della chat
-// richiedono gia' (l'area Agency non ha un modulo suo).
+// Stavano sotto il modulo 'projects' per ripiego, "perche' l'area Agency non ha un
+// modulo suo": dal 7/8/2026 ce l'ha, e sono passati sotto quello (vedi il catalogo).
 export const CHAT_PERMISSIONS = {
   view: 'chat.view',
   use: 'chat.use',
@@ -86,6 +110,12 @@ export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   { key: 'departments', name: 'Departments', isCore: false, description: 'Departments module' },
   { key: 'clients', name: 'Clients', isCore: false, description: 'Clients module' },
   { key: 'projects', name: 'Projects', isCore: false, description: 'Projects module' },
+  {
+    key: AI_PRODUCTION_MODULE_KEY,
+    name: 'Produzione AI',
+    isCore: false,
+    description: "Area di produzione assistita dall'AI: Brief, Fonti, Contenuti Web, Ads, Report, Performance e chat AI",
+  },
   { key: 'checklists', name: 'Checklists', isCore: false, description: 'Checklists module' },
   { key: 'calendar', name: 'Calendar', isCore: false, description: 'Calendar module' },
   { key: 'quotes', name: 'Quotes', isCore: false, description: 'Quotes module' },
@@ -167,9 +197,15 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'messages.view', moduleKey: MESSAGES_MODULE_KEY, description: 'View internal messages' },
   { key: 'messages.send', moduleKey: MESSAGES_MODULE_KEY, description: 'Send internal messages' },
 
-  { key: CHAT_PERMISSIONS.view, moduleKey: 'projects', description: 'View AI chat sessions and their history' },
-  { key: CHAT_PERMISSIONS.use, moduleKey: 'projects', description: 'Write in the AI chat: send messages (spends AI budget), invite, attach, clear' },
-  { key: CHAT_PERMISSIONS.moderate, moduleKey: 'projects', description: "Moderate AI chat groups: remove members, take over and disband, without reading the messages" },
+  { key: AI_PRODUCTION_PERMISSIONS.view, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Vedere i progetti di Produzione AI e i loro contenuti' },
+  { key: AI_PRODUCTION_PERMISSIONS.edit, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Creare e modificare progetti, contenuti, report e dati di performance' },
+  { key: AI_PRODUCTION_PERMISSIONS.generate, moduleKey: AI_PRODUCTION_MODULE_KEY, description: "Far generare contenuti all'AI: consuma il budget AI dell'agenzia" },
+  { key: AI_PRODUCTION_PERMISSIONS.manageSettings, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Gestire le impostazioni AI: provider, chiavi, modelli e tipi di progetto' },
+  { key: AI_PRODUCTION_PERMISSIONS.manageBudget, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Gestire i budget AI e consultare il rendiconto dei consumi' },
+
+  { key: CHAT_PERMISSIONS.view, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'View AI chat sessions and their history' },
+  { key: CHAT_PERMISSIONS.use, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Write in the AI chat: send messages (spends AI budget), invite, attach, clear' },
+  { key: CHAT_PERMISSIONS.moderate, moduleKey: AI_PRODUCTION_MODULE_KEY, description: "Moderate AI chat groups: remove members, take over and disband, without reading the messages" },
 ] as const;
 
 export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
@@ -196,6 +232,14 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
         TEAM_PERMISSIONS.rolesAssign,
         // Prevent legacy broad grant if this permission exists in older databases.
         'team.manage',
+        // Impostazioni AI e budget restano al solo Superadmin, com'e' sempre stato:
+        // prima del 7/8/2026 quelle rotte non passavano dal catalogo ma da un
+        // controllo scritto a mano sul NOME del ruolo ('superadmin'). Ora sono
+        // permessi veri — assegnabili a un ruolo personalizzato — ma l'Admin non
+        // li eredita, o l'aggiunta al catalogo sarebbe un allargamento silenzioso.
+        // Stessa logica di 'modules.manage' qui sopra: configurazione di workspace.
+        AI_PRODUCTION_PERMISSIONS.manageSettings,
+        AI_PRODUCTION_PERMISSIONS.manageBudget,
       ],
     },
   },
@@ -239,8 +283,20 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'web.unpublish',
       'web.version.create',
       'web.version.rollback',
+      // SEO: fino al 7/8/2026 queste due azioni ricadevano su web.view e web.edit,
+      // che il Manager ha entrambe. Assegnarle qui tiene il comportamento identico
+      // ora che le rotte chiedono i permessi veri.
+      'seo.view',
+      'seo.run_scan',
       'messages.view',
       'messages.send',
+      // Produzione AI: il Manager ci lavora, quindi vede, modifica e fa generare.
+      // Corrisponde a cio' che poteva gia' fare quando l'area girava sui permessi
+      // della Pipeline (aveva projects.view/create/edit): nessun allargamento.
+      // Impostazioni e budget no: quelli restano al Superadmin.
+      AI_PRODUCTION_PERMISSIONS.view,
+      AI_PRODUCTION_PERMISSIONS.edit,
+      AI_PRODUCTION_PERMISSIONS.generate,
       // Il manager usa la chat, ma non modera i gruppi altrui: quella resta
       // ad Admin/Superadmin (che la prendono da 'all'/'all_except').
       CHAT_PERMISSIONS.view,
@@ -267,8 +323,17 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'calendar.edit',
       'quotes.view',
       'web.view',
+      // Leggere i report SEO seguiva web.view, che l'Operativo ha; lanciare una
+      // scansione no (serviva web.edit). Resta cosi'.
+      'seo.view',
       'messages.view',
       'messages.send',
+      // Solo lettura sulla Produzione AI: e' esattamente cio' che l'Operativo
+      // poteva fare finora (aveva projects.view ma non projects.edit, e le rotte
+      // di modifica e generazione chiedono edit). Se un domani si vuole che
+      // l'Operativo generi — cioe' spenda budget — e' una decisione da prendere
+      // apposta, non un effetto collaterale di questo riordino.
+      AI_PRODUCTION_PERMISSIONS.view,
       CHAT_PERMISSIONS.view,
       CHAT_PERMISSIONS.use,
     ],
@@ -288,8 +353,10 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'calendar.view',
       'quotes.view',
       'web.view',
+      'seo.view',
       'audit.view',
       'messages.view',
+      AI_PRODUCTION_PERMISSIONS.view,
       // Il Viewer e' in sola lettura: consulta le chat di cui fa parte ma non
       // scrive e non spende (niente chat.use). E' il punto della separazione.
       CHAT_PERMISSIONS.view,

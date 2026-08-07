@@ -36,6 +36,11 @@ export type ChatNavSuggestion = {
 // menu: solo le aree su cui "andare a fare qualcosa" ha senso come seguito di una
 // risposta. Le rotte sono quelle reali del menu (src/layout/Sidebar/SidebarMenu.jsx);
 // il server gia' conosce rotte di frontend altrove (es. dashboard.repository href).
+//
+// ⚠️ Questo elenco e' il GEMELLO del menu laterale: stesse voci, stessi moduli, stessi
+// permessi. Se cambia un permesso di la', va cambiato anche qui, o l'AI proporra' aree
+// che l'utente non puo' aprire (o tacera' su aree che potrebbe). E' successo il
+// 7/8/2026: il menu era stato aggiornato al modulo 'ai_production' e questo file no.
 export const CHAT_NAV_AREAS: ChatNavArea[] = [
   {
     key: 'dashboard',
@@ -50,8 +55,8 @@ export const CHAT_NAV_AREAS: ChatNavArea[] = [
     label: 'Produzione AI',
     route: '/agency/projects',
     description: 'Schede progetto su cui si lavora con l\'AI: Brief, Fonti indicizzate, contenuti e campagne.',
-    module: 'projects',
-    permission: 'projects.view',
+    module: 'ai_production',
+    permission: 'ai_production.view',
   },
   {
     key: 'board-progetti',
@@ -66,32 +71,32 @@ export const CHAT_NAV_AREAS: ChatNavArea[] = [
     label: 'Da risolvere',
     route: '/agency/alerts',
     description: 'Cosa sistemare nei progetti prima di generare contenuti o consegnare al cliente.',
-    module: 'projects',
-    permission: 'dashboard.view',
+    module: 'ai_production',
+    permission: 'ai_production.view',
   },
   {
     key: 'opportunita',
     label: 'Opportunita',
     route: '/agency/opportunities',
     description: 'Opportunita di upsell e nuove attivita rilevate sui progetti.',
-    module: 'projects',
-    permission: 'projects.view',
+    module: 'ai_production',
+    permission: 'ai_production.view',
   },
   {
     key: 'report',
     label: 'Report',
     route: '/agency/reports',
     description: 'Report e rendicontazione dei progetti dell\'agenzia.',
-    module: 'projects',
-    permission: 'dashboard.view',
+    module: 'ai_production',
+    permission: 'ai_production.view',
   },
   {
     key: 'impostazioni-agency',
     label: 'Impostazioni AI',
     route: '/agency/settings',
     description: 'Configurazione dell\'area Produzione AI, incluse le chiavi dei provider AI.',
-    module: 'projects',
-    permission: 'modules.manage',
+    module: 'ai_production',
+    permission: 'ai_production.manage_settings',
   },
   {
     key: 'clienti',

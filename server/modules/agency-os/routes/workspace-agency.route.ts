@@ -1,9 +1,9 @@
-import type { FastifyPluginAsync } from 'fastify';
-import { badRequest, forbidden } from '../../../core/errors.js';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { badRequest } from '../../../core/errors.js';
 import { ok } from '../../../core/response.js';
-import { getUserWorkspaceSystemRoleName, SYSTEM_ROLE_NAME } from '../../../auth/workspace-bootstrap.js';
 import { prisma } from '../../../prisma.js';
-import { PROJECTS_PERMISSIONS, ensureProjectsAccess } from '../../projects/projects.policies.js';
+import { rbacRepository } from '../../../repositories/rbac.repository.js';
+import { AI_PRODUCTION_PERMISSIONS, ensureAiProductionAccess } from '../agency.policies.js';
 import { CHAT_PERMISSIONS, ensureChatAccess } from '../chat.policies.js';
 import { agencyService } from '../agency.service.js';
 import { brandingRepository } from '../../../repositories/branding.repository.js';
@@ -71,29 +71,22 @@ const parseChatScopeTarget = (scope: unknown, targetId: unknown) => {
   throw badRequest('Ambito chat non valido.');
 };
 
-const isAgencySuperadmin = async (workspaceId: string, userId: string) => {
-  const roleName = await getUserWorkspaceSystemRoleName({
-    tx: prisma,
-    workspaceId,
-    userId,
-  });
+// Impostazioni AI, budget e consumi: fino al 7/8/2026 qui c'era un controllo scritto
+// a mano sul NOME del ruolo (isAgencySuperadmin -> 'superadmin'), che scavalcava del
+// tutto il catalogo dei permessi. Effetto: quelle azioni non comparivano nella pagina
+// "Ruoli e permessi" e nessun ruolo personalizzato poteva riceverle, per quanto lo si
+// volesse. Ora sono due permessi veri; il Superadmin resta l'unico ruolo di sistema
+// che li ha (l'Admin ne e' escluso apposta nel catalogo), quindi il comportamento a
+// parita' di ruolo e' identico a prima.
+const ensureAgencySettingsAccess = async (request: FastifyRequest) =>
+  ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.manageSettings);
 
-  return roleName === SYSTEM_ROLE_NAME.superadmin;
-};
-
-const ensureAgencySuperadminAccess = async (request: Parameters<typeof ensureProjectsAccess>[0]) => {
-  const access = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-  const canManage = await isAgencySuperadmin(access.workspace.id, access.user.id);
-  if (!canManage) {
-    throw forbidden('Solo un Superadmin puo gestire le impostazioni runtime Agency.');
-  }
-
-  return access;
-};
+const ensureAgencyBudgetAccess = async (request: FastifyRequest) =>
+  ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.manageBudget);
 
 const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get('/agency/projects', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const projects = await agencyService.listWorkspaceProjects(workspace.id);
 
     return ok(reply, {
@@ -102,7 +95,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Body: unknown }>('/agency/projects', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
     const project = await agencyService.createProject({
       workspaceId: workspace.id,
       body: request.body,
@@ -141,7 +134,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const project = await agencyService.getProject(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -153,7 +146,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/overview',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const overview = await agencyService.getProjectOverview(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -165,7 +158,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/brain',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const brain = await agencyService.getProjectBrain(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -177,7 +170,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/working-context',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const workingContext = await agencyService.buildProjectWorkingContext(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -189,7 +182,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/discovery',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const discovery = await agencyService.getProjectDiscovery(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -201,7 +194,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/discovery/regenerate-from-sources',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const discovery = await agencyService.regenerateProjectDiscoveryFromSources(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -213,7 +206,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/discovery/generate-from-sources',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const discovery = await agencyService.generateProjectDiscoveryFromSourcesWithAi(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -225,7 +218,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/discovery/regenerate-section',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const discovery = await agencyService.regenerateProjectDiscoverySectionFromSources({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -241,7 +234,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/discovery/generate-section',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const discovery = await agencyService.generateProjectDiscoverySectionWithAi({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -257,7 +250,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/sources',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const sources = await agencyService.getProjectSources(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -269,7 +262,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/sources',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const sources = await agencyService.saveProjectSources({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -285,7 +278,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/sources/files',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const file = await request.file();
       if (!file) {
         throw badRequest('Missing multipart file field.');
@@ -309,7 +302,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectFileParams; Querystring: AgencySourceFileQuery }>(
     '/agency/projects/:projectId/sources/files/:fileId',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const sourceFile = await agencyService.getProjectSourceFile({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -329,7 +322,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: AgencyProjectFileParams }>(
     '/agency/projects/:projectId/sources/files/:fileId',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const sources = await agencyService.deleteProjectSourceFile({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -345,7 +338,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/sources/competitors/search',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const body = typeof request.body === 'object' && request.body !== null
         ? request.body as { dryRun?: unknown }
         : {};
@@ -362,7 +355,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get('/agency/settings/provider-status', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const competitorSearch = await agencyService.getCompetitorSearchSettings(workspace.id);
 
     return ok(reply, {
@@ -371,7 +364,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.get('/agency/ai/status', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const ai = await agencyService.getAgencyAiStatus(workspace.id);
 
     return ok(reply, {
@@ -379,12 +372,19 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
     });
   });
 
+  // Sola lettura delle impostazioni: la vede chiunque entri nell'area, ma i valori
+  // sensibili (le chiavi dei provider) li scopre solo chi puo' anche modificarle —
+  // ecco perche' qui il permesso si CONTROLLA senza pretenderlo, invece di sbarrare.
   app.get('/agency/settings/runtime', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
-    const canManage = await isAgencySuperadmin(workspace.id, user.id);
+    const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
+    const [canManage, canManageBudget] = await Promise.all([
+      rbacRepository.hasPermission(user.id, workspace.id, AI_PRODUCTION_PERMISSIONS.manageSettings),
+      rbacRepository.hasPermission(user.id, workspace.id, AI_PRODUCTION_PERMISSIONS.manageBudget),
+    ]);
     const runtimeSettings = await agencyService.getAgencyRuntimeSettings({
       workspaceId: workspace.id,
       canManage,
+      canManageBudget,
     });
 
     return ok(reply, {
@@ -393,7 +393,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.put<{ Body: unknown }>('/agency/settings/runtime', async (request, reply) => {
-    const { user, workspace } = await ensureAgencySuperadminAccess(request);
+    const { user, workspace } = await ensureAgencySettingsAccess(request);
     const runtimeSettings = await agencyService.saveAgencyRuntimeSettings({
       workspaceId: workspace.id,
       actorUserId: user.id,
@@ -408,7 +408,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{
     Querystring: { days?: string; userId?: string; model?: string; functionName?: string; projectId?: string };
   }>('/agency/settings/ai-usage', async (request, reply) => {
-    const { workspace } = await ensureAgencySuperadminAccess(request);
+    const { workspace } = await ensureAgencyBudgetAccess(request);
     const parseDays = (raw?: string) => {
       const value = Number(raw);
       return Number.isFinite(value) && value > 0 ? value : 30;
@@ -863,21 +863,21 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get('/agency/ai/estimates', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const estimates = await agencyService.getWorkspaceAiCostEstimates(workspace.id);
 
     return ok(reply, { estimates });
   });
 
   app.get('/agency/settings/ai-budgets', async (request, reply) => {
-    const { workspace } = await ensureAgencySuperadminAccess(request);
+    const { workspace } = await ensureAgencyBudgetAccess(request);
     const budgets = await agencyService.getAiBudgets(workspace.id);
 
     return ok(reply, { budgets });
   });
 
   app.put<{ Body: unknown }>('/agency/settings/ai-budgets', async (request, reply) => {
-    const { workspace } = await ensureAgencySuperadminAccess(request);
+    const { workspace } = await ensureAgencyBudgetAccess(request);
     const budgets = await agencyService.saveAiBudgets({
       workspaceId: workspace.id,
       body: request.body,
@@ -889,7 +889,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/web',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const web = await agencyService.getProjectWeb(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -901,7 +901,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/web',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const web = await agencyService.saveProjectWeb({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -917,7 +917,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyWebProjectParams }>(
     '/agency/projects/:projectId/web-projects/:webProjectId/generate-ai',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const web = await agencyService.generateProjectWebProjectWithAi({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -933,7 +933,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyWebProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/web-projects/:webProjectId/generate-block-ai',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const web = await agencyService.generateProjectWebBlockWithAi({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -950,7 +950,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/ads',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const ads = await agencyService.getProjectAds(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -962,7 +962,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/ads',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const ads = await agencyService.saveProjectAds({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -978,7 +978,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/ads/generate-asset-ai',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const ads = await agencyService.generateProjectAdsAssetWithAi({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -994,7 +994,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/reports/input',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const input = await agencyService.buildProjectReportInput(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1006,7 +1006,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/reports/client/input',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const input = await agencyService.buildProjectClientReportInput(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1018,7 +1018,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/reports/client',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const clientReport = await agencyService.getProjectClientReport(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1030,7 +1030,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/reports/client',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const clientReport = await agencyService.saveProjectClientReport({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1048,7 +1048,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/reports/client/pdf',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const projectId = request.params.projectId;
 
       const [clientReport, branding, project] = await Promise.all([
@@ -1091,7 +1091,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/diagnosis/input',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const input = await agencyService.buildProjectDiagnosisInput(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1103,7 +1103,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/diagnosis',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const diagnosis = await agencyService.getProjectDiagnosis(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1115,7 +1115,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/diagnosis',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const diagnosis = await agencyService.saveProjectDiagnosis({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1131,7 +1131,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/reports',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const report = await agencyService.getProjectReport(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1143,7 +1143,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/reports',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const report = await agencyService.saveProjectReport({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1157,7 +1157,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get('/agency/reports', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const reports = await agencyService.getWorkspaceReports(workspace.id);
 
     return ok(reply, {
@@ -1168,7 +1168,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.put<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/discovery',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const discovery = await agencyService.saveProjectDiscovery({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1184,7 +1184,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/alerts',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const alerts = await agencyService.getProjectAlerts(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1196,7 +1196,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/alerts/sync',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const alerts = await agencyService.syncProjectAlerts(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1206,7 +1206,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get('/agency/alerts', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const alerts = await agencyService.getWorkspaceAlerts(workspace.id);
 
     return ok(reply, {
@@ -1217,7 +1217,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/opportunities/input',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const input = await agencyService.buildProjectOpportunityInput(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1229,7 +1229,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/opportunities',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const opportunities = await agencyService.getProjectOpportunities(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1241,7 +1241,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/opportunities/sync',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const opportunities = await agencyService.syncProjectOpportunities(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1251,7 +1251,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get('/agency/opportunities', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const opportunities = await agencyService.getWorkspaceOpportunities(workspace.id);
 
     return ok(reply, {
@@ -1262,7 +1262,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/tasks',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const tasks = await agencyService.getProjectTasks(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1274,7 +1274,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/tasks/sync',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const tasks = await agencyService.syncProjectTasks(workspace.id, request.params.projectId);
 
       return ok(reply, {
@@ -1289,7 +1289,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: AgencyProjectParams; Querystring: AgencyPerformanceSnapshotQuery }>(
     '/agency/projects/:projectId/performance/snapshots',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const snapshots = await performanceReportingService.listProjectSnapshots({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1303,7 +1303,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/performance/snapshots',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const snapshot = await performanceReportingService.createProjectSnapshot({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1319,7 +1319,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams; Body: unknown }>(
     '/agency/projects/:projectId/performance/refresh',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const snapshot = await performanceReportingService.refreshProjectSnapshot({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1334,7 +1334,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: AgencyPerformanceSnapshotParams }>(
     '/agency/projects/:projectId/performance/snapshots/:snapshotId',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.delete);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const deleted = await performanceReportingService.deleteProjectSnapshot({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -1347,7 +1347,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
 
   // Descrittori dei connettori (card della dashboard, modello "Provider AI").
   app.get('/agency/performance/connectors', async (request, reply) => {
-    await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const connectors = performanceReportingService.listConnectors();
 
     return ok(reply, { connectors });
@@ -1355,7 +1355,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
 
   // Set di metriche salvabili ("carne'"), condivisi a livello di workspace.
   app.get('/agency/performance/metric-sets', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const metricSets = await performanceReportingService.listMetricSets({
       workspaceId: workspace.id,
     });
@@ -1364,7 +1364,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.post<{ Body: unknown }>('/agency/performance/metric-sets', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+    const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
     const metricSet = await performanceReportingService.createMetricSet({
       workspaceId: workspace.id,
       userId: user.id,
@@ -1377,7 +1377,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.patch<{ Params: AgencyMetricSetParams; Body: unknown }>(
     '/agency/performance/metric-sets/:metricSetId',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const metricSet = await performanceReportingService.updateMetricSet({
         workspaceId: workspace.id,
         id: request.params.metricSetId,
@@ -1391,7 +1391,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.delete<{ Params: AgencyMetricSetParams }>(
     '/agency/performance/metric-sets/:metricSetId',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.delete);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const deleted = await performanceReportingService.deleteMetricSet({
         workspaceId: workspace.id,
         id: request.params.metricSetId,
@@ -1407,7 +1407,11 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/performance/excel/preview',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      // Spende: la proposta di mappatura delle colonne e' una chiamata AI vera
+      // ('reporting.excelMapping', excel-ingestion.service.ts), che passa dal tetto
+      // di budget e scrive una riga di costo. Il 'commit' qui sotto invece no: usa
+      // la mappatura gia' decisa e arrivata nel corpo della richiesta.
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.generate);
       const uploaded = await request.file();
       if (!uploaded) {
         throw badRequest('Nessun file caricato.');
@@ -1427,7 +1431,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/performance/excel/commit',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.create);
+      const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       let buffer: Buffer | null = null;
       let filename = 'import.xlsx';
       let mappingRaw = '';

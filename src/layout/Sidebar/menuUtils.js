@@ -62,6 +62,16 @@ export const canRenderMenuEntry = (entry, access) => {
     return false;
   }
 
+  // Un elenco significa "basta uno di questi", non "servono tutti": lo usa la voce
+  // Impostazioni AI, che apre una pagina con due pannelli governati da due permessi
+  // diversi (impostazioni e budget). Chi ne ha uno solo deve poterci arrivare.
+  if (Array.isArray(entry.requiredPermission)) {
+    if (!entry.requiredPermission.some((key) => hasPermission(access, key))) {
+      return false;
+    }
+    return true;
+  }
+
   if (entry.requiredPermission && !hasPermission(access, entry.requiredPermission)) {
     return false;
   }

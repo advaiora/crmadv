@@ -36,11 +36,12 @@ const resolveWorkspaceDefaultModuleEnabled = (moduleKey: string, isCore: boolean
     return true;
   }
 
-  // Keep SEO off by default until fully configured per workspace.
-  if (moduleKey === 'seo') {
-    return false;
-  }
-
+  // Il modulo 'seo' nasceva spento "finche' non e' configurato per workspace", ma
+  // non c'era niente da configurare e soprattutto nessuna rotta lo controllava: la
+  // scansione SEO girava sui permessi dei Siti in gestione, quindi l'interruttore
+  // non spegneva nulla. Dal 7/8/2026 le rotte SEO chiedono davvero il modulo (vedi
+  // ensureSeoAccess): lasciarlo spento di default farebbe sparire la scheda SEO da
+  // ogni workspace nuovo. Nasce acceso come gli altri; chi non lo vuole lo spegne.
   return true;
 };
 
@@ -388,7 +389,7 @@ export const ensureWorkspaceSystemRoles = async ({
     }),
   ]);
 
-  // Keep core modules always enabled and enable business modules by default (except SEO).
+  // Keep core modules always enabled and enable business modules by default.
   if (modules.length > 0) {
     await tx.workspaceModule.createMany({
       data: modules.map((moduleRecord) => ({

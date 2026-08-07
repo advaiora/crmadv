@@ -60,7 +60,7 @@ import {
 } from '../../modules/web-assets/ui/permissions';
 import '../../modules/web-assets/ui/web-assets-ui.css';
 import 'react-toastify/dist/ReactToastify.css';
-import { hasPermission } from '../../utils/workspaceAccess';
+import { hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
 
 const EMPTY_FORM = {
   assetType: 'website',
@@ -1139,6 +1139,11 @@ const WebAssetsPage = () => {
         const canDelete = hasPermission(access, WEB_ASSETS_PERMISSIONS.delete);
         const canPublish = hasPermission(access, WEB_ASSETS_PERMISSIONS.publish);
         const canAuditView = hasPermission(access, 'audit.view');
+        // La scheda SEO era sempre visibile perche' girava sui permessi dei Siti,
+        // che chi apre questa pagina ha per forza. Dal 7/8/2026 ha modulo e permessi
+        // suoi: senza questo controllo mostrerebbe un pannello che risponde 403.
+        const canViewSeo = hasModuleEnabled(access, 'seo') && hasPermission(access, 'seo.view');
+        const canRunSeoScan = canViewSeo && hasPermission(access, 'seo.run_scan');
         const latestSeoReport = seoReports[0] ?? null;
         const statusSelectDisabled = isWebAssetStatusFieldDisabled({
           submitting,
@@ -1861,13 +1866,15 @@ const WebAssetsPage = () => {
                       >
                         Maintenance
                       </Button>
-                      <Button
-                        size="sm"
-                        variant={detailSection === 'seo' ? 'primary' : 'outline-secondary'}
-                        onClick={() => setDetailSection('seo')}
-                      >
-                        SEO
-                      </Button>
+                      {canViewSeo && (
+                        <Button
+                          size="sm"
+                          variant={detailSection === 'seo' ? 'primary' : 'outline-secondary'}
+                          onClick={() => setDetailSection('seo')}
+                        >
+                          SEO
+                        </Button>
+                      )}
                       {canAuditView && (
                         <Button
                           size="sm"
@@ -2419,7 +2426,7 @@ const WebAssetsPage = () => {
                 </Card>
               )}
 
-              {selectedAsset && detailSection === 'seo' && (
+              {selectedAsset && detailSection === 'seo' && canViewSeo && (
                 <Card className="card-border mt-3">
                   <Card.Header className="bg-transparent border-0 pb-0">
                     <h5 className="mb-1">Audit SEO</h5>
@@ -2443,11 +2450,11 @@ const WebAssetsPage = () => {
                           value={seoKeywords}
                           onChange={(event) => setSeoKeywords(event.target.value)}
                           placeholder="es. agenzia marketing, siti web, milano"
-                          disabled={!canEdit}
+                          disabled={!canRunSeoScan}
                         />
                       </Col>
                       <Col md="auto">
-                        {canEdit ? (
+                        {canRunSeoScan ? (
                           <Button
                             type="button"
                             variant="primary"
@@ -2458,7 +2465,9 @@ const WebAssetsPage = () => {
                             {seoScanning ? 'Scansione...' : 'Esegui scansione'}
                           </Button>
                         ) : (
-                          <div className="small text-muted">Permesso web.edit richiesto per la scansione.</div>
+                          <div className="small text-muted">
+                            Serve il permesso &quot;Lanciare scansioni SEO&quot; per avviare l&apos;analisi.
+                          </div>
                         )}
                       </Col>
                     </Row>

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { badRequest } from '../../core/errors.js';
 import { ok } from '../../core/response.js';
-import { PROJECTS_PERMISSIONS, ensureProjectsAccess } from '../projects/projects.policies.js';
+import { AI_PRODUCTION_PERMISSIONS, ensureAiProductionAccess } from '../agency-os/agency.policies.js';
 import { indexSourceBestEffort } from './sources.indexing.js';
 import { sourcesService } from './sources.service.js';
 
@@ -23,8 +23,17 @@ const indexAfterWrite = (
     { logger },
   );
 
-// Modulo Fonti (V4). Le fonti appartengono a un progetto, quindi sono protette
-// dai permessi del modulo Progetti: lettura projects.view, gestione projects.edit.
+// Modulo Fonti (V4). Le fonti sono il materiale da cui l'AI genera il Brief e i
+// contenuti: fanno parte della Produzione AI, e dal 7/8/2026 sono protette dai
+// permessi di quell'area (lettura ai_production.view, gestione ai_production.edit)
+// invece che da quelli della Pipeline, che erano un ripiego.
+// ⚠️ L'indicizzazione RAG parte da sola dopo una scrittura e SPENDE: gli embeddings
+// scrivono una riga di costo ('sources.embed.index') nella stessa tabella che alimenta
+// il tetto giornaliero. Restano comunque sotto 'edit' e non sotto 'generate', ed e' una
+// scelta: caricare una fonte e' il lavoro ordinario di chi prepara un progetto, non
+// un'azione di generazione, e l'indicizzazione non e' nemmeno richiesta a parte — parte
+// da se'. Chi ha 'edit' senza 'generate' puo' quindi erodere un po' di budget; e' la
+// contropartita accettata per non rendere impossibile il caricamento delle fonti.
 
 type ProjectParams = { projectId: string };
 type SourceParams = { id: string };
@@ -33,7 +42,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Params: ProjectParams }>(
     '/projects/:projectId/sources',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
       const items = await sourcesService.listSources(workspace.id, request.params.projectId);
       return ok(reply, { items });
     },
@@ -42,7 +51,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: ProjectParams; Body: unknown }>(
     '/projects/:projectId/sources',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const source = await sourcesService.createSource({
         workspaceId: workspace.id,
         projectId: request.params.projectId,
@@ -59,7 +68,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: ProjectParams }>(
     '/projects/:projectId/sources/files',
     async (request, reply) => {
-      const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
 
       let file;
       try {
@@ -106,7 +115,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
   app.post<{ Params: ProjectParams }>(
     '/projects/:projectId/sources/reindex',
     async (request, reply) => {
-      const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+      const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
       const items = await sourcesService.listIndexableSources(workspace.id, request.params.projectId);
       let indexed = 0;
       let chunks = 0;
@@ -126,13 +135,13 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
   );
 
   app.get<{ Params: SourceParams }>('/sources/:id', async (request, reply) => {
-    const { workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.view);
+    const { workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.view);
     const source = await sourcesService.getSource(workspace.id, request.params.id);
     return ok(reply, { source });
   });
 
   app.post<{ Params: SourceParams }>('/sources/:id/refresh', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+    const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
     const source = await sourcesService.refreshSource({
       workspaceId: workspace.id,
       id: request.params.id,
@@ -144,7 +153,7 @@ const sourcesRoute: FastifyPluginAsync = async (app) => {
   });
 
   app.delete<{ Params: SourceParams }>('/sources/:id', async (request, reply) => {
-    const { user, workspace } = await ensureProjectsAccess(request, PROJECTS_PERMISSIONS.edit);
+    const { user, workspace } = await ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.edit);
     await sourcesService.deleteSource({
       workspaceId: workspace.id,
       id: request.params.id,

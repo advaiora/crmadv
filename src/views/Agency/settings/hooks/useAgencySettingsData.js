@@ -84,6 +84,10 @@ export const useAgencySettingsData = () => {
   }, [refreshSettings]);
 
   const canManage = Boolean(runtimeSettings?.canManage);
+  // Permesso distinto da canManage (7/8/2026): il rendiconto consumi e i tetti di
+  // spesa hanno un permesso loro. Il ripiego su canManage serve solo se il server e'
+  // di una versione precedente e non manda ancora il campo.
+  const canManageBudget = Boolean(runtimeSettings?.canManageBudget ?? runtimeSettings?.canManage);
   const storageReady = runtimeSettings?.storageReady !== false;
   const aiApiKeyConfigured = Boolean(runtimeSettings?.ai?.openAiApiKeyConfigured ?? (runtimeSettings?.ai?.apiKeyConfigured || aiStatus?.apiKeyConfigured));
   const anthropicApiKeyConfigured = Boolean(runtimeSettings?.ai?.anthropicApiKeyConfigured);
@@ -132,6 +136,7 @@ export const useAgencySettingsData = () => {
     setSaveState,
     refreshSettings,
     canManage,
+    canManageBudget,
     storageReady,
     aiApiKeyConfigured,
     anthropicApiKeyConfigured,

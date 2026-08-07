@@ -6,7 +6,9 @@ import { ok } from '../../../core/response.js';
 import { requirePermission } from '../../../guards/requirePermission.js';
 import { auditRepository } from '../../../repositories/audit.repository.js';
 import {
+  SEO_PERMISSIONS,
   WEB_ASSETS_PERMISSIONS,
+  ensureSeoAccess,
   ensureWebAssetsAccess,
 } from '../policies.js';
 import { webAssetsService } from '../service.js';
@@ -72,6 +74,9 @@ const UNPUBLISHABLE_STATUS = 'PAUSED';
 
 type WorkspaceWebAssetsRouteDependencies = {
   ensureWebAssetsAccessFn: typeof ensureWebAssetsAccess;
+  // La scheda SEO ha un cancello suo dal 7/8/2026: prima girava su web.view/web.edit
+  // e i permessi seo.* del catalogo non li controllava nessuno.
+  ensureSeoAccessFn?: typeof ensureSeoAccess;
   requirePermissionFn: typeof requirePermission;
   webAssetsServiceApi: typeof webAssetsService;
   auditLogFn: typeof audit.log;
@@ -79,6 +84,7 @@ type WorkspaceWebAssetsRouteDependencies = {
 
 const defaultDependencies: WorkspaceWebAssetsRouteDependencies = {
   ensureWebAssetsAccessFn: ensureWebAssetsAccess,
+  ensureSeoAccessFn: ensureSeoAccess,
   requirePermissionFn: requirePermission,
   webAssetsServiceApi: webAssetsService,
   auditLogFn: audit.log,
@@ -236,6 +242,7 @@ export const buildWorkspaceWebAssetsRoute = (
 ): FastifyPluginAsync => async (app) => {
   const {
     ensureWebAssetsAccessFn,
+    ensureSeoAccessFn = ensureSeoAccess,
     requirePermissionFn,
     webAssetsServiceApi,
     auditLogFn,
@@ -740,7 +747,7 @@ export const buildWorkspaceWebAssetsRoute = (
   });
 
   app.get<{ Params: unknown; Querystring: unknown }>('/web-assets/:id/seo/reports', async (request, reply) => {
-    const { workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.view);
+    const { workspace } = await ensureSeoAccessFn(request, SEO_PERMISSIONS.view);
     const params = parseParams(request.params);
     const query = parseMonitoringQuery(request.query);
     const items = await webAssetsServiceApi.listWebAssetSeoReports({
@@ -753,7 +760,7 @@ export const buildWorkspaceWebAssetsRoute = (
   });
 
   app.post<{ Params: unknown; Body: unknown }>('/web-assets/:id/seo/scan', async (request, reply) => {
-    const { user, workspace } = await ensureWebAssetsAccessFn(request, WEB_ASSETS_PERMISSIONS.edit);
+    const { user, workspace } = await ensureSeoAccessFn(request, SEO_PERMISSIONS.runScan);
     const params = parseParams(request.params);
     const payload = webAssetsServiceApi.parseSeoScanPayload(request.body);
     const result = await webAssetsServiceApi.runWebAssetSeoScan({

@@ -40,13 +40,18 @@ export const SidebarMenu = [
         name: "Produzione AI",
         icon: <Icons.Briefcase />,
         path: "/agency/projects",
-        requiredModule: "projects",
-        requiredPermission: "projects.view",
+        // Dal 7/8/2026 l'area ha un modulo e permessi suoi: prima usava quelli
+        // della Pipeline, che e' un'altra cosa. Le due voci qui sotto chiedevano
+        // 'dashboard.view' mentre il server chiedeva 'projects.view': con i ruoli
+        // di sistema non si vedeva (i due permessi viaggiano insieme), ma un ruolo
+        // personalizzato con la sola Dashboard vedeva il link e prendeva un 403.
+        requiredModule: "ai_production",
+        requiredPermission: "ai_production.view",
         childrens: [
           {
             name: "Progetti",
             path: "/agency/projects",
-            requiredPermission: "projects.view",
+            requiredPermission: "ai_production.view",
             grp_name: "apps",
           },
           {
@@ -55,25 +60,33 @@ export const SidebarMenu = [
             // rinominano insieme (roadmap, decisione ①).
             name: "Da risolvere",
             path: "/agency/alerts",
-            requiredPermission: "dashboard.view",
+            requiredPermission: "ai_production.view",
             grp_name: "apps",
           },
           {
             name: "Opportunita",
             path: "/agency/opportunities",
-            requiredPermission: "projects.view",
+            requiredPermission: "ai_production.view",
             grp_name: "apps",
           },
           {
             name: "Report",
             path: "/agency/reports",
-            requiredPermission: "dashboard.view",
+            requiredPermission: "ai_production.view",
             grp_name: "apps",
           },
           {
+            // Chiedeva 'modules.manage', cioe' il permesso di accendere e spegnere
+            // i moduli del workspace: un altro prestito. Ora chiede i permessi delle
+            // azioni che la pagina fa davvero — basta averne uno, perche' i pannelli
+            // dentro sono due e seguono permessi diversi (provider e chiavi da una
+            // parte, consumi e tetti di spesa dall'altra).
             name: "Impostazioni AI",
             path: "/agency/settings",
-            requiredPermission: "modules.manage",
+            requiredPermission: [
+              "ai_production.manage_settings",
+              "ai_production.manage_budget",
+            ],
             grp_name: "apps",
           },
         ],

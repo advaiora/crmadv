@@ -289,9 +289,10 @@ const ChecklistInstanceCard = ({
 const ProjectChecklistPanel = ({ project, access }) => {
   const checklistModuleEnabled = hasModuleEnabled(access, 'checklists');
   const canViewChecklists = hasPermission(access, 'checklists.view');
+  // 'checklists.create' tolto dall'OR: e' nel catalogo ma nessuna rotta lo controlla
+  // (audit del 7/8/2026), quindi accendeva un pulsante che il server rifiuta.
   const canCreateInstances = hasPermission(access, 'checklists.complete_item')
-    || hasPermission(access, 'checklists.manage_templates')
-    || hasPermission(access, 'checklists.create');
+    || hasPermission(access, 'checklists.manage_templates');
   const canCompleteItems = hasPermission(access, 'checklists.complete_item');
   const canAssignItems = hasPermission(access, 'checklists.assign');
 

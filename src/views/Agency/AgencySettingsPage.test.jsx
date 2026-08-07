@@ -58,6 +58,7 @@ const statoHook = (overrides = {}) => ({
   },
   saveState: { status: 'idle', message: '' },
   canManage: true,
+  canManageBudget: true,
   storageReady: true,
   aiApiKeyConfigured: true,
   anthropicApiKeyConfigured: false,
@@ -91,7 +92,7 @@ describe('AgencySettingsPage', () => {
     expect(screen.getByRole('heading', { name: 'Moduli attivi' })).toBeInTheDocument();
   });
 
-  // I due pannelli dei consumi sono per chi puo' gestire: montarli sempre
+  // I due pannelli dei consumi sono per chi governa la spesa: montarli sempre
   // farebbe partire chiamate al server anche in sola lettura.
   it('i pannelli consumi e budget compaiono solo a chi puo gestire', () => {
     render(<AgencySettingsPage />);
@@ -100,13 +101,33 @@ describe('AgencySettingsPage', () => {
   });
 
   it('in sola lettura i due pannelli spariscono ma i cataloghi restano', () => {
-    useAgencySettings.mockReturnValue(statoHook({ canManage: false }));
+    useAgencySettings.mockReturnValue(statoHook({ canManage: false, canManageBudget: false }));
     render(<AgencySettingsPage />);
 
     expect(screen.queryByTestId('pannello-consumi')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pannello-budget')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ruoli team' })).toBeInTheDocument();
     expect(screen.getByText(/Accesso in sola lettura/)).toBeInTheDocument();
+  });
+
+  // Dal 7/8/2026 impostazioni e budget sono due permessi distinti: la pagina deve
+  // saperli distinguere, o i pannelli tornano a comparire a chi prende 403.
+  it('chi governa la spesa ma non le impostazioni vede solo i due pannelli', () => {
+    useAgencySettings.mockReturnValue(statoHook({ canManage: false, canManageBudget: true }));
+    render(<AgencySettingsPage />);
+
+    expect(screen.getByTestId('pannello-consumi')).toBeInTheDocument();
+    expect(screen.getByTestId('pannello-budget')).toBeInTheDocument();
+    expect(screen.getByText(/Accesso in sola lettura/)).toBeInTheDocument();
+  });
+
+  it('chi configura i provider ma non la spesa non vede i pannelli del budget', () => {
+    useAgencySettings.mockReturnValue(statoHook({ canManage: true, canManageBudget: false }));
+    render(<AgencySettingsPage />);
+
+    expect(screen.queryByTestId('pannello-consumi')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pannello-budget')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'AI e Ricerca Competitor' })).toBeInTheDocument();
   });
 
   // I collegamenti che seguono fallirebbero in silenzio se un nome cambiasse:

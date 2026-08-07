@@ -47,13 +47,16 @@ const AgencySettingsPage = () => {
           />
         </Col>
 
-        {settings.canManage && (
+        {/* Consumi e budget seguono il loro permesso, non quello delle impostazioni:
+            sono due cose separate dal 7/8/2026. Chi puo' configurare i provider non
+            necessariamente governa la spesa, e viceversa. */}
+        {settings.canManageBudget && (
           <Col lg={12}>
             <AgencyAiUsagePanel />
           </Col>
         )}
 
-        {settings.canManage && (
+        {settings.canManageBudget && (
           <Col lg={12}>
             <AgencyAiBudgetPanel />
           </Col>
