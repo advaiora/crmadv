@@ -92,6 +92,16 @@ Per ogni cambiamento di schema che finisce su `main` si usano **solo migrazioni 
 
 Regola pratica quando si tocca lo schema: modifica `schema.prisma`, genera la migrazione con `prisma migrate dev`, **committa il file di migrazione** insieme al codice, e **segnala nell'handoff** che c'è una nuova migrazione (ricordando che l'arretrato `20260706085001` va riconciliato *prima*). **Non riscrivere migrazioni già applicate** (cambierebbe il loro checksum e romperebbe gli ambienti dove funzionano già).
 
+## Come nasce una cosa nuova: il nome e il permesso (dal 7/8/2026)
+
+Due regole che valgono per **ogni** pezzo di CRM che si aggiunge o si modifica. Nascono da un caso concreto: fra il 5 e il 7 agosto 2026 sono servite tre sessioni piene solo per rinominare a mano ciò che era nato con un nome sbagliato, e la pagina *Ruoli e permessi* si è ritrovata indietro di mesi rispetto al prodotto. Entrambe le cose si evitano scrivendole bene la prima volta.
+
+**① «Ruoli e permessi» si aggiorna insieme allo sviluppo, da sé.** Quando si aggiunge un pezzo di CRM — una rotta, un'area, un'azione che non tutti devono poter fare — la voce corrispondente nel catalogo (`server/auth/rbac-catalog.ts`) si crea **nello stesso lavoro**, senza che l'utente debba chiederlo. Non è una cortesia né un "poi lo aggiungiamo": è parte di ciò che significa **finito**. Il motivo è che una voce dimenticata non è un difetto estetico, è **una funzione che nessun ruolo può governare** — e non si vede finché qualcuno non ne ha bisogno. Attenzione al ripiego più comune, che è proprio quello da non fare: **appoggiarsi al permesso di un altro modulo** perché "tanto le rotte lo richiedono già". Così è finita la chat AI sotto il modulo `projects`, dove inviare un messaggio che *spende soldi* chiedeva lo stesso permesso della sola lettura.
+
+**② Il naming segue sempre la regola del re-naming.** Ogni elemento nuovo o modificato nasce già con un nome **in italiano, comprensibile e funzionale allo scopo**: dev'essere chiaro a chi lavora in agenzia, non a chi ha scritto il codice. Gli inglesismi si usano **solo dove sono il termine vero del mestiere** — i nomi delle cose dentro Google Ads e Meta (*Headline, Primary text, Keyword, Sitelink, Ad Group*, gli obiettivi di campagna), che tradotti renderebbero il CRM più italiano e meno usabile. Fuori da quei casi, l'inglese è un debito. Vale per le etichette a schermo, i titoli di pagina, le voci di menu e le descrizioni dei permessi; **e vale anche per i nomi tecnici** — chiavi, rotte, cartelle — quando si crea qualcosa da zero, così il codice e l'interfaccia non parlano due lingue diverse.
+
+> Il metodo con cui si sceglie un nome, i nomi già decisi e le alternative scartate col loro perché stanno in `archivio-documenti/03-roadmap-confronto-e-build.md`, voce **«Re-naming delle aree»**. Prima di inventare un nome nuovo, si guarda lì se quell'area ne ha già uno.
+
 ## Frontend `.jsx` — regole di manutenzione (dal 30/7/2026)
 
 Il frontend è la parte più fragile del progetto (niente tipi, storicamente niente test). Dal 30/7/2026 esiste una rete minima che va **mantenuta e allargata**, non aggirata:
