@@ -669,24 +669,33 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
   ---
 
-  ### 🔚 Fase C — il catalogo dei moduli in «Ruoli e permessi» *(decisa il 7/8/2026, si fa PER ULTIMA)*
+  ### 🔜 Fase A2 — «Ruoli e permessi»: italianizzare **e completare** *(decisa il 7/8/2026, si fa PRIMA della fase B)*
 
-  **Cos'è.** Il CRM è fatto a moduli (Clienti, Team, Progetti, Calendario, Credenziali…) e il sistema dei permessi ha bisogno di un elenco scritto di quali moduli esistono, per poter dire *"il ruolo X può vedere il modulo Y"*. Quell'elenco sta in `server/auth/rbac-catalog.ts:80-95` e i suoi nomi si leggono **nella pagina Ruoli e permessi**. Oggi sono tutti in inglese:
+  > ⚠️ **Questa voce sostituisce la "fase C" scritta poche ore prima nella stessa giornata**, che collocava il solo catalogo dei moduli in coda a tutto. Jacopo ha corretto: il lavoro è più largo di quel catalogo e **precede** la fase B. Se in un vecchio commit o handoff si legge "fase C — per ultima", è quella la versione superata.
+  >
+  > 🔸 **L'attrito noto e accettato:** la ragione per cui era stata messa dopo la B è che **la B tocca le chiavi dei permessi**, e ogni voce qui ha sia il nome visibile sia la chiave. Facendola prima, se poi la B rinomina una chiave, quella parte va ripassata. L'attrito è limitato — nome visibile e chiave sono campi diversi — ma chi esegue la B deve **ricontrollare** che l'audit fatto qui sia ancora allineato.
+
+  **Il lavoro è di tre pezzi, in quest'ordine.**
+
+  **① L'audit: cosa manca.** Il CRM è cresciuto (area Produzione AI, chat, Web Assets, Performance, Reportistica…) ma **«Ruoli e permessi» non ha tenuto il passo**: mancano voci che corrispondono a pezzi di prodotto già esistenti. Serve un **censimento accurato** — non a campione — di tutto ciò che oggi il CRM sa fare e che lì non è rappresentato, e poi l'aggiunta delle voci mancanti. È il pezzo più delicato: una voce dimenticata significa una funzione che nessun ruolo può governare.
+
+  **② L'italianizzazione.** Le voci si leggono nella pagina **Ruoli e permessi** e oggi sono in inglese. Il catalogo dei moduli sta in `server/auth/rbac-catalog.ts:80-95`:
 
   > Team · Departments · Clients · Projects · Checklists · Calendar · Quotes · Web · Vault · SEO · Messages
 
-  **⚠️ La regola decisa da Jacopo, che vale più della traduzione:** ogni voce del catalogo dev'essere **identica al nome deciso durante il re-naming** — *in italiano o in inglese, a seconda di cosa si è deciso per quella voce*. Non è «traduciamo tutto»: è «allineiamo tutto». Se un'area è rimasta con un nome inglese perché quello era giusto, il catalogo deve dire quel nome inglese. La tendenza generale di Jacopo è comunque verso l'italiano.
+  **⚠️ La regola di Jacopo, che vale più della traduzione:** ogni voce dev'essere **identica al nome deciso durante il re-naming** — *in italiano o in inglese, a seconda di cosa si è deciso per quella voce*. Non è «traduciamo tutto»: è «allineiamo tutto». La tendenza generale è verso l'italiano, ma dove un termine inglese è stato tenuto apposta, qui va tenuto uguale.
 
-  **Perché si fa per ultima, dopo A e dopo B.** Due ragioni, la seconda è quella che decide:
-  1. Il catalogo copre **tutto il CRM**, comprese aree che il re-naming non ha ancora toccato: allinearlo prima vorrebbe dire allinearlo a nomi non ancora decisi.
-  2. **Ogni voce ha sia il nome visibile sia la chiave** (`{ key: 'vault', name: 'Vault' }`), e la **fase B tocca proprio le chiavi dei permessi**. Farlo prima di B significherebbe rimetterci mano due volte. Facendolo per ultimo si sistema in un colpo solo, con la certezza che niente si muove più.
+  **③ Le due regole permanenti da mettere per iscritto in `CLAUDE.md`.** Sono la ragione per cui questo giro dovrà essere l'ultimo del suo genere:
+  - **«Ruoli e permessi» si aggiorna insieme allo sviluppo, da sé.** Quando si aggiunge un pezzo di CRM, la voce corrispondente si crea **nello stesso lavoro**, senza che l'utente debba chiederlo. Non è una cortesia: è parte del "finito".
+  - **Il naming segue sempre la regola del re-naming.** Ogni elemento nuovo o modificato nasce già con un nome **in italiano, comprensibile e funzionale allo scopo**, con inglesismi **solo dove sono il termine vero del mestiere** (es. i nomi delle cose dentro Google Ads e Meta). Così non servono più sessioni lunghe di ricontrollo e rinomina a mano come quella del 5-7/8/2026.
 
   **Quello che già si sa, per chi lo eseguirà:**
   - Due voci hanno già il loro nome deciso: `vault` → **Credenziali**, `web` → **Siti in gestione** (fase A, 7/8/2026).
-  - ⚠️ **`projects` va guardato con attenzione:** nel menu esistono ora **Pipeline** (l'operatività, il kanban) e **Produzione AI**, che sono due finestre sullo stesso `model Project`. Va deciso a quale delle due corrisponde il modulo — o se il modulo le copre entrambe, nel qual caso serve un nome che valga per tutte e due.
+  - ⚠️ **`projects` va guardato con attenzione:** nel menu esistono ora **Pipeline** (l'operatività, il kanban) e **Produzione AI**, che sono due finestre sullo stesso `model Project`. Va deciso a quale delle due corrisponde il modulo — o se le copre entrambe, nel qual caso serve un nome che valga per tutte e due.
   - **Non si tocca una voce sola.** Tradurne una lascerebbe una parola italiana in mezzo a dieci inglesi, che si legge come una svista invece che come una scelta.
-  - **I nomi vengono copiati nel database.** C'è una riscrittura automatica (`tx.module.upsert` in `workspace-bootstrap.ts:314`, che aggiorna `name` sulla chiave), **ma non parte a ogni avvio**: gira dentro `ensureWorkspaceSystemRoles`, cioè quando si crea un workspace o si rifanno i ruoli di sistema. È il **contrario** del caso dei moduli di progetto, dove bastava aprire la Panoramica. Quindi va verificato come far ripassare quella riscrittura sui workspace già esistenti, o i nomi vecchi resteranno a schermo.
-  - **Nulla è rotto oggi:** il legame fra nome e modulo passa dalla `key`, non dal `name`. È solo un'incoerenza di lettura, e la pagina la vedono solo gli amministratori.
+  - **I nomi vengono copiati nel database.** C'è una riscrittura automatica (`tx.module.upsert` in `workspace-bootstrap.ts:314`, che aggiorna `name` sulla chiave), **ma non parte a ogni avvio**: gira dentro `ensureWorkspaceSystemRoles`, cioè quando si crea un workspace o si rifanno i ruoli di sistema. È il **contrario** del caso dei moduli di progetto, dove bastava aprire la Panoramica. Va quindi verificato come far ripassare quella riscrittura sui workspace già esistenti, o i nomi vecchi resteranno a schermo.
+  - **Nulla è rotto oggi** sul fronte dei nomi: il legame fra nome e modulo passa dalla `key`, non dal `name`. Le voci **mancanti** (pezzo ①) sono invece un buco vero, non un'incoerenza estetica.
+  - Il catalogo dei permessi sta nello stesso file (`rbac-catalog.ts:150-170` circa, voci del tipo `vault.view_list`, `vault.reveal`): è lì che si vede quali azioni un ruolo può compiere, ed è lì che si misura cosa manca.
 
   **Dove collocare B — raccomandazione dell'assistente, da confermare con Jacopo.** Conviene spezzarlo:
   - **B1 — frontend (URL/rotte, nomi file e cartelle di `src/`):** è roba nostra, meccanica, senza decisioni di prodotto una volta che A ha fissato il vocabolario. Va fatto **subito dopo A** (stessa sessione se regge, altrimenti la successiva): è il pezzo che risolve davvero il problema di Jacopo, ed è quello che rincara aspettando.

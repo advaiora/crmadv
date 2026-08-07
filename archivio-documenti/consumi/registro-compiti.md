@@ -51,3 +51,4 @@
 | 2026-08-06 13:46 | Re-naming: rimozione tre schede + rimandi + gergo dai titoli (lavoro in autonomia /vado) | 55 min | 23,2 | 0,42 | esploratore×1 | -0,4 |
 | 2026-08-06 15:18 | Re-naming fase A: barra a quattro gruppi, pallini di priorita e rifiniture | 1h 31m | 37,8 | 0,42 | nessuno | — |
 | 2026-08-07 11:39 | Re-naming fase A: coda + gruppo B completo | 20h 07m | 82,8 | 0,07 | esploratore×1, revisore×2 | 39,6 |
+| 2026-08-07 13:58 | Re-naming fase A: gruppo B completo + revisione | 22h 26m | 94,5 | 0,07 | esploratore×1, revisore×2 | 44,8 |
