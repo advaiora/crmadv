@@ -170,7 +170,7 @@ describe('TechnicalReportView — la vista tecnica', () => {
     useAgencyProjectReportTechnical.mockReturnValue(statoTecnico());
     renderConRouter(<TechnicalReportView projectId="p1" />);
 
-    expect(screen.getByText('Project Snapshot')).toBeInTheDocument();
+    expect(screen.getByText('Fotografia del progetto')).toBeInTheDocument();
     expect(screen.getByText('Stato moduli')).toBeInTheDocument();
     expect(screen.getByText('Tracking incompleto')).toBeInTheDocument();
     expect(screen.getByText('Chiudere il tracking')).toBeInTheDocument();

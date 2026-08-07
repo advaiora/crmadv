@@ -12,9 +12,33 @@ const TYPE_ORDER = {
   improvement: 1,
 };
 
+// Tipo, priorita e stato arrivano dal server come chiavi inglesi. Prima qui si
+// metteva solo la maiuscola, quindi a schermo si leggeva "Critical",
+// "Improvement", "Commercial" in mezzo all'italiano.
+const READABLE_LABELS = {
+  critical: "Critica",
+  improvement: "Miglioramento",
+  commercial: "Commerciale",
+  strategic: "Strategica",
+  urgent: "Urgente",
+  high: "Alta",
+  medium: "Media",
+  low: "Bassa",
+  suggested: "Proposta",
+  accepted: "Accettata",
+  rejected: "Scartata",
+  in_progress: "In corso",
+  done: "Completata",
+};
+
 export const formatOpportunityLabel = (value, fallback = "N/A") => {
   if (typeof value !== "string" || !value.trim()) {
     return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (READABLE_LABELS[normalized]) {
+    return READABLE_LABELS[normalized];
   }
 
   return value

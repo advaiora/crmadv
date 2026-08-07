@@ -188,7 +188,7 @@ const TechnicalReportView = ({ projectId }) => {
         <Col lg={7}>
           <Card className="h-100">
             <Card.Body className="d-flex flex-column gap-2">
-              <div className="fw-semibold">Project Snapshot</div>
+              <div className="fw-semibold">Fotografia del progetto</div>
               <div className="small text-muted">
                 Progetto: <strong>{readableValue(output?.projectSnapshot?.projectName || input?.projectName || projectId)}</strong>
               </div>
@@ -237,7 +237,7 @@ const TechnicalReportView = ({ projectId }) => {
         <Col lg={4}>
           <Card className="h-100">
             <Card.Body>
-              <div className="fw-semibold mb-2">Top Alert</div>
+              <div className="fw-semibold mb-2">Segnalazioni principali</div>
               {renderAlerts(output?.topAlerts)}
             </Card.Body>
           </Card>
@@ -245,7 +245,7 @@ const TechnicalReportView = ({ projectId }) => {
         <Col lg={4}>
           <Card className="h-100">
             <Card.Body>
-              <div className="fw-semibold mb-2">Top Opportunities</div>
+              <div className="fw-semibold mb-2">Opportunita principali</div>
               <AgencyOpportunityList
                 opportunities={output?.topOpportunities || []}
                 groupBy="none"
@@ -257,7 +257,7 @@ const TechnicalReportView = ({ projectId }) => {
         <Col lg={4}>
           <Card className="h-100">
             <Card.Body>
-              <div className="fw-semibold mb-2">Top Tasks</div>
+              <div className="fw-semibold mb-2">Task principali</div>
               {renderTasks(output?.topTasks)}
             </Card.Body>
           </Card>
@@ -266,8 +266,8 @@ const TechnicalReportView = ({ projectId }) => {
 
       <Card>
         <Card.Body>
-          <div className="fw-semibold mb-2">Next Steps</div>
-          {renderStringList(output?.nextSteps, "Nessun next step disponibile nello snapshot corrente.")}
+          <div className="fw-semibold mb-2">Prossimi passi</div>
+          {renderStringList(output?.nextSteps, "Nessun prossimo passo disponibile in questa fotografia.")}
         </Card.Body>
       </Card>
     </AgencyProjectPageTemplate>

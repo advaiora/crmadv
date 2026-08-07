@@ -12,9 +12,30 @@ const PROJECT_STATUS_ORDER = {
   completed: 5,
 };
 
+// Le parole che arrivano dal server sono chiavi inglesi. Qui si traducono.
+// Prima questa funzione si limitava a mettere la maiuscola, quindi a schermo
+// comparivano "Draft", "Ready", "Partial" in una pagina per il resto italiana.
+//
+// Gli stati del progetto (discovery, planning, ...) NON sono in questo elenco
+// di proposito: restano in inglese finche' quello stato non diventa
+// modificabile dall'utente - vedi la decisione in roadmap.
+const READABLE_LABELS = {
+  draft: "Bozza",
+  partial: "Parziale",
+  ready: "Pronto",
+  missing: "Assente",
+  available: "Disponibile",
+  none: "Nessuno",
+};
+
 export const formatReportLabel = (value) => {
   if (typeof value !== "string" || !value.trim()) {
     return "N/A";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (READABLE_LABELS[normalized]) {
+    return READABLE_LABELS[normalized];
   }
 
   return value
