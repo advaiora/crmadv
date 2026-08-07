@@ -9,7 +9,7 @@ const QA_LINKS = [
     { label: 'Messaggi', path: '/apps/email' },
     { label: 'Preventivi', path: '/apps/quotes' },
     { label: 'Siti in gestione', path: '/apps/web-assets' },
-    { label: 'Vault', path: '/apps/vault' },
+    { label: 'Credenziali', path: '/apps/vault' },
     { label: 'Team', path: '/apps/team' },
     { label: 'Calendario', path: '/apps/calendar' },
     { label: 'Audit', path: '/audit' },

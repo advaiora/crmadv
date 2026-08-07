@@ -14,40 +14,13 @@ const TYPE_ORDER = {
 
 // Tipo, priorita e stato arrivano dal server come chiavi inglesi. Prima qui si
 // metteva solo la maiuscola, quindi a schermo si leggeva "Critical",
-// "Improvement", "Commercial" in mezzo all'italiano.
-const READABLE_LABELS = {
-  critical: "Critica",
-  improvement: "Miglioramento",
-  commercial: "Commerciale",
-  strategic: "Strategica",
-  urgent: "Urgente",
-  high: "Alta",
-  medium: "Media",
-  low: "Bassa",
-  suggested: "Proposta",
-  accepted: "Accettata",
-  rejected: "Scartata",
-  in_progress: "In corso",
-  done: "Completata",
-};
-
-export const formatOpportunityLabel = (value, fallback = "N/A") => {
-  if (typeof value !== "string" || !value.trim()) {
-    return fallback;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (READABLE_LABELS[normalized]) {
-    return READABLE_LABELS[normalized];
-  }
-
-  return value
-    .trim()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((entry) => entry.charAt(0).toUpperCase() + entry.slice(1))
-    .join(" ");
-};
+// "Improvement", "Open" in mezzo all'italiano.
+//
+// Il vocabolario e' uno solo per tutta l'area, in agencyStatusLabels: qui non
+// va aggiunta una seconda copia. In particolare gli stati sono quelli veri
+// dell'enum ProjectOpportunityStatus (open, proposed, won, lost, suggested):
+// il default e' "open", quindi sbagliarli si vede subito su ogni riga.
+export { toReadableLabel as formatOpportunityLabel } from "../labels/agencyStatusLabels";
 
 export const sortAgencyOpportunities = (items) => {
   if (!Array.isArray(items)) {

@@ -1,5 +1,6 @@
 import React from "react";
 import { Col, Form, Row } from "react-bootstrap";
+import { AI_FUNCTION_ENTRIES } from "../../../modules/agency-os/ai/aiFunctionLabels";
 
 // Riquadro "Limiti AI, cache e costi": timeout, tetti di caratteri e token,
 // modalita predefinita, dettagli tecnici e i modelli per singola funzione.
@@ -116,11 +117,12 @@ const SettingsAiLimitsPanel = ({ form, canManage, storageReady, onFieldChange })
           <Form.Text>
             Campo per esperti, facoltativo: serve a usare un modello diverso per un singolo lavoro.
             Le chiavi da scrivere sono i nomi tecnici delle funzioni:
-            <code className="ms-1">discovery.generateBrief</code> (Brief completo),
-            <code className="ms-1">discovery.generateSection</code> (Sezione del Brief),
-            <code className="ms-1">web.generateProject</code> (Struttura sito/landing),
-            <code className="ms-1">web.generateBlock</code> (Blocco sito),
-            <code className="ms-1">ads.generateAsset</code> (Copy campagna ADV).
+            {AI_FUNCTION_ENTRIES.map((entry, index) => (
+              <React.Fragment key={entry.functionName}>
+                {index === 0 ? " " : ", "}
+                <code>{entry.functionName}</code> ({entry.label})
+              </React.Fragment>
+            ))}.
           </Form.Text>
         </Form.Group>
       </Col>

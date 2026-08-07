@@ -1585,10 +1585,10 @@ const normalizeScopePurchased = (value: Prisma.JsonValue | null) => {
     return [
       { key: 'web', label: 'Sito web', purchased: scopeMap.website },
       { key: 'landing', label: 'Landing page', purchased: scopeMap.landing_page },
-      { key: 'ads', label: 'Campaign Ads', purchased: scopeMap.google_ads || scopeMap.meta_ads },
+      { key: 'ads', label: 'Campagne ADS', purchased: scopeMap.google_ads || scopeMap.meta_ads },
       { key: 'seo', label: 'SEO', purchased: scopeMap.seo },
-      { key: 'reporting', label: 'Reporting', purchased: scopeMap.reporting },
-      { key: 'diagnosis', label: 'Diagnosis', purchased: scopeMap.diagnosis },
+      { key: 'reporting', label: 'Report', purchased: scopeMap.reporting },
+      { key: 'diagnosis', label: 'Diagnosi', purchased: scopeMap.diagnosis },
     ];
   }
 

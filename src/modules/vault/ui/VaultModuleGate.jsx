@@ -9,7 +9,7 @@ const VaultModuleGate = ({
     <ModulePermissionGate
         requiredModule={VAULT_MODULE_KEY}
         requiredPermission={requiredPermission}
-        moduleName="Vault"
+        moduleName="Credenziali"
     >
         {children}
     </ModulePermissionGate>

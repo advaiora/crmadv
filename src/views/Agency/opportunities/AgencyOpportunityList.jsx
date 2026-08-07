@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useHistory } from "react-router-dom";
 import { rowActivationProps } from "../../../utils/rowActivation";
+import { toImpactLabel } from "../../../modules/agency-os/labels/agencyStatusLabels";
 import {
   formatOpportunityLabel,
   getOpportunityBadgeClass,
@@ -91,7 +92,7 @@ const AgencyOpportunityList = ({
 
                 <div className="small text-muted d-flex flex-wrap gap-3">
                   <span>Priorita stimata: {typeof entry.score === "number" ? entry.score : "Da valutare"}</span>
-                  <span>Impatto: {formatOpportunityLabel(entry.impactLevel)}</span>
+                  <span>Impatto: {toImpactLabel(entry.impactLevel)}</span>
                   <span>Origine: {formatOpportunityLabel(entry.sourceModule || entry.origin)}</span>
                   {entry.suggestedService && <span>Servizio suggerito: {formatOpportunityLabel(entry.suggestedService)}</span>}
                 </div>

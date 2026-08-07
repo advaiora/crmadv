@@ -52,8 +52,8 @@ const SecuritySummaryPlusWidget = ({ title = 'Security & compliance', data, load
           <Stat label="Audit 30g" value={summary.auditEvents30d} loading={loading} />
           <Stat label="Role changes 30g" value={summary.roleChanges30d} loading={loading} />
           <Stat label="Module toggles 30g" value={summary.moduleToggles30d} loading={loading} />
-          <Stat label="Vault reveals 7g" value={summary.vaultReveals7d} loading={loading} />
-          <Stat label="Vault reveals 30g" value={summary.vaultReveals30d} loading={loading} />
+          <Stat label="Credenziali viste 7g" value={summary.vaultReveals7d} loading={loading} />
+          <Stat label="Credenziali viste 30g" value={summary.vaultReveals30d} loading={loading} />
         </div>
 
         {!loading && (

@@ -14,6 +14,13 @@ const AI_FUNCTION_LABELS = {
   "ads.generateAsset": "Copy campagna ADV",
 };
 
+// Le stesse funzioni in ordine, per chi deve mostrarle in elenco (il testo
+// d'aiuto del campo "Modelli per funzione"): cosi' l'elenco non e' una terza
+// copia scritta a mano che si scorda di aggiornarsi.
+export const AI_FUNCTION_ENTRIES = Object.entries(AI_FUNCTION_LABELS).map(
+  ([functionName, label]) => ({ functionName, label }),
+);
+
 // Chi non e' in elenco si mostra com'e': meglio una chiave tecnica di una riga
 // vuota o di un consumo che sparisce dal rendiconto.
 export const toAiFunctionLabel = (value) => {

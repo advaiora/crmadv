@@ -11,21 +11,23 @@ export const TEAM_ROLES = [
   { key: "graphic_offline", label: "Graphic Offline", owner: "Materiali offline e adattamenti brand" },
 ];
 
-// I moduli con il nome che l'utente legge nelle schede di progetto. Prima qui
-// c'erano le chiavi tecniche ("sources/assets", "discovery", "client_report"),
-// mostrate cosi' com'erano: due elenchi intitolati "Moduli attivi" che dicevano
-// cose diverse, uno in italiano e uno in gergo interno.
+// I moduli, con il nome che l'utente legge nelle schede di progetto.
+//
+// ⚠️ Questo elenco deve corrispondere al catalogo vero, che sta nel backend
+// (buildRuleBasedActiveModules in agency.service.ts): prima conteneva le chiavi
+// tecniche ("sources/assets", "client_report") e voci che moduli non sono
+// (Panoramica), e ometteva Memoria. "Agency Brain" resta fuori perche' e'
+// l'unico modulo che la vista non mostra mai.
 export const MODULES = [
-  "Panoramica",
   "Fonti",
   "Brief",
+  "Memoria",
   "Contenuti Web",
   "Campagne ADS",
+  "Report",
+  "Da risolvere",
   "Opportunita",
   "Task",
-  "Report tecnico",
-  "Da risolvere",
-  "Report cliente",
 ];
 
 export const SEARCH_STATUS_LABEL = {

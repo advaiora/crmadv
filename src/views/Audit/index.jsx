@@ -19,7 +19,7 @@ const QUICK_FILTERS = [
   { label: 'Team', patch: { actionPrefix: 'team.' } },
   { label: 'Checklist', patch: { actionPrefix: 'checklists.' } },
   { label: 'Web', patch: { actionPrefix: 'web.' } },
-  { label: 'Vault', patch: { actionPrefix: 'vault.' } },
+  { label: 'Credenziali', patch: { actionPrefix: 'vault.' } },
   { label: 'Branding', patch: { actionPrefix: 'branding.' } },
 ];
 

@@ -34,9 +34,9 @@ const SecuritySummaryWidget = ({ title = 'Security summary', data, loading = fal
       icon={ShieldCheck}
     >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Tile label="Audit events (7d)" value={summary.auditEvents7d} loading={loading} />
-        <Tile label="Vault reveals (7d)" value={summary.vaultReveals7d} loading={loading} />
-        <Tile label="Vault reveals (30d)" value={summary.vaultReveals30d} loading={loading} />
+        <Tile label="Eventi di audit (7g)" value={summary.auditEvents7d} loading={loading} />
+        <Tile label="Credenziali viste (7g)" value={summary.vaultReveals7d} loading={loading} />
+        <Tile label="Credenziali viste (30g)" value={summary.vaultReveals30d} loading={loading} />
       </div>
     </WidgetCard>
   );
