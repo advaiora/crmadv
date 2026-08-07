@@ -11,7 +11,7 @@ const SettingsTeamRolesCard = () => (
         {TEAM_ROLES.map((entry) => (
           <div key={entry.key} className="border rounded-3 p-2">
             <div className="small fw-semibold">{entry.label}</div>
-            <div className="small text-muted">{entry.key} | {entry.owner}</div>
+            <div className="small text-muted">{entry.owner}</div>
           </div>
         ))}
       </div>

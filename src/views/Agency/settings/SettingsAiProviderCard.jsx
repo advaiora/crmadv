@@ -85,7 +85,8 @@ const SettingsAiProviderCard = ({
 
         {!storageReady && (
           <Alert variant="warning" role="alert" className="py-2">
-            Storage impostazioni non pronto. Applica la migration Agency runtime settings prima di salvare configurazioni dal CRM.
+            Le impostazioni non si possono ancora salvare: sul database manca la tabella che le conserva.
+            Serve applicare la migrazione <code>agency runtime settings</code> prima di configurare l&apos;AI da qui.
           </Alert>
         )}
 

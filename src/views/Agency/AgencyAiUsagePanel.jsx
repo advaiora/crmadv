@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Card, Col, Form, Row, Spinner, Table } from "react-bootstrap";
 import { getAgencyAiUsage } from "../../modules/agency-os/data/agencyDataAdapter";
+import { toAiFunctionLabel } from "../../modules/agency-os/ai/aiFunctionLabels";
 
 // Rendiconto consumi AI del workspace (V4 — cost control): totali, dettaglio per
 // dipendente, per funzione e per progetto, ultime chiamate, con filtri periodo/
@@ -191,7 +192,7 @@ const AgencyAiUsagePanel = () => {
                   <option value="">Tutte</option>
                   {options.functions.map((fn) => (
                     <option key={fn} value={fn}>
-                      {fn}
+                      {toAiFunctionLabel(fn)}
                     </option>
                   ))}
                 </Form.Select>
@@ -300,7 +301,7 @@ const AgencyAiUsagePanel = () => {
                   <tbody>
                     {usage.perFunction.map((row) => (
                       <tr key={row.functionName}>
-                        <td className="fw-semibold small">{row.functionName}</td>
+                        <td className="fw-semibold small">{toAiFunctionLabel(row.functionName)}</td>
                         <td className="text-end">{formatNum(row.calls)}</td>
                         <td className="text-end">{formatUsd(row.costUsd)}</td>
                         <td className="text-end">{formatNum(row.inputTokens)}</td>
@@ -371,7 +372,7 @@ const AgencyAiUsagePanel = () => {
                         <td>{row.userName}</td>
                         <td className={row.projectName ? "" : "text-muted"}>{row.projectName || "—"}</td>
                         <td className="text-muted">
-                          {row.functionName}
+                          {toAiFunctionLabel(row.functionName)}
                           {row.fromConversation && (
                             <Badge bg="secondary" className="ms-2 fw-normal">
                               chat

@@ -11,7 +11,7 @@ const SettingsScopeSourcesCard = ({ isDev }) => (
       <div className="d-flex flex-wrap gap-2">
         {AGENCY_PROJECT_SCOPE_OPTIONS.map((entry) => (
           <Badge key={entry.key} bg="light" text="dark" className="border">
-            {entry.label} ({entry.key})
+            {entry.label}
           </Badge>
         ))}
       </div>

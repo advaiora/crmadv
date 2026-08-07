@@ -85,7 +85,7 @@ describe('AgencySettingsPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Impostazioni AI', level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'AI e Ricerca Competitor' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Project types disponibili' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tipi di progetto disponibili' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Scope acquistabile' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ruoli team' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Moduli attivi' })).toBeInTheDocument();

@@ -114,7 +114,13 @@ const SettingsAiLimitsPanel = ({ form, canManage, storageReady, onFieldChange })
             placeholder='{"discovery.generateBrief":"gpt-4o-mini","web.generateBlock":"gpt-4o-mini"}'
           />
           <Form.Text>
-            JSON opzionale. Esempi funzione: discovery.generateBrief, discovery.generateSection, web.generateProject, web.generateBlock, ads.generateAsset.
+            Campo per esperti, facoltativo: serve a usare un modello diverso per un singolo lavoro.
+            Le chiavi da scrivere sono i nomi tecnici delle funzioni:
+            <code className="ms-1">discovery.generateBrief</code> (Brief completo),
+            <code className="ms-1">discovery.generateSection</code> (Sezione del Brief),
+            <code className="ms-1">web.generateProject</code> (Struttura sito/landing),
+            <code className="ms-1">web.generateBlock</code> (Blocco sito),
+            <code className="ms-1">ads.generateAsset</code> (Copy campagna ADV).
           </Form.Text>
         </Form.Group>
       </Col>

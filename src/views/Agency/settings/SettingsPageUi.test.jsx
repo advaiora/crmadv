@@ -223,10 +223,10 @@ describe('SettingsAiProviderCard', () => {
     expect(screen.getByRole('button', { name: 'Salva impostazioni' })).toBeDisabled();
   });
 
-  it('senza storage pronto avvisa della migration mancante', () => {
+  it('senza storage pronto avvisa che manca la migrazione', () => {
     render(<SettingsAiProviderCard {...cardGenitrice({ storageReady: false })} />);
 
-    expect(screen.getByText(/Applica la migration Agency runtime settings/)).toBeInTheDocument();
+    expect(screen.getByText(/manca la tabella che le conserva/)).toBeInTheDocument();
   });
 
   // Un errore e' un avviso da leggere subito, un esito riuscito no. Si guarda
@@ -276,14 +276,14 @@ describe('SettingsAiProviderCard', () => {
 });
 
 describe('cataloghi di sola lettura', () => {
-  it('i tipi di progetto elencano chiave e descrizione', () => {
+  it('i tipi di progetto elencano nome e descrizione, non la chiave tecnica', () => {
     render(<SettingsProjectTypesCard />);
 
     expect(screen.getByText('Website')).toBeInTheDocument();
     expect(screen.getByText('Landing Page')).toBeInTheDocument();
     expect(screen.getByText('Ecommerce')).toBeInTheDocument();
-    expect(screen.getByText(/^website \| /)).toBeInTheDocument();
-    expect(screen.getByText(/^ecommerce \| /)).toBeInTheDocument();
+    expect(screen.queryByText(/^website \| /)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^ecommerce \| /)).not.toBeInTheDocument();
   });
 
   it('gli scope mostrano anche lo stato dei dettagli tecnici', () => {
@@ -307,8 +307,10 @@ describe('cataloghi di sola lettura', () => {
   it('i moduli elencano le voci attive e la nota sui permessi', () => {
     render(<SettingsModulesCard />);
 
-    expect(screen.getByText('discovery')).toBeInTheDocument();
-    expect(screen.getByText('sources/assets')).toBeInTheDocument();
+    // I moduli si chiamano come le schede di progetto, non come le chiavi
+    // tecniche che c'erano prima ("discovery", "sources/assets").
+    expect(screen.getByText('Brief')).toBeInTheDocument();
+    expect(screen.getByText('Fonti')).toBeInTheDocument();
     expect(screen.getByText(/gestibili dal backend CRM solo da Superadmin/)).toBeInTheDocument();
   });
 });

@@ -11,17 +11,21 @@ export const TEAM_ROLES = [
   { key: "graphic_offline", label: "Graphic Offline", owner: "Materiali offline e adattamenti brand" },
 ];
 
+// I moduli con il nome che l'utente legge nelle schede di progetto. Prima qui
+// c'erano le chiavi tecniche ("sources/assets", "discovery", "client_report"),
+// mostrate cosi' com'erano: due elenchi intitolati "Moduli attivi" che dicevano
+// cose diverse, uno in italiano e uno in gergo interno.
 export const MODULES = [
-  "overview",
-  "sources/assets",
-  "discovery",
-  "web",
-  "ads",
-  "opportunities",
-  "tasks",
-  "reports",
-  "diagnosis",
-  "client_report",
+  "Panoramica",
+  "Fonti",
+  "Brief",
+  "Contenuti Web",
+  "Campagne ADS",
+  "Opportunita",
+  "Task",
+  "Report tecnico",
+  "Da risolvere",
+  "Report cliente",
 ];
 
 export const SEARCH_STATUS_LABEL = {
