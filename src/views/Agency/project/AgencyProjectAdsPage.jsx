@@ -19,7 +19,7 @@ import { ADS_WORKFLOW_STEPS } from "./ads/adsPageConstants";
 // campagna, poi si completano i dati, poi si generano gli asset o si salva.
 const buildNextAction = (adsProjects, missingLabels) => {
   if (!adsProjects?.length) {
-    return "Crea la prima campagna Ads collegata al progetto.";
+    return "Crea la prima campagna collegata al progetto.";
   }
   if (missingLabels.length > 0) {
     return `Completa ${missingLabels.slice(0, 2).join(", ")} prima del setup.`;
@@ -38,7 +38,7 @@ const AgencyProjectAdsPage = () => {
         subtitle="Workspace campagne per Google, Meta e checklist operative."
         dataMeta={ads.dataMeta}
       >
-        <p className="mb-0 text-muted small">Caricamento modulo Ads...</p>
+        <p className="mb-0 text-muted small">Caricamento delle Campagne ADS...</p>
       </AgencyProjectPageTemplate>
     );
   }
@@ -94,7 +94,7 @@ const AgencyProjectAdsPage = () => {
           Genera checklist
         </Button>
         <Button type="button" size="sm" variant="primary" onClick={ads.handleSave} disabled={ads.saving}>
-          {ads.saving ? "Salvataggio..." : "Salva Ads"}
+          {ads.saving ? "Salvataggio..." : "Salva"}
         </Button>
       </AgencyNextActionStrip>
 

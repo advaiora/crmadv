@@ -53,7 +53,7 @@ const AgencyProjectWebPage = () => {
         subtitle="Workspace per creare landing e pagine collegate a fonti, Brief e obiettivi progetto."
         dataMeta={web.dataMeta}
       >
-        <p className="mb-0 text-muted small">Caricamento modulo Web...</p>
+        <p className="mb-0 text-muted small">Caricamento dei Contenuti Web...</p>
       </AgencyProjectPageTemplate>
     );
   }
@@ -101,7 +101,7 @@ const AgencyProjectWebPage = () => {
           Genera struttura base
         </Button>
         <Button type="button" size="sm" variant="primary" onClick={web.handleSave} disabled={web.saving}>
-          {web.saving ? "Salvataggio..." : "Salva Web"}
+          {web.saving ? "Salvataggio..." : "Salva"}
         </Button>
       </AgencyNextActionStrip>
 

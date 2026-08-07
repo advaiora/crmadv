@@ -89,12 +89,12 @@ async function main() {
   // Creiamo i moduli attivi (come i progetti demo) cosi' il progetto test compare
   // in lista ed e' navigabile dalla UI.
   const MODULES = [
-    { moduleKey: 'discovery', moduleLabel: 'Discovery', included: true, suggested: false, active: true },
+    { moduleKey: 'discovery', moduleLabel: 'Brief', included: true, suggested: false, active: true },
     { moduleKey: 'brain', moduleLabel: 'Agency Brain', included: true, suggested: false, active: true },
-    { moduleKey: 'memory', moduleLabel: 'Memory', included: true, suggested: false, active: true },
-    { moduleKey: 'ads', moduleLabel: 'Ads', included: true, suggested: false, active: true },
-    { moduleKey: 'reports', moduleLabel: 'Reportistica', included: true, suggested: false, active: true },
-    { moduleKey: 'assets', moduleLabel: 'Assets', included: false, suggested: true, active: true },
+    { moduleKey: 'memory', moduleLabel: 'Memoria', included: true, suggested: false, active: true },
+    { moduleKey: 'ads', moduleLabel: 'Campagne ADS', included: true, suggested: false, active: true },
+    { moduleKey: 'reports', moduleLabel: 'Report', included: true, suggested: false, active: true },
+    { moduleKey: 'assets', moduleLabel: 'Fonti', included: false, suggested: true, active: true },
   ];
   await prisma.projectActiveModule.deleteMany({ where: { workspaceId, projectId: project.id } });
   await prisma.projectActiveModule.createMany({

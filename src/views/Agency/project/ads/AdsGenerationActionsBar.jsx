@@ -67,7 +67,7 @@ const AdsGenerationActionsBar = ({
         Ricarica
       </Button>
       <Button type="button" size="sm" variant="primary" onClick={onSave} disabled={saving}>
-        {saving ? "Salvataggio..." : "Salva output Ads"}
+        {saving ? "Salvataggio..." : "Salva Campagne ADS"}
       </Button>
     </div>
   </div>

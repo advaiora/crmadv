@@ -69,7 +69,7 @@ describe('WebGenerationActionsBar', () => {
 
     screen.getByRole('button', { name: 'Genera bozza base' }).click();
     screen.getByRole('button', { name: 'Wireframe' }).click();
-    screen.getByRole('button', { name: 'Salva output Web' }).click();
+    screen.getByRole('button', { name: 'Salva Contenuti Web' }).click();
 
     expect(azioni.onGenerateBaseDraft).toHaveBeenCalledTimes(1);
     expect(azioni.onGenerateWireframe).toHaveBeenCalledTimes(1);

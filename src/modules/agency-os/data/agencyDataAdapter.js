@@ -811,7 +811,7 @@ const buildFallbackTaskList = (projectId) => {
       id: `fallback-task-${normalizedProjectId}-2`,
       projectId: normalizedProjectId,
       title: "Impostare piano campagne ads sprint 1",
-      description: "Task fallback di avvio per area Ads.",
+      description: "Task di ripiego: il server non ha restituito i task del progetto.",
       teamRole: "ads_specialist",
       priority: "medium",
       status: "todo",

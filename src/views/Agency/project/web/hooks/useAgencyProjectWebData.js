@@ -35,7 +35,7 @@ export const useAgencyProjectWebData = (projectId) => {
       setDataMeta(readAgencyDataMeta(payload));
       getAgencyAiStatus().then((status) => setAiStatus(status)).catch(() => setAiStatus(null));
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Caricamento modulo Web non riuscito.");
+      setSaveError(error instanceof Error ? error.message : "Caricamento dei Contenuti Web non riuscito.");
     } finally {
       setLoading(false);
     }

@@ -91,7 +91,7 @@ const statoHook = (overrides = {}) => ({
 });
 
 // Serve un router vero attorno: a differenza delle pagine sorelle, qui la
-// striscia in cima ha un collegamento ad "Apri Discovery".
+// striscia in cima ha un collegamento ad "Apri il Brief".
 const montaCon = (overrides) => {
   useAgencyProjectAssets.mockReturnValue(statoHook(overrides));
   return render(<MemoryRouter><AgencyProjectAssetsPage /></MemoryRouter>);

@@ -45,7 +45,7 @@ export const useAgencyProjectAdsData = (projectId) => {
       setDataMeta(readAgencyDataMeta(payload));
       setAiStatus(nextAiStatus);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Caricamento modulo Ads non riuscito.");
+      setSaveError(error instanceof Error ? error.message : "Caricamento delle Campagne ADS non riuscito.");
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@ import React from "react";
 import { Badge, Card } from "react-bootstrap";
 import { MODULES } from "./settingsPageConstants";
 
-// Catalogo di sola lettura: i moduli Agency attivi.
+// Catalogo di sola lettura: i moduli attivi dell'area Produzione AI.
 const SettingsModulesCard = () => (
   <Card className="card-border h-100">
     <Card.Body>

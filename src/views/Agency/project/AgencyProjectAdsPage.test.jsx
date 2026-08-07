@@ -120,14 +120,14 @@ describe('AgencyProjectAdsPage', () => {
   it('mentre carica mostra solo l\'avviso di caricamento', () => {
     montaCon({ loading: true, adsState: null });
 
-    expect(screen.getByText('Caricamento modulo Ads...')).toBeInTheDocument();
+    expect(screen.getByText('Caricamento delle Campagne ADS...')).toBeInTheDocument();
     expect(screen.queryByText('Campagne Ads')).not.toBeInTheDocument();
   });
 
   it('anche a caricamento finito, senza dati resta sull\'avviso invece di esplodere', () => {
     montaCon({ loading: false, adsState: null });
 
-    expect(screen.getByText('Caricamento modulo Ads...')).toBeInTheDocument();
+    expect(screen.getByText('Caricamento delle Campagne ADS...')).toBeInTheDocument();
   });
 
   it('a dati caricati monta tutti i riquadri della pagina', () => {
@@ -148,7 +148,7 @@ describe('AgencyProjectAdsPage', () => {
   it('senza campagne create suggerisce di crearne una', () => {
     montaCon();
 
-    expect(screen.getByText(/Crea la prima campagna Ads collegata al progetto\./)).toBeInTheDocument();
+    expect(screen.getByText(/Crea la prima campagna collegata al progetto\./)).toBeInTheDocument();
   });
 
   it('con campagne create ma dati mancanti chiede di completare i primi due', () => {
@@ -201,7 +201,7 @@ describe('AgencyProjectAdsPage', () => {
     const handleSave = vi.fn();
     montaCon({ handleSave });
 
-    screen.getByRole('button', { name: 'Salva Ads' }).click();
+    screen.getByRole('button', { name: 'Salva Campagne ADS' }).click();
 
     expect(handleSave).toHaveBeenCalledTimes(1);
   });

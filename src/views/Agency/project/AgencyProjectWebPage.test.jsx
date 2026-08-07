@@ -100,14 +100,14 @@ describe('AgencyProjectWebPage', () => {
   it('mentre carica mostra solo l\'avviso di caricamento', () => {
     montaCon({ loading: true, webState: null });
 
-    expect(screen.getByText('Caricamento modulo Web...')).toBeInTheDocument();
+    expect(screen.getByText('Caricamento dei Contenuti Web...')).toBeInTheDocument();
     expect(screen.queryByText('Landing e pagine')).not.toBeInTheDocument();
   });
 
   it('anche a caricamento finito, senza dati resta sull\'avviso invece di esplodere', () => {
     montaCon({ loading: false, webState: null });
 
-    expect(screen.getByText('Caricamento modulo Web...')).toBeInTheDocument();
+    expect(screen.getByText('Caricamento dei Contenuti Web...')).toBeInTheDocument();
   });
 
   it('a dati caricati monta tutti i riquadri della pagina', () => {
@@ -161,7 +161,7 @@ describe('AgencyProjectWebPage', () => {
     const handleSave = vi.fn();
     montaCon({ handleSave });
 
-    screen.getByRole('button', { name: 'Salva Web' }).click();
+    screen.getByRole('button', { name: 'Salva Contenuti Web' }).click();
 
     expect(handleSave).toHaveBeenCalledTimes(1);
   });

@@ -2374,8 +2374,8 @@ type AgencyAiEstimatableFunction = {
 };
 
 const AGENCY_AI_ESTIMATABLE_FUNCTIONS: AgencyAiEstimatableFunction[] = [
-  { functionName: 'discovery.generateBrief', label: 'Brief Discovery completo', seedInputTokens: 4000, seedOutputTokens: 2000 },
-  { functionName: 'discovery.generateSection', label: 'Sezione Discovery', seedInputTokens: 2500, seedOutputTokens: 800 },
+  { functionName: 'discovery.generateBrief', label: 'Brief completo', seedInputTokens: 4000, seedOutputTokens: 2000 },
+  { functionName: 'discovery.generateSection', label: 'Sezione del Brief', seedInputTokens: 2500, seedOutputTokens: 800 },
   { functionName: 'web.generateProject', label: 'Struttura sito/landing', seedInputTokens: 3000, seedOutputTokens: 1500 },
   { functionName: 'web.generateBlock', label: 'Blocco sito', seedInputTokens: 1500, seedOutputTokens: 600 },
   { functionName: 'ads.generateAsset', label: 'Copy campagna ADV', seedInputTokens: 1500, seedOutputTokens: 500 },
@@ -5690,7 +5690,7 @@ const buildRuleBasedAlerts = (input: {
       severity: 'MEDIUM',
       status: 'SUGGESTED',
       priority: 'MEDIUM',
-      reason: 'Discovery senza offerta esplicita.',
+      reason: 'Brief senza offerta esplicita.',
     });
   }
 
@@ -5700,7 +5700,7 @@ const buildRuleBasedAlerts = (input: {
       severity: 'HIGH',
       status: 'SUGGESTED',
       priority: 'HIGH',
-      reason: 'Discovery senza audience o cliente ideale esplicito.',
+      reason: 'Brief senza audience o cliente ideale esplicito.',
     });
   }
 
@@ -5710,7 +5710,7 @@ const buildRuleBasedAlerts = (input: {
       severity: 'HIGH',
       status: 'SUGGESTED',
       priority: 'HIGH',
-      reason: 'Discovery senza obiettivo operativo o KPI chiaro.',
+      reason: 'Brief senza obiettivo operativo o KPI chiaro.',
     });
   }
 
@@ -5720,7 +5720,7 @@ const buildRuleBasedAlerts = (input: {
       severity: 'MEDIUM',
       status: 'SUGGESTED',
       priority: 'MEDIUM',
-      reason: 'Discovery senza call to action primaria utilizzabile da Web/Ads.',
+      reason: 'Brief senza call to action primaria utilizzabile da Contenuti Web o Campagne ADS.',
     });
   }
 
@@ -7781,7 +7781,7 @@ export const agencyService = {
       status: extraction.parseStatus === 'parsed' || extraction.parseStatus === 'partial' ? 'parsed' : 'uploaded',
       source: 'manual_upload',
       notes: extraction.parseStatus === 'parsed'
-        ? 'File caricato e testo estratto per la Discovery.'
+        ? 'File caricato e testo estratto per il Brief.'
         : extraction.parseStatus === 'partial'
           ? 'File caricato e testo estratto parzialmente. Verifica o integra con testo manuale.'
         : extraction.parseStatus === 'unsupported'
@@ -7932,7 +7932,7 @@ export const agencyService = {
           manualNotesAvailable: project.sources.manualNotes.length > 0,
         },
         message: isTimeout
-          ? 'La ricerca online ha richiesto troppo tempo ed e stata interrotta. Riprova tra poco o usa un modello piu veloce nelle Impostazioni Agency.'
+          ? 'La ricerca online ha richiesto troppo tempo ed e stata interrotta. Riprova tra poco o usa un modello piu veloce nelle Impostazioni AI.'
           : `Ricerca online configurata, ma la chiamata al provider non e riuscita. Dettaglio tecnico: ${detail}`,
       };
     }
@@ -7949,7 +7949,7 @@ export const agencyService = {
         projectType: project.projectType?.key ?? null,
         manualNotesAvailable: project.sources.manualNotes.length > 0,
       },
-      message: 'Ricerca automatica non ancora configurata. Puoi inserire competitor manualmente o configurare un provider in Impostazioni Agency.',
+      message: 'Ricerca automatica non ancora configurata. Puoi inserire competitor manualmente o configurare un provider in Impostazioni AI.',
     };
   },
 

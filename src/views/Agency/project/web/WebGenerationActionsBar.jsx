@@ -69,7 +69,7 @@ const WebGenerationActionsBar = ({
         Ricarica
       </Button>
       <Button type="button" size="sm" variant="primary" onClick={onSave} disabled={saving}>
-        {saving ? "Salvataggio..." : "Salva output Web"}
+        {saving ? "Salvataggio..." : "Salva Contenuti Web"}
       </Button>
     </div>
   </div>
