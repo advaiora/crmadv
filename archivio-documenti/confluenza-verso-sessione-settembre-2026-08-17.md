@@ -113,7 +113,11 @@ Il piano la dà come *«quasi chiusa dal re-naming»*. Vero, e oggi è migliorat
 
 Al momento della scrittura, `main` locale è **avanti di due commit** rispetto a `origin/main` (fermo a `7e7cb07`). Se al tuo turno risultano già pushati, qualcuno l'ha fatto dopo.
 
-**Ordine consigliato per te:** `git pull` (o verifica di essere allineato) → committa il tuo documento → push. Non serve nessun `rebase` complicato: i due lavori toccano **file diversi**.
+**Ordine consigliato per te:** `git pull` (o verifica di essere allineato) → committa il tuo lavoro → push.
+
+⚠️ **Un file lo state toccando in due, ed è l'unico: `archivio-documenti/03-roadmap-confronto-e-build.md`.** Mentre scrivevo questo documento (ore 14:45) tu ci stavi innestando la release di settembre — 73 righe, la sezione *«FUORI NUMERAZIONE — RELEASE DI SETTEMBRE 2026»*. **Non l'ho toccata e non l'ho committata.** Le mie modifiche alla roadmap sono in commit già chiusi (`7e7cb07`, `39167f7`, `a668a5c`) e stanno in **punti diversi del file** — la voce «Re-naming delle aree» e la sezione del debito tecnico, non la testa del documento dove stai scrivendo tu.
+
+Quindi: se al `pull` esce un conflitto su quel file, è **di sovrapposizione testuale, non di sostanza** — le due modifiche non si contraddicono, vanno tenute entrambe. Tutto il resto tocca file diversi.
 
 **Registro compiti:** la riga annotata oggi riporta una durata di **232h**, che è falsa — il registro misura dall'ultima annotazione, che è del 7/8. Il **consumo** (47,9 unità) è invece attendibile. Non fidarti della colonna durata su sessioni distanti.
 
