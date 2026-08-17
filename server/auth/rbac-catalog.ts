@@ -108,9 +108,17 @@ export type SystemRoleDefinition = {
 // "Vault". Dove il termine inglese e' quello vero del mestiere (SEO, Ads, Brief) resta
 // inglese: allineare non vuol dire tradurre tutto.
 export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
+  // ⚠️ Queste due voci sono ACCORCIATE rispetto al menu, che dice "Branding Workspace" e
+  // "Gestione Moduli" (SidebarMenu.jsx:342 e :349, e cosi' si chiamano anche le due
+  // pagine). Qui il contesto lo da' gia' la colonna dei moduli, quindi ripetere
+  // "Gestione" e "Workspace" sarebbe rumore. Non e' un disallineamento sfuggito: e' la
+  // stessa scelta fatta per "Impostazioni Pipeline" -> "Impostazioni" sotto un genitore
+  // che dice gia' Pipeline.
+  //   🔸 Da riguardare quando si esegue il nuovo gruppo "Impostazioni" del menu
+  //   (decisioni-cliente-e-menu-2026-08-07.md §3.2): li' dentro anche il menu potrebbe
+  //   accorciarsi a "Moduli" e "Branding", e allora le due copie combacerebbero da sole.
+  // "Branding" resta comunque inglese perche' e' il termine del mestiere.
   { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
-  // "Branding" resta inglese: e' il termine del mestiere, ed e' gia' il nome della
-  // pagina e della voce nel profilo. Tradurlo qui creerebbe due nomi per la stessa cosa.
   { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
   { key: 'audit', name: 'Audit', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
   { key: DASHBOARD_MODULE_KEY, name: 'Dashboard', isCore: true, description: 'Panoramica operativa del workspace' },
@@ -151,7 +159,12 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: TEAM_PERMISSIONS.view, moduleKey: TEAM_MODULE_KEY, description: 'Vedere le persone del team' },
   { key: TEAM_PERMISSIONS.invite, moduleKey: TEAM_MODULE_KEY, description: 'Invitare nuove persone nel workspace' },
   { key: TEAM_PERMISSIONS.edit, moduleKey: TEAM_MODULE_KEY, description: 'Modificare i dati delle persone del team' },
-  { key: TEAM_PERMISSIONS.deactivate, moduleKey: TEAM_MODULE_KEY, description: 'Disattivare una persona del team' },
+  // ⚠️ Governa TRE azioni, non una: disattiva, riattiva e rimuove. La rimozione e' un
+  // hard delete della membership, ma ha un secondo cancello dentro il service
+  // (team.service.ts:416-419) che la lascia al solo Superadmin: chi ha questo permesso
+  // senza esserlo disattiva e riattiva, e sulla rimozione prende un 403. La descrizione
+  // lo dice, o si concede credendo di concedere la sola disattivazione.
+  { key: TEAM_PERMISSIONS.deactivate, moduleKey: TEAM_MODULE_KEY, description: 'Disattivare e riattivare una persona del team, e rimuoverla (la rimozione resta comunque al solo Superadmin)' },
   { key: TEAM_PERMISSIONS.rolesAssign, moduleKey: TEAM_MODULE_KEY, description: 'Cambiare il ruolo di una persona del team' },
 
   { key: 'departments.view', moduleKey: 'departments', description: 'Vedere i reparti' },
@@ -160,7 +173,15 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
 
   { key: 'clients.view', moduleKey: 'clients', description: 'Vedere i clienti' },
   { key: 'clients.create', moduleKey: 'clients', description: 'Creare clienti' },
-  { key: 'clients.edit', moduleKey: 'clients', description: 'Modificare i clienti' },
+  // ⚠️ Molto piu' largo del nome: oltre alla scheda cliente governa le DEFINIZIONI dei
+  // campi personalizzati (custom-fields.route.ts, le quattro rotte di scrittura — la
+  // lettura passa da clients.view) e la
+  // CONFIGURAZIONE delle integrazioni (integrations.route.ts) — dove "configurare"
+  // include salvare ed eliminare la chiave API del provider Brevo e lanciare la
+  // sincronizzazione dei clienti verso l'esterno. Ne' i campi personalizzati ne' le
+  // integrazioni hanno un permesso proprio: si appoggiano a questo (scelta dichiarata a
+  // commento in quei due file). Chi lo concede va messo in condizione di saperlo.
+  { key: 'clients.edit', moduleKey: 'clients', description: 'Modificare i clienti, definire i loro campi personalizzati e configurare le integrazioni, chiave del provider compresa' },
   { key: 'clients.delete', moduleKey: 'clients', description: 'Eliminare clienti' },
   { key: 'projects.view', moduleKey: 'projects', description: 'Vedere i progetti della Pipeline' },
   { key: 'projects.view_all', moduleKey: 'projects', description: "Vedere TUTTI i progetti del workspace, anche quelli di altri reparti o non assegnati" },
@@ -170,13 +191,32 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'projects.move_stage', moduleKey: 'projects', description: 'Spostare un progetto fra le colonne della bacheca' },
   { key: 'checklists.view', moduleKey: 'checklists', description: 'Vedere i memo operativi' },
   { key: 'checklists.manage_templates', moduleKey: 'checklists', description: 'Creare, modificare e archiviare i modelli di memo' },
-  // ⚠️ Le tre chiavi che seguono NON sono controllate da nessuna rotta: le mutazioni
-  // sui modelli passano tutte da manage_templates. Restano nel catalogo per non
-  // toglierle a chi le ha, ma oggi non governano niente (annotato in roadmap).
+  // ⚠️ Le tre chiavi che seguono non sono controllate da NESSUNA ROTTA: le mutazioni sui
+  // modelli passano tutte da manage_templates. Restano nel catalogo per non toglierle a
+  // chi le ha (annotato in roadmap).
+  //   MA "nessuna rotta" non vuol dire "niente": 'checklists.edit' e' letta FUORI dalle
+  //   rotte, da dashboard.policies.ts:121, dove concorre ad alzare a "manager" il livello
+  //   dell'utente sulla Dashboard — e il livello decide quali riquadri vede. Quindi chi
+  //   un domani volesse cancellare queste tre chiavi cancelli pure create e delete, ma
+  //   NON edit senza prima passare da li'.
+  //   Per misurarne l'impatto vero prima di toccarla: sta in un OR con altre sei chiavi
+  //   (team.edit, projects.edit, projects.move_stage, quotes.send, quotes.accept,
+  //   checklists.assign), quindi cancellarla cambia la Dashboard solo ai ruoli che hanno
+  //   'checklists.edit' e NESSUNA delle altre sei. Caso raro, ma silenzioso.
   { key: 'checklists.create', moduleKey: 'checklists', description: 'Creare modelli di memo (in disuso: vale manage_templates)' },
-  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Modificare modelli di memo (in disuso: vale manage_templates)' },
+  { key: 'checklists.edit', moduleKey: 'checklists', description: 'Modificare modelli di memo (sui modelli vale manage_templates; questo concorre a definire il livello della Dashboard)' },
   { key: 'checklists.delete', moduleKey: 'checklists', description: 'Archiviare modelli di memo (in disuso: vale manage_templates)' },
-  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Spuntare le voci di un memo in corso' },
+  // ⚠️ Non solo spuntare: e' anche il permesso che AVVIA un memo su un progetto (crea
+  // l'istanza, da sola o in blocco per lo stage), che riapre una voce gia' chiusa e che
+  // la segna "non applicabile". L'assegnazione delle voci alle persone invece no: quella
+  // e' 'checklists.assign', qui sotto.
+  //   ⚠️⚠️ "Non applicabile" NON e' una spunta piu' debole: e' uno stato TERMINALE
+  //   (checklists.repository.ts:6-7) e il cancello di avanzamento cerca solo gli stati
+  //   incompleti (listMissingRequiredItemIds, :853-874). Quindi marcando "non
+  //   applicabili" le voci obbligatorie si fa passare un progetto in uno stage gated
+  //   SENZA avere 'checklists.override_gate', che e' il permesso nato apposta per quello.
+  //   Chi concede questo permesso deve saperlo: sovrapposizione annotata in roadmap.
+  { key: 'checklists.complete_item', moduleKey: 'checklists', description: 'Avviare un memo su un progetto, spuntarne le voci, riaprirle e segnarle come non applicabili' },
   { key: 'checklists.assign', moduleKey: 'checklists', description: 'Assegnare le voci di un memo alle persone' },
   { key: 'checklists.override_gate', moduleKey: 'checklists', description: 'Far avanzare un progetto anche con un memo non completato' },
   { key: 'calendar.view', moduleKey: 'calendar', description: 'Vedere gli appuntamenti' },
@@ -187,9 +227,15 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'quotes.create', moduleKey: 'quotes', description: 'Creare preventivi' },
   { key: 'quotes.edit', moduleKey: 'quotes', description: 'Modificare i preventivi' },
   { key: 'quotes.delete', moduleKey: 'quotes', description: 'Eliminare preventivi' },
-  { key: 'quotes.send', moduleKey: 'quotes', description: 'Inviare un preventivo al cliente' },
-  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Registrare che il cliente ha accettato un preventivo' },
-  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Gestire i modelli di preventivo' },
+  { key: 'quotes.send', moduleKey: 'quotes', description: "Inviare un preventivo al cliente, annullare l'invio e reinviarlo" },
+  // ⚠️ Copre tutte e due le risposte, non la sola accettazione: 'quotes.reject' non
+  // esiste, e la rotta di rifiuto chiede questa stessa chiave.
+  { key: 'quotes.accept', moduleKey: 'quotes', description: 'Registrare la risposta del cliente a un preventivo: accettato o rifiutato' },
+  // ⚠️ Tre famiglie sotto un nome solo: i modelli di preventivo, i TESTI DELLE EMAIL di
+  // invio/accettazione/rifiuto (dove serve anche solo per LEGGERLI) e le metriche dei
+  // preventivi. Quindi chi vuole far leggere le metriche a qualcuno gli sta dando anche
+  // la cancellazione dei modelli: separarle e' un lavoro a se', annotato in roadmap.
+  { key: 'quotes.manage_templates', moduleKey: 'quotes', description: 'Gestire i modelli di preventivo e i testi delle email ai clienti, e vedere le metriche dei preventivi' },
   { key: 'web.view', moduleKey: 'web', description: 'Vedere i siti in gestione' },
   { key: 'web.create', moduleKey: 'web', description: 'Aggiungere un sito in gestione' },
   { key: 'web.edit', moduleKey: 'web', description: 'Modificare i siti in gestione' },
@@ -224,12 +270,22 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: CHAT_PERMISSIONS.moderate, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Moderare i gruppi di chat altrui: togliere persone e sciogliere il gruppo, senza leggerne i messaggi' },
 ] as const;
 
-// ⚠️ I NOMI dei ruoli non si toccano, nemmeno 'Viewer' che e' inglese: `name` e' la
-// chiave con cui il bootstrap fa l'upsert (`workspaceId_name`), quindi rinominarne uno
-// non lo rinomina — ne crea un secondo e lascia il primo orfano, con le persone ancora
-// attaccate a quello vecchio. Se un giorno si vorranno italianizzare, servira' una
-// migrazione dedicata. Le DESCRIZIONI invece sono solo testo mostrato, e sono in
-// italiano dal 7/8/2026.
+// ⚠️ I NOMI dei ruoli VANNO BENE COSI', 'Viewer' compreso: e' una decisione esplicita di
+// Jacopo (7/8/2026), non un residuo del re-naming rimasto indietro. Non c'e' nessuna
+// italianizzazione in sospeso — se qualcuno la ripropone, la risposta e' gia' data.
+//   Esiste anche un vincolo tecnico, che pero' non e' piu' la ragione: `name` e' la
+//   chiave con cui il bootstrap fa l'upsert (`workspaceId_name`), quindi oggi
+//   rinominarne uno non lo rinominerebbe — ne creerebbe un secondo lasciando il primo
+//   orfano, con le persone ancora attaccate a quello vecchio. Toglierlo e' la voce
+//   "Dare a Role una chiave stabile" in roadmap, che serve a prescindere da questi nomi.
+//
+// ⚠️ Le DESCRIZIONI qui sotto NON si comportano come quelle dei permessi: oggi non le
+// vede nessuno. Il bootstrap le scrive a database (workspace-bootstrap.ts:415-433) ma
+// nessuna query le rilegge — non sono nella `select` di nessun metodo del repository dei
+// ruoli, quindi non escono da `GET /workspaces/:id/roles` ne' da `/auth/me`, e la pagina
+// "Ruoli e permessi" mostra solo la descrizione dei PERMESSI. Sono comunque scritte in
+// italiano dal 7/8/2026, perche' il giorno che si decidesse di mostrarle sarebbero gia'
+// pronte — ma non si scriva codice dando per scontato che l'utente le stia leggendo.
 export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
   {
     name: SYSTEM_ROLE_NAME.superadmin,

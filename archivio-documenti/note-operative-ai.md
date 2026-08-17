@@ -710,3 +710,20 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 4. **Prima di crearne una nuova, cercare se una mappa completa esiste gia'.** Qui ce n'era una giusta (`alertsConstants.js`) e ne ho aggiunta una quarta parziale accanto. La domanda da farsi e' *"chi altro traduce questa stessa parola?"*, non *"come la traduco qui"*.
 
 **Vale per qualsiasi mappa costruita a mano** su valori che nascono altrove: etichette di stato, permessi, chiavi di moduli, nomi di funzione. Il segnale d'allarme e' scrivere un oggetto letterale senza aver appena guardato la sorgente.
+
+---
+
+## 50. Verificare che il catalogo RBAC arrivi a schermo quando il pane dell'anteprima non e' visibile
+
+**Contesto:** 8/8/2026, chiusura dei rilievi della fase A2. Avevo riscritto sette descrizioni di permessi in `server/auth/rbac-catalog.ts` e dovevo dimostrare che l'utente le legge davvero nella pagina "Ruoli e permessi", non solo che il file era cambiato.
+
+**Errore / ostacolo:** ho provato dal browser. `navigate` e' andato in **timeout a 300s** e lo screenshot e' fallito con *"the Browser pane is not displayed, so the page is not compositing frames"*. E' lo stesso muro che aveva fermato la sessione del 7/8, che infatti aveva chiuso l'handoff con "verifica a schermo non fatta". **Insistere col browser quando il pane non e' visibile e' tempo buttato:** senza pane visibile non c'e' rendering, quindi niente screenshot e spesso niente DOM.
+
+**Modo corretto — verificare il DATO invece della pagina**, che per questo catalogo e' equivalente perche' la pagina stampa esattamente cio' che sta a database:
+1. **Leggere prima il database.** Trovera' ancora i valori **vecchi**: normale, il catalogo si riscrive solo quando gira `ensureRbacCatalog`, che sta dentro `ensureWorkspaceSystemRoles` (chiamata a ogni `/auth/me`). Non concluderne che la modifica non funziona.
+2. **Provocare la risincronizzazione da script** invece di cercare un login: `ensureRbacCatalog` non e' esportata, ma `ensureWorkspaceSystemRoles` si' (`server/auth/workspace-bootstrap.ts:360`) e accetta `{ tx, workspaceId, actorUserId, sourceAction }`.
+3. ⚠️ **Alzare il timeout della transazione, o fallisce sempre:** il default di Prisma e' **5 secondi** e questa funzione ne impiega di piu' (errore `P2028 — Transaction already closed`, con rollback di tutto). Serve `prisma.$transaction(fn, { timeout: 120_000, maxWait: 30_000 })`. Il fallimento sembra un difetto del bootstrap: non lo e', e' il timeout dello script.
+4. **Rileggere il database e confrontare.** A quel punto ci sono i valori nuovi, ed e' la prova che cercavi.
+5. Lo script va **nella cartella del progetto** (nello scratchpad `@prisma/client` non si risolve, nota #20) e si **cancella subito dopo**, prima del commit — `git status` lo mostrerebbe fra i file da aggiungere.
+
+**Vale in generale:** quando la verifica a schermo e' bloccata, chiedersi *"qual e' il dato che quella schermata stampa?"* e verificare quello. Vale per il catalogo permessi, per le etichette dei moduli di progetto e per ogni cosa che il frontend si limita a rendere. E' anche molto piu' veloce.

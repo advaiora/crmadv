@@ -1044,7 +1044,7 @@ const workspaceAgencyRoute: FastifyPluginAsync = async (app) => {
   );
 
   // Export PDF brandizzato del report cliente (V6). Stessa autorizzazione della
-  // lettura (projects.view). Serve i byte come application/pdf in download.
+  // lettura (ai_production.view). Serve i byte come application/pdf in download.
   app.get<{ Params: AgencyProjectParams }>(
     '/agency/projects/:projectId/reports/client/pdf',
     async (request, reply) => {

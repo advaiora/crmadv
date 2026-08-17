@@ -108,9 +108,14 @@ test('RBAC catalog: nomi e descrizioni non usano il vocabolario vecchio', () => 
     'Clients',
   ];
 
+  // Le DESCRIZIONI dei ruoli sono state riscritte in italiano nello stesso giro, quindi
+  // sono esposte allo stesso rischio e stanno qui dentro. I loro NOMI no, di proposito:
+  // Superadmin/Admin/Manager/Operativo/Viewer restano come sono per decisione di Jacopo
+  // (7/8/2026), quindi non sono soggetti al vocabolario del re-naming.
   const testi = [
     ...SYSTEM_MODULE_CATALOG.flatMap((entry) => [entry.name, entry.description]),
     ...SYSTEM_PERMISSION_CATALOG.map((entry) => entry.description),
+    ...SYSTEM_ROLE_DEFINITIONS.map((entry) => entry.description),
   ];
 
   for (const testo of testi) {
