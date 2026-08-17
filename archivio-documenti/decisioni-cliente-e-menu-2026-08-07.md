@@ -251,6 +251,9 @@ Verifiche condotte il 17/8 in sola lettura, senza modificare nulla.
 ### ④ Team — l'invito
 1. **Configurare il server di posta.** ✅ Dati forniti da Jacopo il 17/8: mittente **`noreply@advaiora.com`** *(confermato: `noreplay` era un refuso)*, host `mail.advaiora.com`, porta `587`. 🔐 **La password NON è in questo documento e non deve mai finirci**: va solo nel file `.env`, che è escluso dal repository. Poiché è transitata in chat, valutare di cambiarla dopo la configurazione.
 2. **Maschera di configurazione dentro il CRM** ✅ (richiesta di Jacopo): i parametri del server di posta devono essere modificabili dalle impostazioni, non solo da file.
+   - ✅ **Nome deciso (Jacopo, 17/8):** la pagina si chiama **«Server di posta»**. Scartati: *Posta in uscita* (più caldo ma meno esplicito), *Invio email* (sembra il posto dove si scrivono le email), *Notifiche email* (fa pensare a quali avvisi ricevere, non al canale).
+   - ✅ **Chi vi accede (Jacopo, 17/8): Superadmin e Admin.** Scelta consapevole: dentro c'è la password di una casella aziendale vera, quindi il permesso va assegnato sapendo che chi ce l'ha può far spedire email a nome dell'agenzia.
+   - ⚠️ **Da collegare tutti e tre i lettori dei parametri di posta, non solo l'invito** *(accertato il 17/8 mappando il codice)*: oggi esistono **tre implementazioni SMTP indipendenti** che leggono le stesse variabili d'ambiente — `server/modules/team/team-invite.notifier.ts` (l'invito), `server/modules/quotes/notifications.ts` (i preventivi), e `src/core/email/mailer.ts` (**codice morto**, zero importatori, per giunta dentro l'albero del frontend). Configurare la posta "per il Team" senza collegare anche i preventivi li lascia rotti nello stesso identico modo, in silenzio.
 3. **Dire la verità nell'interfaccia:** la risposta deve distinguere "invito creato **e** email partita" da "invito creato, **email non partita**", e la schermata deve mostrarlo invece di dire sempre "successo".
 4. **Pulsante "copia link invito"** accanto a ogni invito in attesa. È ciò che rende il flusso a prova di guasto: se la posta non funziona, il link si manda a mano.
 5. **Chiudere le due lacune** ✅ approvate: la modifica membro oggi vuota, e il filtro "In attesa" morto.
@@ -367,8 +370,8 @@ Sequenza pensata perché **degradi bene**: se il tempo stringe, quello che resta
 ## 7.7 Punti aperti e rischi
 
 1. ✅ **Messaggi e Profilo: verificati il 17/8** — vedi ⑥-bis e ⑥-ter. Il perimetro non è più incerto. Tre decisioni restano da prendere, elencate ai punti 7-9 qui sotto.
-2. ⚠️ **La data esatta di consegna non è fissata.** "Settembre" copre quattro settimane e la differenza fra l'inizio e la fine del mese cambia cosa ci sta dentro. Da precisare.
-3. ⚠️ **Il cestino è il rischio numero uno**, anche ristretto al perimetro. Se qualcosa deve slittare, guardare prima qui.
+2. ✅ **DATA FISSATA — inizio settembre 2026** *(Jacopo, 17/8/2026)*. Sono circa **quindici giorni lavorativi** dalla data della decisione. ⚠️ **Conseguenza da affrontare subito, non a fine corsa:** con questa data il piano non ci sta intero, e le due voci che sforano sono note in anticipo — il **cestino** (⑦) e gli **allegati dei messaggi** (§7.10 punto 8). Vedi la voce §7.11 qui sotto: sono da decidere **esplicitamente**, non da lasciar scivolare.
+3. ⚠️ **Il cestino è il rischio numero uno**, anche ristretto al perimetro. Se qualcosa deve slittare, guardare prima qui. *(Con la data di inizio settembre non è più un "se": vedi §7.11.)*
 4. 🔐 **La password della casella di posta è transitata in chat.** Non è in nessun file del repository. Valutare di cambiarla dopo la configurazione.
 5. 📌 **Collocazione del Registro attività nel menu: confronto con Jacopo obbligatorio prima di eseguire.**
 6. ⚠️ **Si lavora su due sessioni in parallelo.** Prima di toccare un file, verificare che non sia già in mano all'altra sessione — e non committare mai il lavoro altrui.
@@ -422,3 +425,28 @@ Conseguenze operative:
 9. 🟡 **DECISO 17/8 nella direzione, da precisare in un dettaglio — le pagine del Profilo si fondono.** Volontà di Jacopo: *"Modifica Profilo"* diventa davvero la pagina dove si modificano le impostazioni del proprio utente; *"Impostazioni Account"* è il nome giusto per quella pagina; e la vecchia *"Impostazioni Account"* (sola consultazione: ruoli, permessi, moduli, attività recente) **viene inglobata lì dentro**. Da tre pagine a meno.
    - ⚠️ **Attenzione, oggi la situazione è invertita:** la modifica funziona già, ma sta in *"Il Mio Profilo"* (`/pages/profile`), mentre *"Modifica Profilo"* è la pagina di sola lettura. Quindi non si "riconverte" una pagina vuota: si **sposta la modifica** da una pagina all'altra.
    - 📌 **Resta da precisare: una pagina o due?** Vedi §7.8.
+
+## 7.11 Il perimetro contro la data — cosa esce, da decidere esplicitamente
+
+> **Nasce il 17/8/2026**, quando la data di consegna è stata fissata a **inizio settembre** (§7.7 punto 2). Prima la domanda non era ponibile: senza data non si sa cosa non ci sta.
+
+**Il conto, in una riga.** Quindici giorni lavorativi, undici voci in §7.5, e due di quelle voci sono da sole più grosse di tre delle altre messe insieme. Non è una stima al ribasso per prudenza: sono **due lavori che il piano stesso segnala come pesanti** prima ancora che ci fosse una data.
+
+**Le due voci in questione, con cosa costa ciascuna:**
+
+| Voce | Perché sfora | Cosa comporta tagliarla |
+|---|---|---|
+| **⑦ Cestino** | Anche ristretto alle sole entità in perimetro: stato "cancellato" su ognuna, **tutte le letture** di quelle entità da correggere perché escludano i cancellati, e i collegamenti che oggi il database cancella a catena da riportare a livello applicativo — altrimenti un record ripristinato torna svuotato. Più la pagina del cestino con ripristino e cancellazione definitiva. Il piano lo chiama *"il punto più pesante della lista"* da prima che esistesse una scadenza | Al lancio **una cancellazione è definitiva**. Va detto all'utente nella finestra di conferma, con parole esplicite. I dati di oggi sono tutti di prova, quindi il rischio vero comincia il giorno del rollout |
+| **Allegati ai messaggi** *(§7.10 punto 8)* | Richiedono di **conservare i file**, cosa che il modulo Messaggi oggi non fa affatto: serve una tabella per i byte, il caricamento, lo scaricamento permessato, i limiti di dimensione e di tipo. C'è un precedente da copiare (la Chat AI), che accorcia ma non azzera | Si scrivono messaggi di solo testo, come oggi. Nessuna funzione peggiora: non esiste ancora |
+
+**Cosa invece resta dentro comunque**, perché è piccolo o perché è la ragione stessa della consegna: server di posta e invito, cambio e recupero password, le due correzioni rosse dei Messaggi, i Clienti, il Registro attività, il riordino del menu, lo spegnimento dei moduli fuori perimetro, l'audit di sicurezza.
+
+**Le tre strade, con la raccomandazione:**
+
+1. ✅ **Consigliata — fuori entrambe.** Si consegna con le sei aree solide e nessun lavoro a metà. Cestino e allegati diventano il primo blocco **dopo** la consegna, quando il tempo non stringe e il cestino si può fare bene su tutto il CRM invece che solo sul perimetro. *Costo:* al lancio si cancella per sempre, e i messaggi sono di solo testo.
+2. **Fuori solo gli allegati, il cestino si fa.** Ha senso se la paura del rollout è che qualcuno cancelli un cliente vero per sbaglio. *Costo:* è la voce col rischio più alto di arrivare a metà il giorno prima della consegna — e un cestino a metà è peggio di nessun cestino, perché fa credere che i dati si recuperino.
+3. **Dentro entrambe, sposta la data.** Legittimo se la data è nostra e non del cliente. *Se invece la data è del cliente, questa strada non esiste* e la scelta è fra 1 e 2.
+
+📌 **Chi decide: Jacopo.** Finché non decide si lavora nell'ordine di §7.5, che mette apposta cestino e rifiniture in fondo: quindi **nessuna riga di lavoro va sprecata** qualunque cosa scelga, e la decisione può arrivare anche fra una settimana.
+
+⚠️ **Se la scelta è la 1**, una cosa va fatta *dentro* la release e non dopo: la finestra di conferma di ogni cancellazione deve dire che è **definitiva**. È mezz'ora di lavoro e cambia cosa succede il primo giorno di uso vero.
