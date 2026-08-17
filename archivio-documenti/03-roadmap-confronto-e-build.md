@@ -159,6 +159,40 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 ---
 
+## 🚩 FUORI NUMERAZIONE — RELEASE DI SETTEMBRE 2026: **priorità assoluta su ogni V**
+
+> **Definita il 17/8/2026 da Jacopo, su commessa.** Non è una V e non entra nella numerazione: è la **prima consegna reale del CRM**, e finché non è chiusa **viene prima di qualunque V**, compresa quella in corso.
+>
+> **Regola di priorità dichiarata:** la commessa di release batte qualunque altra pianificazione. Se dopo settembre arriveranno nuove direttive con una nuova scadenza di consegna, quelle avranno a loro volta priorità su tutto.
+>
+> **📄 Il piano completo — perimetro, stato verificato area per area, lavoro punto per punto, ordine di lavorazione, rischi — sta in `archivio-documenti/decisioni-cliente-e-menu-2026-08-07.md`, PARTE SECONDA.** Qui c'è solo la sintesi che serve a chi legge la roadmap per orientarsi; **il dettaglio si legge lì**, ed è lì che va aggiornato (per non avere due copie che divergono).
+
+**Il perimetro — sei aree al 100%:** Clienti · Team · Messaggi · Ruoli e permessi · Profilo · **Registro attività** *(nuova)*.
+
+**Tutto il resto si nasconde al lancio** da Gestione Moduli: Produzione AI, Pipeline, Preventivi, Siti in gestione, Credenziali, Calendario, Memo Operativi. ✅ Verificato che il modulo `modules` è `isCore` e non si può spegnere: il Super Admin resta sempre in grado di riaccendere quello che vuole.
+
+**Il lavoro, in sintesi:**
+
+| Voce | Sostanza |
+|---|---|
+| **Clienti** | L'import CSV **esiste già e funziona**; il difetto vero è il tetto tecnico di ~1 MB (il file viaggia dentro la richiesta) → volumi grossi falliscono. Da fare: caricamento come vero allegato, anteprima prima di confermare (la modalità "prova senza salvare" c'è già nel backend, scollegata), supporto Excel. Campi nuovi: **PEC, codice SDI, sito web, referente** come standard; **settore, fonte del contatto** come campi personalizzati. I campi personalizzati vanno **ricollocati nel flusso di registrazione di un cliente nuovo** (la funzione è già completa — sei tipi — ma sepolta in una pagina a sé) |
+| **Team** | L'invito è meccanicamente corretto ma **la consegna è rotta**: senza server di posta l'email non parte e il CRM dice comunque "successo". Da fare: configurare la posta (`noreply@advaiora.com`), maschera di configurazione dentro il CRM, esito di consegna veritiero, **pulsante "copia link invito"** (è ciò che rende il flusso a prova di guasto). Più: modifica membro oggi è una funzione vuota, filtro "In attesa" morto |
+| **Ruoli e permessi** | **Quasi chiuso dal re-naming** (`b94c19a` ~70 descrizioni tradotte, `7465f12` modulo `ai_production` con `generate` separato). I cinque nomi inglesi rimasti (Branding, Audit, Dashboard, Team, SEO) **restano** per decisione di Jacopo |
+| **Profilo** | I documenti che lo davano "non cablato ai dati" sono **obsoleti**. Ma manca **il cambio password**, in nessun punto del CRM → 🔴 blocco vero. Si aggiunge anche il **recupero password via email**. Struttura decisa: *Il Mio Profilo* diventa contenitore, con dentro **Impostazioni Account** (modifica + password), **I miei permessi** (ruoli/permessi/moduli) e *Scorciatoie*. La pagina *Modifica Profilo* sparisce (era di sola lettura e dichiarava il falso) |
+| **Messaggi** | Il cuore funziona. 🔴 **Il registro viene inondato**: una riga "ha letto" ogni 1,5s per conversazione aperta → **va chiuso PRIMA di costruire il Registro attività**, o nasce illeggibile. 🔴 Se la chiamata al profilo fallisce la casella mostra la **Chat AI**, che al lancio sarà nascosta. Più: storico oltre 120 messaggi irraggiungibile (il server pagina già, il client no), interrogazioni ogni 2s senza rallentare, tetto contatti. **Entrano nella release** anche allegati e cancellazione "alla WhatsApp" (solo per me / per tutti) |
+| **Registro attività** | L'impianto **esiste già** (tabella, filtri, pagina, permesso): manca la copertura, oggi manuale e sparsa in ~20 file, con **il login non tracciato**. Approccio deciso: **ibrido** — intercettore automatico sulle entità principali + registrazioni manuali dove serve significato ricco. 📌 **La collocazione nel menu si decide in un confronto con Jacopo, non da soli** |
+| **Cestino** | Meccanismo generale, **acceso solo sulle entità in perimetro**; il resto lo eredita in seguito. ⚠️ **Rischio numero uno della release**: se qualcosa deve slittare, guardare prima qui |
+| **Sicurezza** | Audit pre-lancio, a codice fermo. Priorità al controllo che **ogni interrogazione sia filtrata per workspace** (in multi-azienda è *il* rischio) |
+| **Permessi automatici** | La regola è già in `CLAUDE.md`; manca farla verificare da una macchina. **Metà 1 subito** ("ogni permesso usato esiste nel catalogo": oggi solo 4 moduli su 16 leggono dal catalogo centrale, gli altri riscrivono a mano). Metà 2 ("ogni rotta ha un permesso") da valutare dopo |
+
+**Cosa entra qui dal piano di riordino** (vedi *Debito tecnico* → «Riordino gerarchico»): la rimozione delle voci ridondanti *Nuovo Cliente*/*Nuovo Preventivo*, il nuovo gruppo **Impostazioni**, **Reparti** spostato sotto Team, e la collocazione del Registro attività. **Non** entrano il dossier cliente né l'arricchimento AI.
+
+⚠️ **Regola di demarcazione sui Clienti** — è l'unica area che release e riordino toccano insieme: a settembre si fa il **contenuto** (campi, import, dove sta il pulsante dei campi personalizzati); il **ridisegno della pagina** è V12. Non anticipare la forma, verrebbe rifatta.
+
+**Punti ancora aperti:** la data esatta di consegna; la collocazione a menu del Registro attività (confronto con Jacopo); i due dettagli della cancellazione messaggi (traccia «messaggio eliminato» sì/no, limite di tempo sì/no).
+
+---
+
 ### 🟦 V1 — Foundation & Apple-Style Shell *(re-baseline)*
 **Obiettivo:** trasformare la base attuale nello scheletro Apple-style e ripulire il boilerplate.
 **Contenuto (nuovo rispetto ad oggi):**
@@ -247,8 +281,24 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 **Obiettivo:** memoria di progetto vera + AI economicamente controllata.
 
+> ### ⭐ ATTO DI CHIUSURA DELLA V5 — l'arricchimento AI si ancora al CLIENTE, non al progetto *(deciso il 7/8/2026, approvato da Claudio)*
+>
+> **Il problema, in una riga:** nello schema dati **tutto ciò che appartiene a qualcuno è già ancorato al `Client`** — siti, credenziali, preventivi, perfino le conversazioni AI con `scope: 'client'`. L'unica eccezione sono `ProjectMemory`, `ProjectSource` e i loro embedding, ancorati solo al `Project`. Cioè: **l'unico strato del prodotto che non conosce il cliente è proprio quello dove si accumula la conoscenza.** Un cliente con tre progetti richiede di caricare, estrarre e vettorizzare il suo brand book **tre volte** — e di aggiornarlo in tre posti quando cambia.
+>
+> **Le decisioni prese** *(dettaglio completo, con le alternative scartate e il loro perché, in `decisioni-cliente-e-menu-2026-08-07.md` Parte Prima)*:
+> 1. **Salgono al cliente** i materiali (le Fonti) **e il ritratto stabile dell'azienda**. Restano al progetto l'obiettivo specifico e tutto ciò che viene prodotto.
+> 2. **Delle otto sezioni del Brief:** quattro diventano piena proprietà del cliente (*Contesto business, Brand e comunicazione, Aspetti tecnici, Materiali disponibili*), una resta del progetto (*Obiettivo progetto*), e **tre esistono in due gradi** — *Target, Offerta, Marketing e acquisizione*: una versione generale sul cliente, una **ristretta** sul progetto, presentata come ritaglio esplicito di quella del cliente. ⚠️ Requisito non negoziabile: l'interfaccia deve rendere inequivocabile **quale livello si sta leggendo e quale si sta modificando**.
+> 3. **Eredità ≠ verifica:** il progetto nasce già compilato, ma chi lo apre **vede cosa ha ereditato e da quando**, e conferma con un gesto solo (per progetto, non per campo). Serve a evitare che un ritratto vecchio di mesi resti in circolo proprio *perché* l'eredità funziona bene.
+> 4. **Un progetto è "pronto"** quando le informazioni esistono, **indipendentemente dal livello in cui stanno scritte**. È un cambio di comportamento reale rispetto a oggi.
+> 5. **Progetti con più clienti collegati** (il CRM lo permette già, e oggi sceglie *in silenzio* il primo selezionato): alla creazione si chiede **esplicitamente** — eredita da uno di questi (quale?) oppure non ereditare da nessuno.
+> 6. **Il cliente ha una propria area indipendente** — Fonti e generazione del Brief usabili **anche prima che esista un progetto** (serve a profilare in trattativa). Di conseguenza, **nel progetto quelle schede vanno modificate**, non affiancate: le quattro sezioni del cliente spariscono come campi da compilare (restano leggibili), le tre a doppio livello cambiano faccia, e il pulsante di generazione si divide in due.
+>
+> **Ordine obbligato:** ① sciogliere l'ambiguità `Project.clientId` vs la tabella `ProjectClient` (di fatto risolta dalla decisione 5) → ② fissare la regola di precedenza (decisioni 2-3) → ③ spostare l'ancora → ④ **solo allora** eseguire il consolidamento delle fonti *legacy* parcheggiato il 22/7 (vedi voce più sotto). Invertire ④ significa travasare i dati in una forma che si sta per cambiare, cioè farlo due volte.
+>
+> **Perché qui e non più tardi:** ogni V successiva aggiunge un consumatore dell'ancoraggio sbagliato — la Discovery su RAG (qui sotto), la reportistica per cliente (V6), le creatività (V7), la validazione contro le Fonti (V8). Il costo cresce, e a differenza del re-naming qui si spostano **dati**, non stringhe.
+
 **Residuo da completare dopo la V4:**
-- **Discovery consolidata su RAG reale** (Business Recap, Obiettivi/Target, Offerta/Competitor) — le fondamenta (chunk + embeddings + `sources.rag.ts`) ci sono dal 13/7.
+- **Discovery consolidata su RAG reale** (Business Recap, Obiettivi/Target, Offerta/Competitor) — le fondamenta (chunk + embeddings + `sources.rag.ts`) ci sono dal 13/7. ⚠️ **Da fare dopo l'atto di chiusura qui sopra**, o si costruisce a livello progetto ciò che va poi rifatto a livello cliente.
 - **Audit grafico dell'area Agency** (chiaro/scuro) — vedi nota di rifinitura più sotto. Era segnato *"da fare prima di aprire la Chat collaborativa"*: **è in ritardo**, la chat è stata aperta lo stesso.
 - **Badge `AiCostEstimate` sui pulsanti AI secondari** (`web.generateBlock` ecc.) — vedi nota più sotto.
 - *(opzionale)* migrare URL/file **legacy** del blob `ProjectMemory.sourcesJson` dentro `ProjectSource`, per avere un'unica fonte di verità. **⏸️ Analizzato e RIMANDATO per decisione di Jacopo (22/7/2026 — è lavoro suo, Modulo Fonti del 10/7).** Audit read-only sul DB demo: **6 ProjectMemory, 0 con dati legacy nel blob** (né in `sourcesJson` né nel fallback `briefJson.sources`); le 12 fonti esistenti sono **già** in `ProjectSource`. Quindi: (a) sul demo **non c'è nulla da migrare**; (b) il merge in lettura (`augmentSourcesWithIndexedRecords`) **già unifica** le due sorgenti per l'AI — questa V è **solo pulizia architetturale, nessun guadagno funzionale**; (c) l'esecuzione tocca **dati reali dei progetti** e richiede scelte di prodotto che non vanno indovinate: come trattare i **file senza testo integrale** (nel blob c'è solo l'anteprima/`manualText`, il binario non è conservato → non re-indicizzabili), se i **competitor** diventano fonti (semantica diversa), come **de-duplicare** col merge in lettura ed evitare il doppio conteggio, e se cambiare il **percorso di scrittura** dell'editor "Fonti e Materiali". Domande poste a Jacopo a fine sessione 22/7.
@@ -359,7 +409,13 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 ### 🟦 V12 — Finale: Importazione dati legacy, Hardening & Rollout
 **Obiettivo:** transizione completa senza interruzioni.
 **Contenuto:**
+- **⭐ PRIMO BLOCCO — Riordino gerarchico dell'interfaccia** *(deciso il 7/8/2026; dettaglio in `decisioni-cliente-e-menu-2026-08-07.md` §3)*. **Va fatto per primo, prima del rollout**, e il motivo è di tempistica: riorganizzare la navigazione **dopo** che le persone hanno imparato quella vecchia è il momento peggiore possibile. Si consegna la forma definitiva, non quella che cambierà fra un mese.
+  - **La pagina cliente diventa un dossier completo**: tutto ciò che è del cliente vive lì dentro **per intero** (non anteprime) — Fonti/Brief, i suoi progetti, i suoi preventivi, i suoi siti, le sue credenziali — ciascuno in una propria scheda, più una **scheda Panoramica** con lo stesso ruolo che ha oggi quella di un progetto: lettura sintetica, non elenco grezzo.
+  - **I moduli dedicati restano anche a sé** (Preventivi, Siti in gestione, Credenziali): rispondono a una domanda che il dossier del singolo cliente non può dare — *"cosa scade questa settimana, su tutti i clienti insieme"*. Sono due modi diversi di guardare gli stessi dati e servono entrambi.
+  - **Il criterio di densità** applicato per intero: un blocco va dietro una linguetta se **non cambia una decisione che stai prendendo adesso**; resta visibile se la cambia, anche a costo di densità. ⚠️ Non è "nascondi tutto": il precedente contrario è la scheda Memoria, nascosta per errore e resa visibile di proposito il 5/8 perché *"in un'area dove l'AI scrive per te, poterlo guardare è una questione di fiducia"*.
+  - **Perché non prima:** dipende dall'ancoraggio al cliente deciso in V5 e dal set finale dei moduli. **Perché non in V13:** quella è dichiarata come "l'ultima, quella che rischia di non farsi mai" — metterci la navigazione equivale a non farla.
 - **Mappatura schema & importazione dei dati** dal sistema legacy (continuità clienti/storico). *(NB: qui "importazione" = travaso dei dati reali dal vecchio sistema al nuovo — è cosa diversa dalle migrazioni dello schema del DB, che si fanno tracciate durante lo sviluppo.)*
+  - 📌 **Domanda da riaprire qui, non prima** *(7/8/2026)*: come si travasa **l'elenco vero dei clienti dell'agenzia**. È stata esplicitamente distinta dai dati oggi nel CRM, che sono **tutti di test** e non richiedono nessuna strategia di migrazione.
 - **Hardening** sicurezza/performance, audit completo, test end-to-end.
 - Rollout progressivo + QA finale, dismissione definitiva del legacy.
 
@@ -469,6 +525,28 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 - **La ricerca rapida (Ctrl+K) non controlla il flag Super Admin** *(trovato il 5/8/2026 dall'esploratore, preparando lo spostamento della Console piattaforma)*. `src/components/command-palette/CommandPalette.jsx` costruisce le destinazioni "Vai a" iterando **direttamente** l'array `SidebarMenu`, ma la sua funzione di filtro `canAccessEntry` (righe 25-33) guarda solo `requiredModule` e `requiredPermission`: **non guarda mai `requirePlatformAdmin`**. Risultato: **qualunque utente loggato, anche non Super Admin, digitando in Ctrl+K si vede suggerire "Console piattaforma"** — cosa che nella sidebar vera non succede, perché lì il controllo c'è (`menuUtils.js:56-59`, `canRenderMenuEntry`). **Non è un buco di sicurezza**: la pagina si difende da sola (`PlatformConsole.jsx:18-41` mostra *"Questa area è riservata ai Super Admin di piattaforma"*) e il backend ha un guard dedicato. È un **suggerimento di navigazione che non dovrebbe comparire**, e una **seconda funzione di filtro divergente** dalla prima — due liste che decidono la stessa cosa in modo diverso, cioè il classico difetto che peggiora col tempo. **Il rimedio naturale** è far usare a CommandPalette lo stesso `canRenderMenuEntry` di `menuUtils.js` invece della propria copia. ⚠️ Diventa più rilevante se si decide di lasciare voci nell'array `SidebarMenu` **solo** per renderle cercabili da Ctrl+K (è il caso della Console piattaforma dal 5/8): in quello scenario la palette diventa l'unica via d'accesso, e il filtro sbagliato si vede di più.
 
 - **Un ripiego che non scatta mai: il nome cliente nella testata di progetto** *(trovato il 6/8/2026 leggendo il contesto di lavoro per i pallini)*. In `AgencyProjectPageTemplate.jsx` la testata scrive `project?.clientName?.trim() || workingContext?.client?.name?.trim() || ""`. Il secondo ramo **non può funzionare**: il contesto di lavoro che arriva dal server (`buildProjectWorkingContext`, `agency.service.ts:9349`) non ha nessuna chiave `client` — il nome del cliente sta in `project.clientName`. Quindi il ripiego è scritto ma non scatta mai, e quando il progetto non porta il nome cliente si legge *"Cliente non assegnato"* anche se il cliente c'è. **Non è urgente** (nel caso normale il primo ramo funziona) e **non è stato corretto di proposito**, per non allargare il lavoro in corso: la correzione è di una parola (`workingContext?.project?.clientName`), ma cambia cosa si vede a schermo e va guardata con l'occhio, non solo con i test.
+
+- **Riordino gerarchico del menu — la parte che non dipende da nulla** *(deciso il 7/8/2026 con Jacopo, approvato da Claudio; dettaglio in `decisioni-cliente-e-menu-2026-08-07.md` §3.2-3.3)*.
+
+  **Il problema, misurato.** Il menu laterale ha **15 voci di primo livello**, e almeno sei sono nel posto sbagliato **per natura, non per gusto**: la configurazione è sparsa in tre gruppi diversi (Ruoli e Reparti sotto *Sicurezza*; Branding, Gestione Moduli e Scorciatoie **dentro il menu Profilo**, mescolate a "Il Mio Profilo"); **Reparti** sta sotto Sicurezza invece che con Team, di cui è struttura organizzativa; **Theme Preview** e **Responsive QA** sono strumenti di sviluppo esposti all'utente finale; **Nuovo Cliente** e **Nuovo Preventivo** sono *azioni* messe in un menu di *navigazione*, e per giunta **ridondanti** (il pulsante equivalente esiste già negli elenchi — `ClientsList.jsx:278`, `QuotesList.jsx:268` — e c'è pure una scorciatoia da tastiera). Non è un menu da rifinire: è cresciuto per accumulo, una voce per ogni modulo consegnato.
+
+  **La destinazione: da 15 righe a 10.** Clienti diventa l'ombrello che raccoglie anche Preventivi, Siti in gestione e Credenziali; nasce una riga **Impostazioni** (Ruoli e permessi, Registro attività, Branding Workspace, Gestione Moduli); Reparti passa sotto Team; gli strumenti di sviluppo escono dal menu utente; Profilo tiene solo roba personale. *(Memo Operativi **resta dov'è**: era stato proposto lo spostamento in Impostazioni, Jacopo l'ha escluso.)*
+
+  **Come si divide, e perché.** Stessa logica che ha funzionato per il re-naming (A leggero subito, B pesante dopo):
+  - **La parte leggera — regruppamento del menu — non dipende da niente di futuro** e si può fare presto: quei sei difetti restano sbagliati qualunque cosa aggiungano V6-V11. **Una fetta è già assegnata alla release di settembre** (gruppo Impostazioni, Reparti sotto Team, rimozione delle due voci ridondanti, collocazione del Registro attività) — vedi la sezione *Release di settembre* in testa alla Parte C.
+  - **La parte pesante — il dossier cliente e il criterio di densità applicato ovunque — è collocata come primo blocco della V12**, perché dipende dall'ancoraggio al cliente (V5) e dal set finale dei moduli.
+
+  ✅ **Incastro con la fase B del re-naming — riformulato il 17/8/2026, la versione precedente era troppo restrittiva.**
+
+  La prima stesura (7/8) diceva *"non toccare la struttura degli indirizzi dei moduli fino alla V12, o li si tocca due volte"*. **Verificando si è scoperto che quel conflitto in gran parte non esiste**, e la regola si è ristretta a ciò che serve davvero. Tre righe:
+
+  1. **Il vocabolario si rinomina quando si fa la fase B**, senza rimandarlo (`agency` → nome nuovo, `discovery` → `brief`), in file, cartelle e rotte. Non dipende dalla gerarchia. ⚠️ *"Senza rimandarlo" vale dentro il lavoro di re-naming: la fase B **non precede la release di settembre**, perché rinomina l'area Produzione AI, che al lancio sarà nascosta — vedi la nota di sequenziamento in fondo.*
+  2. **Il raggruppamento del menu NON richiede di spostare nessun indirizzo**, quindi si può fare quando conviene — anche dentro la release di settembre — senza toccare una sola rotta. In questo CRM la posizione a menu e l'indirizzo sono **indipendenti**: il gruppo *Sicurezza* contiene già oggi `/settings/roles`, `/settings/departments` e `/audit`, tre indirizzi senza nulla in comune, e nessun gruppo impone un prefisso ai figli. In più i moduli **restano anche come aree a sé** (§3.1 del documento di dettaglio): la vista globale tiene il suo indirizzo, e il dossier semmai ne aggiunge uno **nuovo** per il singolo cliente — che è una creazione, non uno spostamento.
+  3. **Spostare davvero un indirizzo sotto il cliente resta una decisione a sé**, non implicata dal riordino: si valuta quando il dossier esiste. ⚠️ Il motivo per non anticiparla non è la documentazione che invecchia, è che **alcuni indirizzi potrebbero essere salvati a database** (Scorciatoie utente, Console piattaforma — sospetto già annotato nella voce della fase B): lì cambiare un indirizzo è anche spostare dati, e farlo due volte costa due migrazioni.
+
+  📌 **Regola di igiene generale, adottata su proposta di Jacopo (17/8):** chi cambia una di queste cose **aggiorna nello stesso lavoro il documento che la descrive**, così nessun piano resta a dire cose superate. Vale a prescindere da questa voce.
+
+  🔸 **Osservazione lasciata qui apposta:** il riordino riapre in parte la **V1**, che aveva fra gli obiettivi dichiarati la *«navigazione a sottrazione: menu contestuale per modulo/ruolo»* ed è segnata come chiusa. Non è una dimenticanza di allora — una struttura si vede solo dopo aver riempito il prodotto — ma va scritto, perché chi legge fra sei mesi non pensi che sia stato saltato qualcosa.
 
 - **Re-naming delle aree: prima le etichette (A), poi i nomi tecnici (B)** *(aperto il 5/8/2026 con Jacopo; è l'attività che aspettava la chiusura del riordino file)*.
 
@@ -778,11 +856,20 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
   ⚠️ **Da verificare quando si aprirà il piano di B** (l'esploratore è obbligatorio, si tocca l'area Agency): se esistono **percorsi salvati a database** che si romperebbero cambiando gli URL — sospetti principali le **Scorciatoie** utente (`/settings/shortcuts`) e la **Console piattaforma**. Un URL cambiato a codice è banale; un URL cambiato che vive anche come dato salvato è un'altra cosa.
 
-  ⚠️ **B tocca gli stessi indirizzi di un altro lavoro già pianificato — non toccarli due volte.** Il riordino della navigazione deciso il 7/8/2026 (`archivio-documenti/decisioni-cliente-e-menu-2026-08-07.md` §3.2 e §4.4, approvato da Claudio) **sposta** Siti in gestione, Credenziali e Preventivi sotto Clienti, cioè cambia gli indirizzi degli stessi moduli che B rinomina. La linea di separazione, decisa lì, è netta:
-  - **Sì, B lo fa subito:** rinominare il *vocabolario* dentro file, cartelle e rotte (`agency` → il nome nuovo, `discovery` → `brief`). Non dipende dalla gerarchia e non va rimandato.
-  - **No, B lo lascia stare:** "sistemare" la *struttura* degli indirizzi dei moduli che quel riordino sposterà (es. `/apps/web-assets`). Quelli si toccano una volta sola, in quella sede — altrimenti si rinominano ora e si spostano fra un mese.
+  ✅ **Rapporto con il riordino della navigazione — riscritto il 17/8/2026. La versione del 7/8 diceva che i due lavori si contendevano gli stessi indirizzi: verificando si è visto che in gran parte NON è vero, e la regola si è ristretta.**
 
-  **⚠️ Nota anti-conflitto per chi riprende:** B **non** è "pulizia da fare quando capita" e **non** va anticipato di iniziativa mentre si fa altro — vale la regola generale delle cose trovate per strada. Ha un motivo suo e un momento suo.
+  Il riordino deciso il 7/8 (`archivio-documenti/decisioni-cliente-e-menu-2026-08-07.md` §3.2 e §4.4) porta Siti in gestione, Credenziali e Preventivi **sotto Clienti nel menu**. Si era dedotto che ciò spostasse i loro indirizzi, e quindi che B dovesse tenerne le mani lontane. **Non è così:**
+  - **La posizione a menu e l'indirizzo sono indipendenti in questo CRM.** Il gruppo *Sicurezza* contiene già oggi `/settings/roles`, `/settings/departments` e `/audit` — tre indirizzi senza nulla in comune. Nessun gruppo impone un prefisso ai propri figli.
+  - **I moduli restano anche come aree a sé** (decisione §3.1: serve la vista "cosa scade su tutti i clienti"). Quindi la vista globale **tiene il suo indirizzo**; il dossier semmai ne aggiunge uno **nuovo** per il singolo cliente, che è una creazione e non uno spostamento.
+
+  **La regola che resta, in tre righe:**
+  1. **B rinomina il vocabolario senza rimandarlo** (`agency` → nome nuovo, `discovery` → `brief`) in file, cartelle e rotte.
+  2. **Il raggruppamento a menu non richiede nessuno spostamento di indirizzo** e può essere fatto quando conviene, indipendentemente da B — anche dentro la release di settembre, dove infatti è già assegnato.
+  3. **Spostare davvero un indirizzo sotto il cliente è una decisione a sé**, da prendere quando il dossier esiste (V12). ⚠️ Il motivo per non anticiparla è quello annotato qui sopra: alcuni di quegli indirizzi **potrebbero vivere come dati salvati a database**, e allora cambiarli due volte significa due migrazioni, non due find-and-replace.
+
+  📌 **Regola di igiene generale, adottata su proposta di Jacopo (17/8):** chi cambia una di queste cose **aggiorna nello stesso lavoro il documento che la descrive**. Serve a evitare che un piano resti a dire cose superate — ed è il motivo per cui questa voce è stata riscritta invece di lasciata com'era.
+
+  **⚠️ Nota anti-conflitto per chi riprende:** B **non** è "pulizia da fare quando capita" e **non** va anticipato di iniziativa mentre si fa altro — vale la regola generale delle cose trovate per strada. Ha un motivo suo e un momento suo. ⛔ **In particolare, B NON precede la release di settembre:** rinomina l'area Produzione AI, che al lancio sarà **nascosta**, quindi anticiparla non porterebbe nulla alla consegna — e non è breve (`Agency` compare in oltre 60 file, e in B il revisore torna obbligatorio).
 
 ---
 
@@ -790,6 +877,7 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
 | Build | Tema | Blocco aggiunto |
 |---|---|---|
+| **🚩 Settembre 2026** | **Prima consegna reale** | **Fuori numerazione, priorità su ogni V.** Sei aree al 100% (Clienti, Team, Messaggi, Ruoli e permessi, Profilo, Registro attività) + cestino sul perimetro + audit sicurezza; tutto il resto nascosto al lancio |
 | **V1** | Shell | Apple UX + Command-K + cleanup |
 | **V2** | Governance | Super Admin console + ruoli Discord-style + reparti |
 | **V3** | Dato | Custom Fields + import/export + Brevo |
@@ -809,6 +897,7 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 > **Rinumerazione del 24 luglio 2026.** È stata inserita una **nuova V6** (*Reportistica multi-sorgente*) **prima** della vecchia V6, perché quest'ultima aveva ancora pezzi aperti (generazione visiva). Tutto ciò che seguiva **slitta di uno**: vecchia V6 "Produzione AI" → **V7**, Lab → V8, Vendita → V9, Agenda → V10, Finance → V11, Go-live → V12: si passa da 11 a **12 V**. Se in un documento o in un commit precedente al 24/7 leggi "V6"–"V11" riferito a Produzione AI / Lab / Vendita / Agenda / Finance / Go-live, aggiungi uno.
 
 ### Note di sequenziamento
+- **🚩 La release di settembre 2026 precede tutto** *(dal 17/8/2026)*. Non è una V, non entra nella numerazione, e finché non è consegnata **viene prima di qualunque V**, compresa quella in corso. Le V riprendono dopo — salvo nuove commesse con nuova scadenza, che avrebbero a loro volta la precedenza. Il perimetro è **quasi disgiunto** da quello delle V: le sei aree della release stanno fuori da Produzione AI, che è il cuore di V5-V7. Le sole intersezioni sono i **Clienti** (la release fa il contenuto, la V12 la forma) e il **menu** (la release prende la fetta leggera del riordino).
 - **La V4 (chat) e la V5 (AI core) sono intrecciate, ed è voluto.** La V4 gira sul motore già costruito nella V5 (RAG, budget, multi-provider): **numericamente la V4 dipende dalla V5, cronologicamente no**. Il residuo della V5 si completa **dopo** la chiusura della V4.
 - **La V5 resta la priorità di valore** (il differenziatore AI) ed era parzialmente parallelizzabile a V2/V3 perché lo scaffold OpenAI esisteva già.
 - V1–V3 sono prerequisiti UX/dato che rendono "vendibile" e ordinata ogni feature successiva.
