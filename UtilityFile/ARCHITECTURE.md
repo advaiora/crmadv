@@ -144,7 +144,9 @@ Business (MVP 1):
 - In assenza di SMTP, l'invito viene comunque creato e la risposta lo dichiara (`delivery: {emailSent, reason}`, dal 17/8/2026: prima l'interfaccia diceva "successo" a prescindere).
 - Quando l'email NON parte, `inviteLink` viene restituito **anche in produzione** (non piu' solo in dev): senza, chi invita non avrebbe modo di far entrare la persona. Va a chi ha gia' `team.invite` ed e' autenticato.
 - `POST /api/team/invites/:inviteId/link` rigenera il link di un invito PENDING (il token in chiaro non e' conservato, quindi non si puo' rileggere: si conia di nuovo, e il precedente decade). Scadenza invariata; audit `team.invite_link_regenerated`.
-- Il preset `Superadmin` non e' assegnabile per invito (allineato a `REGISTRABLE_WORKSPACE_ROLE_NAMES` e alla registrazione): si concede solo a un membro esistente, da un altro Superadmin.
+- **Gerarchia sull'invito (17/8/2026):** non si puo' invitare a un ruolo piu' alto del proprio (stesso livello concesso). Vale per `createInvite`, per la consegna del link di un invito esistente, e per la **sovrascrittura** di un invito gia' in attesa (che ne cambia ruolo e token). Usa `isSystemRoleAtOrBelow` sulla scala `SYSTEM_ROLE_PRIORITY`; il frontend filtra la tendina (`invitableRolePresets`) e spegne il pulsante del link (`canActOnInvitePreset`).
+- **Il preset `Superadmin` non e' assegnabile per invito, nemmeno da un Superadmin:** un invito e' una stringa al portatore che crea l'utente e restituisce un token, e dal 17/8 quel link si copia negli appunti. Si concede solo a un membro esistente, da Ruoli e permessi. Allineato a `resolveRegistrationRoleName`, che declassa a Viewer chi chiede Superadmin in registrazione.
+- ⚠️ `revokeInvite` / `deleteInvite` **non** hanno controllo di gerarchia: chi ha `team.invite` puo' revocare o cancellare un invito di livello superiore. Non concede poteri, ma e' un buco di simmetria noto (annotato nel piano di settembre).
 
 ## 15) Checklist MVP decisions (2026-03-05)
 - `StageChecklistRule` is the primary gate model (`workspaceId + projectCategoryId + pipelineStageId + checklistTemplateId` unique).

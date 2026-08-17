@@ -157,6 +157,7 @@ export const buildWorkspaceTeamRoute = (
     const result = await teamInviteServiceApi.regenerateInviteLink({
       workspaceId: workspace.id,
       inviteId: params.inviteId,
+      actorUserId: user.id,
     });
 
     await createAuditEvent({

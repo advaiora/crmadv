@@ -27,6 +27,20 @@ const SYSTEM_ROLE_PRIORITY: Record<WorkspaceSystemRoleName, number> = {
   [SYSTEM_ROLE_NAME.viewer]: 10,
 };
 
+/**
+ * `true` se `roleName` sta allo stesso livello o piu' in basso di `referenceRoleName`
+ * nella scala dei ruoli di sistema.
+ *
+ * Serve alla regola decisa da Jacopo il 17/8/2026: **un ruolo piu' basso non puo'
+ * mai creare un invito per un ruolo piu' alto del suo.** La scala e' quella che il
+ * workspace usa gia' per stabilire quale sia il ruolo "piu' alto" di un utente:
+ * non se ne introduce una seconda, che prima o poi divergerebbe.
+ */
+export const isSystemRoleAtOrBelow = (
+  roleName: WorkspaceSystemRoleName,
+  referenceRoleName: WorkspaceSystemRoleName,
+) => SYSTEM_ROLE_PRIORITY[roleName] <= SYSTEM_ROLE_PRIORITY[referenceRoleName];
+
 const WORKSPACE_SYSTEM_ROLE_NAME_SET = new Set<WorkspaceSystemRoleName>(
   SYSTEM_ROLE_DEFINITIONS.map((role) => role.name),
 );

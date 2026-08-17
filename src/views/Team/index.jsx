@@ -18,11 +18,12 @@ import { ToastContainer, toast } from 'react-toastify';
 import TeamModuleGate from '../../modules/team/ui/TeamModuleGate';
 import { describeInviteDelivery, INVITE_DELIVERY_TONE } from '../../modules/team/ui/inviteDelivery';
 import {
-  TEAM_INVITE_ROLE_PRESETS,
   TEAM_INVITE_STATUS_OPTIONS,
   TEAM_PERMISSIONS,
   TEAM_ROLE_PRESETS,
   TEAM_STATUS_OPTIONS,
+  canActOnInvitePreset,
+  invitableRolePresets,
 } from '../../modules/team/ui/constants';
 import {
   assignTeamMemberRole,
@@ -76,6 +77,8 @@ const TeamWorkspacePage = ({ access }) => {
   const canAssignRoles = hasPermission(access, TEAM_PERMISSIONS.rolesAssign);
   const canAssignCustomRoles = hasPermission(access, 'roles.assign');
   const actorIsSuperadmin = Array.isArray(access?.roles) && access.roles.includes('Superadmin');
+  // Non si invita a un ruolo piu' alto del proprio (regola del 17/8/2026).
+  const invitableRoles = invitableRolePresets(access?.roles);
   const canDeleteMembers = canDeactivate && actorIsSuperadmin;
 
   const [tab, setTab] = useState('members');
@@ -562,11 +565,18 @@ const TeamWorkspacePage = ({ access }) => {
                       const canDeleteInvite = canInvite;
                       const deleteReason = !canDeleteInvite ? `Permesso richiesto: ${TEAM_PERMISSIONS.invite}` : '';
                       const deleting = Boolean(deleteInviteLoading[invite.inviteId]);
+                      // Non si consegna il link di un invito destinato a un
+                      // ruolo piu' alto del proprio: il server lo rifiuta, e il
+                      // pulsante deve dirlo prima invece di dopo.
+                      const canActOnInvite = canActOnInvitePreset(access?.roles, invite.rolePreset || 'Viewer');
+                      const linkDisabled = !canInvite || invite.status !== 'PENDING' || !canActOnInvite;
                       const linkReason = !canInvite
                         ? `Permesso richiesto: ${TEAM_PERMISSIONS.invite}`
                         : (invite.status !== 'PENDING'
                           ? 'Solo PENDING'
-                          : 'Crea un link nuovo e lo copia. Se un link era già stato mandato, quello smette di funzionare.');
+                          : (!canActOnInvite
+                            ? `Invito destinato a ${invite.rolePreset}: e un ruolo piu alto del tuo`
+                            : 'Crea un link nuovo e lo copia. Se un link era già stato mandato, quello smette di funzionare.'));
                       const linkLoading = Boolean(inviteLinkLoading[invite.inviteId]);
                       return (
                         <tr key={invite.inviteId}>
@@ -577,7 +587,7 @@ const TeamWorkspacePage = ({ access }) => {
                           <td>{formatDateTime(invite.createdAt)}</td>
                           <td className="text-end">
                             <div className="d-inline-flex gap-2">
-                              <span title={linkReason}><Button size="sm" variant="outline-primary" disabled={!canInvite || invite.status !== 'PENDING' || linkLoading} onClick={() => void onRegenerateInviteLink(invite)}>{linkLoading ? 'Creo...' : 'Link invito'}</Button></span>
+                              <span title={linkReason}><Button size="sm" variant="outline-primary" disabled={linkDisabled || linkLoading} onClick={() => void onRegenerateInviteLink(invite)}>{linkLoading ? 'Creo...' : 'Link invito'}</Button></span>
                               <span title={revokeReason}><Button size="sm" variant="outline-danger" disabled={Boolean(revokeReason) || loading} onClick={() => void onRevokeInvite(invite)}>{loading ? 'Revoca...' : 'Revoca'}</Button></span>
                               <span title={deleteReason}><Button size="sm" variant="outline-secondary" disabled={Boolean(deleteReason) || deleting} onClick={() => void onDeleteInvite(invite)}>{deleting ? 'Elimina...' : 'Elimina'}</Button></span>
                             </div>
@@ -654,7 +664,7 @@ const TeamWorkspacePage = ({ access }) => {
         <Form onSubmit={onInviteSubmit}>
           <Modal.Body>
             <Form.Group className="mb-3"><Form.Label>Email</Form.Label><Form.Control type="email" value={inviteForm.email} onChange={(event) => setInviteForm((current) => ({ ...current, email: event.target.value }))} required /></Form.Group>
-            <Form.Group className="mb-3"><Form.Label>Ruolo preset</Form.Label><Form.Select value={inviteForm.rolePreset} onChange={(event) => setInviteForm((current) => ({ ...current, rolePreset: event.target.value }))}>{TEAM_INVITE_ROLE_PRESETS.map((role) => <option key={role} value={role}>{role}</option>)}</Form.Select></Form.Group><Form.Text className="text-muted d-block mb-3">Il ruolo Superadmin non si concede per invito: si assegna a un membro già esistente da Ruoli e permessi.</Form.Text>
+            <Form.Group className="mb-3"><Form.Label>Ruolo preset</Form.Label><Form.Select value={inviteForm.rolePreset} onChange={(event) => setInviteForm((current) => ({ ...current, rolePreset: event.target.value }))}>{invitableRoles.map((role) => <option key={role} value={role}>{role}</option>)}</Form.Select></Form.Group><Form.Text className="text-muted d-block mb-3">Puoi invitare al tuo ruolo o a uno più basso. I ruoli più alti del tuo non compaiono.</Form.Text>
             <Form.Group><Form.Label>Scadenza (giorni)</Form.Label><Form.Select value={inviteForm.expiresInDays} onChange={(event) => setInviteForm((current) => ({ ...current, expiresInDays: Number(event.target.value) }))}>{[3, 7, 14, 30].map((days) => <option key={days} value={days}>{days}</option>)}</Form.Select></Form.Group>
             {inviteError && <Alert variant="danger" className="mt-3 mb-0 py-2">{inviteError}</Alert>}
             {inviteOutcome && (inviteOutcome.detail || inviteOutcome.showLink) && (

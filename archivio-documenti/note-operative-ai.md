@@ -749,7 +749,26 @@ node --test --import tsx "server/modules/team/**/*.test.ts" "server/modules/quot
 
 Il costo non sta nei test — durano millisecondi — ma nell'avvio di `tsx` su ogni file.
 
-**La regola:** cartella toccata durante il lavoro, suite intera **una volta sola** prima della revisione finale, e **da sola** — nessun `tsc`, nessun dev server, nessun altro test in parallelo.
+**La regola:** cartella toccata durante il lavoro, suite intera **una volta sola** prima della revisione finale, e possibilmente non insieme a un altro processo pesante (tipicamente `tsc`, che da solo tiene occupato un core per minuti).
+
+⚠️ **Quanto pesa questa nota dipende dalla macchina, e la macchina sta cambiando.** Il fattore 7x e' stato misurato su un **Intel Celeron N4500, 2 core / 2 thread**: li' un solo processo pesante occupa meta' del computer e due lo saturano. Su una macchina con piu' thread la contesa si riduce a poco o niente. **Non trasformare questa nota in un divieto** — in particolare non spegnere i dev server o far aspettare chi sta guardando il CRM: era il rimedio a un limite di quel computer, non una buona pratica. Quello che resta valido ovunque e' il resto: restringere il glob durante il lavoro, e diffidare di un tempo misurato mentre gira qualcos'altro.
+
+---
+
+## 53. ⚠️ La skill `claude-api` versa 178.000 TOKEN in conversazione: il 59% del contesto in un colpo solo
+
+**Contesto:** 17/8/2026. Jacopo ha chiesto di annotare in roadmap l'idea di far pesare i consumi della chat AI sugli **abbonamenti** Anthropic e OpenAI invece che sulle API a consumo. La regola nelle mie istruzioni dice di caricare la skill `claude-api` **ogni volta** che si parla di prezzi o limiti di un modello, e di non rispondere a memoria. L'ho fatto.
+
+**Cosa e' costato:** la skill non da' una risposta, **riversa in conversazione tutta la sua libreria di riferimento** — guida alle migrazioni fra modelli, dodici file sui Managed Agents, prompt caching, tool use, l'SDK TypeScript. Misurato sulla trascrizione della sessione: **un singolo blocco da 178.222 token**, il **59% di tutta la conversazione**. Per confronto, *tutto il lavoro vero* di quella sessione — leggere una dozzina di file, due subagent, quattro giri di `tsc`, la suite di test, una ventina di modifiche — sta in 125.000 token messi insieme. **La skill e' costata piu' di tutto il resto sommato.**
+
+**Perche' e' un problema qui:** la sessione e' partita al 40% di contesto occupato **prima di scrivere una riga di codice** (84.000 token di istruzioni di sistema + 178.000 di skill), e questo accorcia di molto quanto lavoro ci sta prima che il contesto vada riassunto.
+
+**Modo corretto:**
+- **Se la domanda riguarda la fattibilita' o la licenza** (*"si puo' usare l'abbonamento invece delle API?"*, *"questo modello e' adatto?"*), la skill **non serve**: e' una domanda di condizioni d'uso, non di sintassi. Si risponde con quello che si sa, dichiarando cosa va verificato.
+- **La skill serve davvero** quando si sta **scrivendo o modificando codice** che chiama l'API: nomi esatti dei modelli, parametri, forma delle chiamate. Li' vale il suo costo, perche' sbagliare un identificatore di modello significa un 404 in produzione.
+- **Se serve solo il nome di un modello o un prezzo**, `shared/models.md` da solo basta e costa una frazione.
+
+**Il segnale d'allarme generale:** quando una skill si presenta con *"Base directory for this skill"* seguito da decine di documenti inclusi, ha appena occupato il contesto per il resto della sessione. Vale la pena chiedersi, **prima** di caricarla, se la domanda e' di *fare* o soltanto di *sapere*.
 
 ---
 

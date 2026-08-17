@@ -4,6 +4,8 @@ import { signAccessToken } from '../../auth/jwt.js';
 import {
   SYSTEM_ROLE_NAME,
   assignWorkspaceUserRole,
+  getUserWorkspaceSystemRoleName,
+  isSystemRoleAtOrBelow,
   normalizeWorkspaceSystemRoleName,
 } from '../../auth/workspace-bootstrap.js';
 import { TEAM_MODULE_KEY, type WorkspaceSystemRoleName } from '../../auth/rbac-catalog.js';
@@ -120,6 +122,10 @@ type TeamInviteServiceDependencies = {
   prismaClient: typeof prisma;
   moduleRepo: typeof moduleRepository;
   notifier: typeof teamInviteNotifier;
+  getActorSystemRoleFn: (input: {
+    workspaceId: string;
+    userId: string;
+  }) => Promise<WorkspaceSystemRoleName | null>;
   assignWorkspaceUserRoleFn: typeof assignWorkspaceUserRole;
   signAccessTokenFn: typeof signAccessToken;
   generateTokenFn: typeof generateInviteToken;
@@ -134,6 +140,8 @@ const defaultDependencies: TeamInviteServiceDependencies = {
   prismaClient: prisma,
   moduleRepo: moduleRepository,
   notifier: teamInviteNotifier,
+  getActorSystemRoleFn: ({ workspaceId, userId }) =>
+    getUserWorkspaceSystemRoleName({ tx: prisma, workspaceId, userId }),
   assignWorkspaceUserRoleFn: assignWorkspaceUserRole,
   signAccessTokenFn: signAccessToken,
   generateTokenFn: generateInviteToken,
@@ -163,16 +171,23 @@ const resolveInviteBaseUrl = () => {
 };
 
 /**
- * Il ruolo Superadmin non si concede per invito.
+ * Il ruolo Superadmin non si concede per invito, nemmeno da un altro Superadmin.
  *
- * La stessa regola esiste gia' altrove: `REGISTRABLE_WORKSPACE_ROLE_NAMES` non
- * lo elenca, e la registrazione declassa a Viewer chi lo chiede
- * (`resolveRegistrationRoleName`). L'invito se l'era persa, e la conseguenza
- * era grossa: chiunque avesse `team.invite` - il Manager, per esempio, che NON
- * puo' assegnare ruoli - poteva creare un invito con preset Superadmin, aprirlo
- * e ritrovarsi una sessione da Superadmin. Finche' la posta non era configurata
- * il link non usciva mai, quindi la falla restava teorica: dal momento in cui il
- * link viene restituito a schermo, non lo e' piu'.
+ * ⚠️ Sembra ridondante con la gerarchia qui sotto - se solo un Superadmin puo'
+ * invitare un Superadmin, e un Superadmin puo' gia' promuovere chiunque, che
+ * differenza fa? Ne fa una grossa, ed e' il motivo per cui questa regola
+ * esiste: **promuovere e invitare non sono lo stesso potere.**
+ *  - promuovere passa da `assignWorkspaceUserRole`, che pretende un destinatario
+ *    gia' membro attivo del workspace: una persona con un account e una password;
+ *  - invitare produce **una stringa al portatore**. La rotta di accettazione e'
+ *    pubblica, l'autenticazione e' facoltativa, e senza sessione l'invito
+ *    **crea l'utente** sull'email indicata e restituisce un token d'accesso.
+ *
+ * Dal 17/8/2026 quel link viene mostrato a schermo e copiato negli appunti
+ * quando l'email non parte: finisce in chat, in un messaggio, in un blocco note.
+ * Un invito da Superadmin sarebbe un oggetto per cui *chi lo apre per primo
+ * comanda* - compreso chi non era il destinatario. Il resto del progetto la
+ * pensa gia' cosi': la registrazione declassa a Viewer chi chiede Superadmin.
  */
 const assertInvitablePreset = (roleName: WorkspaceSystemRoleName) => {
   if (roleName === SYSTEM_ROLE_NAME.superadmin) {
@@ -196,6 +211,38 @@ const resolveRolePresetNameOrThrow = (rolePreset: InviteRolePresetInput) => {
   assertInvitablePreset(normalizedRoleName);
 
   return normalizedRoleName;
+};
+
+/**
+ * Nessuno puo' invitare a un ruolo piu' alto del proprio.
+ *
+ * Regola di Jacopo, 17/8/2026, valida universalmente: non avrebbe senso che un
+ * Manager faccia entrare un Admin. Prima non c'era nessun controllo e la
+ * conseguenza era grossa: chiunque avesse `team.invite` poteva crearsi un invito
+ * con preset **Superadmin**, aprirlo, e ritrovarsi una sessione da Superadmin -
+ * mentre in ogni altro punto del CRM i ruoli di sistema li assegna solo un
+ * Superadmin. Restava teorica solo perche' senza posta configurata il link non
+ * usciva mai; col pulsante "Link invito" non lo sarebbe piu' stata.
+ *
+ * Stesso livello e' concesso: un Admin puo' invitare un Admin.
+ */
+const assertActorCanInviteRole = ({
+  actorRoleName,
+  rolePresetName,
+}: {
+  actorRoleName: WorkspaceSystemRoleName | null;
+  rolePresetName: WorkspaceSystemRoleName;
+}) => {
+  if (!actorRoleName) {
+    throw forbidden('Actor has no system role in this workspace');
+  }
+
+  if (!isSystemRoleAtOrBelow(rolePresetName, actorRoleName)) {
+    throw forbidden(
+      `Non puoi invitare qualcuno al ruolo ${rolePresetName}: e piu alto del tuo (${actorRoleName})`,
+      { actorRole: actorRoleName, requestedRole: rolePresetName },
+    );
+  }
 };
 
 const resolveRolePresetForAcceptance = (rolePresetName: string | null) =>
@@ -272,6 +319,7 @@ export const buildTeamInviteService = (
     prismaClient,
     moduleRepo,
     notifier,
+    getActorSystemRoleFn,
     assignWorkspaceUserRoleFn,
     signAccessTokenFn,
     generateTokenFn,
@@ -292,6 +340,13 @@ export const buildTeamInviteService = (
       const rolePresetName = resolveRolePresetNameOrThrow(parsedPayload.rolePreset);
       const expiresAt = resolveInviteExpiry(now, parsedPayload.expiresInDays);
 
+      const actorRoleName = await getActorSystemRoleFn({
+        workspaceId: input.workspaceId,
+        userId: input.invitedByUserId,
+      });
+
+      assertActorCanInviteRole({ actorRoleName, rolePresetName });
+
       await inviteRepository.expirePendingInvites(input.workspaceId, now);
 
       const existingUser = await userRepo.findByEmail(email);
@@ -305,6 +360,19 @@ export const buildTeamInviteService = (
       const token = generateTokenFn();
       const tokenHash = hashTokenFn(token);
       const existingPendingInvite = await inviteRepository.findPendingInviteByEmail(input.workspaceId, email);
+
+      // Se un invito per questa persona esiste gia', invitarla di nuovo lo
+      // SOVRASCRIVE: cambia il ruolo e cambia il token, quindi il link gia'
+      // consegnato smette di funzionare. E' un potere sull'invito di qualcun
+      // altro, e va misurato sul ruolo di QUELL'invito, non solo su quello
+      // nuovo - altrimenti un Manager puo' calpestare l'invito da Admin appena
+      // spedito dal Superadmin, declassarlo, e prendersi il link.
+      if (existingPendingInvite) {
+        assertActorCanInviteRole({
+          actorRoleName,
+          rolePresetName: resolveRolePresetForAcceptance(existingPendingInvite.rolePresetName),
+        });
+      }
 
       const invite = existingPendingInvite
         ? await inviteRepository.refreshPendingInvite({
@@ -390,6 +458,7 @@ export const buildTeamInviteService = (
     async regenerateInviteLink(input: {
       workspaceId: string;
       inviteId: string;
+      actorUserId: string;
     }): Promise<RegenerateInviteLinkResult> {
       const now = nowFn();
       await inviteRepository.expirePendingInvites(input.workspaceId, now);
@@ -403,10 +472,16 @@ export const buildTeamInviteService = (
         throw badRequest('Only pending invites can produce a new link');
       }
 
-      // Un invito con preset Superadmin non puo' piu' nascere (vedi
-      // assertInvitablePreset), ma potrebbe essercene uno creato prima della
-      // regola: non gli si consegna un link nuovo.
-      assertInvitablePreset(resolveRolePresetForAcceptance(existingInvite.rolePresetName));
+      // Consegnare il link e' come creare l'invito: se non potresti crearlo a
+      // quel ruolo, non puoi nemmeno farne uscire il link. Vale anche per gli
+      // inviti nati prima della regola.
+      assertActorCanInviteRole({
+        actorRoleName: await getActorSystemRoleFn({
+          workspaceId: input.workspaceId,
+          userId: input.actorUserId,
+        }),
+        rolePresetName: resolveRolePresetForAcceptance(existingInvite.rolePresetName),
+      });
 
       const inviteBaseUrl = resolveInviteBaseUrl();
       if (!inviteBaseUrl) {

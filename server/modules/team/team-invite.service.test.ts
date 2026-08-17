@@ -92,6 +92,9 @@ const createService = (overrides: Record<string, unknown> = {}) => {
         reason: 'MAIL_NOT_CONFIGURED',
       }),
     } as never,
+    // Chi invita, salvo diversa indicazione del singolo test, e' un Superadmin:
+    // cosi' i test che non parlano di gerarchia non ne sono influenzati.
+    getActorSystemRoleFn: async () => 'Superadmin',
     assignWorkspaceUserRoleFn: async () => ({
       previousRoleName: null,
       assignedRoleName: 'Viewer',
@@ -195,33 +198,129 @@ test('createInvite reports a delivered email instead of always claiming success'
   assert.equal(result.inviteLink, undefined);
 });
 
-test('createInvite refuses to hand out the Superadmin role', async () => {
-  const service = createService();
+test('createInvite reads the actor role for the right user and workspace', async () => {
+  const lookups: Array<{ workspaceId: string; userId: string }> = [];
+  const service = createService({
+    getActorSystemRoleFn: async (input: { workspaceId: string; userId: string }) => {
+      lookups.push(input);
+      return 'Superadmin';
+    },
+  });
+
+  await service.createInvite({
+    workspaceId: 'workspace-1',
+    invitedByUserId: 'user-admin',
+    invitedByDisplayName: 'Admin User',
+    payload: { email: 'invitee@example.com', rolePreset: 'Viewer' },
+  });
+
+  // Il ruolo va letto per CHI INVITA, non per il destinatario, e nel workspace
+  // dell'invito: se il cablaggio cambia, la guardia diventa decorativa.
+  assert.deepEqual(lookups[0], { workspaceId: 'workspace-1', userId: 'user-admin' });
+});
+
+test('createInvite refuses the Superadmin preset even to a Superadmin', async () => {
+  const service = createService({
+    getActorSystemRoleFn: async () => 'Superadmin',
+  });
 
   await assert.rejects(
     service.createInvite({
       workspaceId: 'workspace-1',
-      invitedByUserId: 'user-admin',
-      invitedByDisplayName: 'Admin User',
-      payload: {
-        email: 'invitee@example.com',
-        rolePreset: 'Superadmin',
-      },
+      invitedByUserId: 'user-super',
+      invitedByDisplayName: 'Super User',
+      payload: { email: 'invitee@example.com', rolePreset: 'Superadmin' },
     }),
     (error: unknown) => error instanceof HttpError && error.statusCode === 400,
+    'un invito e una stringa al portatore: il ruolo massimo non ci passa',
   );
 });
 
-test('regenerateInviteLink refuses a legacy Superadmin invite', async () => {
+test('createInvite refuses to overwrite a pending invite of a higher role', async () => {
   const service = createService({
+    getActorSystemRoleFn: async () => 'Manager',
     inviteRepository: {
-      findInviteById: async () => makeInvite({ rolePresetName: 'Superadmin' }),
+      findPendingInviteByEmail: async () => makeInvite({ rolePresetName: 'Admin' }),
     },
   });
 
   await assert.rejects(
-    service.regenerateInviteLink({ workspaceId: 'workspace-1', inviteId: 'invite-1' }),
-    (error: unknown) => error instanceof HttpError && error.statusCode === 400,
+    service.createInvite({
+      workspaceId: 'workspace-1',
+      invitedByUserId: 'user-manager',
+      invitedByDisplayName: 'Manager User',
+      payload: { email: 'invitee@example.com', rolePreset: 'Viewer' },
+    }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 403,
+    'invitare di nuovo sovrascrive: non si calpesta l invito di chi sta piu in alto',
+  );
+});
+
+test('createInvite refuses a role higher than the inviter own', async () => {
+  const service = createService({
+    getActorSystemRoleFn: async () => 'Manager',
+  });
+
+  await assert.rejects(
+    service.createInvite({
+      workspaceId: 'workspace-1',
+      invitedByUserId: 'user-manager',
+      invitedByDisplayName: 'Manager User',
+      payload: { email: 'invitee@example.com', rolePreset: 'Admin' },
+    }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 403,
+    'il Manager non deve poter invitare un Admin',
+  );
+});
+
+test('createInvite allows the inviter own role and every role below it', async () => {
+  const service = createService({
+    getActorSystemRoleFn: async () => 'Manager',
+  });
+
+  for (const rolePreset of ['Manager', 'Operativo', 'Viewer']) {
+    const result = await service.createInvite({
+      workspaceId: 'workspace-1',
+      invitedByUserId: 'user-manager',
+      invitedByDisplayName: 'Manager User',
+      payload: { email: 'invitee@example.com', rolePreset },
+    });
+
+    assert.ok(result.inviteId, `il Manager deve poter invitare un ${rolePreset}`);
+  }
+});
+
+test('createInvite refuses an actor without a system role in the workspace', async () => {
+  const service = createService({
+    getActorSystemRoleFn: async () => null,
+  });
+
+  await assert.rejects(
+    service.createInvite({
+      workspaceId: 'workspace-1',
+      invitedByUserId: 'user-ghost',
+      invitedByDisplayName: 'Ghost',
+      payload: { email: 'invitee@example.com', rolePreset: 'Viewer' },
+    }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 403,
+  );
+});
+
+test('regenerateInviteLink refuses to release a link above the actor own role', async () => {
+  const service = createService({
+    getActorSystemRoleFn: async () => 'Manager',
+    inviteRepository: {
+      findInviteById: async () => makeInvite({ rolePresetName: 'Admin' }),
+    },
+  });
+
+  await assert.rejects(
+    service.regenerateInviteLink({
+      workspaceId: 'workspace-1',
+      inviteId: 'invite-1',
+      actorUserId: 'user-manager',
+    }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 403,
   );
 });
 
@@ -241,6 +340,7 @@ test('regenerateInviteLink issues a fresh link without moving the expiry', async
   const result = await service.regenerateInviteLink({
     workspaceId: 'workspace-1',
     inviteId: 'invite-1',
+    actorUserId: 'user-admin',
   });
 
   assert.ok(result.inviteLink.includes(`token=${TEST_TOKEN}`));
@@ -263,7 +363,11 @@ test('regenerateInviteLink refuses invites that are no longer pending', async ()
   });
 
   await assert.rejects(
-    service.regenerateInviteLink({ workspaceId: 'workspace-1', inviteId: 'invite-1' }),
+    service.regenerateInviteLink({
+      workspaceId: 'workspace-1',
+      inviteId: 'invite-1',
+      actorUserId: 'user-admin',
+    }),
     (error: unknown) => error instanceof HttpError && error.statusCode === 400,
   );
 });
