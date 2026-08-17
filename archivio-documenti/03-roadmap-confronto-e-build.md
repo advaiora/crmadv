@@ -759,7 +759,15 @@ Voci non legate a una singola versione: si pianificano quando conviene, non fann
 
   </details>
 
-  **Dove collocare B — raccomandazione dell'assistente, da confermare con Jacopo.** Conviene spezzarlo:
+  ### 📋 Il piano di B è scritto: `archivio-documenti/piano-fase-B-renaming-tecnico.md` *(17/8/2026)*
+
+  Costruito su due ricognizioni indipendenti (una su `src/**`, una su `server/**` + `prisma/**`). **Niente è stato eseguito.** Tre cose da sapere subito, perché cambiano quanto è scritto qui sotto:
+
+  1. **⚠️ La divisione «B1 frontend / B2 backend» qui sotto NON è eseguibile.** Il backend dichiara **94 rotte** `/agency/...` e il frontend ne chiama 50: sono le **due metà dello stesso indirizzo**, e rinominarne una sola rompe l'area intera. Il piano riorganizza il lavoro **per asse** (classi CSS · chiavi permesso · URL · file e cartelle · vocabolario `discovery`), dove solo il lotto degli URL è obbligatoriamente atomico fra i due lati.
+  2. **Manca il prerequisito vero: nessun nome tecnico è mai stato deciso.** A differenza delle etichette della fase A, per cartelle, URL e chiavi non è stato scelto niente — va fatto col metodo del re-naming prima di toccare un file.
+  3. **Il nodo con Claudio risulta essere solo la migrazione**, cercato apposta e non smentito: nessuna dipendenza esterna alle chiavi (niente OpenAPI/Postman, le integrazioni non le leggono, i seed non le scrivono a mano). Jacopo ha autorizzato a procedere a questa condizione (17/8/2026). E la migrazione è **più semplice del previsto**: `Permission` ha `key` unica globale e `RolePermission` collega **per identificativo**, quindi un `UPDATE` della chiave tocca ~72 righe e **nessun ruolo perde niente**, personalizzati compresi.
+
+  **Dove collocare B — la raccomandazione originale, superata dal punto 1 qui sopra ma tenuta per memoria del ragionamento:**
   - **B1 — frontend (URL/rotte, nomi file e cartelle di `src/`):** è roba nostra, meccanica, senza decisioni di prodotto una volta che A ha fissato il vocabolario. Va fatto **subito dopo A** (stessa sessione se regge, altrimenti la successiva): è il pezzo che risolve davvero il problema di Jacopo, ed è quello che rincara aspettando.
   - **B2 — backend e permessi** (cartella-modulo `server/modules/agency-os/`, chiavi permesso tipo `projects.view`, eventuali righe `Permission` a database): ⛔ **da concordare con Claudio prima**, è area a decisioni condivise, e toccare le chiavi dei permessi può comportare una **migrazione**. Non si fa unilateralmente.
 
