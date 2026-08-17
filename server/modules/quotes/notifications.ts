@@ -1,4 +1,4 @@
-import nodemailer, { type Transporter } from 'nodemailer';
+import { resolveMailTransport, type ResolvedMailTransport } from '../../core/mail.js';
 import { brandingRepository } from '../../repositories/branding.repository.js';
 import { quotesRepository } from './repository.js';
 import { renderQuotePdf } from './pdf/quotePdf.js';
@@ -55,7 +55,7 @@ type QuoteNotificationsDependencies = {
   upsertNotificationSettings: typeof quotesRepository.upsertNotificationSettings;
   findBrandingByWorkspaceId: typeof brandingRepository.findByWorkspaceId;
   renderQuotePdfFn: typeof renderQuotePdf;
-  createTransport: () => Transporter | null;
+  resolveTransport: () => Promise<ResolvedMailTransport | null>;
 };
 
 type NotificationEventMetrics = {
@@ -73,8 +73,6 @@ type WorkspaceNotificationsMetrics = {
   ACCEPTED: NotificationEventMetrics;
   REJECTED: NotificationEventMetrics;
 };
-
-const DEFAULT_EMAIL_FROM = 'no-reply@local';
 
 export type QuoteNotificationEvent = 'SENT' | 'ACCEPTED' | 'REJECTED';
 
@@ -110,56 +108,6 @@ const eventFieldMap = {
     body: 'rejectedBody',
   },
 } as const;
-
-const readEnv = (name: string) => {
-  const raw = process.env[name];
-  if (typeof raw !== 'string') {
-    return undefined;
-  }
-
-  const normalized = raw.trim();
-  return normalized.length > 0 ? normalized : undefined;
-};
-
-const parseBoolean = (value: string | undefined, fallback: boolean) => {
-  if (value === undefined) {
-    return fallback;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (normalized === '1' || normalized === 'true') {
-    return true;
-  }
-  if (normalized === '0' || normalized === 'false') {
-    return false;
-  }
-
-  return fallback;
-};
-
-const resolveTransport = () => {
-  const host = readEnv('SMTP_HOST');
-  if (!host) {
-    return null;
-  }
-
-  const rawPort = readEnv('SMTP_PORT');
-  const port = rawPort ? Number(rawPort) : 587;
-  if (!Number.isInteger(port) || port <= 0) {
-    return null;
-  }
-
-  const secure = parseBoolean(readEnv('SMTP_SECURE'), false);
-  const user = readEnv('SMTP_USER');
-  const pass = readEnv('SMTP_PASS');
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    ...(user ? { auth: { user, pass: pass ?? '' } } : {}),
-  });
-};
 
 const normalizeTemplateText = (value: string | null | undefined, fallback: string) => {
   if (typeof value !== 'string') {
@@ -333,7 +281,9 @@ export const buildQuoteNotificationsService = (
     upsertNotificationSettings: overrides.upsertNotificationSettings ?? quotesRepository.upsertNotificationSettings,
     findBrandingByWorkspaceId: overrides.findBrandingByWorkspaceId ?? brandingRepository.findByWorkspaceId,
     renderQuotePdfFn: overrides.renderQuotePdfFn ?? renderQuotePdf,
-    createTransport: overrides.createTransport ?? resolveTransport,
+    // Niente ripiego di sviluppo qui: una notifica di preventivo non deve
+    // risultare "recapitata" perche' e' finita in una casella finta.
+    resolveTransport: overrides.resolveTransport ?? (() => resolveMailTransport()),
   };
 
   return {
@@ -362,11 +312,11 @@ export const buildQuoteNotificationsService = (
         return result;
       }
 
-      const transport = dependencies.createTransport();
-      if (!transport) {
+      const mail = await dependencies.resolveTransport();
+      if (!mail) {
         const result = {
           delivered: false,
-          skippedReason: 'SMTP_NOT_CONFIGURED',
+          skippedReason: 'MAIL_NOT_CONFIGURED',
         } satisfies NotifyQuoteEventResult;
         updateMetricsForResult(input.workspaceId, input.event, result);
         return result;
@@ -400,8 +350,8 @@ export const buildQuoteNotificationsService = (
             )]
             : undefined;
 
-        const info = await transport.sendMail({
-          from: readEnv('EMAIL_FROM') || DEFAULT_EMAIL_FROM,
+        const info = await mail.transport.sendMail({
+          from: mail.from,
           to: recipient,
           subject,
           text,

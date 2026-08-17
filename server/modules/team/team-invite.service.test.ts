@@ -89,7 +89,7 @@ const createService = (overrides: Record<string, unknown> = {}) => {
     notifier: {
       sendInvite: async () => ({
         delivered: false,
-        reason: 'SMTP_NOT_CONFIGURED',
+        reason: 'MAIL_NOT_CONFIGURED',
       }),
     } as never,
     assignWorkspaceUserRoleFn: async () => ({
@@ -165,6 +165,107 @@ test('createInvite stores token hash only and not plain token', async () => {
   assert.equal(createPayload?.tokenHash, `hashed:${TEST_TOKEN}`);
   assert.equal('token' in (createPayload as Record<string, unknown>), false);
   assert.ok(typeof result.inviteLink === 'string' && result.inviteLink.includes(`token=${TEST_TOKEN}`));
+  // L'invito e' stato creato ma l'email non e' partita: la risposta deve dirlo.
+  assert.equal(result.delivery.emailSent, false);
+  assert.equal(result.delivery.reason, 'MAIL_NOT_CONFIGURED');
+});
+
+test('createInvite reports a delivered email instead of always claiming success', async () => {
+  const service = createService({
+    notifier: {
+      sendInvite: async () => ({
+        delivered: true,
+        providerMessageId: 'provider-1',
+      }),
+    } as never,
+  });
+
+  const result = await service.createInvite({
+    workspaceId: 'workspace-1',
+    invitedByUserId: 'user-admin',
+    invitedByDisplayName: 'Admin User',
+    payload: {
+      email: 'invitee@example.com',
+    },
+  });
+
+  assert.equal(result.delivery.emailSent, true);
+  assert.equal(result.delivery.reason, undefined);
+  // Se l'email e' partita il link non serve a chi invita: non va esposto.
+  assert.equal(result.inviteLink, undefined);
+});
+
+test('createInvite refuses to hand out the Superadmin role', async () => {
+  const service = createService();
+
+  await assert.rejects(
+    service.createInvite({
+      workspaceId: 'workspace-1',
+      invitedByUserId: 'user-admin',
+      invitedByDisplayName: 'Admin User',
+      payload: {
+        email: 'invitee@example.com',
+        rolePreset: 'Superadmin',
+      },
+    }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 400,
+  );
+});
+
+test('regenerateInviteLink refuses a legacy Superadmin invite', async () => {
+  const service = createService({
+    inviteRepository: {
+      findInviteById: async () => makeInvite({ rolePresetName: 'Superadmin' }),
+    },
+  });
+
+  await assert.rejects(
+    service.regenerateInviteLink({ workspaceId: 'workspace-1', inviteId: 'invite-1' }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 400,
+  );
+});
+
+test('regenerateInviteLink issues a fresh link without moving the expiry', async () => {
+  let refreshPayload: Record<string, unknown> | null = null;
+
+  const service = createService({
+    inviteRepository: {
+      findInviteById: async () => makeInvite(),
+      refreshPendingInvite: async (input: Record<string, unknown>) => {
+        refreshPayload = input;
+        return makeInvite();
+      },
+    },
+  });
+
+  const result = await service.regenerateInviteLink({
+    workspaceId: 'workspace-1',
+    inviteId: 'invite-1',
+  });
+
+  assert.ok(result.inviteLink.includes(`token=${TEST_TOKEN}`));
+  assert.ok(refreshPayload);
+  // Il token cambia (il precedente smette di valere)...
+  assert.equal((refreshPayload as Record<string, unknown>).tokenHash, `hashed:${TEST_TOKEN}`);
+  // ...ma la scadenza resta quella dell'invito: chiedere il link non deve
+  // allungare di nascosto la vita dell'invito.
+  assert.deepEqual(
+    (refreshPayload as Record<string, unknown>).expiresAt,
+    new Date('2026-03-11T10:00:00.000Z'),
+  );
+});
+
+test('regenerateInviteLink refuses invites that are no longer pending', async () => {
+  const service = createService({
+    inviteRepository: {
+      findInviteById: async () => makeInvite({ status: 'REVOKED' }),
+    },
+  });
+
+  await assert.rejects(
+    service.regenerateInviteLink({ workspaceId: 'workspace-1', inviteId: 'invite-1' }),
+    (error: unknown) => error instanceof HttpError && error.statusCode === 400,
+  );
 });
 
 test('deleteInvite removes invite record in workspace scope', async () => {

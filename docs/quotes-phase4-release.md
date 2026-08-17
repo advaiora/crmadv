@@ -47,7 +47,9 @@
 2. Check `GET /quotes/metrics` per workspace for:
    - elevated `error` counters
    - slow `avgDurationMs` in `exportPdf`
-3. Verify notification skip reasons (`SMTP_NOT_CONFIGURED`, `CLIENT_EMAIL_MISSING`) are within expected range.
+3. Verify notification skip reasons (`MAIL_NOT_CONFIGURED`, `CLIENT_EMAIL_MISSING`) are within expected range.
+   (`MAIL_NOT_CONFIGURED` replaced `SMTP_NOT_CONFIGURED` on 17/8/2026, when the three
+   independent SMTP readers were merged into `server/core/mail.ts`.)
 4. Track 4xx/5xx rates on quote routes.
 
 ## Rollback Notes

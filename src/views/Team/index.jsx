@@ -16,7 +16,9 @@ import {
 import { Info, MailPlus, RefreshCw, Trash2, UserCog, UserPlus, UserX, Users } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import TeamModuleGate from '../../modules/team/ui/TeamModuleGate';
+import { describeInviteDelivery, INVITE_DELIVERY_TONE } from '../../modules/team/ui/inviteDelivery';
 import {
+  TEAM_INVITE_ROLE_PRESETS,
   TEAM_INVITE_STATUS_OPTIONS,
   TEAM_PERMISSIONS,
   TEAM_ROLE_PRESETS,
@@ -28,6 +30,7 @@ import {
   createTeamInvite,
   deleteTeamMember,
   deleteTeamInvite,
+  regenerateTeamInviteLink,
   listTeamInvites,
   listTeamMembers,
   revokeTeamInvite,
@@ -112,6 +115,8 @@ const TeamWorkspacePage = ({ access }) => {
   const [deleteDialog, setDeleteDialog] = useState({ open: false, member: null, saving: false, error: '' });
   const [revokeLoading, setRevokeLoading] = useState({});
   const [deleteInviteLoading, setDeleteInviteLoading] = useState({});
+  const [inviteLinkLoading, setInviteLinkLoading] = useState({});
+  const [regeneratedLink, setRegeneratedLink] = useState(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMemberSearch(memberSearchDraft.trim().toLowerCase()), 280);
@@ -200,6 +205,13 @@ const TeamWorkspacePage = ({ access }) => {
   useEffect(() => { if (memberPage > memberTotalPages) setMemberPage(memberTotalPages); }, [memberPage, memberTotalPages]);
   useEffect(() => { if (invitePage > inviteTotalPages) setInvitePage(inviteTotalPages); }, [invitePage, inviteTotalPages]);
 
+  const inviteOutcome = useMemo(
+    () => (inviteCreated
+      ? describeInviteDelivery(inviteCreated.delivery, { hasLink: Boolean(inviteCreated.inviteLink) })
+      : null),
+    [inviteCreated],
+  );
+
   const onInviteSubmit = async (event) => {
     event.preventDefault();
     setInviteSubmitting(true);
@@ -212,7 +224,12 @@ const TeamWorkspacePage = ({ access }) => {
         expiresInDays: Number(inviteForm.expiresInDays),
       });
       setInviteCreated(result);
-      toast.success('Invito creato con successo');
+      const outcome = describeInviteDelivery(result?.delivery, { hasLink: Boolean(result?.inviteLink) });
+      if (outcome.tone === INVITE_DELIVERY_TONE.warning) {
+        toast.warning(outcome.title);
+      } else {
+        toast.success(outcome.title);
+      }
       await loadInvites();
     } catch (error) {
       const message = errorMessage(error, 'Invito non creato');
@@ -255,13 +272,13 @@ const TeamWorkspacePage = ({ access }) => {
     }
   };
 
-  const onCopyInviteLink = async () => {
-    if (!inviteCreated?.inviteLink) return;
+  const onCopyText = async (text) => {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(inviteCreated.inviteLink);
+      await navigator.clipboard.writeText(text);
       toast.success('Link copiato');
     } catch {
-      toast.error('Copia non riuscita');
+      toast.error('Copia non riuscita: selezionalo a mano dal riquadro');
     }
   };
 
@@ -331,6 +348,34 @@ const TeamWorkspacePage = ({ access }) => {
       toast.error(errorMessage(error, 'Revoca invito non riuscita'));
     } finally {
       setRevokeLoading((current) => ({ ...current, [invite.inviteId]: false }));
+    }
+  };
+
+  const onRegenerateInviteLink = async (invite) => {
+    const confirmed = window.confirm(
+      `Creare un link nuovo per l'invito a ${invite.email}?\n\nSe un link era già stato mandato, quello smette di funzionare.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setInviteLinkLoading((current) => ({ ...current, [invite.inviteId]: true }));
+    try {
+      const result = await regenerateTeamInviteLink(invite.inviteId);
+      setRegeneratedLink({ email: invite.email, link: result.inviteLink });
+      try {
+        await navigator.clipboard.writeText(result.inviteLink);
+        toast.success('Link nuovo creato e copiato');
+      } catch {
+        // La copia automatica puo' fallire (permessi del browser): il link
+        // resta comunque a schermo, quindi non e' un vicolo cieco.
+        toast.info('Link nuovo creato: copialo dal riquadro qui sopra');
+      }
+      await loadInvites();
+    } catch (error) {
+      toast.error(errorMessage(error, 'Creazione del link non riuscita'));
+    } finally {
+      setInviteLinkLoading((current) => ({ ...current, [invite.inviteId]: false }));
     }
   };
 
@@ -494,6 +539,14 @@ const TeamWorkspacePage = ({ access }) => {
             </Card.Body>
           </Card>
           {invitesError && <Alert variant="danger">{invitesError}</Alert>}
+          {regeneratedLink && (
+            <Alert variant="info" dismissible onClose={() => setRegeneratedLink(null)}>
+              <div className="small fw-semibold mb-1">Link di invito per {regeneratedLink.email}</div>
+              <div className="small mb-2">Mandalo tu alla persona. Vale fino alla scadenza già indicata nella tabella.</div>
+              <div className="small text-break mb-2">{regeneratedLink.link}</div>
+              <Button size="sm" variant="outline-primary" onClick={() => void onCopyText(regeneratedLink.link)}>Copia link</Button>
+            </Alert>
+          )}
           <Card className="card-border flat-keep team-data-table-shell">
             <Card.Body>
               <div className="table-responsive">
@@ -509,6 +562,12 @@ const TeamWorkspacePage = ({ access }) => {
                       const canDeleteInvite = canInvite;
                       const deleteReason = !canDeleteInvite ? `Permesso richiesto: ${TEAM_PERMISSIONS.invite}` : '';
                       const deleting = Boolean(deleteInviteLoading[invite.inviteId]);
+                      const linkReason = !canInvite
+                        ? `Permesso richiesto: ${TEAM_PERMISSIONS.invite}`
+                        : (invite.status !== 'PENDING'
+                          ? 'Solo PENDING'
+                          : 'Crea un link nuovo e lo copia. Se un link era già stato mandato, quello smette di funzionare.');
+                      const linkLoading = Boolean(inviteLinkLoading[invite.inviteId]);
                       return (
                         <tr key={invite.inviteId}>
                           <td>{invite.email}</td>
@@ -518,6 +577,7 @@ const TeamWorkspacePage = ({ access }) => {
                           <td>{formatDateTime(invite.createdAt)}</td>
                           <td className="text-end">
                             <div className="d-inline-flex gap-2">
+                              <span title={linkReason}><Button size="sm" variant="outline-primary" disabled={!canInvite || invite.status !== 'PENDING' || linkLoading} onClick={() => void onRegenerateInviteLink(invite)}>{linkLoading ? 'Creo...' : 'Link invito'}</Button></span>
                               <span title={revokeReason}><Button size="sm" variant="outline-danger" disabled={Boolean(revokeReason) || loading} onClick={() => void onRevokeInvite(invite)}>{loading ? 'Revoca...' : 'Revoca'}</Button></span>
                               <span title={deleteReason}><Button size="sm" variant="outline-secondary" disabled={Boolean(deleteReason) || deleting} onClick={() => void onDeleteInvite(invite)}>{deleting ? 'Elimina...' : 'Elimina'}</Button></span>
                             </div>
@@ -594,10 +654,24 @@ const TeamWorkspacePage = ({ access }) => {
         <Form onSubmit={onInviteSubmit}>
           <Modal.Body>
             <Form.Group className="mb-3"><Form.Label>Email</Form.Label><Form.Control type="email" value={inviteForm.email} onChange={(event) => setInviteForm((current) => ({ ...current, email: event.target.value }))} required /></Form.Group>
-            <Form.Group className="mb-3"><Form.Label>Ruolo preset</Form.Label><Form.Select value={inviteForm.rolePreset} onChange={(event) => setInviteForm((current) => ({ ...current, rolePreset: event.target.value }))}>{TEAM_ROLE_PRESETS.map((role) => <option key={role} value={role}>{role}</option>)}</Form.Select></Form.Group>
+            <Form.Group className="mb-3"><Form.Label>Ruolo preset</Form.Label><Form.Select value={inviteForm.rolePreset} onChange={(event) => setInviteForm((current) => ({ ...current, rolePreset: event.target.value }))}>{TEAM_INVITE_ROLE_PRESETS.map((role) => <option key={role} value={role}>{role}</option>)}</Form.Select></Form.Group><Form.Text className="text-muted d-block mb-3">Il ruolo Superadmin non si concede per invito: si assegna a un membro già esistente da Ruoli e permessi.</Form.Text>
             <Form.Group><Form.Label>Scadenza (giorni)</Form.Label><Form.Select value={inviteForm.expiresInDays} onChange={(event) => setInviteForm((current) => ({ ...current, expiresInDays: Number(event.target.value) }))}>{[3, 7, 14, 30].map((days) => <option key={days} value={days}>{days}</option>)}</Form.Select></Form.Group>
             {inviteError && <Alert variant="danger" className="mt-3 mb-0 py-2">{inviteError}</Alert>}
-            {inviteCreated?.inviteLink && <Alert variant="info" className="mt-3 mb-0"><div className="small mb-2">Link invito (dev):</div><div className="small text-break mb-2">{inviteCreated.inviteLink}</div><Button size="sm" variant="outline-primary" onClick={() => void onCopyInviteLink()}>Copia link</Button></Alert>}
+            {inviteOutcome && (inviteOutcome.detail || inviteOutcome.showLink) && (
+              <Alert
+                variant={inviteOutcome.tone === INVITE_DELIVERY_TONE.warning ? 'warning' : 'info'}
+                className="mt-3 mb-0"
+              >
+                <div className="small fw-semibold mb-1">{inviteOutcome.title}</div>
+                {inviteOutcome.detail && <div className="small mb-2">{inviteOutcome.detail}</div>}
+                {inviteOutcome.showLink && (
+                  <>
+                    <div className="small text-break mb-2">{inviteCreated.inviteLink}</div>
+                    <Button size="sm" variant="outline-primary" onClick={() => void onCopyText(inviteCreated.inviteLink)}>Copia link</Button>
+                  </>
+                )}
+              </Alert>
+            )}
             {inviteCreated?.invitePreviewUrl && (
               <Alert variant="success" className="mt-3 mb-0">
                 <div className="small mb-2">Email inviata (preview dev):</div>

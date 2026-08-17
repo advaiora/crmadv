@@ -727,3 +727,52 @@ Cosi' la migrazione resta **tracciata** (regola del progetto), additiva e senza 
 5. Lo script va **nella cartella del progetto** (nello scratchpad `@prisma/client` non si risolve, nota #20) e si **cancella subito dopo**, prima del commit — `git status` lo mostrerebbe fra i file da aggiungere.
 
 **Vale in generale:** quando la verifica a schermo e' bloccata, chiedersi *"qual e' il dato che quella schermata stampa?"* e verificare quello. Vale per il catalogo permessi, per le etichette dei moduli di progetto e per ogni cosa che il frontend si limita a rendere. E' anche molto piu' veloce.
+
+---
+
+## 51. La suite backend costa 66 SECONDI da sola e 476 IN CONTESA: il numero che misuri dipende da cosa gira accanto
+
+**Contesto:** 17/8/2026, lavoro sull'invito Team. Avevo toccato due moduli backend (`team` e `quotes`) e volevo sapere se avevo rotto qualcosa.
+
+**Cosa e' successo:** ho lanciato `npm run test:unit` (la suite intera, `server/**/*.test.ts`) **mentre `npx tsc --noEmit` girava in background**. Ha impiegato **476 secondi** — quasi otto minuti. A fine sessione ho rilanciato la stessa identica suite senza niente accanto: **66 secondi**. Stessa suite, stesso computer, **sette volte piu' lenta** solo per la contesa.
+
+**Le due conseguenze pratiche:**
+
+1. **La nota #37 vale anche per il backend, non solo per Vitest.** Non e' solo che i worker possono fallire: e' che i tempi si gonfiano al punto da far sembrare inutilizzabile uno strumento che ci mette un minuto. Se una corsa sembra assurdamente lenta, la prima domanda e' *"cosa sto facendo girare accanto?"*, non *"come faccio a restringerla?"*.
+2. **Non fidarsi di un tempo misurato in contesa** per decidere come lavorare. Io avevo quasi scritto qui che "la suite intera costa 8 minuti": sarebbe stato falso, e avrebbe spinto le sessioni future a evitarla proprio quando serve.
+
+**Restringere il glob resta comunque utile durante il lavoro** (12 secondi contro 66, e soprattutto un output che si legge):
+
+```
+node --test --import tsx "server/modules/team/**/*.test.ts" "server/modules/quotes/*.test.ts"
+```
+
+Il costo non sta nei test — durano millisecondi — ma nell'avvio di `tsx` su ogni file.
+
+**La regola:** cartella toccata durante il lavoro, suite intera **una volta sola** prima della revisione finale, e **da sola** — nessun `tsc`, nessun dev server, nessun altro test in parallelo.
+
+---
+
+## 52. `npx tsc --noEmit` due volte nello stesso comando raddoppia un'attesa di cinque minuti
+
+**Contesto:** stesso giorno. Volevo sia le ultime righe dell'output sia il conteggio degli errori, e ho scritto:
+
+```
+npx tsc --noEmit 2>&1 | tail -5 && echo "---" && npx tsc --noEmit 2>&1 | grep -c "error TS"
+```
+
+**Errore:** su questo progetto `tsc` impiega **circa cinque minuti** a giro. Cosi' ne impiega dieci, per un'informazione che si ricava da una corsa sola. La prima e' andata in timeout a 300s ed e' finita in background, la seconda ha continuato a girare mentre lavoravo, senza che potessi vedere nulla fino alla fine.
+
+**Modo corretto — una corsa sola che scrive su file, poi si legge il file quante volte serve:**
+
+```
+npx tsc --noEmit > "<scratchpad>/tsc.txt" 2>&1; grep -c "error TS" "<scratchpad>/tsc.txt"
+```
+
+E soprattutto: **il conteggio da solo non dice se hai rotto tu.** Il numero di riferimento (233) e' vecchio di settimane e nel frattempo il progetto e' cresciuto. La domanda giusta non e' *"quanti errori ci sono"* ma *"ce ne sono nei file che ho toccato"*:
+
+```
+grep -E "team-invite|core/mail|Team/index" "<scratchpad>/tsc.txt"
+```
+
+Cosi' si distingue in un secondo il proprio danno dalla deriva altrui — e in questa sessione ha trovato subito i due errori davvero miei, in mezzo a trenta preesistenti negli stessi file di test.

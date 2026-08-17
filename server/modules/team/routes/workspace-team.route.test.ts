@@ -104,6 +104,27 @@ const buildMockTeamInviteService = (
     expiresAt: new Date().toISOString(),
     status: 'PENDING',
     rolePreset: 'Viewer',
+    delivery: { emailSent: true },
+  }),
+  regenerateInviteLink: async () => ({
+    invite: {
+      inviteId: 'cinvite000000000000000000001',
+      workspaceId: 'workspace-1',
+      email: 'invitee@example.com',
+      status: 'PENDING',
+      rolePreset: 'Viewer',
+      expiresAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      acceptedAt: null,
+      revokedAt: null,
+      invitedBy: {
+        userId: 'user-1',
+        name: 'Admin',
+        email: 'admin@example.com',
+      },
+      acceptedBy: null,
+    },
+    inviteLink: 'http://localhost:5173/accept-invite?token=test-token',
   }),
   listInvites: async () => [],
   revokeInvite: async () => ({
@@ -313,6 +334,62 @@ test('team invite delete route writes audit event team.invite_deleted', async ()
 
     assert.equal(response.statusCode, 200);
     assert.ok(events.includes('team.invite_deleted'));
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('team invite link route writes audit event team.invite_link_regenerated', async () => {
+  let app: FastifyInstance | null = null;
+  const events: string[] = [];
+  const auditPayloads: Array<Record<string, unknown>> = [];
+
+  try {
+    app = await createTestApp({
+      auditLogFn: (async (payload: { event: string }) => {
+        events.push(payload.event);
+        auditPayloads.push(payload as unknown as Record<string, unknown>);
+      }) as unknown as typeof audit.log,
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/team/invites/cinvite000000000000000000001/link',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.ok(events.includes('team.invite_link_regenerated'));
+
+    // Il link contiene il token d'ingresso: nel registro attivita' non ci va.
+    const serializedAudit = JSON.stringify(auditPayloads);
+    assert.equal(serializedAudit.includes('accept-invite'), false);
+    assert.equal(serializedAudit.includes('test-token'), false);
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('team invite link route requires the invite permission', async () => {
+  let app: FastifyInstance | null = null;
+  const requestedPermissions: string[] = [];
+
+  try {
+    app = await createTestApp({
+      ensureTeamAccessFn: (async (_request: unknown, permissionKey: string) => {
+        requestedPermissions.push(permissionKey);
+        return {
+          user: { id: 'user-1' },
+          workspace: { id: 'workspace-1' },
+        };
+      }) as unknown as EnsureTeamAccessFn,
+    });
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/team/invites/cinvite000000000000000000001/link',
+    });
+
+    assert.deepEqual(requestedPermissions, ['team.invite']);
   } finally {
     await closeApp(app);
   }

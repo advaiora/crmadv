@@ -16,6 +16,16 @@ export const TEAM_ROLE_PRESETS = [
   'Viewer',
 ];
 
+/**
+ * I ruoli assegnabili tramite INVITO: gli stessi meno Superadmin.
+ *
+ * Superadmin si concede solo a un membro che esiste gia', dalla gestione ruoli,
+ * e solo da parte di un altro Superadmin. Offrirlo nell'invito voleva dire
+ * lasciare che chiunque potesse invitare (per esempio un Manager) si fabbricasse
+ * una sessione da Superadmin aprendo l'invito che aveva appena creato.
+ */
+export const TEAM_INVITE_ROLE_PRESETS = TEAM_ROLE_PRESETS.filter((role) => role !== 'Superadmin');
+
 export const TEAM_STATUS_OPTIONS = [
   { value: 'ALL', label: 'Tutti' },
   { value: 'ACTIVE', label: 'Attivi' },

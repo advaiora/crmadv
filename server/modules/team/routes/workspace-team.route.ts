@@ -151,6 +151,32 @@ export const buildWorkspaceTeamRoute = (
     return ok(reply, { invite });
   });
 
+  app.post<{ Params: unknown }>('/api/team/invites/:inviteId/link', async (request, reply) => {
+    const { user, workspace } = await ensureTeamAccessFn(request, TEAM_PERMISSIONS.invite);
+    const params = parseInviteParams(request.params);
+    const result = await teamInviteServiceApi.regenerateInviteLink({
+      workspaceId: workspace.id,
+      inviteId: params.inviteId,
+    });
+
+    await createAuditEvent({
+      action: TEAM_AUDIT_ACTION.inviteLinkRegenerated,
+      actorUserId: user.id,
+      workspaceId: workspace.id,
+      targetType: 'team_invite',
+      targetId: result.invite.inviteId,
+      metadata: {
+        inviteId: result.invite.inviteId,
+        email: result.invite.email,
+        // Il link contiene il token: nel registro non ci finisce mai.
+      },
+      request,
+      auditLogFn,
+    });
+
+    return ok(reply, result);
+  });
+
   const deleteInviteHandler = async (
     request: FastifyRequest<{ Params: unknown }>,
     reply: FastifyReply,

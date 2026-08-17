@@ -6,7 +6,7 @@ import {
   assignWorkspaceUserRole,
   normalizeWorkspaceSystemRoleName,
 } from '../../auth/workspace-bootstrap.js';
-import { TEAM_MODULE_KEY } from '../../auth/rbac-catalog.js';
+import { TEAM_MODULE_KEY, type WorkspaceSystemRoleName } from '../../auth/rbac-catalog.js';
 import { moduleRepository } from '../../repositories/module.repository.js';
 import { teamRepository } from './team.repository.js';
 import { userRepository } from '../../repositories/user.repository.js';
@@ -64,14 +64,39 @@ type TeamInviteDto = {
   } | null;
 };
 
+/**
+ * Perche' l'email non e' partita. Tre cause distinte, che si raccontano
+ * all'utente in tre modi diversi: prima del 17/8/2026 erano tutte appiattite
+ * su "SMTP non configurato", che nel caso della base URL mancante era falso.
+ */
+export type TeamInviteDeliveryFailure =
+  /** Non esiste un server di posta configurato. */
+  | 'MAIL_NOT_CONFIGURED'
+  /** Il server c'e' ma ha rifiutato il messaggio. */
+  | 'SEND_FAILED'
+  /** Non si sa a quale indirizzo pubblico risponde il CRM: il link non e' componibile. */
+  | 'INVITE_LINK_UNAVAILABLE';
+
+export type TeamInviteDelivery = {
+  emailSent: boolean;
+  reason?: TeamInviteDeliveryFailure;
+};
+
 type CreateTeamInviteResult = {
   inviteId: string;
   email: string;
   expiresAt: string;
   status: string;
   rolePreset: string;
+  /** L'esito reale della consegna. L'invito puo' esistere e l'email non essere partita. */
+  delivery: TeamInviteDelivery;
   inviteLink?: string;
   invitePreviewUrl?: string;
+};
+
+type RegenerateInviteLinkResult = {
+  invite: TeamInviteDto;
+  inviteLink: string;
 };
 
 type AcceptTeamInviteResult = {
@@ -137,6 +162,26 @@ const resolveInviteBaseUrl = () => {
   }
 };
 
+/**
+ * Il ruolo Superadmin non si concede per invito.
+ *
+ * La stessa regola esiste gia' altrove: `REGISTRABLE_WORKSPACE_ROLE_NAMES` non
+ * lo elenca, e la registrazione declassa a Viewer chi lo chiede
+ * (`resolveRegistrationRoleName`). L'invito se l'era persa, e la conseguenza
+ * era grossa: chiunque avesse `team.invite` - il Manager, per esempio, che NON
+ * puo' assegnare ruoli - poteva creare un invito con preset Superadmin, aprirlo
+ * e ritrovarsi una sessione da Superadmin. Finche' la posta non era configurata
+ * il link non usciva mai, quindi la falla restava teorica: dal momento in cui il
+ * link viene restituito a schermo, non lo e' piu'.
+ */
+const assertInvitablePreset = (roleName: WorkspaceSystemRoleName) => {
+  if (roleName === SYSTEM_ROLE_NAME.superadmin) {
+    throw badRequest(
+      'Il ruolo Superadmin non puo essere assegnato tramite invito: va concesso a un membro gia esistente da Ruoli e permessi',
+    );
+  }
+};
+
 const resolveRolePresetNameOrThrow = (rolePreset: InviteRolePresetInput) => {
   const rawValue = Array.isArray(rolePreset) ? rolePreset[0] : rolePreset;
   if (!rawValue) {
@@ -145,8 +190,10 @@ const resolveRolePresetNameOrThrow = (rolePreset: InviteRolePresetInput) => {
 
   const normalizedRoleName = normalizeWorkspaceSystemRoleName(rawValue);
   if (!normalizedRoleName) {
-    throw badRequest('Invalid rolePreset. Allowed values: Superadmin, Admin, Manager, Operativo, Viewer');
+    throw badRequest('Invalid rolePreset. Allowed values: Admin, Manager, Operativo, Viewer');
   }
+
+  assertInvitablePreset(normalizedRoleName);
 
   return normalizedRoleName;
 };
@@ -280,15 +327,27 @@ export const buildTeamInviteService = (
         ? `${inviteBaseUrl}/accept-invite?token=${encodeURIComponent(token)}`
         : null;
 
-      const notificationResult = inviteLink
-        ? await notifier.sendInvite({
+      let delivery: TeamInviteDelivery;
+      let previewUrl: string | null = null;
+
+      if (!inviteLink) {
+        // Non e' un problema di posta: senza indirizzo pubblico il link non e'
+        // nemmeno componibile, e dirlo "SMTP non configurato" sarebbe falso.
+        delivery = { emailSent: false, reason: 'INVITE_LINK_UNAVAILABLE' };
+      } else {
+        const notificationResult = await notifier.sendInvite({
           toEmail: email,
           workspaceName: invite.workspace.name,
           invitedByName: input.invitedByDisplayName,
           inviteLink,
           expiresAt,
-        })
-        : { delivered: false, reason: 'SMTP_NOT_CONFIGURED' as const };
+        });
+
+        delivery = notificationResult.delivered
+          ? { emailSent: true }
+          : { emailSent: false, reason: notificationResult.reason ?? 'SEND_FAILED' };
+        previewUrl = notificationResult.previewUrl ?? null;
+      }
 
       return {
         inviteId: invite.id,
@@ -296,11 +355,15 @@ export const buildTeamInviteService = (
         expiresAt: invite.expiresAt.toISOString(),
         status: invite.status,
         rolePreset: invite.rolePresetName ?? SYSTEM_ROLE_NAME.viewer,
-        ...(!notificationResult.delivered && isDevelopment() && inviteLink
-          ? { inviteLink }
-          : {}),
-        ...(notificationResult.delivered && isDevelopment() && notificationResult.previewUrl
-          ? { invitePreviewUrl: notificationResult.previewUrl }
+        delivery,
+        // Se l'email non e' partita il link va restituito SEMPRE, non solo in
+        // sviluppo: e' l'unico modo che ha chi invita per far entrare la
+        // persona lo stesso. Va a chi ha appena creato l'invito ed e' gia'
+        // autenticato con il permesso di gestire il Team, quindi non allarga
+        // la platea di chi puo' vederlo.
+        ...(!delivery.emailSent && inviteLink ? { inviteLink } : {}),
+        ...(delivery.emailSent && isDevelopment() && previewUrl
+          ? { invitePreviewUrl: previewUrl }
           : {}),
       };
     },
@@ -310,6 +373,58 @@ export const buildTeamInviteService = (
       await inviteRepository.expirePendingInvites(workspaceId, now);
       const invites = await inviteRepository.listInvitesByWorkspace(workspaceId);
       return invites.map(mapInviteToDto);
+    },
+
+    /**
+     * Restituisce un link di accettazione utilizzabile per un invito gia' in
+     * attesa - quando l'email non e' partita, o la persona l'ha persa.
+     *
+     * Il link va necessariamente RIGENERATO: del token si conserva solo
+     * l'impronta (`tokenHash`), mai il valore in chiaro, quindi non esiste da
+     * nessuna parte un link da rileggere. Conseguenza da dire all'utente: il
+     * link precedente smette di funzionare.
+     *
+     * La scadenza NON viene spostata: chiedere di nuovo il link non deve
+     * allungare di nascosto la vita di un invito.
+     */
+    async regenerateInviteLink(input: {
+      workspaceId: string;
+      inviteId: string;
+    }): Promise<RegenerateInviteLinkResult> {
+      const now = nowFn();
+      await inviteRepository.expirePendingInvites(input.workspaceId, now);
+
+      const existingInvite = await inviteRepository.findInviteById(input.workspaceId, input.inviteId);
+      if (!existingInvite) {
+        throw notFound('Team invite not found');
+      }
+
+      if (existingInvite.status !== 'PENDING') {
+        throw badRequest('Only pending invites can produce a new link');
+      }
+
+      // Un invito con preset Superadmin non puo' piu' nascere (vedi
+      // assertInvitablePreset), ma potrebbe essercene uno creato prima della
+      // regola: non gli si consegna un link nuovo.
+      assertInvitablePreset(resolveRolePresetForAcceptance(existingInvite.rolePresetName));
+
+      const inviteBaseUrl = resolveInviteBaseUrl();
+      if (!inviteBaseUrl) {
+        throw badRequest('Invite link cannot be built: public base URL is not configured');
+      }
+
+      const token = generateTokenFn();
+      const updatedInvite = await inviteRepository.refreshPendingInvite({
+        inviteId: existingInvite.id,
+        tokenHash: hashTokenFn(token),
+        expiresAt: existingInvite.expiresAt,
+        rolePresetName: existingInvite.rolePresetName ?? SYSTEM_ROLE_NAME.viewer,
+      });
+
+      return {
+        invite: mapInviteToDto(updatedInvite),
+        inviteLink: `${inviteBaseUrl}/accept-invite?token=${encodeURIComponent(token)}`,
+      };
     },
 
     async revokeInvite(input: {

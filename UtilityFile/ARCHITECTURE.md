@@ -141,7 +141,10 @@ Business (MVP 1):
 - Default expiry: 7 giorni (`expiresInDays` override consentito fino a 30).
 - Accept endpoint usa il workspace dal record invito (no workspace param), quindi il token determina sempre il tenant corretto.
 - Se modulo `team` e disabilitato per il workspace dell'invito, `accept` risponde `403`.
-- In assenza di SMTP, l'invito viene comunque creato; in dev viene restituito `inviteLink` in response per test manuale.
+- In assenza di SMTP, l'invito viene comunque creato e la risposta lo dichiara (`delivery: {emailSent, reason}`, dal 17/8/2026: prima l'interfaccia diceva "successo" a prescindere).
+- Quando l'email NON parte, `inviteLink` viene restituito **anche in produzione** (non piu' solo in dev): senza, chi invita non avrebbe modo di far entrare la persona. Va a chi ha gia' `team.invite` ed e' autenticato.
+- `POST /api/team/invites/:inviteId/link` rigenera il link di un invito PENDING (il token in chiaro non e' conservato, quindi non si puo' rileggere: si conia di nuovo, e il precedente decade). Scadenza invariata; audit `team.invite_link_regenerated`.
+- Il preset `Superadmin` non e' assegnabile per invito (allineato a `REGISTRABLE_WORKSPACE_ROLE_NAMES` e alla registrazione): si concede solo a un membro esistente, da un altro Superadmin.
 
 ## 15) Checklist MVP decisions (2026-03-05)
 - `StageChecklistRule` is the primary gate model (`workspaceId + projectCategoryId + pipelineStageId + checklistTemplateId` unique).

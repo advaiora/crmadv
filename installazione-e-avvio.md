@@ -84,6 +84,15 @@ VITE_API_BASE_URL="/api"
 
 GOOGLE_CLIENT_ID=""
 VITE_GOOGLE_CLIENT_ID=""
+
+SMTP_HOST="mail.esempio.com"
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER="noreply@esempio.com"
+SMTP_PASS="(la password della casella)"
+EMAIL_FROM="noreply@esempio.com"
+
+APP_BASE_URL="http://localhost:5173"
 ```
 
 Per generare una `ENCRYPTION_KEY` valida in PowerShell puoi usare:
@@ -95,6 +104,15 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 Copia il valore generato dentro `ENCRYPTION_KEY`.
 
 Nota: se non usi il login Google in locale, puoi lasciare vuoti `GOOGLE_CLIENT_ID` e `VITE_GOOGLE_CLIENT_ID`. L'API mostrera' un avviso, ma il server puo' comunque partire.
+
+### Il server di posta (`SMTP_*`)
+
+Da qui passano gli **inviti al Team** e le **notifiche dei preventivi** — e ci passera' il **recupero password** quando sara' costruito (non esiste ancora). Leggono tutti la stessa configurazione (`server/core/mail.ts`), quindi si configura una volta sola.
+
+- **Se lasci `SMTP_HOST` vuoto il CRM non spedisce niente**, e lo dice a schermo invece di far finta di aver spedito. In sviluppo ripiega su una casella finta (Ethereal) che restituisce un link per leggere il messaggio: utile per collaudare, non recapita nulla a nessuno.
+- `SMTP_SECURE` va **`false`** sulla porta 587 (la cifratura parte dopo la connessione) e `true` sulla 465.
+- `SMTP_PASS` e' la password della casella. Sta **solo qui**: `.env` e' escluso dal repository apposta, e non va copiata dentro nessun documento di progetto.
+- `APP_BASE_URL` e' l'indirizzo pubblico a cui risponde il CRM: serve a comporre il link di accettazione degli inviti. In sviluppo, se manca, si usa `http://localhost:5173`; **in produzione senza questa variabile gli inviti non sono utilizzabili**.
 
 ## 6. Genera il client Prisma
 

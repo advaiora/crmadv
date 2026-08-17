@@ -54,7 +54,11 @@ test('notifyQuoteEvent skips delivery when client email is missing', async () =>
     }),
     findBrandingByWorkspaceId: async () => null,
     renderQuotePdfFn: async () => Buffer.from('pdf'),
-    createTransport: () => createTransportStub(sentEmails),
+    resolveTransport: async () => ({
+      transport: createTransportStub(sentEmails),
+      from: 'no-reply@test.local',
+      source: 'env' as const,
+    }),
   });
 
   const result = await service.notifyQuoteEvent({
@@ -120,7 +124,11 @@ test('notifyQuoteEvent sends templated email and PDF attachment for SENT', async
       updatedAt: new Date(),
     }),
     renderQuotePdfFn: async () => Buffer.from('%PDF-1.4 test-pdf'),
-    createTransport: () => createTransportStub(sentEmails),
+    resolveTransport: async () => ({
+      transport: createTransportStub(sentEmails),
+      from: 'no-reply@test.local',
+      source: 'env' as const,
+    }),
   });
 
   const result = await service.notifyQuoteEvent({

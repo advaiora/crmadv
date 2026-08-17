@@ -22,6 +22,14 @@ export const revokeTeamInvite = (inviteId) =>
 export const deleteTeamInvite = (inviteId) =>
   apiPost(`${TEAM_API_BASE}/invites/${inviteId}/delete`, {});
 
+/**
+ * Ottiene un link di accettazione utilizzabile per un invito gia' in attesa.
+ * Il link viene rigenerato (il token in chiaro non e' conservato da nessuna
+ * parte), quindi quello precedente smette di funzionare.
+ */
+export const regenerateTeamInviteLink = (inviteId) =>
+  apiPost(`${TEAM_API_BASE}/invites/${inviteId}/link`, {});
+
 export const setTeamMemberActiveState = (memberId, active) =>
   apiPost(`${TEAM_API_BASE}/${memberId}/deactivate`, {
     active: Boolean(active),

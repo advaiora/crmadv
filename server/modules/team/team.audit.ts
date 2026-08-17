@@ -4,6 +4,9 @@ import { audit } from '../../audit/audit.js';
 
 export const TEAM_AUDIT_ACTION = {
   inviteSent: 'team.invite',
+  // Rigenerare il link produce di fatto una nuova credenziale d'ingresso:
+  // va tracciato come le altre azioni sugli inviti.
+  inviteLinkRegenerated: 'team.invite_link_regenerated',
   inviteRevoked: 'team.invite_revoked',
   inviteDeleted: 'team.invite_deleted',
   inviteAccepted: 'team.invite_accepted',
