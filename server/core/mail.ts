@@ -1,4 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
+import { mailCrypto } from '../modules/mail/mail.crypto.js';
+import { mailRepository } from '../modules/mail/mail.repository.js';
 
 /**
  * Fonte unica della configurazione di posta del CRM.
@@ -8,9 +10,16 @@ import nodemailer, { type Transporter } from 'nodemailer';
  * collegato a niente): configurarne uno lasciava gli altri rotti in silenzio.
  * Chi ha bisogno di spedire un'email passa da qui.
  *
- * Oggi i parametri arrivano dalle variabili d'ambiente. Quando esistera' la
- * pagina "Server di posta" dentro il CRM, sara' questo modulo a leggerli dal
- * database e a tenere le variabili come ripiego: i chiamanti non cambiano.
+ * Dal 18/8/2026 i parametri arrivano dalla pagina "Server di posta" (salvati per
+ * workspace, password cifrata a riposo) e le variabili d'ambiente restano come
+ * ripiego per chi non ha ancora configurato niente. L'ordine e' sempre questo:
+ * prima il database del workspace, poi l'ambiente.
+ *
+ * ⚠️ Questo file importa il repository del modulo `mail`, quindi `core` dipende
+ * da un modulo — cosa che altrove non fa. E' una scelta: l'alternativa era una
+ * seconda porta d'ingresso alla posta accanto a questa, ed e' esattamente il
+ * problema che il 17/8 e' costato un giro di lavoro a chiudere. Meglio una
+ * dipendenza dichiarata che due strade che divergono.
  */
 
 export type MailSettings = {
@@ -23,7 +32,21 @@ export type MailSettings = {
 };
 
 /** Da dove arrivano i parametri usati per spedire. */
-export type MailSettingsSource = 'env' | 'ethereal';
+export type MailSettingsSource = 'database' | 'env' | 'ethereal';
+
+/**
+ * L'esito della ricerca di una configurazione, con i tre casi tenuti distinti.
+ *
+ * `illeggibile` esiste perche' "non c'e' un server di posta" e "il server c'e'
+ * ma non riusciamo a leggerne la password" sono due guasti diversi che
+ * richiedono due rimedi diversi: il primo si risolve configurando, il secondo
+ * dicendo che la chiave di cifratura del server e' cambiata. Confonderli
+ * manderebbe chi amministra a riscrivere parametri che erano gia' giusti.
+ */
+export type EsitoConfigurazionePosta =
+  | { esito: 'ok'; settings: MailSettings; source: Exclude<MailSettingsSource, 'ethereal'> }
+  | { esito: 'assente' }
+  | { esito: 'illeggibile' };
 
 export type ResolvedMailTransport = {
   transport: Transporter;
@@ -39,6 +62,13 @@ export type ResolveMailTransportOptions = {
    * server vero. In produzione non si attiva mai.
    */
   allowDevFallback?: boolean;
+  /**
+   * Il workspace di cui usare il server di posta configurato dalla pagina
+   * "Server di posta". Senza, si leggono solo le variabili d'ambiente — che e'
+   * il comportamento giusto per le spedizioni che non appartengono a nessun
+   * workspace, non un ripiego da correggere.
+   */
+  workspaceId?: string | null;
 };
 
 export const DEFAULT_MAIL_FROM = 'no-reply@local';
@@ -101,18 +131,97 @@ export const readMailSettingsFromEnv = (): MailSettings | null => {
 };
 
 /**
- * I parametri in vigore adesso. Async di proposito: quando la pagina "Server di
- * posta" li salvera' a database la lettura diventera' una query, e i chiamanti
- * non dovranno essere riscritti una seconda volta.
+ * Legge i parametri salvati nel CRM per un workspace.
+ *
+ * `assente` = non c'e' nessuna riga, oppure la configurazione e' stata messa in
+ * pausa dall'interruttore della pagina: in entrambi i casi si passa al ripiego
+ * sulle variabili d'ambiente, ed e' voluto.
+ *
+ * ⚠️ `illeggibile` = la riga c'e' ma la password non si decifra, cioe' la
+ * chiave di cifratura del server e' cambiata (o il database viene da un altro
+ * ambiente). Qui NON si ripiega sull'ambiente: spedire dal mittente sbagliato
+ * senza dirlo a nessuno sarebbe peggio del guasto. Ma non si lancia nemmeno
+ * un'eccezione — che risalirebbe fino a un "Errore interno del server" — perche'
+ * chi chiama deve poterlo spiegare a schermo.
  */
-export const resolveMailSettings = async (): Promise<MailSettings | null> =>
-  readMailSettingsFromEnv();
+export const readMailSettingsFromDatabase = async (
+  workspaceId: string,
+): Promise<EsitoConfigurazionePosta> => {
+  const record = await mailRepository.findByWorkspaceId(workspaceId);
+  if (!record || !record.attivo) {
+    return { esito: 'assente' };
+  }
 
-export const createMailTransport = (settings: MailSettings): Transporter =>
+  let pass: string | null;
+  try {
+    pass = await mailCrypto.decrypt({
+      workspaceId,
+      ciphertext: record.ciphertext,
+      iv: record.iv,
+      authTag: record.authTag,
+      keyVersion: record.keyVersion,
+    });
+  } catch {
+    return { esito: 'illeggibile' };
+  }
+
+  return {
+    esito: 'ok',
+    source: 'database',
+    settings: {
+      host: record.server,
+      port: record.porta,
+      secure: record.connessioneSicura,
+      user: record.utente,
+      pass,
+      from: record.mittente,
+    },
+  };
+};
+
+/**
+ * I parametri in vigore adesso, con l'indicazione di da dove arrivano.
+ * L'ordine e' database del workspace, poi variabili d'ambiente — tranne quando
+ * la configurazione a database e' illeggibile, che si ferma li'.
+ */
+export const resolveMailSettingsDettagliato = async (
+  workspaceId?: string | null,
+): Promise<EsitoConfigurazionePosta> => {
+  if (workspaceId) {
+    const daDatabase = await readMailSettingsFromDatabase(workspaceId);
+    if (daDatabase.esito !== 'assente') {
+      return daDatabase;
+    }
+  }
+
+  const daAmbiente = readMailSettingsFromEnv();
+  return daAmbiente
+    ? { esito: 'ok', source: 'env', settings: daAmbiente }
+    : { esito: 'assente' };
+};
+
+/**
+ * Attese massime, in millisecondi, prima di rinunciare alla connessione.
+ * Servono a chi apre una connessione verso un indirizzo scelto sul momento
+ * (la prova della pagina "Server di posta"): senza, nodemailer resta appeso
+ * fino al suo default di due minuti e chi ha premuto il pulsante non sa se
+ * stia succedendo qualcosa. Per le spedizioni vere si lasciano i default.
+ */
+export type MailTransportTimeouts = {
+  connectionTimeout?: number;
+  greetingTimeout?: number;
+  socketTimeout?: number;
+};
+
+export const createMailTransport = (
+  settings: MailSettings,
+  timeouts: MailTransportTimeouts = {},
+): Transporter =>
   nodemailer.createTransport({
     host: settings.host,
     port: settings.port,
     secure: settings.secure,
+    ...timeouts,
     ...(settings.user ? { auth: { user: settings.user, pass: settings.pass ?? '' } } : {}),
   });
 
@@ -135,31 +244,49 @@ const createEtherealTransport = async (): Promise<ResolvedMailTransport | null> 
   }
 };
 
+export type EsitoCanaleDiPosta =
+  | ({ esito: 'ok' } & ResolvedMailTransport)
+  | { esito: 'assente' }
+  | { esito: 'illeggibile' };
+
 /**
- * Il canale pronto a spedire, o `null` se non c'e'.
- * Chi riceve `null` deve dirlo a schermo, non far finta di aver spedito.
+ * Il canale pronto a spedire, con i tre esiti tenuti distinti.
+ * Lo usano i due punti che spediscono davvero (inviti e notifiche dei
+ * preventivi), perche' devono poter dire QUALE guasto e' successo invece di
+ * ridurlo a "non configurato".
+ *
+ * ⚠️ Non rimettere accanto una versione "comoda" che appiattisca i tre esiti in
+ * `null`: c'era, non la usava piu' nessuno, ed e' l'errore in cui questo
+ * modulo e' gia' cascato due volte in un giorno — la pagina «Server di posta»
+ * annunciava "nessun server configurato" davanti a una maschera piena e giusta,
+ * mandando a riscrivere parametri che non c'entravano niente.
  */
-export const resolveMailTransport = async (
+export const resolveMailTransportDettagliato = async (
   options: ResolveMailTransportOptions = {},
-): Promise<ResolvedMailTransport | null> => {
-  const settings = await resolveMailSettings();
-  if (settings) {
+): Promise<EsitoCanaleDiPosta> => {
+  const resolved = await resolveMailSettingsDettagliato(options.workspaceId);
+
+  if (resolved.esito === 'ok') {
     return {
-      transport: createMailTransport(settings),
-      from: settings.from,
-      source: 'env',
+      esito: 'ok',
+      transport: createMailTransport(resolved.settings),
+      from: resolved.settings.from,
+      source: resolved.source,
     };
   }
 
-  if (options.allowDevFallback && isDevelopment()) {
-    return createEtherealTransport();
+  // Una configurazione illeggibile non si aggira con la casella finta: il
+  // ripiego di sviluppo serve a chi non ha ancora configurato niente, non a
+  // mascherare un guasto.
+  if (resolved.esito === 'assente' && options.allowDevFallback && isDevelopment()) {
+    const ethereal = await createEtherealTransport();
+    if (ethereal) {
+      return { esito: 'ok', ...ethereal };
+    }
   }
 
-  return null;
+  return { esito: resolved.esito };
 };
-
-/** `true` se esiste un server di posta configurato davvero (Ethereal non conta). */
-export const isMailConfigured = async () => (await resolveMailSettings()) !== null;
 
 /** Il link per leggere un messaggio finito nella casella finta di sviluppo. */
 export const getDevPreviewUrl = (info: unknown) => nodemailer.getTestMessageUrl(info as never) || null;

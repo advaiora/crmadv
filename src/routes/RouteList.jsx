@@ -45,6 +45,7 @@ import EditProfile from "../views/Profiles/EditProfile";
 import Account from "../views/Profiles/Account";
 import WorkspaceBranding from "../views/WorkspaceBranding";
 import ModulesSettingsPage from "../views/Settings/Modules";
+import MailServerPage from "../views/Settings/MailServer";
 import ThemePreviewPage from "../views/Settings/ThemePreview";
 import ResponsiveQAPage from "../views/Settings/ResponsiveQA";
 import ShortcutsSettings from "../views/Settings/ShortcutsSettings";
@@ -139,6 +140,7 @@ export const routes = [
     { path: 'pages/account', exact: true, component: Account },
     { path: 'pages/workspace-branding', exact: true, component: WorkspaceBranding },
     { path: 'settings/modules', exact: true, component: ModulesSettingsPage },
+    { path: 'settings/mail-server', exact: true, component: MailServerPage },
     { path: 'settings/theme-preview', exact: true, component: ThemePreviewPage },
     { path: 'settings/shortcuts', exact: true, component: ShortcutsSettings },
     { path: 'settings/roles', exact: true, component: RolesSettings },

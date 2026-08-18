@@ -63,3 +63,31 @@ describe('describeInviteDelivery', () => {
     expect(result.detail).toBe('');
   });
 });
+
+describe('describeInviteDelivery — configurazione illeggibile', () => {
+  it('manda a reinserire la password, non a configurare il server da capo', () => {
+    const result = describeInviteDelivery(
+      { emailSent: false, reason: 'MAIL_CONFIG_UNREADABLE' },
+      { hasLink: true },
+    );
+
+    expect(result.tone).toBe(INVITE_DELIVERY_TONE.warning);
+    expect(result.detail).toContain('password');
+    expect(result.showLink).toBe(true);
+  });
+
+  it('non dice la stessa cosa del server mancante', () => {
+    const illeggibile = describeInviteDelivery(
+      { emailSent: false, reason: 'MAIL_CONFIG_UNREADABLE' },
+      { hasLink: true },
+    );
+    const mancante = describeInviteDelivery(
+      { emailSent: false, reason: 'MAIL_NOT_CONFIGURED' },
+      { hasLink: true },
+    );
+
+    // Se i due messaggi tornassero identici, la distinzione introdotta il
+    // 18/8/2026 sarebbe stata riassorbita senza che nessuno se ne accorga.
+    expect(illeggibile.detail).not.toBe(mancante.detail);
+  });
+});

@@ -353,6 +353,13 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
+            name: "Server di posta",
+            path: "/settings/mail-server",
+            requiredModule: "mail",
+            requiredPermission: "mail.manage",
+            grp_name: "apps",
+          },
+          {
             name: "Theme Preview",
             path: "/settings/theme-preview",
             grp_name: "apps",

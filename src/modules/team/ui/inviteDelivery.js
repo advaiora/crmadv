@@ -25,6 +25,11 @@ const FAILURE_MESSAGES = {
     detail:
       'Il server di posta ha rifiutato il messaggio. Copia il link qui sotto e mandalo tu; controlla poi i parametri del server di posta.',
   },
+  MAIL_CONFIG_UNREADABLE: {
+    title: EMAIL_NOT_SENT,
+    detail:
+      "Il server di posta è configurato, ma il CRM non riesce più a leggerne la password: succede quando cambia la chiave di cifratura del server, o quando il database arriva da un altro ambiente. Copia il link qui sotto e mandalo tu; poi riapri «Server di posta» e reinserisci la password.",
+  },
   INVITE_LINK_UNAVAILABLE: {
     title: "L'invito è stato creato, ma non è utilizzabile",
     detail:

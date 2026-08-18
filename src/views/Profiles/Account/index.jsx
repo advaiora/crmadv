@@ -21,6 +21,7 @@ const MODULE_ROUTES = {
   messages: '/apps/email',
   modules: '/settings/modules',
   audit: '/audit',
+  mail: '/settings/mail-server',
 };
 
 // ⚠️ Terza copia dei nomi dei moduli, dopo il catalogo backend (rbac-catalog.ts) e il
@@ -45,6 +46,7 @@ const MODULE_LABELS = {
   messages: 'Messaggi',
   modules: 'Moduli',
   audit: 'Audit',
+  mail: 'Server di posta',
 };
 
 const CORE_PERMISSIONS = [
@@ -155,6 +157,12 @@ const Account = ({ toggleCollapsedNav }) => {
       .map((moduleKey) => {
         const isEnabled = enabledModules.includes(moduleKey);
         const route = MODULE_ROUTES[moduleKey] || null;
+        // ⚠️ Euristica sui SUFFISSI: l'accesso a un modulo si riconosce dall'ultima
+        // parola del permesso, quindi un suffisso nuovo va aggiunto qui — ed e' il
+        // motivo per cui i suffissi nuovi e' meglio non farli nascere (CLAUDE.md,
+        // regola ②-bis). Il 18/8/2026 'posta.gestisci' non combaciava con nessuno
+        // dei tre, e la pagina dichiarava "Server di posta: non accessibile" anche
+        // a un Superadmin. Rinominato in 'mail.manage', questa riga e' tornata com'era.
         const hasViewPermission =
           permissionSet.has(`${moduleKey}.view`)
           || permissionSet.has(`${moduleKey}.manage`)

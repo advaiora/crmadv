@@ -57,3 +57,4 @@
 | 2026-08-17 15:15 | pianificazione release settembre + innesto roadmap | 244h 36m | 214,3 | 0,01 | revisore×4, esploratore×4, Explore×8 | 40,8 |
 | 2026-08-17 17:04 | Release settembre - punto 4: posta unificata, invito veritiero, link invito | 1h 40m | 50,7 | 0,51 | esploratore×1, revisore×1 | 8,0 |
 | 2026-08-18 09:20 | Release settembre - gerarchia dei ruoli sull'invito Team | 17h 56m | 91,6 | 0,09 | esploratore×1, revisore×2 | 14,5 |
+| 2026-08-18 12:49 | Server di posta: pagina, permesso e migrazioni (non committato) | 3h 19m | 55,2 | 0,28 | esploratore×1, revisore×3 | 11,6 |

@@ -33,6 +33,28 @@ export const TEAM_MODULE_KEY = 'team';
 export const DASHBOARD_MODULE_KEY = 'dashboard';
 export const MESSAGES_MODULE_KEY = 'messages';
 
+// Il modulo "Server di posta" (18/8/2026), nato con la pagina che permette di
+// configurare l'SMTP dall'interno del CRM invece che dal file .env.
+//   ⚠️ La chiave e' in INGLESE come le altre sedici, e il permesso finisce in
+//   '.manage' come tutti gli altri. Era nato in italiano ('posta',
+//   'posta.gestisci') ed e' stato rinominato subito, prima del commit: una
+//   terminazione nuova ('.gestisci') aveva rotto un controllo che riconosce i
+//   permessi dall'ultima parola (src/views/Profiles/Account/index.jsx), e la
+//   pagina dichiarava "Server di posta: non accessibile" anche a un Superadmin.
+//   Il guasto non si vedeva finche' qualcuno non apriva quella pagina.
+//   La regola che ne e' uscita sta in CLAUDE.md: l'italiano vale per cio' che
+//   l'utente legge — l'etichetta a schermo resta «Server di posta» — mentre i
+//   nomi tecnici che entrano in strutture gia' esistenti (chiavi dei permessi,
+//   chiavi dei moduli, nomi delle tabelle) seguono la convenzione di quelle
+//   strutture, finche' la fase B del re-naming non le cambia tutte insieme.
+export const MAIL_MODULE_KEY = 'mail';
+
+export const MAIL_PERMISSIONS = {
+  manage: 'mail.manage',
+} as const;
+
+export type MailPermissionKey = (typeof MAIL_PERMISSIONS)[keyof typeof MAIL_PERMISSIONS];
+
 // Il modulo dell'area "Produzione AI" (7/8/2026, fase A2 del re-naming). Prima non
 // esisteva: le sue ~90 rotte — Brief, Fonti, Contenuti Web, Ads, Report, Alert,
 // Opportunita', Task, Performance — giravano tutte sui permessi di 'projects', cioe'
@@ -121,6 +143,11 @@ export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
   { key: 'audit', name: 'Audit', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
+  // isCore come Moduli, Branding e Audit: e' configurazione di sistema, non una
+  // funzione di business che ha senso accendere e spegnere. Un workspace col
+  // server di posta "spento" da Gestione Moduli non saprebbe piu' come mandare
+  // un invito, e non capirebbe perche'.
+  { key: MAIL_MODULE_KEY, name: 'Server di posta', isCore: true, description: 'Parametri del server usato dal CRM per spedire le email' },
   { key: DASHBOARD_MODULE_KEY, name: 'Dashboard', isCore: true, description: 'Panoramica operativa del workspace' },
   { key: TEAM_MODULE_KEY, name: 'Team', isCore: false, description: 'Persone del workspace, inviti e ruoli' },
   { key: 'departments', name: 'Reparti', isCore: false, description: "Reparti dell'agenzia e assegnazione delle persone" },
@@ -145,6 +172,11 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'modules.manage', moduleKey: 'modules', description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding.manage', moduleKey: 'branding', description: 'Modificare logo, colori e nome del workspace' },
   { key: 'audit.view', moduleKey: 'audit', description: 'Consultare il registro di chi ha fatto cosa e quando' },
+  // ⚠️ Chi ha questo permesso decide da quale casella parte la posta del CRM —
+  // inviti compresi. Non e' "vedere una configurazione": e' poter dirottare le
+  // email del workspace su un server proprio. La descrizione lo dice, o si
+  // concede credendo di concedere l'accesso a una schermata di sola lettura.
+  { key: MAIL_PERMISSIONS.manage, moduleKey: MAIL_MODULE_KEY, description: 'Configurare il server di posta da cui il CRM spedisce le email (inviti compresi)' },
   { key: DASHBOARD_PERMISSIONS.view, moduleKey: DASHBOARD_MODULE_KEY, description: 'Vedere la Dashboard operativa' },
 
   // Permessi storici sulla gestione dei ruoli: restano perche' le rotte li usano.

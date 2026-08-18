@@ -55,6 +55,7 @@ test('notifyQuoteEvent skips delivery when client email is missing', async () =>
     findBrandingByWorkspaceId: async () => null,
     renderQuotePdfFn: async () => Buffer.from('pdf'),
     resolveTransport: async () => ({
+      esito: 'ok' as const,
       transport: createTransportStub(sentEmails),
       from: 'no-reply@test.local',
       source: 'env' as const,
@@ -125,6 +126,7 @@ test('notifyQuoteEvent sends templated email and PDF attachment for SENT', async
     }),
     renderQuotePdfFn: async () => Buffer.from('%PDF-1.4 test-pdf'),
     resolveTransport: async () => ({
+      esito: 'ok' as const,
       transport: createTransportStub(sentEmails),
       from: 'no-reply@test.local',
       source: 'env' as const,
@@ -178,4 +180,45 @@ test('notifyQuoteEvent sends templated email and PDF attachment for SENT', async
   assert.match(String(sentEmails[0].text), /Mario Rossi/);
   assert.ok(Array.isArray(sentEmails[0].attachments));
   assert.equal((sentEmails[0].attachments as Array<unknown>).length, 1);
+});
+
+test('notifiche preventivi: configurazione illeggibile non si confonde con "non configurato"', async () => {
+  const service = buildQuoteNotificationsService({
+    getNotificationSettings: async () => ({
+      workspaceId: 'ws-1',
+      enabled: true,
+      sentSubject: null,
+      sentBody: null,
+      acceptedSubject: null,
+      acceptedBody: null,
+      rejectedSubject: null,
+      rejectedBody: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }) as never,
+    findBrandingByWorkspaceId: (async () => null) as never,
+    renderQuotePdfFn: async () => Buffer.from('pdf'),
+    resolveTransport: async () => ({ esito: 'illeggibile' as const }),
+  });
+
+  const result = await service.notifyQuoteEvent({
+    workspaceId: 'ws-1',
+    event: 'SENT',
+    quote: {
+      id: 'quote-1',
+      status: 'SENT',
+      currency: 'EUR',
+      total: 100,
+      client: {
+        name: 'Mario Rossi',
+        email: 'mario@example.com',
+      },
+    },
+  });
+
+  // Non "MAIL_NOT_CONFIGURED": chi guarda i contatori deve poter distinguere
+  // "va configurato" da "la password non si legge piu'", che portano a due
+  // rimedi diversi.
+  assert.equal(result.delivered, false);
+  assert.equal(result.skippedReason, 'MAIL_CONFIG_UNREADABLE');
 });

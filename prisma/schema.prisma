@@ -223,6 +223,7 @@ model Workspace {
   aiConversationAttachments  AiConversationAttachment[]
   performanceSnapshots       PerformanceSnapshot[]
   performanceMetricSets      PerformanceMetricSet[]
+  mailServerSettings         MailServerSettings?
 }
 
 model User {
@@ -1492,6 +1493,39 @@ model WorkspaceBranding {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+/// I parametri del server di posta di un workspace, impostati dalla pagina
+/// "Server di posta". Una riga per workspace, o nessuna: se non c'e', il CRM
+/// ripiega sulle variabili d'ambiente (vedi server/core/mail.ts).
+///
+/// La password NON sta qui in chiaro: viaggia nella busta di cifratura
+/// ciphertext/iv/authTag/keyVersion, gli stessi quattro nomi gia' usati da
+/// Integration e AgencyRuntimeSetting. Sono tenuti in inglese di proposito:
+/// sono la stessa cosa ovunque nel progetto, e rinominarli solo qui
+/// spezzerebbe l'unico schema riconoscibile a colpo d'occhio quando si cerca
+/// dove il CRM conserva un segreto.
+model MailServerSettings {
+  id          String @id @default(cuid())
+  workspaceId String @unique
+  /// Spento, il CRM torna a spedire con le variabili d'ambiente senza che la
+  /// configurazione vada persa. Serve a due cose che capitano davvero: mettere
+  /// in pausa un server che sta rimbalzando le email, e preparare una
+  /// configurazione prima di metterla in uso. Senza questo campo l'unico modo
+  /// per tornare indietro sarebbe cancellare la riga, e con essa la password.
+  attivo            Boolean   @default(true)
+  server            String    @db.VarChar(255)
+  porta             Int       @default(587)
+  connessioneSicura Boolean   @default(false)
+  utente            String?   @db.VarChar(255)
+  mittente          String    @db.VarChar(255)
+  ciphertext        String?   @db.Text
+  iv                String?   @db.VarChar(255)
+  authTag           String?   @db.VarChar(255)
+  keyVersion        Int?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model QuoteNotificationSettings {

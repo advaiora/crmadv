@@ -76,6 +76,8 @@ export type TeamInviteDeliveryFailure =
   | 'MAIL_NOT_CONFIGURED'
   /** Il server c'e' ma ha rifiutato il messaggio. */
   | 'SEND_FAILED'
+  /** Il server e' configurato nel CRM ma la sua password non si decifra piu'. */
+  | 'MAIL_CONFIG_UNREADABLE'
   /** Non si sa a quale indirizzo pubblico risponde il CRM: il link non e' componibile. */
   | 'INVITE_LINK_UNAVAILABLE';
 
@@ -405,6 +407,7 @@ export const buildTeamInviteService = (
       } else {
         const notificationResult = await notifier.sendInvite({
           toEmail: email,
+          workspaceId: input.workspaceId,
           workspaceName: invite.workspace.name,
           invitedByName: input.invitedByDisplayName,
           inviteLink,

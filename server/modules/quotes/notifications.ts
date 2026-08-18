@@ -1,4 +1,4 @@
-import { resolveMailTransport, type ResolvedMailTransport } from '../../core/mail.js';
+import { resolveMailTransportDettagliato, type EsitoCanaleDiPosta } from '../../core/mail.js';
 import { brandingRepository } from '../../repositories/branding.repository.js';
 import { quotesRepository } from './repository.js';
 import { renderQuotePdf } from './pdf/quotePdf.js';
@@ -55,7 +55,7 @@ type QuoteNotificationsDependencies = {
   upsertNotificationSettings: typeof quotesRepository.upsertNotificationSettings;
   findBrandingByWorkspaceId: typeof brandingRepository.findByWorkspaceId;
   renderQuotePdfFn: typeof renderQuotePdf;
-  resolveTransport: () => Promise<ResolvedMailTransport | null>;
+  resolveTransport: (workspaceId: string) => Promise<EsitoCanaleDiPosta>;
 };
 
 type NotificationEventMetrics = {
@@ -283,7 +283,12 @@ export const buildQuoteNotificationsService = (
     renderQuotePdfFn: overrides.renderQuotePdfFn ?? renderQuotePdf,
     // Niente ripiego di sviluppo qui: una notifica di preventivo non deve
     // risultare "recapitata" perche' e' finita in una casella finta.
-    resolveTransport: overrides.resolveTransport ?? (() => resolveMailTransport()),
+    // Il workspace serve a usare il server di posta configurato dalla pagina
+    // "Server di posta": senza, si spedirebbe sempre con le variabili
+    // d'ambiente e configurare dall'interfaccia non cambierebbe niente qui.
+    resolveTransport:
+      overrides.resolveTransport
+      ?? ((workspaceId: string) => resolveMailTransportDettagliato({ workspaceId })),
   };
 
   return {
@@ -312,11 +317,16 @@ export const buildQuoteNotificationsService = (
         return result;
       }
 
-      const mail = await dependencies.resolveTransport();
-      if (!mail) {
+      const mail = await dependencies.resolveTransport(input.workspaceId);
+      if (mail.esito !== 'ok') {
+        // I due guasti restano distinti anche nei contatori: "non configurato"
+        // si risolve configurando, "illeggibile" reinserendo la password dopo
+        // un cambio di chiave di cifratura. Appiattirli manderebbe chi guarda
+        // le metriche a riscrivere parametri che erano gia' giusti.
         const result = {
           delivered: false,
-          skippedReason: 'MAIL_NOT_CONFIGURED',
+          skippedReason:
+            mail.esito === 'illeggibile' ? 'MAIL_CONFIG_UNREADABLE' : 'MAIL_NOT_CONFIGURED',
         } satisfies NotifyQuoteEventResult;
         updateMetricsForResult(input.workspaceId, input.event, result);
         return result;

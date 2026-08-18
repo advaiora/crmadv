@@ -31,6 +31,7 @@ import workspaceCalendarRoute from "./modules/calendar/routes/workspace-calendar
 import workspaceMessagingRoute from "./modules/messaging/routes/workspace-messaging.route.js";
 import workspaceDashboardRoute from "./modules/dashboard/routes/workspace-dashboard.route.js";
 import workspaceAuditRoute from "./modules/audit/routes/workspace-audit.route.js";
+import workspaceMailRoute from "./modules/mail/routes/workspace-mail.route.js";
 import workspaceTeamRoute from "./modules/team/routes/workspace-team.route.js";
 import workspaceVaultRoute from "./modules/vault/routes/workspace-vault.route.js";
 import workspaceAgencyRoute from "./modules/agency-os/routes/workspace-agency.route.js";
@@ -289,6 +290,7 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   void app.register(workspaceMessagingRoute);
   void app.register(workspaceDashboardRoute);
   void app.register(workspaceAuditRoute);
+  void app.register(workspaceMailRoute);
   void app.register(workspaceTeamRoute);
   void app.register(workspaceVaultRoute);
   void app.register(workspaceAgencyRoute);
