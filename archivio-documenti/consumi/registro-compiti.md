@@ -56,3 +56,4 @@
 | 2026-08-17 11:00 | Chiusura rilievi fase A2 re-naming (descrizioni permessi, commenti falsi, roadmap) | 232h 48m | 47,9 | 0,00 | esploratore×1, Explore×6, revisore×1 | -4,6 |
 | 2026-08-17 15:15 | pianificazione release settembre + innesto roadmap | 244h 36m | 214,3 | 0,01 | revisore×4, esploratore×4, Explore×8 | 40,8 |
 | 2026-08-17 17:04 | Release settembre - punto 4: posta unificata, invito veritiero, link invito | 1h 40m | 50,7 | 0,51 | esploratore×1, revisore×1 | 8,0 |
+| 2026-08-18 09:20 | Release settembre - gerarchia dei ruoli sull'invito Team | 17h 56m | 91,6 | 0,09 | esploratore×1, revisore×2 | 14,5 |
