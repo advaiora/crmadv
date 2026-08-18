@@ -360,6 +360,8 @@ Sequenza pensata perché **degradi bene**: se il tempo stringe, quello che resta
 
 ✅ **Aggiornato il 17/8 dopo la verifica di Messaggi e Profilo.**
 
+✅ **Confermato il 18/8: la sequenza resta questa, undici voci, nessuna tolta.** Con la decisione del §7.11 (cestino e allegati dentro, data a metà settembre) l'ordine non cambia — cambia però cosa significa il punto 7 e la coda: non sono più il margine su cui si può cedere, sono lavoro che va consegnato. ⚠️ **Gli allegati ai messaggi stanno nel punto 8** insieme alle rifiniture gialle, ma **non sono una rifinitura**: richiedono conservazione dei file (tabella, caricamento, scaricamento permessato, limiti), quindi vanno affrontati per primi dentro quel punto e non per ultimi.
+
 1. **Server di posta + invito Team** (④). Sblocca l'inserimento di persone vere, serve a collaudare tutto il resto con più utenti, ed **è il prerequisito** del punto 2 se si sceglie il recupero password via email.
 2. **Cambio password** (⑥-ter n.1). È il blocco più grave trovato: senza, chi dimentica la password non rientra più. Subito dopo la posta, perché il recupero la usa.
 3. **Controllo automatico dei permessi, metà 1** (⑨). Poco lavoro, e da qui in avanti ogni cosa nuova nasce controllata invece che verificata a posteriori.
@@ -386,8 +388,8 @@ Sequenza pensata perché **degradi bene**: se il tempo stringe, quello che resta
 ## 7.7 Punti aperti e rischi
 
 1. ✅ **Messaggi e Profilo: verificati il 17/8** — vedi ⑥-bis e ⑥-ter. Il perimetro non è più incerto. Tre decisioni restano da prendere, elencate ai punti 7-9 qui sotto.
-2. ✅ **DATA FISSATA — inizio settembre 2026** *(Jacopo, 17/8/2026)*. Sono circa **quindici giorni lavorativi** dalla data della decisione. ⚠️ **Conseguenza da affrontare subito, non a fine corsa:** con questa data il piano non ci sta intero, e le due voci che sforano sono note in anticipo — il **cestino** (⑦) e gli **allegati dei messaggi** (§7.10 punto 8). Vedi la voce §7.11 qui sotto: sono da decidere **esplicitamente**, non da lasciar scivolare.
-3. ⚠️ **Il cestino è il rischio numero uno**, anche ristretto al perimetro. Se qualcosa deve slittare, guardare prima qui. *(Con la data di inizio settembre non è più un "se": vedi §7.11.)*
+2. ✅ **DATA SPOSTATA — metà settembre 2026** *(Jacopo, 18/8/2026)*. **Sostituisce** la data di *inizio settembre* fissata il 17/8, che resta scritta solo nell'handoff di quel giorno (documento storico, non si riscrive). Sono circa **ventuno giorni lavorativi** dal 18/8. **Perché è cambiata:** il §7.11 ha deciso di tenere dentro il perimetro **entrambe** le voci pesanti — il **cestino** (⑦) e gli **allegati dei messaggi** (§7.10 punto 8) — e con inizio settembre non ci stavano. Non è una data guadagnata: è **la settimana in più che quelle due voci costano**. ⚠️ Il margine reale resta stretto, ed è il punto 3 a mangiarselo.
+3. ⚠️ **Il cestino è il rischio numero uno**, anche ristretto al perimetro. Se qualcosa deve slittare, guardare prima qui. *(Con la decisione del §7.11 non è più la voce "che potrebbe uscire", è la voce **da sorvegliare**: è dentro, ed è quella per cui la data si è spostata. Un cestino a metà il giorno prima della consegna è peggio di nessun cestino — quindi il momento per accorgersene è quando lo si comincia, non alla fine.)*
 4. 🔐 **La password della casella di posta è transitata in chat.** Non è in nessun file del repository. Valutare di cambiarla dopo la configurazione.
 5. 📌 **Collocazione del Registro attività nel menu: confronto con Jacopo obbligatorio prima di eseguire.**
 6. ⚠️ **Si lavora su due sessioni in parallelo.** Prima di toccare un file, verificare che non sia già in mano all'altra sessione — e non committare mai il lavoro altrui.
@@ -446,6 +448,17 @@ Conseguenze operative:
 
 > **Nasce il 17/8/2026**, quando la data di consegna è stata fissata a **inizio settembre** (§7.7 punto 2). Prima la domanda non era ponibile: senza data non si sa cosa non ci sta.
 
+## ✅ DECISO il 18/8/2026 da Jacopo — **strada 3: dentro entrambe, data spostata a metà settembre**
+
+**Cestino e allegati ai messaggi restano nel perimetro della release.** La data si sposta da inizio a **metà settembre 2026** (§7.7 punto 2 aggiornato di conseguenza).
+
+**Cosa comporta, in pratica:**
+- **Nessun taglio da comunicare.** Le finestre di conferma della cancellazione *non* devono dire «definitiva»: il cestino ci sarà. (Quella mezz'ora di lavoro descritta in fondo alla strada 1 **non serve più** — era il rimedio al taglio.)
+- **I Messaggi nascono con gli allegati**, quindi serve davvero la conservazione dei file: tabella per i byte, caricamento, scaricamento permessato, limiti di dimensione e di tipo. Il precedente da copiare è la Chat AI.
+- **L'ordine di lavorazione (§7.5) non cambia** e va seguito com'è: mette apposta cestino e rifiniture in fondo. Con entrambe le voci dentro, però, quel "in fondo" non è più un cuscinetto — è lavoro obbligato, e **arrivarci con dieci giorni davanti invece di tre è la ragione per cui la data si è spostata**. Chi vede l'ordine di lavorazione scivolare lo dica subito, non alla vigilia.
+
+⚠️ **La condizione che regge questa strada:** vale perché **la data era nostra, non presa con il cliente**. Se in futuro arriva una data concordata con il cliente, la strada 3 smette di esistere e la scelta torna fra la 1 e la 2 qui sotto — che restano scritte per questo, non per storia.
+
 **Il conto, in una riga.** Quindici giorni lavorativi, undici voci in §7.5, e due di quelle voci sono da sole più grosse di tre delle altre messe insieme. Non è una stima al ribasso per prudenza: sono **due lavori che il piano stesso segnala come pesanti** prima ancora che ci fosse una data.
 
 **Le due voci in questione, con cosa costa ciascuna:**
@@ -463,6 +476,6 @@ Conseguenze operative:
 2. **Fuori solo gli allegati, il cestino si fa.** Ha senso se la paura del rollout è che qualcuno cancelli un cliente vero per sbaglio. *Costo:* è la voce col rischio più alto di arrivare a metà il giorno prima della consegna — e un cestino a metà è peggio di nessun cestino, perché fa credere che i dati si recuperino.
 3. **Dentro entrambe, sposta la data.** Legittimo se la data è nostra e non del cliente. *Se invece la data è del cliente, questa strada non esiste* e la scelta è fra 1 e 2.
 
-📌 **Chi decide: Jacopo.** Finché non decide si lavora nell'ordine di §7.5, che mette apposta cestino e rifiniture in fondo: quindi **nessuna riga di lavoro va sprecata** qualunque cosa scelga, e la decisione può arrivare anche fra una settimana.
+📌 **Chi ha deciso: Jacopo, il 18/8/2026 — strada 3.** Vedi il riquadro in cima a questa sezione. Le strade 1 e 2 restano scritte perché tornano in gioco se la data diventa del cliente.
 
-⚠️ **Se la scelta è la 1**, una cosa va fatta *dentro* la release e non dopo: la finestra di conferma di ogni cancellazione deve dire che è **definitiva**. È mezz'ora di lavoro e cambia cosa succede il primo giorno di uso vero.
+⚠️ **Nota che decade con la strada 3:** *"se la scelta è la 1, la finestra di conferma di ogni cancellazione deve dire che è **definitiva**"*. Con il cestino dentro la release **non è più vero il contrario**: le conferme devono descrivere ciò che succede davvero, cioè che l'elemento **finisce nel cestino e si può ripristinare**. È lo stesso mezz'ora di lavoro, con il testo opposto — e va fatto **insieme al cestino**, non prima, altrimenti il CRM promette un ripristino che ancora non esiste.

@@ -189,7 +189,9 @@ Principio di sequenziamento: **prima la shell (UX + accessi) in cui tutto vive, 
 
 ⚠️ **Regola di demarcazione sui Clienti** — è l'unica area che release e riordino toccano insieme: a settembre si fa il **contenuto** (campi, import, dove sta il pulsante dei campi personalizzati); il **ridisegno della pagina** è V12. Non anticipare la forma, verrebbe rifatta.
 
-**Punti ancora aperti:** la data esatta di consegna; la collocazione a menu del Registro attività (confronto con Jacopo); i due dettagli della cancellazione messaggi (traccia «messaggio eliminato» sì/no, limite di tempo sì/no).
+📅 **Data di consegna: metà settembre 2026** *(Jacopo, 18/8/2026)*. Prima era *inizio* settembre (fissata il 17/8): si è spostata perché **cestino e allegati ai messaggi restano dentro il perimetro** invece di essere tagliati — decisione per esteso nel piano, §7.11. Quindi **nessuna voce della tabella qui sopra esce**, cestino compreso.
+
+**Punti ancora aperti:** la collocazione a menu del Registro attività (confronto con Jacopo); i due dettagli della cancellazione messaggi (traccia «messaggio eliminato» sì/no, limite di tempo sì/no).
 
 ---
 
