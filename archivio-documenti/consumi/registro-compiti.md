@@ -59,3 +59,4 @@
 | 2026-08-18 09:20 | Release settembre - gerarchia dei ruoli sull'invito Team | 17h 56m | 91,6 | 0,09 | esploratore×1, revisore×2 | 14,5 |
 | 2026-08-18 12:49 | Server di posta: pagina, permesso e migrazioni (non committato) | 3h 19m | 55,2 | 0,28 | esploratore×1, revisore×3 | 11,6 |
 | 2026-08-18 17:00 | Rinomina modulo posta -> mail (chiavi, cartelle, schema, rotte, eventi) + regola naming in CLAUDE.md | 2h 35m | 27,4 | 0,18 | revisore×1 | -2,8 |
+| 2026-08-20 09:30 | Pianificazione passaggio a Paperclip: ricerca, piano tecnico, quadro d'insieme HTML, consegna skill al lab | 19h 15m | 18,9 | 0,02 | nessuno | — |
