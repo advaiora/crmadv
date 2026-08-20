@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paperclip — il quadro d'insieme</title>
+<style>
+  :root{
+    --bg:#fbfbfd; --card:#ffffff; --ink:#1d1d1f; --ink-soft:#515154; --ink-faint:#86868b;
+    --line:#e3e3e6; --accent:#0071e3; --accent-soft:#e8f1fd;
+    --verde:#1a7f37; --verde-bg:#e8f5ec; --giallo:#9a6700; --giallo-bg:#fdf6e3; --rosso:#b42318; --rosso-bg:#fdeceb;
+    --spento:#9a9aa0; --spento-bg:#f2f2f4;
+    --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0b0b0d; --card:#151517; --ink:#f5f5f7; --ink-soft:#c0c0c6; --ink-faint:#8a8a91;
+      --line:#2a2a2e; --accent:#4da3ff; --accent-soft:#12233a;
+      --verde:#5cc47c; --verde-bg:#12291a; --giallo:#e0b341; --giallo-bg:#2c2413; --rosso:#ff8078; --rosso-bg:#2e1614;
+      --spento:#7a7a82; --spento-bg:#1c1c1f;
+      --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:980px; margin:0 auto; padding:56px 24px 96px}
+  header{margin-bottom:56px}
+  h1{font-size:44px; line-height:1.1; letter-spacing:-.022em; margin:0 0 12px; font-weight:600}
+  .sub{font-size:19px; color:var(--ink-soft); margin:0 0 6px; max-width:62ch}
+  .meta{font-size:14px; color:var(--ink-faint)}
+  h2{font-size:13px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-faint);
+     font-weight:600; margin:0 0 20px; padding-bottom:10px; border-bottom:1px solid var(--line)}
+  section{margin-bottom:64px}
+  h3{font-size:22px; letter-spacing:-.01em; margin:34px 0 10px; font-weight:600}
+  p{margin:0 0 14px; color:var(--ink-soft); max-width:72ch}
+  p.lead{color:var(--ink); font-size:18px}
+  strong{color:var(--ink); font-weight:600}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+        padding:26px; box-shadow:var(--shadow); margin:22px 0}
+  figure{margin:26px 0}
+  figcaption{font-size:13px; color:var(--ink-faint); margin-top:12px; text-align:center}
+  svg{display:block; width:100%; height:auto}
+  .svgtext{font:600 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; fill:var(--ink)}
+  .svgsmall{font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; fill:var(--ink-faint)}
+  .svglabel{font:600 10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+            fill:var(--ink-faint); letter-spacing:.08em; text-transform:uppercase}
+  table{width:100%; border-collapse:collapse; font-size:15px; margin:18px 0}
+  th{text-align:left; font-size:12px; letter-spacing:.07em; text-transform:uppercase;
+     color:var(--ink-faint); font-weight:600; padding:0 12px 10px 0; border-bottom:1px solid var(--line)}
+  td{padding:12px 12px 12px 0; border-bottom:1px solid var(--line); color:var(--ink-soft); vertical-align:top}
+  td:first-child{color:var(--ink); font-weight:500; white-space:nowrap}
+  .scroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin:22px 0}
+  .tile{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px}
+  .tile .k{font-size:30px; font-weight:600; letter-spacing:-.02em; margin-bottom:2px}
+  .tile .l{font-size:13px; color:var(--ink-faint); line-height:1.45}
+  .gate{border-left:3px solid; border-radius:8px; padding:14px 18px; margin:12px 0; font-size:15px}
+  .g-verde{border-color:var(--verde); background:var(--verde-bg)}
+  .g-giallo{border-color:var(--giallo); background:var(--giallo-bg)}
+  .g-rosso{border-color:var(--rosso); background:var(--rosso-bg)}
+  .gate b{display:block; margin-bottom:4px; font-size:14px; letter-spacing:.02em}
+  .g-verde b{color:var(--verde)} .g-giallo b{color:var(--giallo)} .g-rosso b{color:var(--rosso)}
+  .note{border-left:3px solid var(--accent); background:var(--accent-soft);
+        border-radius:8px; padding:14px 18px; margin:18px 0; font-size:15px; color:var(--ink)}
+  .note b{font-weight:600}
+  .warn{border-left:3px solid var(--giallo); background:var(--giallo-bg);
+        border-radius:8px; padding:14px 18px; margin:18px 0; font-size:15px; color:var(--ink)}
+  .bar{display:flex; height:14px; border-radius:7px; overflow:hidden; margin:20px 0 10px; border:1px solid var(--line)}
+  .bar span{display:block}
+  .legend{display:flex; flex-wrap:wrap; gap:18px; font-size:13px; color:var(--ink-soft)}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:middle}
+  footer{margin-top:80px; padding-top:26px; border-top:1px solid var(--line); font-size:14px; color:var(--ink-faint)}
+  code{font:500 13.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+       background:var(--spento-bg); padding:2px 6px; border-radius:5px; color:var(--ink)}
+  /* Sul telefono gli schemi non si rimpiccioliscono fino a diventare illeggibili:
+     mantengono una larghezza minima e si fanno scorrere in orizzontale dentro il loro riquadro. */
+  @media (max-width:700px){
+    figure.card{overflow-x:auto; -webkit-overflow-scrolling:touch}
+    figure.card svg{min-width:660px}
+    figcaption{min-width:0}
+  }
+  @media (max-width:640px){ h1{font-size:32px} .wrap{padding:36px 18px 64px} .card{padding:20px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Paperclip — il quadro d'insieme</h1>
+  <p class="sub">Come funzionerà l'azienda di agent che costruisce il CRM: chi la compone, cosa decide da sola, cosa passa da voi.</p>
+  <p class="meta">19 agosto 2026 · per Jacopo e Claudio · il piano tecnico completo sta in <code>piano-paperclip-2026-08-19.md</code></p>
+</header>
+
+<section>
+  <h2>In breve</h2>
+  <p class="lead">Oggi il lavoro è <strong>una conversazione</strong>: si apre una sessione, si spiega cosa serve, e alla fine si scrive un handoff perché la conversazione muore e con lei la memoria.</p>
+  <p class="lead">Domani è <strong>una bacheca di compiti con dei mestieri intorno</strong>. Dieci agent con un ruolo preciso si svegliano da soli, prendono un compito alla volta, e lo portano fino al punto in cui serve una vostra firma. Voi non scrivete più codice: <strong>decidete, approvate e correggete</strong> — dal cruscotto o da Discord, anche dal telefono.</p>
+
+  <div class="grid">
+    <div class="tile"><div class="k">10</div><div class="l">mestieri, di cui uno spento in attesa</div></div>
+    <div class="tile"><div class="k">2</div><div class="l">soli scrivono codice: backend e frontend</div></div>
+    <div class="tile"><div class="k">12 h</div><div class="l">dopo cui una decisione non urgente procede da sola</div></div>
+    <div class="tile"><div class="k">33 su 57</div><div class="l">meccaniche del metodo attuale che si portano identiche</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>L'organigramma</h2>
+  <p>Quattro fasce. In cima siete voi; sotto, i mestieri raggruppati per cosa fanno. <strong>Solo la fascia arancione tocca il codice</strong> — e sempre su un ramo separato, mai sul ramo principale.</p>
+
+  <figure class="card">
+  <svg viewBox="0 0 900 470" role="img" aria-label="Organigramma dell'azienda di agent">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+    </defs>
+    <g style="color:var(--line)" stroke="currentColor" stroke-width="1.5" fill="none">
+      <path d="M450,64 L450,96" marker-end="url(#ar)"/>
+      <path d="M450,158 L450,190" marker-end="url(#ar)"/>
+      <path d="M450,252 L450,284" marker-end="url(#ar)"/>
+      <path d="M450,346 L450,378" marker-end="url(#ar)"/>
+    </g>
+
+    <!-- consiglio -->
+    <rect x="300" y="14" width="300" height="50" rx="12" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+    <text x="450" y="36" class="svgtext" text-anchor="middle" style="fill:var(--accent)">IL CONSIGLIO — Jacopo e Claudio</text>
+    <text x="450" y="53" class="svgsmall" text-anchor="middle">pari grado · approvano, rifiutano, riordinano</text>
+
+    <!-- prepara -->
+    <text x="30" y="122" class="svglabel">Prepara</text>
+    <rect x="150" y="98" width="270" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="285" y="122" class="svgtext" text-anchor="middle">🧭 Capocantiere</text>
+    <text x="285" y="141" class="svgsmall" text-anchor="middle">decide cosa si fa dopo</text>
+    <rect x="480" y="98" width="270" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="615" y="122" class="svgtext" text-anchor="middle">🗺️ Esploratore</text>
+    <text x="615" y="141" class="svgsmall" text-anchor="middle">dice dove si mette mano</text>
+
+    <!-- scrive -->
+    <text x="30" y="216" class="svglabel">Scrive</text>
+    <rect x="150" y="192" width="270" height="60" rx="12" fill="var(--giallo-bg)" stroke="var(--giallo)" stroke-width="1.5"/>
+    <text x="285" y="216" class="svgtext" text-anchor="middle">🔨 Sviluppatore backend</text>
+    <text x="285" y="235" class="svgsmall" text-anchor="middle">server · database · permessi</text>
+    <rect x="480" y="192" width="270" height="60" rx="12" fill="var(--giallo-bg)" stroke="var(--giallo)" stroke-width="1.5"/>
+    <text x="615" y="216" class="svgtext" text-anchor="middle">🎨 Sviluppatore frontend</text>
+    <text x="615" y="235" class="svgsmall" text-anchor="middle">interfaccia · aspetto · uso</text>
+
+    <!-- controlla -->
+    <text x="30" y="310" class="svglabel">Controlla</text>
+    <rect x="150" y="286" width="190" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="245" y="310" class="svgtext" text-anchor="middle">🔍 Revisore</text>
+    <text x="245" y="329" class="svgsmall" text-anchor="middle">gli errori tipici</text>
+    <rect x="355" y="286" width="190" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="450" y="310" class="svgtext" text-anchor="middle">🛡️ Guardiano</text>
+    <text x="450" y="329" class="svgsmall" text-anchor="middle">permessi e sicurezza</text>
+    <rect x="560" y="286" width="190" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="655" y="310" class="svgtext" text-anchor="middle">🖥️ Collaudatore</text>
+    <text x="655" y="329" class="svgsmall" text-anchor="middle">apre il browser</text>
+
+    <!-- ricorda -->
+    <text x="30" y="404" class="svglabel">Ricorda</text>
+    <rect x="150" y="380" width="270" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="285" y="404" class="svgtext" text-anchor="middle">📋 Cronista</text>
+    <text x="285" y="423" class="svgsmall" text-anchor="middle">memoria e documenti</text>
+    <rect x="480" y="380" width="270" height="60" rx="12" fill="var(--card)" stroke="var(--line)"/>
+    <text x="615" y="404" class="svgtext" text-anchor="middle">📊 Capo del personale</text>
+    <text x="615" y="423" class="svgsmall" text-anchor="middle">valuta la squadra</text>
+
+    <!-- spento -->
+    <rect x="780" y="192" width="105" height="60" rx="12" fill="var(--spento-bg)" stroke="var(--line)" stroke-dasharray="4 3"/>
+    <text x="832" y="212" class="svgtext" text-anchor="middle" style="fill:var(--spento)">🧪 Collaudo</text>
+    <text x="832" y="227" class="svgtext" text-anchor="middle" style="fill:var(--spento)">AI</text>
+    <text x="832" y="243" class="svgsmall" text-anchor="middle">spento</text>
+  </svg>
+  <figcaption>Due scrivono, sette guardano. È deliberato: in questo progetto l'errore che costa non è il codice sbagliato — quello si vede — ma il collegamento a metà, che funziona e mente.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Il giro di un compito</h2>
+  <p>Dall'idea al codice unito. È lo stesso giro di adesso: cambia che <strong>i passaggi non stanno più nella testa di un assistente dentro una conversazione, stanno nel sistema</strong> — quindi non si dimenticano e non si saltano quando si va di fretta.</p>
+
+  <figure class="card">
+  <svg viewBox="0 0 900 300" role="img" aria-label="Il ciclo di vita di un compito">
+    <defs>
+      <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+      </marker>
+    </defs>
+
+    <g style="color:var(--line)" stroke="currentColor" stroke-width="1.5" fill="none">
+      <path d="M148,55 L188,55" marker-end="url(#ar2)"/>
+      <path d="M328,55 L368,55" marker-end="url(#ar2)"/>
+      <path d="M508,55 L548,55" marker-end="url(#ar2)"/>
+      <path d="M688,55 L728,55" marker-end="url(#ar2)"/>
+      <path d="M790,86 L790,126" marker-end="url(#ar2)"/>
+      <path d="M730,157 L690,157" marker-end="url(#ar2)"/>
+      <path d="M550,157 L510,157" marker-end="url(#ar2)"/>
+      <path d="M370,157 L330,157" marker-end="url(#ar2)"/>
+    </g>
+    <!-- ritorno indietro -->
+    <g style="color:var(--rosso)" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="5 4">
+      <path d="M430,188 L430,232 L250,232 L250,86" marker-end="url(#ar2)"/>
+    </g>
+    <text x="340" y="252" class="svgsmall" style="fill:var(--rosso)">torna indietro da solo, senza disturbare nessuno</text>
+
+    <rect x="8" y="30" width="140" height="52" rx="11" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text x="78" y="52" class="svgtext" text-anchor="middle" style="fill:var(--accent)">1 · Il compito</text>
+    <text x="78" y="69" class="svgsmall" text-anchor="middle">nasce dal piano</text>
+
+    <rect x="188" y="30" width="140" height="52" rx="11" fill="var(--card)" stroke="var(--line)"/>
+    <text x="258" y="52" class="svgtext" text-anchor="middle">2 · Mappa</text>
+    <text x="258" y="69" class="svgsmall" text-anchor="middle">esploratore</text>
+
+    <rect x="368" y="30" width="140" height="52" rx="11" fill="var(--giallo-bg)" stroke="var(--giallo)"/>
+    <text x="438" y="52" class="svgtext" text-anchor="middle">3 · Si scrive</text>
+    <text x="438" y="69" class="svgsmall" text-anchor="middle">su un ramo suo</text>
+
+    <rect x="548" y="30" width="140" height="52" rx="11" fill="var(--card)" stroke="var(--line)"/>
+    <text x="618" y="52" class="svgtext" text-anchor="middle">4 · Permessi</text>
+    <text x="618" y="69" class="svgsmall" text-anchor="middle">guardiano</text>
+
+    <rect x="728" y="30" width="140" height="52" rx="11" fill="var(--card)" stroke="var(--line)"/>
+    <text x="798" y="52" class="svgtext" text-anchor="middle">5 · Revisione</text>
+    <text x="798" y="69" class="svgsmall" text-anchor="middle">revisore</text>
+
+    <rect x="728" y="131" width="140" height="52" rx="11" fill="var(--card)" stroke="var(--line)"/>
+    <text x="798" y="153" class="svgtext" text-anchor="middle">6 · Collaudo</text>
+    <text x="798" y="170" class="svgsmall" text-anchor="middle">browser + screenshot</text>
+
+    <rect x="548" y="131" width="140" height="52" rx="11" fill="var(--rosso-bg)" stroke="var(--rosso)" stroke-width="1.5"/>
+    <text x="618" y="153" class="svgtext" text-anchor="middle" style="fill:var(--rosso)">7 · IL CANCELLO</text>
+    <text x="618" y="170" class="svgsmall" text-anchor="middle">voi, su Discord</text>
+
+    <rect x="368" y="131" width="140" height="52" rx="11" fill="var(--verde-bg)" stroke="var(--verde)"/>
+    <text x="438" y="153" class="svgtext" text-anchor="middle" style="fill:var(--verde)">8 · Si unisce</text>
+    <text x="438" y="170" class="svgsmall" text-anchor="middle">al ramo principale</text>
+
+    <rect x="188" y="131" width="140" height="52" rx="11" fill="var(--card)" stroke="var(--line)"/>
+    <text x="258" y="153" class="svgtext" text-anchor="middle">9 · Si registra</text>
+    <text x="258" y="170" class="svgsmall" text-anchor="middle">cronista</text>
+  </svg>
+  <figcaption>In tutto questo voi intervenite una volta sola, al passo 7 — e vi costa il tempo di leggere e premere un pulsante.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Chi decide cosa</h2>
+  <p>Il principio è uno e si verifica in un secondo: <strong>un agent si ferma quando la decisione è vostra, non perché la cosa è importante.</strong> La domanda da farsi è <em>se sbaglio, si disfa da sola con un altro commit, o ce la portiamo dietro?</em></p>
+
+  <div class="gate g-verde">
+    <b>VERDE — decide da solo</b>
+    Dove mettere un file, come chiamare una funzione, come strutturare un test, l'ordine delle estrazioni. E soprattutto: <strong>rimandare indietro un lavoro</strong> — è quello che fa chiudere la gran parte delle correzioni fra due agent, senza svegliare nessuno.
+  </div>
+
+  <div class="gate g-giallo">
+    <b>GIALLO — si ferma, parcheggia con le opzioni già scritte, e va avanti con altro</b>
+    Nomi, etichette, cosa vede l'utente, dove va una voce nel menu, un sospetto conflitto fra voi due.
+    <br><br><strong>⏱ Dopo 12 ore senza risposta procede con l'opzione raccomandata e lo dichiara.</strong> Si può fare perché il lavoro è su un ramo: sbagliato ma reversibile costa poco. Serve perché altrimenti il sabato l'azienda si ferma sul primo dubbio.
+  </div>
+
+  <div class="gate g-rosso">
+    <b>ROSSO — si ferma e aspetta. Nessuna scadenza, nessuna eccezione</b>
+    Unire al ramo principale · qualsiasi migrazione del database · qualsiasi modifica ai permessi e ai ruoli · tutto ciò che è irreversibile · tutto ciò che <em>esce</em> (email, pubblicazioni, credenziali) · assumere un agent o cambiare una skill · sforare un budget.
+    <br><br><strong>I rossi si approvano dal cruscotto, non da Discord:</strong> dal telefono si vede un riassunto, per un rosso servono le differenze del codice per intero.
+  </div>
+
+  <div class="note">
+    <b>Cosa vuol dire «fatto».</b> Un compito può chiudersi <strong>senza che un umano abbia guardato la pagina</strong>: la prova a schermo la fa il collaudatore e gli screenshot restano allegati. È la scelta più veloce e la più esposta — il rischio non è il codice rotto, che i test prendono, ma <strong>la cosa che funziona e non è quella giusta</strong>. Per questo serve un campione quotidiano: cinque minuti sul riepilogo del cronista.
+  </div>
+</section>
+
+<section>
+  <h2>Il difetto da cui ci si difende</h2>
+  <p>È il problema più segnalato di Paperclip, e il modo in cui si manifesta è ciò che lo rende pericoloso: <strong>dopo molti giri la qualità cala, e quando un agent perde il filo riparte da assunzioni nuove in silenzio</strong> invece di segnalare il buco. Non dà errore. Sembra che stia lavorando.</p>
+
+  <div class="card" style="text-align:center; padding:34px 26px">
+    <div style="font-size:23px; font-weight:600; letter-spacing:-.01em; line-height:1.35">
+      La sessione è usa e getta.<br>La memoria è il compito.
+    </div>
+    <p style="margin:16px auto 0; max-width:60ch; text-align:left">
+      Un compito, una sessione: finito il compito, la memoria di lavoro si butta. Funziona solo se tutto ciò che serve a riprendere — il mandato, la mappa, cosa è stato provato e scartato — <strong>è scritto nel compito e non ricordato</strong>. Se è così, buttarla è gratis e si può fare sempre.
+    </p>
+  </div>
+
+  <div class="note">
+    <b>Qui l'handoff non muore: cambia soggetto.</b> Non è più Jacopo che scrive a Jacopo — è la sessione che scrive alla sessione che la sostituisce. Il formato resta identico perché il problema è identico, ed è il pezzo di metodo che avete raffinato per mesi.
+  </div>
+</section>
+
+<section>
+  <h2>Cosa cambia per voi due</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>&nbsp;</th><th>Oggi</th><th>Domani</th></tr></thead>
+    <tbody>
+      <tr><td>Dove si lavora</td><td>Sul portatile, una sessione per volta</td><td>Su una macchina sempre accesa</td></tr>
+      <tr><td>Come si chiede</td><td>Lo si spiega a voce in chat</td><td>Si scrive un compito, o lo scrive il capocantiere dal piano</td></tr>
+      <tr><td>Chi ricorda</td><td>L'handoff, scritto a mano a fine sessione</td><td>Il compito stesso, più la traccia delle attività</td></tr>
+      <tr><td>Lavoro in autonomia</td><td>Eccezione, si accende con <code>/vado</code></td><td><strong>Normale.</strong> È la supervisione a essere l'eccezione</td></tr>
+      <tr><td>Il vostro ruolo</td><td>Scrivete a un assistente</td><td>Approvate, rifiutate, riordinate le priorità</td></tr>
+      <tr><td>In due</td><td>A staffetta, mai insieme</td><td>A staffetta <em>o</em> insieme, su rami diversi</td></tr>
+      <tr><td>Dal telefono</td><td>Niente</td><td>Approvate con un pulsante su Discord</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Cosa si porta del metodo attuale</h2>
+  <p>Le 57 meccaniche costruite in questi mesi — regole, documenti, comandi, strumenti — classificate una per una. <strong>Quasi niente si butta: cambia il contenitore, non il contenuto.</strong></p>
+
+  <div class="bar" aria-hidden="true">
+    <span style="width:57.9%; background:var(--verde)"></span>
+    <span style="width:22.8%; background:var(--accent)"></span>
+    <span style="width:8.8%; background:var(--giallo)"></span>
+    <span style="width:8.8%; background:var(--spento)"></span>
+    <span style="width:1.7%; background:var(--rosso)"></span>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--verde)"></i>33 identiche</span>
+    <span><i style="background:var(--accent)"></i>13 declinate</span>
+    <span><i style="background:var(--giallo)"></i>5 rovesciate</span>
+    <span><i style="background:var(--spento)"></i>5 escluse</span>
+    <span><i style="background:var(--rosso)"></i>1 decaduta</span>
+  </div>
+
+  <h3>I quattro passaggi che vale la pena conoscere</h3>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Cosa</th><th>Che fine fa</th></tr></thead>
+    <tbody>
+      <tr><td><code>/vado</code></td><td><strong>Diventa la costituzione dell'azienda.</strong> Oggi è l'interruttore che accende l'autonomia; domani l'autonomia è la norma, quindi le sue regole smettono di essere «cosa fare quando non ci sono» e diventano «come si lavora»</td></tr>
+      <tr><td><code>/handoff</code></td><td>Si spezza in tre: la parte «a me stesso» <strong>rinasce come passaggio di sessione</strong> fra agent; la parte «all'altro» resta come passaggio del testimone; la parte su server e consumi decade</td></tr>
+      <tr><td>Le note operative</td><td>Diventano skill vere. Paperclip carica il testo <strong>solo quando serve</strong>, quindi l'indice si porta sempre e il contenuto si paga a domanda</td></tr>
+      <tr><td>I tre agent attuali</td><td>Si trasferiscono quasi parola per parola. L'<strong>architetto cambia nome in «capo del personale»</strong>, perché guarda la squadra e non il software</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>La linea del tempo</h2>
+  <p>La release di settembre resta la prima consegna reale e batte ogni altra pianificazione. <strong>La data non è un patto incontrovertibile</strong>: si può sforare con ragionevole margine. Le fasce qui sotto dicono l'ordine, non una scadenza contrattuale.</p>
+
+  <figure class="card">
+  <svg viewBox="0 0 900 220" role="img" aria-label="Linea del tempo della release">
+    <line x1="40" y1="40" x2="860" y2="40" stroke="var(--line)" stroke-width="2"/>
+    <g>
+      <circle cx="40" cy="40" r="5" fill="var(--accent)"/>
+      <circle cx="392" cy="40" r="5" fill="var(--accent)"/>
+      <circle cx="744" cy="40" r="5" fill="var(--accent)"/>
+      <circle cx="860" cy="40" r="6" fill="var(--verde)"/>
+    </g>
+    <text x="40" y="26" class="svgsmall">19 ago</text>
+    <text x="392" y="26" class="svgsmall">1 set</text>
+    <text x="744" y="26" class="svgsmall">14 set</text>
+    <text x="860" y="26" class="svgsmall" text-anchor="end" style="fill:var(--verde)">consegna</text>
+
+    <rect x="40" y="62" width="340" height="58" rx="10" fill="var(--card)" stroke="var(--line)"/>
+    <text x="58" y="85" class="svgtext">Traguardi 1 – 6</text>
+    <text x="58" y="104" class="svgsmall">posta e inviti · password · permessi · messaggi · clienti · registro</text>
+
+    <rect x="392" y="62" width="340" height="58" rx="10" fill="var(--giallo-bg)" stroke="var(--giallo)" stroke-width="1.5"/>
+    <text x="410" y="85" class="svgtext">Traguardi 7 – 8 — le due pesanti</text>
+    <text x="410" y="104" class="svgsmall">cestino · allegati ai messaggi</text>
+
+    <rect x="744" y="62" width="116" height="58" rx="10" fill="var(--card)" stroke="var(--line)"/>
+    <text x="762" y="85" class="svgtext">9 – 11</text>
+    <text x="762" y="104" class="svgsmall">menu · moduli</text>
+    <text x="762" y="118" class="svgsmall">audit</text>
+
+    <rect x="40" y="146" width="820" height="52" rx="10" fill="var(--rosso-bg)" stroke="var(--rosso)" stroke-dasharray="5 4"/>
+    <text x="58" y="169" class="svgtext" style="fill:var(--rosso)">⚠ Il primo tratto è il più carico</text>
+    <text x="58" y="188" class="svgsmall">Contiene sei traguardi, di cui uno sono tre lavori distinti e un altro è bloccato in partenza da una decisione. Se scivola, mangia i giorni del cestino.</text>
+  </svg>
+  <figcaption>Su undici traguardi, sei hanno un cancello rosso e cinque uno giallo: due su tre richiedono un vostro intervento. È la natura di questa release, che tocca permessi, migrazioni ed email.</figcaption>
+  </figure>
+
+  <div class="note">
+    <b>L'aspettativa giusta da avere.</b> Su questa release l'azienda <strong>non lavorerà da sola per giorni</strong>: vi toglierà il lavoro meccanico e vi lascerà le decisioni — che è il guadagno vero, ma è un guadagno diverso dall'autonomia. Quella arriva dopo, sulle V, dove i cancelli rossi sono molti meno.
+  </div>
+</section>
+
+<section>
+  <h2>Le quattro cose da sapere prima di partire</h2>
+
+  <div class="warn">
+    <strong>1 · Il serbatoio è uno solo.</strong> La finestra di cinque ore dell'abbonamento è dell'account: ci pescano gli agent sulla macchina <em>più</em> tutti e due voi. E il cruscotto di Paperclip vi mostrerà un'azienda che spende zero, perché conta i soldi e su abbonamento i soldi sono zero. Il freno che mette in pausa gli agent quando la finestra si carica <strong>va costruito: non esiste già pronto</strong>.
+  </div>
+
+  <div class="warn">
+    <strong>2 · Il collaudatore sbaglierà, il primo mese.</strong> È nella natura del collaudo automatico d'interfaccia: un pulsante spostato di dieci pixel fa fallire una prova che non doveva fallire. Non è un motivo per non averlo — è un motivo per dargli un mese di rodaggio prima di fidarsene.
+  </div>
+
+  <div class="warn">
+    <strong>3 · La memoria dell'azienda vive solo sulla macchina.</strong> Il codice sta su git e si recupera sempre. La storia dei compiti, le decisioni e la traccia delle attività no: se la macchina si perde, si perde esattamente la cosa che state costruendo per non perdere. Serve un salvataggio periodico.
+  </div>
+
+  <div class="warn">
+    <strong>4 · Se una chat può approvare, quella chat è una porta d'accesso.</strong> Discord con i pulsanti è comodissimo e rende praticabili le 12 ore. Ma va tenuto privato, solo voi due, e i cancelli rossi restano fuori di lì.
+  </div>
+</section>
+
+<footer>
+  Documento di sintesi — il piano tecnico completo, con i mandati di ogni mestiere, le skill da costruire, il censimento delle 57 meccaniche e il passaggio futuro alle API, sta in <code>archivio-documenti/piano-paperclip-2026-08-19.md</code>. Se i due divergono, vince quello.
+</footer>
+
+</div>
+</body>
+</html>

@@ -10,7 +10,7 @@ Sei a fine sessione di lavoro su questo progetto. Devi scrivere il **documento d
 ## Contesto del metodo di lavoro (importante)
 
 - Si lavora **uno alla volta**, come in una staffetta: chi finisce passa il testimone.
-- Si pusha **sempre su `main`**, niente branch (salvo test straordinari). I push sono frequenti, quindi si può sempre tornare indietro.
+- **Si lavora su rami, e `main` si tocca solo per unione** *(dal 19/8/2026, per la messa online)*: un lavoro, un ramo, con push frequenti sul proprio ramo. ⚠️ **L'handoff deve quindi dire su quale ramo si è rimasti**, e se restano rami aperti non ancora uniti a `main`.
 - **L'handoff è l'unico vero raccordo fra una sessione e la successiva, chiunque la riprenda.** Deve bastare da solo, senza bisogno di chiedere spiegazioni.
 - ⚠️ **Chi riprende NON è necessariamente l'altra persona, e di norma non lo è.** L'handoff serve in due modi: (a) passare il testimone all'**altra persona** quando cambia il turno — **Jacopo** lun-ven, **Claudio** sab-dom; (b) permettere alla **stessa persona** di riprendere il proprio lavoro giorni dopo, in una sessione nuova che non ricorda nulla di quella precedente. Poiché **Jacopo sviluppa la maggior parte del tempo**, il caso ordinario è **Jacopo → Jacopo**: scrivere l'handoff pensando solo a Claudio è un errore, e produce un documento che dà per scontate proprio le cose che servono a chi continua.
 

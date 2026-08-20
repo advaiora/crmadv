@@ -62,8 +62,8 @@ Per ogni pezzo della coda, **prima di cominciarlo**:
 4. Se parti, **portalo a termine** anche se sfora un po'. Non guardare l'ora nel frattempo.
 
 **A pezzo concluso** (deciso da Jacopo il 6/8/2026):
-- **committa e pusha subito su `main`.** È già la norma del progetto, ed è ciò che rende sicura un'interruzione: se la sessione muore, non si perde niente e il lavoro è visibile anche da fuori. Messaggio di commit nello stile del progetto (italiano, che dice *cosa cambia per chi usa il CRM*, non quali file sono stati toccati).
-- **Mai** `--no-verify`, **mai** force push, **mai** riscrivere la storia, **mai** creare o cambiare branch.
+- **committa e pusha subito sul ramo del lavoro in corso** *(aggiornato il 19/8/2026: prima diceva «su `main`», quando si pushava direttamente sul ramo principale)*. È ciò che rende sicura un'interruzione: se la sessione muore, non si perde niente e il lavoro è visibile anche da fuori. Messaggio di commit nello stile del progetto (italiano, che dice *cosa cambia per chi usa il CRM*, non quali file sono stati toccati).
+- **Mai** `--no-verify`, **mai** force push, **mai** riscrivere la storia. ⚠️ E **mai unire a `main`**: l'unione è una decisione dell'utente, che al rientro trova il ramo pronto e la sceglie lui. Creare il ramo del proprio lavoro invece si può — anzi si deve.
 - Annota il pezzo nel registro: `npm run consumi:compito -- "<nome del lavoro>"` con `--da`/`--a` per delimitarlo. Non è burocrazia: è quello che rende affidabile il punto 3.2 la prossima volta.
 
 **Se la coda si svuota e avanza tempo** (deciso da Jacopo il 6/8/2026): pesca **solo item piccoli già scritti in roadmap** — le "trovate per strada", il debito tecnico minuto — cioè cose già tracciate, a basso rischio, che non richiedono una sua decisione. **Vietato** iniziare una V nuova, spezzare un file-mostro non assegnato, o toccare schema e permessi per riempire il tempo.

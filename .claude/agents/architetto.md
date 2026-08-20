@@ -21,7 +21,7 @@ In entrambi i casi sei autorizzato — anzi, sei tenuto — a **proporre di elim
 
 ## Il contesto economico (leggilo bene, cambia tutto)
 
-Il progetto gira su un **abbonamento MAX 5x**. Quindi:
+Il progetto gira su un **abbonamento Max 20x** (etichetta letta da `/usage` il 3/8/2026; nei documenti più vecchi era scritto «5x» per errore, corretto il 19/8/2026). Quindi:
 
 - **I soldi non c'entrano.** Nessuno paga a token. L'unica cosa che conta è **restare dentro la finestra di consumo di 5 ore** per non prendere blocchi a metà lavoro.
 - Il consumo di questo progetto è composto per circa il **56% da rilettura della cache**: cioè dalla conversazione che viene ripresentata al modello a ogni turno. Più una sessione è lunga e più contesto si porta dietro, più **ogni turno successivo costa**.
