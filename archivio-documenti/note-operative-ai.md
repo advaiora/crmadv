@@ -809,3 +809,18 @@ Cosi' si distingue in un secondo il proprio danno dalla deriva altrui — e in q
 - Una contraddizione fra un'istruzione di sessione e `CLAUDE.md` e' **un conflitto da segnalare**, esattamente come quelli fra Jacopo e Claudio: si dice cosa dice l'una, cosa dice l'altra, e si aspetta. Non e' una decisione da prendere per conto proprio, **e va sollevata prima di cominciare il lavoro**, non nel riepilogo finale.
 - Il campanello: se stai per **saltare un passo del metodo** (revisore, esploratore, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
 - Prima di dire *"c'e' una regola che me lo vieta"*, **guarda dove sta davvero**: `.claude/settings.json` e `settings.local.json` del progetto, gli stessi due sotto `~/.claude/`, un eventuale `CLAUDE.md` utente. Se non e' in nessuno di quelli, e' il prompt di sessione dell'applicazione: **non e' modificabile ne' da te ne' da un file del repository**, e va detto cosi' — altrimenti Jacopo cerca di togliere una regola che non esiste da nessuna parte.
+
+---
+
+## 55. Il terminale in modalita' automatica perde i comandi Unix a meta' sessione, e `git commit -m` si rompe sulle virgolette
+
+**Contesto:** 24/8/2026, sessione di sole decisioni sui documenti. Due inciampi diversi con la stessa radice: la modalita' automatica dell'applicazione spinge a fare tutto dal terminale.
+
+**Errore, primo:** `sed -n '546,605p' file.md` ha funzionato per tre chiamate, poi ha risposto `sed: command not found` - e con lui `find` e `head`. Non e' un guasto da diagnosticare: l'ambiente del terminale non e' stabile fra una chiamata e l'altra, e i comandi Unix possono sparire dal percorso a meta' lavoro.
+
+**Errore, secondo:** `git commit -m @'...'@` con un here-string di PowerShell **si e' rotto** perche' il messaggio conteneva virgolette doppie. PowerShell 5.1 ri-quota la stringa passandola a un eseguibile esterno, e git ha ricevuto il messaggio spezzato in pathspec: `error: pathspec 'di' did not match any file(s)`. Il commit non e' avvenuto, ma `git add` si', quindi lo stato era gia' cambiato a meta'.
+
+**Modo corretto:**
+- **Per leggere e cercare, non usare il terminale.** Read, Grep e Glob sono gli strumenti del progetto, non funzionano a intermittenza, e Grep restituisce i numeri di riga gia' pronti. Il terminale serve per git, npm e i comandi veri.
+- **Se un comando Unix sparisce, non insistere e non indagare:** passa allo strumento dedicato, o a PowerShell.
+- **Un messaggio di commit su piu' righe si passa da file, mai da riga di comando:** si scrive nella cartella di appoggio della sessione e si usa `git commit -F <percorso>`. Vale sempre, non solo quando ci sono virgolette - le virgolette sono solo il caso in cui si accorge.
