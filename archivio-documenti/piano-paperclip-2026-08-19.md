@@ -215,6 +215,8 @@ Nove accesi, uno spento in attesa. Ognuno nasce da un pezzo di metodo che esiste
 
 ⚠️ **Con tetto di spesa e chiave già impostati prima di essere acceso.** È l'unico agent del team che **fa chiamate vere a pagamento**, anche mentre tutto il resto gira su abbonamento. Il budget non si decide il giorno dell'accensione.
 
+✅ **Sciolto il 24/8/2026 → §12.6.** Fa partire lui le generazioni; **quando interviene** non dipende dalla V5 ma da cinque innesti osservabili nel diff, riconosciuti da uno script (`npm run tocca-ai`); **nessun tetto come politica di spesa** (un collaudo costa 3-9 centesimi), ma un **fusibile da 10 $/giorno** sulla sua **utenza CRM dedicata**, che è anche il punto dove i suoi consumi si distinguono da tutti gli altri.
+
 **Battito:** nessuno. Spento.
 
 ### 2.3 Il quadro d'insieme
@@ -317,7 +319,7 @@ Le condizioni perché un compito arrivi al cancello:
 
 ### 3.5 I tre freni automatici
 
-1. **Il serbatoio si sta caricando.** Sopra una soglia di consumo nella finestra in corso, gli agent si mettono in pausa da soli. ⚠️ **Da costruire: non esiste già pronto** — Paperclip conta i soldi, e su abbonamento i soldi sono zero. Vedi §6 e §12.
+1. ~~**Il serbatoio si sta caricando.**~~ 🛑 **Sospeso per decisione di Jacopo del 24/8/2026: non si costruisce, per ora** (§12.5). Era il freno che, sopra una soglia di consumo nella finestra in corso, avrebbe messo gli agent in pausa da soli — da costruire, perché Paperclip conta i soldi e su abbonamento i soldi sono zero. **Quindi i freni automatici oggi sono due, non tre**, e il consumo del serbatoio non è sorvegliato da nessuno.
 2. **Qualcosa si è rotto e non torna verde.** Dopo un tentativo serio, se test o compilazione restano rossi: si riporta il ramo a uno stato coerente, si parcheggia, si passa oltre. **Mai lasciare il lavoro peggio di come lo si è trovato.**
 3. **Un permesso ha bloccato uno strumento.** Non si insiste con varianti per mezz'ora: si annota, si aggira se possibile, altrimenti si parcheggia quel pezzo.
 
@@ -597,8 +599,8 @@ main                     ← protetto. Ci si arriva solo per approvazione del co
 ### 7.5 Cosa questo NON risolve
 
 - **Non risolve due persone che vogliono cose diverse.** Lo rende visibile prima, ed è già molto.
-- **Non risolve la contesa sull'ambiente di sviluppo**, se database e server finiscono sulla VPS.
-- **Non risolve il serbatoio condiviso.** Se lavorate insieme lo consumate insieme.
+- **Non risolve la contesa sull'ambiente di sviluppo**, se database e server finiscono sulla VPS. ⚠️ **Dal 24/8/2026 ci finiscono** (§12.4): è un problema reale, non più un'ipotesi.
+- **Non risolve il serbatoio condiviso.** Se lavorate insieme lo consumate insieme. ⚠️ **E dal 24/8/2026 non lo risolve nemmeno il freno automatico, che non si costruisce** (§12.5).
 
 ---
 
@@ -739,6 +741,8 @@ Ogni agent al lavoro è un processo Claude Code vero. Il conto, per ordini di gr
 
 **Il KVM 1 ha 4 GB e un processore.** Ci gira l'azienda con **un agent alla volta** e senza l'ambiente di sviluppo sulla macchina. Con due o tre agent insieme, il collaudatore che apre il browser e l'ambiente del CRM, la misura naturale è il **KVM 4** (4 processori, 16 GB).
 
+⚠️ **Aggiornamento del 24/8/2026 — non è più un'ipotesi.** Jacopo ha deciso che **l'ambiente di sviluppo vive sulla VPS** (§12.4): la riga «se sta lì» della tabella qui sopra vale sempre. Sommando Paperclip, PostgreSQL, API, Vite, un agent al lavoro e Chromium si sta **fuori dai 4 GB** già in condizioni normali. **Il KVM 4 è la macchina di partenza**, e il KVM 1 non è più un'opzione da cui cominciare.
+
 **Il sintomo, quando arriverà, non darà un errore chiaro:** compilazioni che muoiono senza spiegazione, test interrotti a metà, la macchina che rallenta invece di protestare. **È memoria esaurita, non codice rotto** — riconoscerlo subito evita di rincorrere fantasmi.
 
 ### 10.2 Il serbatoio
@@ -833,14 +837,15 @@ Un mestiere alla volta, partendo da quello che rischia meno:
 ### 12.1 I rischi
 
 🔴 **1. Il serbatoio condiviso, e il freno che non esiste ancora.** Il cruscotto vi mostrerà un'azienda che spende zero mentre il serbatoio si svuota, e il primo sintomo sarà che vi bloccate voi. **Il freno va costruito, non configurato.** Finché non c'è, battiti lenti e agent spenti quando non servono.
+> ⚠️ **Aggiornamento del 24/8/2026: il freno non si costruisce, per decisione di Jacopo** (§12.5). Il rischio quindi **non è mitigato** e resta rosso: si convive con «battiti lenti e agent spenti quando non servono», che è tutto ciò che rimane.
 
 🔴 **2. Un solo abbonamento, due persone, agent non presidiati.** Due questioni distinte: i termini d'uso sulle sessioni programmate (§11.1 punto ②) e la condivisione dell'account fra due persone. Il rimedio strutturale a entrambe è il passaggio alle API.
 
-🟠 **3. La macchina.** §10. Scelta consapevole di partire dal taglio piccolo.
+🟠 **3. La macchina.** §10. ~~Scelta consapevole di partire dal taglio piccolo.~~ **Superato il 24/8/2026:** con l'ambiente di sviluppo sulla VPS (§12.4) si parte dal **KVM 4**, non dal KVM 1.
 
 🟠 **4. Il collaudatore darà falsi allarmi il primo mese.** Con la definizione di «fatto» scelta — chiusura senza sguardo umano obbligatorio — un falso verde è più insidioso di un falso rosso. **Il campione quotidiano è la contromisura, e va guardato davvero.**
 
-🟠 **5. L'ambiente di sviluppo del CRM: dove sta.** Decisione ancora aperta, per scelta. Se va sulla VPS, il vecchio problema del lucchetto di Prisma torna identico; se resta locale, gli agent non possono far girare parte dei test. **Non c'è una risposta gratis.**
+🟠 **5. L'ambiente di sviluppo del CRM: dove sta.** ~~Decisione ancora aperta, per scelta. Se va sulla VPS, il vecchio problema del lucchetto di Prisma torna identico; se resta locale, gli agent non possono far girare parte dei test.~~ **Deciso il 24/8/2026: va sulla VPS** (§12.4). ⚠️ E la frase sul lucchetto di Prisma **era sbagliata**: quel guasto è un comportamento di Windows, e la VPS è Linux. Il rischio che resta ha un'altra forma — **due agent che migrano lo stesso database insieme** — ed è già arginato dal fatto che le migrazioni sono un cancello rosso. **Da verificare in fase 0-2.**
 
 🟡 **6. Paperclip è giovane.** Nato a marzo 2026, con migrazioni di schema attese a ogni aggiornamento. **Non aggiornare durante la settimana della consegna.**
 
@@ -854,18 +859,167 @@ Un mestiere alla volta, partendo da quello che rischia meno:
 
 ### 12.2 Le decisioni ancora aperte
 
-| # | Cosa | Quando serve |
-|---|---|---|
-| 1 | **Dove sta l'ambiente di sviluppo del CRM** | Da provare sul campo, ma **presto** |
-| 2 | **La soglia del freno sul serbatoio** | Prima della fase 3 |
-| 3 | **Il tetto di spesa del collaudatore AI**, anche se nasce spento | Prima che venga acceso |
-| 4 | **La collocazione a menu del Registro attività** | Blocca il traguardo 6 della release |
+| # | Cosa | Quando serve | Stato |
+|---|---|---|---|
+| 1 | **Dove sta l'ambiente di sviluppo del CRM** | Da provare sul campo, ma **presto** | ✅ **Decisa da Jacopo il 24/8/2026: vive tutto sulla VPS** → §12.4 |
+| 2 | **La soglia del freno sul serbatoio** | Prima della fase 3 | ✅ **Decisa da Jacopo il 24/8/2026: per ora nessun monitoraggio dei consumi** → §12.5 |
+| 3 | **Il tetto di spesa del collaudatore AI**, anche se nasce spento | Prima che venga acceso | ✅ **Decisa da Jacopo il 24/8/2026: nessuna politica di spesa, un fusibile da 10 $/giorno — più la regola di quando interviene** → §12.6 |
+| 4 | **La collocazione a menu del Registro attività** | Blocca il traguardo 6 della release | ✅ **Decisa da Jacopo il 24/8/2026: dentro *Impostazioni*, come prima voce del gruppo** → `decisioni-cliente-e-menu-2026-08-07.md` ⑥ |
+
+> ✅ **Al 24/8/2026 le quattro decisioni sono tutte sciolte.** Quello che resta da fare prima di accendere Paperclip non sono più decisioni ma lavori, ed è utile tenerli distinti: gli **argini** prima del primo compito (rischio 7), il **salvataggio periodico** della VPS (rischio 8, che con la decisione 1 vale doppio), e le **quattro skill del lab** (§5.5), necessarie in fase 2.
 
 ### 12.3 Le correzioni nei documenti esistenti — ✅ FATTE il 19/8/2026
 
 1. ✅ **`.claude/agents/architetto.md` dichiarava un abbonamento «MAX 5x»**: corretto in Max 20x, con la nota che nei documenti più vecchi il «5x» era un errore.
 2. ✅ **La regola «si pusha sempre su `main`, niente branch» è stata riscritta** in **tre** file, non due: `CLAUDE.md`, `.claude/commands/handoff.md` e — trovato durante la correzione — `.claude/commands/vado.md`, che vietava esplicitamente di creare rami e diceva di committare su `main`. Adesso quel comando dice di committare **sul ramo del lavoro in corso**, e che **unire a `main` non è mai una decisione dell'assistente**: al rientro l'utente trova il ramo pronto e sceglie lui.
 3. ✅ **Registrato in `team-agenti.md`**, registro delle decisioni: il passaggio a Paperclip, la caduta della regola sui rami, e la conseguenza sull'archivio delle alternative — **il primo dei tre motivi per cui la configurazione «Fabbrica» era stata scartata il 23/7/2026 non vale più**. La riga originale del §5.1 non è stata riscritta: registra il ragionamento di allora e si legge insieme alla nuova.
+
+### 12.4 Decisione 1 — l'ambiente di sviluppo vive tutto sulla VPS *(24/8/2026, Jacopo)*
+
+**Cosa si è deciso.** Il database PostgreSQL, il server dei dati (porta 4000) e il server delle pagine (porta 5173) **si spostano sulla VPS**, insieme a Paperclip. Gli agent possono quindi far girare l'intera suite dei collaudi e vedere il CRM funzionare davvero: niente lavoro alla cieca, e la definizione di «fatto» del §3.4 regge in pieno.
+
+**Tre conseguenze da tenere presenti.**
+
+**① La taglia della macchina cambia, ed è una spesa.** Il KVM 1 (4 GB, un processore) era dimensionato **senza** l'ambiente di sviluppo sulla macchina. Con PostgreSQL, l'API, Vite e le compilazioni che pesano 1–1,5 GB, più Paperclip, più un agent al lavoro, più Chromium del collaudatore, il taglio piccolo non regge. **Il KVM 4 (4 processori, 16 GB) diventa la misura di partenza, non l'aggiornamento successivo** — vedi §10.1.
+
+**② Il «lucchetto di Prisma» probabilmente non si presenta, ma la contesa sì.** ⚠️ Il rischio 5 del §12.1 diceva che spostando l'ambiente sulla VPS *«il vecchio problema del lucchetto di Prisma torna identico»*: **è quasi certamente sbagliato, e va verificato in fase 0.** Quel guasto — `prisma generate` che fallisce mentre `tsx watch` è acceso — è un comportamento **di Windows**, dove non si può rinominare un file `.dll` mentre un processo lo tiene aperto. **La VPS è Linux, dove quel vincolo non esiste**: il file viene sostituito e il processo acceso continua col vecchio finché non riparte.
+
+Resta però la contesa vera, che è un'altra: **due agent che migrano lo stesso database nello stesso momento**, e l'API che si riavvia a metà di una migrazione. Il rimedio è già nell'impianto — **le migrazioni sono un cancello rosso** (§3.2), quindi passano una alla volta e con la vostra approvazione — ma va verificato che regga davvero, e la fase 2 è il posto giusto per provarlo.
+
+**③ I portatili non ospitano più niente.** Poiché voi due non scrivete più codice, sul vostro computer non serve più alcun server acceso. La regola di `CLAUDE.md` sui dev server («una sola sessione accesa per volta», porte 4000 e 5173 libere) **cambia oggetto: da adesso riguarda la VPS**, non le vostre macchine. Va riscritta quando si esegue la fase 0.
+
+⚠️ **E il salvataggio periodico (rischio 8) diventa più importante di prima:** sulla VPS non c'è più solo la memoria dell'azienda, c'è anche **il database di sviluppo del CRM**.
+
+### 12.5 Decisione 2 — nessun monitoraggio dei consumi, per ora *(24/8/2026, Jacopo)*
+
+**Cosa si è deciso.** **Il freno sul serbatoio non si costruisce.** Non è più un lavoro da fare prima della fase 3: si accende l'azienda senza. Se e quando servirà, lo si riprenderà **su richiesta esplicita di Jacopo**, e questo capitolo esiste perché quel giorno non si ricominci da zero.
+
+**Cosa vale nel frattempo.** La contromisura resta quella già scritta al rischio 1: **battiti lenti e agent spenti quando non servono**, più la consapevolezza che il primo sintomo di serbatoio esaurito **sarà che vi bloccate voi**, a metà di quello che state facendo. Non c'è nessun avviso automatico che lo anticipi.
+
+---
+
+#### Quello che è già stato studiato — da qui si riparte
+
+**Il metro.** L'unico numero che una macchina sa calcolare da sola è il **«peso»** di `scripts/agenti/consumi.mjs`. **La percentuale del limite non è leggibile da nessun comando** (verificato, sta in `CLAUDE.md`): si ottiene solo convertendo il peso con i campioni di `archivio-documenti/consumi/calibrazione.json`.
+
+**La calibrazione, allo stato del 24/8/2026** — quattro campioni validi su cinque:
+
+| peso | % da `/usage` | rapporto |
+|---|---|---|
+| 84,3 | 18% | 0,214 |
+| 156,3 | 30% | 0,192 |
+| 84,0 | 24% | 0,286 |
+| 21,6 | 6% | 0,278 |
+
+Ne esce un limite pieno fra **~350 e ~520 di peso**, centrato intorno a **440**: un'incertezza del ±20%, sufficiente per una soglia prudente e non per una tirata. Due letture in più a finestra carica la stringerebbero parecchio. ⚠️ Sottigliezza che morde vicino alla soglia: lo script misura le **ultime 5 ore scorrevoli**, `/usage` ha un **reset a orario fisso** — i due perimetri non coincidono, e l'errore è massimo a finestra piena.
+
+**I punti di riferimento** (§10.2): picco storico misurato con due persone al lavoro **194 di peso = 47% del limite**; un compito del registro costa **fra 20 e 90**; ne segue un tetto di **4-8 compiti chiusi per finestra di 5 ore**, che è un massimo e non una previsione, perché il 49% del consumo attuale è *rileggere quel che si è già detto* — voce che su Paperclip crolla.
+
+**Non è una decisione, sono tre:** *(a)* su cosa si misura, *(b)* quale numero, *(c)* cosa succede quando scatta — pausa secca a metà compito, oppure «nessun compito nuovo, finisci quello aperto». La seconda è più sana: un compito troncato lascia il ramo a metà, ed è esattamente ciò che il freno 2 del §3.5 vieta.
+
+**Il nodo (a), che va sciolto prima del numero.** `consumi.mjs` legge `~/.claude/projects`, cioè **i registri della macchina su cui gira**. Un freno installato sulla VPS vedrà solo se stesso: **il consumo dei due portatili gli è invisibile**. Da qui le due strade studiate.
+
+**Strada A — la somma delle tre macchine** *(il portatile di Jacopo, quello di Claudio, la VPS)*. Ogni macchina misura se stessa e manda **solo un numero** — `{macchina, peso, ora}` — in un punto comune sulla VPS; il freno somma e confronta.
+
+- **Come ci arriva il numero: via SSH, non con una porta nuova.** Discord è stato scelto proprio per **non esporre nessun indirizzo pubblico della VPS** (§7.4): aprire un ingresso per il freno riaprirebbe il buco appena evitato. SSH sulla VPS c'è già e serve comunque per amministrarla; con una chiave limitata a quel solo comando (`command=` in `authorized_keys`) quella chiave non può fare altro che depositare un numero.
+- ❌ **Non via Discord**, benché sarebbe in uscita da entrambe le parti: per *leggere* i numeri il bot avrebbe bisogno del permesso di lettura dei messaggi, che il §7.4 dice esplicitamente di non concedere.
+- 🔒 **Viaggia il numero, mai i registri.** Le trascrizioni contengono codice, dati dei clienti e — come questo progetto ha già sperimentato — almeno una volta una password. Non escono dal portatile.
+- **I tre problemi e le loro risposte.** *Portatile spento o addormentato:* il suo numero invecchia, e trattarlo come zero allenterebbe il freno proprio quando non sa — si **tiene l'ultimo valore noto** finché non supera le cinque ore, dichiarando «misura parziale». *Costo di misurare:* lo script rilegge tutti i registri a ogni giro (misurati 7,6 e 29,6 secondi, e cresce), quindi cadenza larga — **quindici minuti bastano**, perché un compito brucia 20-90 di peso nell'arco di decine di minuti — e **non** si ottimizza in incrementale uno script che il §11.5 manda in pensione al passaggio alle API. *Finestre non allineate:* errore trascurabile rispetto al ±20% della calibrazione.
+- **Regola sopra tutte:** il freno mette in pausa **gli agent, mai voi**. Se l'aggregatore si rompe, gli agent si fermano — è il verso giusto in cui sbagliare.
+- **Costo:** mezza giornata scarsa, più un'attività pianificata su ciascuno dei due portatili Windows.
+
+**Strada B — il segnale di presenza** *(la variante povera)*. Nessuna misura sui portatili: quando uno di voi si mette al lavoro **lo dichiara** con un comando su Discord, e per le ore successive il freno **abbassa il proprio tetto**. Coglie quasi tutto il beneficio, perché il pericolo vero è esattamente «agent che bruciano mentre una persona lavora», e costa quasi zero. Difetti: dipende dal fatto che ve ne ricordiate, e sa **se** ci siete ma non **quanto** state consumando.
+
+**Le soglie che erano state proposte** — da rivedere il giorno in cui si riprende, non da applicare così:
+
+| | Allarme | Pausa |
+|---|---|---|
+| Freno cieco (solo VPS) | ~30% (130 di peso) | ~40% (175 di peso) |
+| Con la somma delle tre macchine (strada A) | ~45% | ~60% |
+
+Il 40% del freno cieco è basso **apposta**: se non vede i portatili, il 40% che misura può già essere il 70% reale.
+
+**Quando tutto questo si ritira.** Al passaggio alle API (§11): lì il vincolo torna a essere il denaro, e il freno diventa **il budget di Paperclip, che esiste già**. È il motivo per cui non conviene costruire con cura una cosa a scadenza nota.
+
+### 12.6 Decisione 3 — il collaudatore AI: quando interviene, e il fusibile *(24/8/2026, Jacopo)*
+
+**Le tre cose decise, in tre righe.** ① Il collaudatore **fa partire lui** le generazioni, e interviene **in autonomia quando il lavoro tocca l'AI** — non «quando cambia la V5». ② **Nessun tetto di spesa come politica di lavoro**: i costi reali sono trascurabili e l'agent lavora libero. ③ Un **tetto giornaliero come solo fusibile anti-avaria**, per il caso in cui si rompa e generi a raffica.
+
+---
+
+#### A · Quando scatta un collaudo — la regola
+
+Il vincolo posto da Jacopo: legare il collaudo alla V5 sarebbe **limitante**, perché possono nascere funzionalità AI non previste in origine, che una regola così non vedrebbe. Ma «quando opportuno», dato a un agent, è un giudizio — cioè un invito a sbagliare. La regola sostituisce il giudizio con qualcosa di **osservabile nel diff**, sfruttando un fatto strutturale:
+
+> **Una funzionalità del CRM non può usare l'AI senza passare dal motore AI.** Se ci passa, si vede nel codice. Se non ci passa, non è una funzionalità AI.
+
+Nel codice quel motore è un punto preciso: la funzione che registra ogni chiamata in **`AiUsageLog`** (`server/modules/agency-os/agency.service.ts`).
+
+**Il collaudo scatta quando il ramo del compito tocca una di queste cinque cose:**
+
+| | Cosa | Perché è lì |
+|---|---|---|
+| 1 | **Il codice che genera** — un file che chiama il motore AI, **o che lo importa attraverso la catena degli import** | È ciò che cattura le funzionalità AI **non previste**: possono nascere ovunque, ma per funzionare devono arrivare al motore |
+| 2 | **Il testo dei prompt** | Cambia l'uscita senza che cambi una riga di logica |
+| 3 | **Lo schema dell'uscita strutturata** (`jsonSchema`) | È un guasto già avvenuto in questo progetto: uno schema che non elenca i campi torna un oggetto vuoto, registrato come «AI usata» |
+| 4 | **Chi genera** — catalogo dei modelli, modello predefinito, provider | Stesso codice, generatore diverso, uscita diversa |
+| 5 | **Cosa entra nella generazione** — fonti e RAG, campi personalizzati che alimentano il prompt | Stesso prompt, materia prima diversa |
+
+**Non fa scattare il collaudo**, altrimenti scatterebbe su tutto: la grafica delle pagine che *mostrano* una generazione, i test, la documentazione, i permessi non AI. **Mostrare una generazione non è generarla.**
+
+#### B · Chi applica la regola: uno script, non un agent
+
+`npm run tocca-ai` — dato il diff del ramo, risponde **sì o no**. Deterministico, zero token, e non ha giornate storte. L'istruzione all'agent si riduce a: *esegui lo script; se dice sì, marca il compito «da collaudare»*. Stesso mestiere di `npm run mappa` e `lint:colors`.
+
+⚠️ **L'asimmetria che chiude i buchi.** Lo script, il capocantiere e il revisore possono **aggiungere** il collaudo; **nessun agent può toglierlo** quando lo script dice sì — solo il consiglio, esplicitamente. I due errori non si equivalgono: un collaudo fatto per niente costa cinque centesimi, uno saltato lascia passare verso un cliente una generazione rotta.
+
+**Clausola di chiusura: in dubbio, si collauda.** Non è un'esortazione vaga, è un conto: il costo del collaudo superfluo è noto e minuscolo, quello del collaudo mancato no.
+
+#### C · Quanto costa davvero — misurato il 24/8/2026
+
+Dalle stime che il CRM già tiene (`AGENCY_AI_ESTIMATABLE_FUNCTIONS`) e dal suo listino dei modelli, a prezzi **Claude Sonnet** (3 $/M in entrata, 15 $/M in uscita):
+
+| Generazione | token seed (in/out) | costo |
+|---|---|---|
+| Brief completo (Discovery) | 4000 / 2000 | ~4,2 ¢ |
+| Struttura sito/landing | 3000 / 1500 | ~3,2 ¢ |
+| Sezione del Brief | 2500 / 800 | ~2,0 ¢ |
+| Blocco sito | 1500 / 600 | ~1,4 ¢ |
+| Copy campagna ADV | 1500 / 500 | ~1,2 ¢ |
+
+Con Opus si moltiplica per ~1,7 (il Brief arriva a 7 ¢). Poiché **ogni collaudo sono due chiamate** — una che fa nascere la generazione, una che la giudica — **un collaudo completo costa fra 3 e 9 centesimi di dollaro**. Anche duecento collaudi al mese fanno 6-18 dollari.
+
+> ⚠️ Sono **centesimi, non frazioni di centesimo**: l'intuizione iniziale era ottimista di un ordine di grandezza. La conclusione però non cambia.
+
+#### D · Il fusibile — e perché non è una politica di spesa
+
+**In regime normale** il numero di collaudi è limitato dai compiti che toccano l'AI: una manciata al mese, una dozzina di collaudi l'uno. **In avaria non è limitato da niente**: un ciclo di ritentativi fa due chiamate a giro e non ha una ragione per fermarsi. Se si rompe il venerdì sera sono **sessanta ore senza nessuno che guardi**.
+
+**Il fusibile esiste già dentro il CRM e non va costruito:** `AiBudget` è un **limite giornaliero in dollari per utente**, controllato **prima** di ogni chiamata a pagamento, che solleva `AiBudgetExceededError`. Giornaliero è il taglio giusto per un'avaria: un tetto mensile lascerebbe bruciare in un weekend l'intera disponibilità del mese.
+
+**Valore deciso: 10 $ al giorno** sull'utenza del collaudatore. Una giornata pesante di collaudi legittimi (~100 collaudi ≈ 5 $) non lo sfiora; un weekend di avaria costa trenta dollari invece di qualche centinaio. Alzabile in qualunque momento dal consiglio.
+
+⚠️ **Due trappole, o il fusibile non esiste:**
+1. **`assertWithinAiBudget` si salta se non c'è un utente nel contesto** (job di sistema): il collaudatore deve chiamare il CRM **come utente**, passando dalle stesse rotte che userebbe una persona. È anche il collaudo più fedele, perché prova ciò che il cliente riceve davvero.
+2. **`0` non significa «bloccato», significa «nessun limite».**
+
+#### E · La classificazione dei consumi — anche questa c'è già
+
+`AiUsageLog` registra **per ogni chiamata**: workspace, utente, progetto, nome della funzione, modello, token in entrata e uscita, **costo in dollari**, durata ed esito — con filtri e somme per utente già pronti.
+
+Quindi la separazione **non si fa a livello di chiave del provider** (era la proposta iniziale, ritirata perché più complicata del necessario) **ma a livello di utenza CRM**: al collaudatore si dà **la sua utenza dedicata nel CRM**, e da lì escono gratis entrambe le cose — la classificazione dei consumi *e* il punto dove si imposta il fusibile. **Una utenza e un numero.**
+
+> Questo non intacca la regola del §11.4: le chiavi AI del CRM e quelle degli agent restano separate. Il collaudatore, chiamando il CRM dall'esterno come utente, usa la chiave del CRM **per costruzione** — e la contabilità le distingue lo stesso, per utente.
+
+#### F · Cosa resta da fare, e quando
+
+| Cosa | Quando |
+|---|---|
+| Scrivere `npm run tocca-ai` (mezza giornata scarsa) | All'accensione del collaudatore AI |
+| Creare l'utenza CRM dedicata e impostarle il tetto di 10 $/giorno | Idem — **prima** del primo collaudo |
+| Scrivere i criteri di dominio nella skill `crm-collaudo-generazioni-ai` | Nel lab, §5.5 |
+
+**L'accensione resta dopo la release di settembre**, alla riapertura della V5 (§8.5). Ciò che questa decisione garantisce è che quel giorno non ci sia niente da progettare.
 
 ---
 

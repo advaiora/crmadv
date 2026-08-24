@@ -291,7 +291,27 @@ Verifiche condotte il 17/8 in sola lettura, senza modificare nulla.
 - **Più** le registrazioni manuali già esistenti dove serve un significato ricco (*"ha inviato il preventivo al cliente"* dice più di *"ha modificato una riga"*).
 - Chiudere in ogni caso i buchi noti, **a partire dal login**, che oggi non è tracciato.
 
-📌 **Istruzione lasciata apposta (richiesta di Jacopo):** **prima di collocare la voce nel menu, fare un breve confronto con Jacopo.** Nel riordino della Parte Prima l'Audit finiva dentro il nuovo gruppo *Impostazioni*, ma se il Registro attività diventa qualcosa che si consulta davvero, quella collocazione va rimessa in discussione. **Non deciderlo da soli.**
+~~📌 **Istruzione lasciata apposta (richiesta di Jacopo):** **prima di collocare la voce nel menu, fare un breve confronto con Jacopo.** Nel riordino della Parte Prima l'Audit finiva dentro il nuovo gruppo *Impostazioni*, ma se il Registro attività diventa qualcosa che si consulta davvero, quella collocazione va rimessa in discussione. **Non deciderlo da soli.**~~
+
+✅ **Confronto fatto, collocazione decisa il 24/8/2026 da Jacopo: dentro il gruppo «Impostazioni», come PRIMA voce.**
+
+L'ordine del gruppo diventa quindi: **Registro attività** · Ruoli e permessi · Branding Workspace · Gestione Moduli.
+
+**Perché lì, in tre motivi.**
+1. **È il suo vicino naturale.** *«Chi può fare cosa»* (Ruoli e permessi) e *«chi ha fatto cosa»* (Registro attività) sono la stessa famiglia: l'amministrazione del workspace.
+2. **Sopravvive alla V12.** Il §4.3 impone di consegnare la navigazione nella **forma definitiva**, perché spostarla dopo che le persone l'hanno imparata è il momento peggiore. Una riga di primo livello sarebbe stata comoda al lancio — dove il menu è corto perché quasi tutti i moduli sono nascosti — ma sarebbe diventata l'undicesima riga alla riaccensione dei moduli, cioè da spostare. Questa collocazione non si sposta.
+3. **Non lo apre l'operatore.** La voce è governata da `audit.view`: la consultano gli amministratori. È uno strumento di amministrazione, e sta nel cassetto dell'amministrazione.
+
+⚠️ **Perché PRIMA e non ultima, ed è la parte che non va persa.** È l'unica delle quattro voci del gruppo che **si consulta** invece di configurarsi: le altre tre si toccano una volta e si dimenticano. Metterla in fondo a un cassetto chiamato *Impostazioni* è il modo classico di rendere invisibile proprio la cosa che si cerca di fretta quando è successo qualcosa. Prima voce, e il rischio si chiude a costo zero.
+
+✅ **Trovato collocando la voce, e deciso lo stesso giorno (Jacopo, 24/8/2026): anche «Server di posta» va in *Impostazioni*.**
+
+Stava sotto *Profilo* perché è nato il 18/8, dopo che il riordino della Parte Prima era già stato scritto. **Verificato nello schema:** `MailServerSettings` ha `workspaceId @unique` ed è governata da `mail.manage` — cioè **una configurazione per workspace, impostata una volta, riservata agli amministratori**. È lo stesso identico oggetto di Branding Workspace e Gestione Moduli, che da *Profilo* vengono spostati proprio per quel motivo. (La verifica escludeva anche l'altra ipotesi possibile, cioè che fosse una configurazione unica dell'installazione e appartenesse all'area *Piattaforma* del superadmin: non lo è.)
+
+Lasciarla dov'era avrebbe significato svuotare *Profilo* delle impostazioni aziendali **tranne una**: il tipo di residuo che fra sei mesi nessuno sa più spiegare.
+
+**Ordine finale del gruppo Impostazioni:** Registro attività · Ruoli e permessi · Server di posta · Branding Workspace · Gestione Moduli.
+**Costo:** due righe in `src/layout/Sidebar/SidebarMenu.jsx`. **Nessuna rotta da spostare** — posizione a menu e indirizzo sono indipendenti in questo CRM (§4.4).
 
 ### ⑥-bis Messaggi — quello che va sistemato *(verificato il 17/8)*
 
@@ -345,8 +365,8 @@ Il progetto non parte da zero: esiste già la protezione contro le richieste ver
 | Dalla Parte Prima | In settembre? | Nota |
 |---|---|---|
 | Togliere "Nuovo Cliente"/"Nuovo Preventivo" dal menu | ✅ **Sì** | Decisione §3.3, due righe. Le azioni restano raggiungibili dai pulsanti già esistenti negli elenchi e dalle scorciatoie da tastiera |
-| Collocare il Registro attività nella gerarchia decisa | ✅ **Sì** | Va collocato comunque — ma **prima parlarne con Jacopo**, vedi ⑥ |
-| Il gruppo **Impostazioni** (Ruoli e permessi, Registro attività, Branding Workspace, Gestione Moduli) + Reparti spostato sotto Team | ✅ **Sì** | Era il punto "da valutare", **approvato**. Attenzione: il catalogo permessi ha due nomi accorciati (*Moduli*, *Branding*) che il menu scrive per esteso — il disallineamento noto si chiude proprio qui |
+| Collocare il Registro attività nella gerarchia decisa | ✅ **Sì** | ✅ **Sciolto il 24/8/2026: dentro *Impostazioni*, come prima voce del gruppo.** Il confronto con Jacopo è stato fatto — motivazioni in ⑥ |
+| Il gruppo **Impostazioni** (**Registro attività**, Ruoli e permessi, **Server di posta**, Branding Workspace, Gestione Moduli) + Reparti spostato sotto Team | ✅ **Sì** | Era il punto "da valutare", **approvato**. ⚠️ **Composizione e ordine fissati il 24/8**: il Registro attività sta **primo**, perché è l'unico che si consulta invece di configurarsi; e **«Server di posta» entra nel gruppo** (stava sotto *Profilo* perché nata dopo la stesura del riordino — vedi ⑥). Attenzione: il catalogo permessi ha due nomi accorciati (*Moduli*, *Branding*) che il menu scrive per esteso — il disallineamento noto si chiude proprio qui |
 | Dossier cliente completo (§3.1) | ❌ No | Troppo grosso, e dipende dalle decisioni sull'arricchimento AI. Resta al primo blocco della V12 |
 | Arricchimento AI a livello cliente (§2) | ❌ No | Produzione AI è fuori perimetro e verrà nascosta al lancio. Resta alla chiusura della V5 |
 
