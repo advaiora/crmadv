@@ -675,6 +675,8 @@ Le V riprendono nell'ordine stabilito: completamento della **V5** (motore AI) �
 
 ⭐ **La scoperta che cambia il piano di impianto:** esiste un'estensione che espone l'API di Paperclip come strumenti dentro Claude Code. **Quindi l'azienda non si costruisce a mano cliccando: si costruisce da una sessione di lavoro, leggendo questo piano.**
 
+> ✅ **Verificato il 24/8/2026, e ha un nome: `@paperclipai/mcp-server`**, pacchetto ufficiale dentro il repository di Paperclip (`packages/mcp-server`). **Procedura completa, correzioni e regola d'ingaggio: §9.4.** Leggi quel capitolo prima di eseguire questo, perché ne corregge due punti.
+
 ### 9.1 Quello che resta manuale — poco
 
 | Cosa | Chi |
@@ -682,7 +684,8 @@ Le V riprendono nell'ordine stabilito: completamento della **V5** (motore AI) �
 | Creare la VPS e installarci Paperclip | Jacopo |
 | Installare e **autenticare Claude Code** sulla macchina (deve essere eseguibile nel percorso di sistema) | Jacopo |
 | Clonare il repository sulla macchina | Jacopo |
-| Generare la chiave dell'API e metterla nella configurazione dell'estensione, **sul computer locale** | Jacopo |
+| Generare la chiave dell'API e metterla nella configurazione dell'estensione, **sul computer locale** — ⚠️ serve la **chiave del consiglio** (*board key*), e **non è un pulsante nelle impostazioni**: si passa da un flusso a riga di comando con approvazione dalla UI (§9.4) | Jacopo |
+| Aprire il **tunnel SSH** dal portatile alla VPS, perché il collegamento non richieda di esporre l'API su internet (§9.4) | Jacopo |
 | Creare il bot Discord e collegarlo | Jacopo |
 | Installare Chrome o Chromium per il collaudatore | Jacopo |
 
@@ -692,12 +695,15 @@ Le V riprendono nell'ordine stabilito: completamento della **V5** (motore AI) �
 
 Agent con i loro mandati · budget · battiti · gerarchia · assegnazione delle skill · le Iniziative, i Progetti, i Traguardi e i Compiti generati dai documenti di piano · il compito permanente «Testimone».
 
+> ⚠️ **Corretto il 24/8/2026 — questo elenco resta vero, ma non per la via che si immaginava.** Gli strumenti dedicati del collegamento coprono compiti, commenti, documenti, progetti, obiettivi e approvazioni; **sugli agent sanno solo leggere** (`paperclipListAgents`, `paperclipGetAgent`). Creare gli agent, i budget e i battiti passa dallo strumento-passepartout `paperclipApiRequest`, che chiama qualunque percorso `/api`. Quindi la parte «carica la roadmap come compiti» è diretta e comoda; la parte «crea i dieci mestieri» va costruita sull'API grezza. **Dettaglio in §9.4.**
+
 **E le skill non si trasferiscono a mano:** viaggiano **dentro il repository**. Si scrivono nel lab, finiscono in `paperclip/skills/`, si committano, la VPS fa `git pull`. Sono già sulla macchina: installarle è indicare un percorso.
 
 ⚠️ **Due regole non negoziabili su questo:**
 
 1. **La chiave dell'API è una credenziale.** Va nella configurazione locale dell'estensione — **mai in chat, mai nel repository**. In questo progetto una password è già transitata in chat una volta ed è finita nelle trascrizioni salvate sul disco.
-2. **Fra gli strumenti dell'estensione c'è la facoltà di approvare.** Non va usata: le approvazioni sono la funzione del consiglio, e tutto l'impianto dei cancelli perde senso se le firma un assistente. Se Paperclip permette chiavi con poteri limitati, quella usata per l'impianto **non deve avere diritto di approvazione**.
+2. **Fra gli strumenti dell'estensione c'è la facoltà di approvare.** Non va usata: le approvazioni sono la funzione del consiglio, e tutto l'impianto dei cancelli perde senso se le firma un assistente. ~~Se Paperclip permette chiavi con poteri limitati, quella usata per l'impianto **non deve avere diritto di approvazione**.~~
+   ⚠️ **Verificato il 24/8/2026: non le permette.** Le chiavi di Paperclip **non hanno ambiti** — o possono tutto, o non esistono — e lo strumento c'è, si chiama `paperclipApprovalDecision`. Quindi **questa regola non è imponibile tecnicamente: regge sul comportamento.** Il che la rende più importante, non meno.
 
 ### 9.3 Le quattro fasi
 
@@ -721,6 +727,79 @@ Si accendono capocantiere e cronista, si impostano i battiti, si collega Discord
 
 **Fase 4 — Il regime** *(dalla terza-quarta settimana)*
 Si accende il capo del personale, si misura, si tara. Da qui il team si modifica sui numeri, non sulle impressioni.
+
+### 9.4 Il collegamento, in concreto — verificato il 24/8/2026
+
+> Questo capitolo **corregge** il §9.1 e il §9.2, scritti il 19/8 sulla base di una ricerca più superficiale. Dove i due divergono, vale questo.
+
+#### ⭐ La regola d'ingaggio — si legge prima di tutto il resto *(Jacopo, 24/8/2026)*
+
+**Il collegamento resta acceso.** Non è una finestra da aprire e richiudere: non c'è nessun rituale di revoca a impianto finito, e la chiave non ha una scadenza.
+
+**Il confine non è tecnico, è di mandato:**
+
+> **L'assistente non esegue nessuna azione dentro Paperclip che non gli sia stata chiesta esplicitamente e chiaramente da una delle due persone.** Se la richiesta c'è, la esegue per intero. Se non c'è, non tocca niente — nemmeno se gli sembra utile, ovvio o migliorativo.
+
+Vale nel tempo: fra due mesi una richiesta nuova si esegue **con lo stesso collegamento**, senza rigenerare né riautorizzare niente.
+
+⚠️ **Perché questa regola è scritta qui, ed è la parte da non perdere.** Nella discussione del 24/8 l'assistente aveva costruito un impianto di contenimento — chiave a scadenza, finestra di costruzione, revoca a lavoro finito — partendo da una **supposizione propria**, mai formulata da nessuno: che il controllo dovesse restare *tecnicamente* in mano alle persone. Jacopo l'ha corretta:
+
+> *«Non è un problema se sei collegato a Paperclip e puoi eseguire azioni al suo interno. L'importante — e questo sì è fondamentale — è che tu non esegua alcuna azione se non richiesta direttamente e chiaramente dall'utente.»*
+
+**Ne segue una regola di metodo più generale, valida oltre Paperclip: non aggiungere limitazioni che nessuno ha chiesto.** Un assistente che si auto-restringe per prudenza sposta il problema senza risolverlo, e costa tempo a chi deve smontarlo.
+
+#### Che cos'è
+
+**`@paperclipai/mcp-server`**, pacchetto **ufficiale** dentro il repository di Paperclip (`packages/mcp-server`). Espone l'API REST come strumenti utilizzabili da Claude Code.
+
+⚠️ **Attenzione ai sosia.** Cercando «paperclip mcp» escono almeno tre pacchetti **di terzi** con nome quasi identico (uno su PyPI, due su GitHub). Il pacchetto installato **si porta dentro la chiave dell'azienda**: dev'essere `@paperclipai/mcp-server`, dall'organizzazione `paperclipai`, e nient'altro. Vale la regola del rischio 9: versione fissata.
+
+#### Dove gira — e perché serve un tunnel
+
+Il server MCP **gira sul computer di chi lavora**, accanto a Claude Code, **non sulla VPS**. Si lega a `127.0.0.1` apposta, perché porta la chiave.
+
+Ma allora il portatile deve raggiungere l'API della VPS — cioè proprio la cosa che il **§7.4** aveva evitato scegliendo Discord al posto di Telegram, per non esporre nessun indirizzo pubblico della macchina. **La risposta è la stessa già adottata altrove: un tunnel SSH.** SSH sulla VPS c'è comunque per amministrarla, e così non si apre niente al mondo:
+
+```bash
+ssh -N -L 3100:localhost:3100 utente@la-vps
+```
+
+Da lì in poi, per il portatile, Paperclip è `http://localhost:3100`.
+
+#### I quattro passi
+
+1. **Generare la chiave del consiglio** (*board key*). ⚠️ **Non è un pulsante nelle impostazioni:** oggi le chiavi API esistono per gli *agent* (`POST /api/agents/{agentId}/keys`), mentre per gli operatori del consiglio si passa da un **flusso a riga di comando con approvazione dalla UI**. Esiste una richiesta aperta per token a lunga vita per il consiglio (issue #3479), non ancora realizzata.
+2. **Aprire il tunnel** (sopra).
+3. **Registrare il server MCP**, con la chiave nella configurazione **locale** — mai in chat, mai nel repository (regola 1 del §9.2). Forma del comando, da riconfermare al momento dell'esecuzione:
+
+```bash
+claude mcp add paperclip --env PAPERCLIP_API_URL=http://localhost:3100 --env PAPERCLIP_API_KEY=... --env PAPERCLIP_COMPANY_ID=... -- npx -y @paperclipai/mcp-server
+```
+
+4. **Verificare** con una lettura innocua che gli strumenti rispondano.
+
+#### Cosa espone
+
+**23 strumenti in lettura** (agent, compiti, commenti, documenti, progetti, obiettivi, approvazioni, contesto del battito) e **15 in scrittura** (creare e aggiornare compiti, prendere e rilasciare un compito, commenti, documenti, approvazioni).
+
+Più **`paperclipApiRequest`**, lo **strumento-passepartout**: chiama qualunque percorso `/api` con un corpo JSON. È lui che rende possibile ciò che gli strumenti dedicati non coprono — creare gli agent, i budget, i battiti, la gerarchia.
+
+#### La targa delle scritture
+
+Il server accetta un **`PAPERCLIP_RUN_ID`** che viene appiccicato a ogni scrittura, e Paperclip tiene un **registro di sicurezza** più un **registro delle attività dell'operatore**. Non è un guinzaglio ed è inutile trattarlo come tale: è una comodità vera: dando un identificativo alla sessione di impianto — `impianto-2026-09-01` — si rilegge dopo **l'elenco esatto di ciò che quella sessione ha creato**, senza doverlo ricostruire a memoria.
+
+#### Cosa il collegamento NON dà
+
+Utile saperlo, perché «pieno potere» suona più largo di quello che è. Il server MCP parla **solo** con `/api` di Paperclip:
+
+- **niente shell sulla VPS** — non installa, non esegue comandi, non tocca il sistema;
+- **niente sul CRM** — non vede il database, non vede il codice, non tocca git.
+
+Il raggio d'azione è **una configurazione**. Gli agent che *poi* lavoreranno davvero sul CRM sono contenuti da tutt'altro: `main` protetto, un ramo per lavoro, revisione obbligatoria (rischio 7).
+
+#### Fonti
+
+Verificato il 24/8/2026 su: [`docs/api/overview.md`](https://github.com/paperclipai/paperclip/blob/master/docs/api/overview.md) · [`packages/mcp-server`](https://github.com/paperclipai/paperclip/tree/master/packages/mcp-server) · [riferimento API](https://docs.paperclip.ing/reference/api/overview) · [issue #3479](https://github.com/paperclipai/paperclip/issues/3479) · [issue #1177](https://github.com/paperclipai/paperclip/issues/1177).
 
 ---
 
