@@ -60,3 +60,4 @@
 | 2026-08-18 12:49 | Server di posta: pagina, permesso e migrazioni (non committato) | 3h 19m | 55,2 | 0,28 | esploratore×1, revisore×3 | 11,6 |
 | 2026-08-18 17:00 | Rinomina modulo posta -> mail (chiavi, cartelle, schema, rotte, eventi) + regola naming in CLAUDE.md | 2h 35m | 27,4 | 0,18 | revisore×1 | -2,8 |
 | 2026-08-20 09:30 | Pianificazione passaggio a Paperclip: ricerca, piano tecnico, quadro d'insieme HTML, consegna skill al lab | 19h 15m | 18,9 | 0,02 | nessuno | — |
+| 2026-08-25 11:50 | controllo qualita e raccordo delle quattro skill Paperclip (+ decisioni e collegamento MCP) | 26h 23m | 38,9 | 0,02 | nessuno | — |
