@@ -59,6 +59,32 @@ oddly taken, check whether what is taking it is alive.
 - **The gate's four states** — loading, error, module off, permission missing — are all four required.
   A gate that only handles the last one shows a broken page in the other three.
 
+### ⚠️ `constants.js` is not the only hand-copied permission list  [F06:SECOND_PERMISSION_LIST]
+
+`[CODE]` There are **two** places in the frontend where permission strings are copied by hand from the
+backend catalogue, and the second one is the one people forget:
+
+| # | Where | What it holds |
+|---|---|---|
+| 1 | `src/modules/<module>/ui/constants.js` | the module's own keys — the one named by the project map |
+| 2 | **`src/views/Profiles/Account/index.jsx` → `CORE_PERMISSIONS`** | a flat list of the permissions considered "core", used by the *Impostazioni Account* page, beside a `MODULE_LABELS` map of module key → Italian label |
+
+The second list is **cited by no rule and by no map**, which is exactly why it goes stale. It is also
+the file where the permission **suffix** trap lives — `.view` / `.manage` / `.view_list` — the one that
+on 18/8/2026 made *«Server di posta: non accessibile»* appear to a Superadmin.
+
+**What this means for your work.** When a task adds or renames a permission and the frontend links are
+yours, ask both questions, not one: *does the module's `constants.js` carry the new key?* **and** *does
+this key belong in `CORE_PERMISSIONS`, and is its suffix character-for-character the backend's one?*
+A new module added to `MODULE_LABELS` also needs its Italian label, or the page renders the raw key.
+
+⚠️ **A typo here fails silently.** The frontend check is `hasPermission(access, key)` in
+`src/utils/workspaceAccess.js`, a plain `Array.includes()`: a mistyped key never matches, and the
+feature simply stays invisible with no error anywhere — no console warning, no failing test.
+
+*Whether the key should exist at all, and which roles receive it, is not yours* → the guardian's skill
+owns the full six-link chain. Yours are the two frontend lists, the gate component and the menu entry.
+
 ⚠️ **When your work involves a permission**: the frontend links are yours, the catalogue entry and the
 roles are not, and they are 🔴 red (→ [F07:RED]).
 
@@ -232,6 +258,14 @@ quoted here it is because the frontend way of obeying it needed saying.
 - **Module anatomy, the four gate states with their Italian strings, and `constants.js` holding the
   module key and permission strings**: `src/modules/clients/ui/ClientsModuleGate.jsx` and
   `src/modules/clients/ui/constants.js`, read directly — Tier 1 / **HIGH** `[CODE]`.
+- **⭐ The second hand-copied permission list, `CORE_PERMISSIONS` in
+  `src/views/Profiles/Account/index.jsx`, beside its `MODULE_LABELS` map** → [F06:SECOND_PERMISSION_LIST]:
+  the file read directly; the fact that it is named by no rule and by no map was established by the
+  guardian's pass over the chain and is recorded in `ai-skill-lab/_CONSEGNA-PAPERCLIP.md` §9.4 —
+  Tier 1 / **HIGH** `[CODE]`. **Added 25/8/2026:** this document previously named only list ①, which
+  made `[F06:MODULE_ANATOMY]` incomplete on the exact file where the suffix trap lives.
+- **`hasPermission` is a plain `Array.includes()`, so a mistyped key fails silently**:
+  `src/utils/workspaceAccess.js`, read directly — Tier 1 / **HIGH** `[CODE]`.
 - **The six dead files in `src/views/Calendar/` and the naming collision that produced `board/`**:
   `crmadv/archivio-documenti/03-roadmap-confronto-e-build.md`, *Debito tecnico*, entry of 5/8/2026 —
   Tier 1 / **MEDIUM** (project document read directly; the files were not re-verified as still

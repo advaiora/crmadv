@@ -196,7 +196,10 @@
 
 **Due trappole in cui non ricadere:**
 - **`npm run lint:colors`/`lint:css` coprono solo `src/modules/**`.** Le pagine in `src/views/**` (tutta l'area Agency e' `src/views/Agency`) **non sono lintate**: un lint verde NON vuol dire che quell'area sia pulita. I colori a mano vanno cercati a mano con grep (`#[0-9a-fA-F]{3,8}`, `rgba?\(`, `bg="light"`, `bg-white`, `text-bg-light`, `variant="light"`).
-- **Molti pattern "sospetti" nei JSX sono gia' neutralizzati da `globals.css`.** Prima di riscrivere a tappeto i componenti, verificare cosa fa gia' il sistema globale: `.badge.bg-light`/`.text-bg-light` sono rimappati a `var(--muted)`+`var(--foreground)`; `[data-bs-theme="dark"] .bg-white` -> `var(--card)`; `--bs-light` e `.btn-light` sono tematizzati. Quindi `Badge bg="light"`, `div bg-white`, `Button variant="light"` **funzionano gia' in scuro** e NON vanno toccati. Restano scoperti (da sistemare) i casi non nella lista di globals, es. `Alert variant="light"` (`.alert-light` non e' tematizzato).
+- **Molti pattern "sospetti" nei JSX sono gia' neutralizzati da `globals.css`.** Prima di riscrivere a tappeto i componenti, verificare cosa fa gia' il sistema globale: `.badge.bg-light`/`.text-bg-light` sono rimappati a `var(--muted)`+`var(--foreground)`; `[data-bs-theme="dark"] .bg-white` -> `var(--card)`; `--bs-light` e `.btn-light` sono tematizzati. Quindi `Badge bg="light"`, `div bg-white`, `Button variant="light"` **funzionano gia' in scuro** e NON vanno toccati.
+  - ⚠️ **Correzione del 25/8/2026.** Questa riga finiva con *«Restano scoperti (da sistemare) i casi non nella lista di globals, es. `Alert variant="light"` (`.alert-light` non e' tematizzato)»*. **Era falso, ed e' stato tolto.** `.alert-light` **e' tematizzato**, ma da un terzo posto che questa nota non contemplava: `src/styles/scss/style.scss` (la regola `&.alert-light`, righe ~17889-17895), dove i valori fissi sono **commentati** e sostituiti da `var(--hk-text-secondary)` / `var(--hk-bg-secondary)` / `var(--hk-border-tertiary)`, ognuno marcato `// <-- THEMED`; le tre variabili `--hk-*` sono definite due volte in `globals.css`, una per tema.
+  - ⭐ **La lezione che vale piu' del caso singolo: i posti dove cercare sono TRE, non due.** Il JSX, `globals.css`, **e lo strato `--hk-*` dentro l'SCSS di Jampack** — che e' quello che si salta sempre, perche' e' un file di terze parti da 18.000 righe che nessuno apre. Prima di dichiarare una classe "scoperta", la terza ricerca va fatta li'. **Quante altre classi Jampack passino da quell'indirezione non e' stato enumerato:** le altre voci di questa nota vanno trattate come piste, non come verdetti.
+  - *Trovato dallo sviluppo delle skill Paperclip (`crm-design-frontend`), verificato sul codice il 25/8/2026. Contava correggerlo alla fonte perche' da questo file viene **generata** la skill `crm-note-operative`, che il piano da' **a tutti gli agent**: una riga falsa qui sarebbe diventata una riga falsa nel bagaglio di ogni mestiere.*
 
 **Dove stava il vero problema (caso Agency):** un CSS di area dedicato (`src/views/Agency/agency-ui.css`) che definiva i propri colori con **esadecimali chiari fissi** (`#ffffff`, `#f8fafc`, ...) e li imponeva con `!important`, **senza blocco `[data-bs-theme="dark"]`**. Dentro l'area scavalcava il sistema a token -> box e campi (`form-control`) bianchi in scuro. Fix: convertire tutti i valori in token globali (i propri alias `--agency-*` puntati a `var(--card|--muted|--border|--foreground|--primary|--accent)`), cosi' cambiano da soli.
 
@@ -824,3 +827,22 @@ Cosi' si distingue in un secondo il proprio danno dalla deriva altrui — e in q
 - **Per leggere e cercare, non usare il terminale.** Read, Grep e Glob sono gli strumenti del progetto, non funzionano a intermittenza, e Grep restituisce i numeri di riga gia' pronti. Il terminale serve per git, npm e i comandi veri.
 - **Se un comando Unix sparisce, non insistere e non indagare:** passa allo strumento dedicato, o a PowerShell.
 - **Un messaggio di commit su piu' righe si passa da file, mai da riga di comando:** si scrive nella cartella di appoggio della sessione e si usa `git commit -F <percorso>`. Vale sempre, non solo quando ci sono virgolette - le virgolette sono solo il caso in cui si accorge.
+---
+
+## 56. I documenti del progetto sono decisioni datate, non specifiche: si citano come pista, si agisce dopo aver aperto il codice
+
+**Contesto:** 25/8/2026, controllo di qualita' sulle quattro skill Paperclip. Le sessioni del lab hanno verificato contro il codice le affermazioni prese dai documenti di `crmadv`, invece di fidarsi.
+
+**Errore (nostro, accumulato nel tempo):** **due fonti considerate affidabili contenevano affermazioni false**, e nessuna delle due dava segno di esserlo.
+- `note-operative-ai.md` #14 elencava `Alert variant="light"` fra i casi scoperti in tema scuro. Falso: `.alert-light` e' tematizzato dallo strato `--hk-*` dentro `src/styles/scss/style.scss`.
+- `design-linguaggio-apple-web.md` §3.4 diceva che `CollapsibleSection` anima `transition: height`. Il codice dichiara l'opposto nella propria intestazione e anima `transform`.
+
+Entrambe erano vere quando sono state scritte, o non sono mai state verificate. Nessuna delle due sarebbe emersa leggendo solo i documenti: **si vedono solo aprendo il file**.
+
+**Perche' conta piu' dei due casi:** questi file non restano fermi. `note-operative-ai.md` **genera** la skill `crm-note-operative`, che il piano da' **a tutti gli agent**; `design-linguaggio-apple-web.md` e' prescritto da `CLAUDE.md` come lettura obbligatoria prima di toccare l'aspetto di una pagina. Una riga falsa li' dentro si moltiplica per il numero di chi la legge.
+
+**Modo corretto:**
+- **Un documento o una nota si cita come PISTA, non come specifica.** Dice dove guardare; cosa c'e' scritto lo dice il codice. Vale anche per il piano e per la bibbia, non solo per le note.
+- **Quando documento e codice divergono, vince il codice — e la divergenza si CORREGGE ALLA FONTE**, non si aggira. Aggirarla in silenzio lascia la trappola in piedi per il prossimo.
+- **Un elenco del tipo "le N cose di tipo X" e' un'istantanea, mai una definizione.** Il tipo si riconosce **strutturalmente**, enumerando dal codice: per le generazioni AI, i punti che arrivano a uno scarico a pagamento — non la lista scritta in un documento, che ne aveva cinque su almeno sette.
+- **"Non l'ho trovato" non e' "non c'e'".** Prima di scrivere che il CRM non ha X, la ricerca va fatta su tre vie — per **sinonimo**, per **schema/endpoint**, per **indice**. Il caso di `.alert-light` e' esemplare: cercando solo in `globals.css` la risposta era "scoperto", ed era sbagliata; i posti da guardare erano **tre**, e il terzo e' un file di terze parti da 18.000 righe che nessuno apre.

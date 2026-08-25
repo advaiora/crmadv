@@ -21,13 +21,14 @@ Non sei legato al commit: leggi le modifiche in corso, quindi funzioni in qualsi
 
 `git status --short` e `git diff` (aggiungi `git diff --staged` se c'è roba in staging). Da lì apri **solo** i file che servono a giudicare, e leggi solo le parti pertinenti — su questa codebase alcuni file superano le 10.000 righe (`server/modules/agency-os/agency.service.ts`) e leggerli interi non è sostenibile.
 
-**Prima di spuntare i collegamenti, apri la mappa già pronta**: `archivio-documenti/mappa/mappa-progetto.md` (la rigenera `npm run mappa`). Codifica esattamente le catene che qui sotto sono l'errore #1 — moduli con i loro export, i **permessi del catalogo backend che NON risultano nelle costanti frontend** (§3), i centralini, i modelli Prisma. Usala come lista da spuntare contro il diff, poi conferma sul codice. Se la data/commit in cima è più vecchia del diff, fidati del codice.
+**Prima di spuntare i collegamenti, apri la mappa già pronta**: `archivio-documenti/mappa/mappa-progetto.md` (la rigenera `npm run mappa`). Codifica esattamente le catene che qui sotto sono l'errore #1 — moduli con i loro export, i centralini, i modelli Prisma. Usala come lista da spuntare contro il diff, poi conferma sul codice. Se la data/commit in cima è più vecchia del diff, fidati del codice.
+
+> La sezione §3 della mappa — **i permessi del catalogo backend che non risultano nelle costanti frontend** — non è più materia tua: è del guardiano. Vedi «Cosa NON è compito tuo».
 
 ## Cosa cercare — in ordine di quanto fa male
 
 **1. Collegamento incompleto (il più frequente e il più subdolo).** Una cosa aggiunta in alcuni punti e non in tutti: funziona a metà e nessuno se ne accorge.
-- Permesso nuovo: c'è in `server/auth/rbac-catalog.ts` **sia** nell'elenco dei permessi **sia** nei ruoli che devono averlo? E nel `policies.ts` del modulo? E nelle `constants.js` del frontend? E in `SidebarMenu.jsx` / `MobileBottomNav.jsx`?
-- Rotta nuova: registrata in `server/app.ts`? c'è il client in `src/modules/.../api/`? c'è la voce in `src/routes/RouteList.jsx`?
+- Rotta nuova: registrata in `server/app.ts`? c'è il client in `src/modules/.../api/`? c'è la voce in `src/routes/RouteList.jsx`? *(Il **permesso** di quella rotta non lo guardi tu: è del guardiano.)*
 - Parametro nuovo su una funzione condivisa: è stato collegato a **tutte** le rotte che la chiamano, non solo a quelle in cui si stava lavorando? (è esattamente l'errore della nota operativa **#21**)
 
 **2. Database.** Se `prisma/schema.prisma` è cambiato, deve esserci una migrazione nuova in `prisma/migrations/` **dentro la stessa modifica**. Se manca, è un errore da segnalare in cima: la regola di progetto vieta `prisma db push`, e una migrazione mancante rompe l'ambiente di chi riprende. Non si riscrivono mai migrazioni già esistenti.
@@ -38,13 +39,32 @@ Non sei legato al commit: leggi le modifiche in corso, quindi funzioni in qualsi
 
 **5. Convenzione sbagliata.** Codice backend nuovo che finisce in `server/routes/` o `server/services/` invece che dentro `server/modules/<nome>/`. Non è un bug, ma è debito: segnalalo come nota, non come errore.
 
-**6. Sicurezza, quando pertinente.** Se la modifica scarica un indirizzo fornito dall'utente, passa da `server/core/net-guard.ts`? Se tocca chiavi o segreti, restano cifrati e fuori dai log?
+**6.** ~~Sicurezza.~~ **Passata al guardiano** (vedi sotto). Il numero resta vuoto di proposito: altri documenti citano questi errori **per numero**, e rinumerarli li romperebbe.
 
 **7. Test.** Se hai toccato logica con test accanto, i test coprono il caso nuovo? (il frontend non ha praticamente test: non segnalarne l'assenza come difetto, è una scelta nota)
 
 ## Cosa NON è compito tuo
 
 Non riscrivere il codice. Non proporre rifacimenti o astrazioni non richieste. Non commentare lo stile se non viola una regola scritta del progetto. Non ripetere le regole di `CLAUDE.md`: citale.
+
+### Permessi e sicurezza sono del guardiano *(dal 25/8/2026)*
+
+Questo file è nato quando il guardiano non esisteva, e si teneva tutto. Il piano dell'azienda di agent traccia la linea in una frase:
+
+> *«Il guardiano controlla permessi e sicurezza, se il compito li tocca. **Il revisore controlla il resto.**»* — `archivio-documenti/piano-paperclip-2026-08-19.md` §1.2, passi 5 e 6.
+
+**Non sono più materia tua**, e non lo sono nemmeno quando le vedi benissimo:
+- **la catena dei permessi** — catalogo, `policies.ts` del modulo, costanti frontend, `SidebarMenu.jsx`, `MobileBottomNav.jsx`, e la migrazione di riporto per i ruoli personalizzati;
+- **i nomi delle chiavi** di permesso e di modulo, con le loro trappole;
+- **la sicurezza** — filtro per workspace sulle interrogazioni, indirizzi forniti dall'utente (`server/core/net-guard.ts`), chiavi e segreti nei registri.
+
+**Ti resta tutto il resto**, e non è poco: il collegamento delle **rotte** (`server/app.ts`, client api, `RouteList.jsx`), il parametro condiviso da collegare a *tutte* le rotte (nota **#21**), lo **schema cambiato senza migrazione** (#2), le **generazioni AI che ripiegano in silenzio** (#3), i **colori a mano** (#4), le **convenzioni** (#5), i **test** (#7).
+
+> ⚖️ **La domanda che scioglie i casi al confine:** *cambia chi può fare cosa, oppure se un dato attraversa un confine?* **Sì → guardiano. No → tuo.** Così una rotta nuova la guarda il guardiano **dal lato del permesso** e tu **dal lato del collegamento**, senza pestarvi i piedi.
+
+⚠️ **Segnalare anche le cose del guardiano non è scrupolo: è raddoppiare il rumore** sulle stesse righe, e diluire l'unica cosa che stavi guardando tu. Se non sai di chi sia un rilievo, **dillo come dubbio** invece di prendertelo.
+
+📌 **Perché è scritto qui e non solo nella skill:** da questo file verrà **generata** la skill `metodo-revisione`. Correggere la proiezione invece della fonte ricrea esattamente la divergenza che la generazione esiste per impedire.
 
 ## Come rispondere
 

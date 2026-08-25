@@ -1070,6 +1070,8 @@ Con Opus si moltiplica per ~1,7 (il Brief arriva a 7 ¢). Poiché **ogni collaud
 
 > ⚠️ Sono **centesimi, non frazioni di centesimo**: l'intuizione iniziale era ottimista di un ordine di grandezza. La conclusione però non cambia.
 
+⚠️ **Correzione del 25/8/2026, dalla ricerca del lab: quella tabella non copre tutte le generazioni.** `AGENCY_AI_ESTIMATABLE_FUNCTIONS` ne enumera **cinque**, ma nel CRM esistono almeno **due altri punti che spendono davvero** e che nessuno ha costificato: la **mappatura AI dei fogli di calcolo** (`reporting.excelMapping`, `server/modules/agency-os/reporting/excel-ingestion.service.ts`) e la **ricerca competitor** (`agency.service.ts:3772`). → **La forbice 3-9 ¢ non va citata per quei due**: vanno misurati, il primo dal registro dei consumi, il secondo dalla contabilità del fornitore perché non scrive nessuna riga. Ne segue anche una regola generale, che è la T8 del resoconto: **un elenco «le N cose di tipo X» è un'istantanea, mai una definizione** — il tipo si riconosce enumerando dal codice i punti che arrivano a uno scarico a pagamento.
+
 #### D · Il fusibile — e perché non è una politica di spesa
 
 **In regime normale** il numero di collaudi è limitato dai compiti che toccano l'AI: una manciata al mese, una dozzina di collaudi l'uno. **In avaria non è limitato da niente**: un ciclo di ritentativi fa due chiamate a giro e non ha una ragione per fermarsi. Se si rompe il venerdì sera sono **sessanta ore senza nessuno che guardi**.
@@ -1081,6 +1083,18 @@ Con Opus si moltiplica per ~1,7 (il Brief arriva a 7 ¢). Poiché **ogni collaud
 ⚠️ **Due trappole, o il fusibile non esiste:**
 1. **`assertWithinAiBudget` si salta se non c'è un utente nel contesto** (job di sistema): il collaudatore deve chiamare il CRM **come utente**, passando dalle stesse rotte che userebbe una persona. È anche il collaudo più fedele, perché prova ciò che il cliente riceve davvero.
 2. **`0` non significa «bloccato», significa «nessun limite».**
+
+#### D-bis · Il fusibile copre la generazione, non il giudizio — e va bene così *(chiarito il 25/8/2026)*
+
+La skill del collaudatore ha sollevato il punto giusto: **ogni collaudo sono due chiamate**, una che *fa nascere* la generazione e una che la *giudica*, e **solo la prima passa dal CRM**. La seconda è il ragionamento dell'agent, quindi **fuori dal fusibile giornaliero**. La domanda che la skill lascia aperta — *«dove gira, chi la paga, in quale registro compare»* — ha questa risposta:
+
+| | La generazione | Il giudizio |
+|---|---|---|
+| **Dove gira** | dentro il CRM, chiamato come utente | dentro l'agent su Paperclip |
+| **Oggi (abbonamento)** | **costa soldi veri** → coperta da `AiBudget`, 10 $/giorno | **costa zero in denaro**: consuma la finestra dell'abbonamento, non il portafoglio |
+| **Dopo il passaggio alle API (§11)** | invariata | diventa una chiamata a pagamento sulla chiave dell'agent → coperta dal **budget di Paperclip per agent** (§11.3) |
+
+→ **In entrambi i regimi tutto ciò che costa denaro è sotto un tetto**, ma sotto **due tetti diversi**, ed è corretto che sia così: sono due contabilità che il §11.4 impone di non mescolare. Ciò che oggi non ha tetto è il **consumo di finestra** del giudizio — ed è la stessa cosa che non ce l'ha per tutti gli altri nove mestieri, per la decisione 2 (§12.5).
 
 #### E · La classificazione dei consumi — anche questa c'è già
 

@@ -144,6 +144,18 @@ restated: `crm-regole-codice` carries the rules of `crmadv/CLAUDE.md`; `crm-note
 the numbered operating notes; `metodo-parcheggiare-decisione` carries the parking method. When a
 document here says «check note #9», that is a real number in `crm-note-operative`.
 
+✅ **This is not an assumption — it is written in the company plan.** §5.5 assigns `crm-regole-codice`
+to *«i due sviluppatori, revisore, guardiano»* and `crm-note-operative` to *«tutti, per mestiere»*.
+You are one of the two developers, so **both reach you**, and "cite rather than duplicate" is the
+correct shape here rather than a bet.
+
+⚠️ **What to do if one of them is not actually on you.** The plan states the intent; the library is
+configured by the board, and a configuration can lag a plan. If you look for a rule this skill points
+at and the sibling skill is not there, **that is a gap to declare, not to fill**: park it
+(→ [F07:PARKING_FORMAT]) naming the missing skill, and do not reconstruct the rule from memory. A
+rule reconstructed here becomes a second copy that drifts — which is exactly what pointing was meant
+to prevent.
+
 ---
 
 ## PART 7 — OUT OF SCOPE  [F00:OUT_OF_SCOPE]

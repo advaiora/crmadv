@@ -133,12 +133,38 @@ meantime".
 - **Hiring an agent, changing a heartbeat, installing or replacing a skill** — the last one because
   updating a skill updates **every agent that carries it, in one stroke**.
 - **Exceeding a budget.**
-- **Touching a file over the size threshold that is not assigned to your task**
-  (→ [F06:SIZE_AND_TESTS]).
+- **Restructuring a file over the size threshold that is not assigned to your task**
+  (→ [F06:SIZE_AND_TESTS], and read the reading below before you escalate).
 
 ⚠️ **Reds are approved from the dashboard, not from chat.** From a phone one sees a summary; a red needs
 the code diff in full. So a red is not "unblocked" by a message — do not treat one as answered until
 it is answered where it is supposed to be.
+
+### ⚠️ The last red says *restructure*, not *touch*  [F07:OVERSIZE_READING]
+
+The company rule is worded *«toccare un file fuori norma per dimensione non assegnato a quel compito»*
+(plan §3.2). **Read literally it produces false reds**, and this was measured, not supposed: on a diff
+correcting **one character** inside a file of ~10,000 lines, six agents out of six escalated it to a
+red gate, some declaring the task unclosable.
+
+Three cases, and they are not the same thing:
+
+| What your diff does to an over-threshold file you were not assigned | Verdict |
+|---|---|
+| **splits, extracts, reorganises or substantially rewrites it** — the work the census has already assigned to somebody, at a stated moment | 🔴 **red.** It pre-empts planned work, which is what the rule exists to stop |
+| **a marginal edit unrelated to your task** — a semicolon, an import, one line | **a low-grade note**: say the hunk does not belong to this branch. Not a gate |
+| **an edit your task genuinely required** | nothing. The file's size is not the point |
+
+**For this craft the middle row is the common one**, because frontend work is spread across shared
+files: a colour token corrected inside a long view, an import reordered by the formatter. Escalating
+those turns every honest diff into an approval request → [F00:SKILL_LEVEL_ERRORS].
+
+⚠️ **None of this loosens the rule you already have**: you still never widen a task to tidy a
+file-monster you met on the way (→ [F06:SIZE_AND_TESTS]), and a task whose *own* file is over
+threshold still starts by extracting. What changes is only what counts as a **gate**.
+
+**Same three cases, same words, in `crm-permessi-e-sicurezza` and `crm-pianificazione`** — deliberately:
+this is the rule where three skills stating it differently would legitimise three different exceptions.
 
 **The frontend-specific consequence worth stating.** A task that requires a new permission cannot be
 finished by you, however much of it is frontend. Do the part that does not depend on it, and park the
