@@ -175,9 +175,13 @@ reserving the space in a single reflow.
 instead of growing — is written in the file's own header, as a stated compromise.
 **Cause of the success:** the change followed a measurement, and the **price** was recorded rather than
 hidden. Anyone reading it later knows both what was gained and what was given up.
-**Lesson:** write down what a solution costs, not only what it fixes. ⚠️ The project's design document
-was **not** updated and still describes the old technique — which is why the code wins
-(→ [F00:SKILL_LEVEL_ERRORS]). → [F04:COLLAPSIBLE_SECTION]
+**Lesson:** write down what a solution costs, not only what it fixes.
+✅ **The project's design document has since been corrected — 25/8/2026.** When this case was written it
+still described the old technique, which is how the divergence was caught; `design-linguaggio-apple-web.md`
+§3.4 now describes the transform-based mechanism, with its reason and its trade-off.
+⚠️ **The rule that caught it is unchanged, and it is the part that matters:** when a project document and
+the code disagree, **the code wins**, and you report the divergence rather than editing the document from
+inside a skill (→ [F00:SKILL_LEVEL_ERRORS]). → [F04:COLLAPSIBLE_SECTION]
 
 ### P5 · One helper instead of a pattern re-typed per list
 

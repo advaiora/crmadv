@@ -22,20 +22,33 @@ improvement. Written **in Italian** → [F00:LANGUAGE].
    - **whether it is a doubt**, said explicitly, when you are not certain.
 4. **One closing line**: whether the work is clear from your side or not.
 
-**Worked example, in the output language:**
+**Worked example, in the output language.**
 
-> 1. **`server/auth/rbac-catalog.ts` — il permesso `seo.export` è nel catalogo ma non risulta assegnato
->    a nessuno dei cinque ruoli di sistema.**
->    Nessun ruolo predefinito può esportare i report SEO: la funzione esiste e non è governabile da
->    nessuno finché non si crea un ruolo personalizzato apposta.
+⚠️ **Read this line before the example, not after it.** What follows is an **illustration of the
+form**, not a finding from a real diff. The **paths and line numbers are placeholders on purpose** —
+`percorso/file.ext:NN` — precisely because this example has the exact shape of a real report, and an
+invented location that looks real is the fastest way to produce a perfect false alarm
+→ [F05:NEGATIVE_CASES]. **Never copy a location from here.** Every `file:riga` you write comes from
+the diff you are reading, checked by symbol name → [F01:CHAIN_OVERVIEW].
+
+> 1. **`server/auth/rbac-catalog.ts` — il permesso `<modulo>.export` è nel catalogo ma non risulta
+>    assegnato a nessuno dei cinque ruoli di sistema.**
+>    Nessun ruolo predefinito può usare quella funzione: esiste e non è governabile da nessuno finché
+>    non si crea un ruolo personalizzato apposta.
 >
-> 2. **`src/layout/Mobile/MobileBottomNav.jsx:31` — la voce Pipeline chiede `projects.view` mentre la
->    sidebar chiede l'array `['projects.view', 'projects.view_all']`.**
->    Chi ha solo `projects.view_all` vede la Pipeline da desktop e non da telefono. Ogni schermata
->    sembra corretta guardata da sola. *(Dubbio: l'array in sidebar potrebbe essere intenzionale — se lo
->    è, va allineato il mobile, non tolto l'array.)*
+> 2. **`percorso/file.jsx:NN` — la voce `<Voce>` del menu mobile chiede `<modulo>.view` mentre quella
+>    della sidebar chiede l'array `['<modulo>.view', '<modulo>.view_all']`.**
+>    Chi ha solo `<modulo>.view_all` vede la voce da desktop e non da telefono. Ogni schermata sembra
+>    corretta guardata da sola. *(Dubbio: l'array in sidebar potrebbe essere intenzionale — se lo è, va
+>    allineato il mobile, non tolto l'array.)*
 >
 > **Il lavoro non è pronto: la voce 1 va chiusa prima del cancello.**
+
+**What the example is teaching, and it is not the content:** the severity ordering, the one-sentence
+statement, the concrete consequence, the doubt declared as a doubt, and the closing line. The two
+shapes — *«a permission exists in the catalogue but reaches no role»* and *«two entry points ask for
+different permissions for the same thing»* — are real recurring shapes in this codebase. **The
+locations are not.**
 
 **Three things the format forbids**
 
@@ -216,7 +229,9 @@ generated artefact · Tier 3 = inference.
 - The severity order (PART 2) is this skill's proposal. If the council orders them differently in
   practice, the council wins.
 - The two worked examples in PART 1 are illustrations built on real code shapes; they are not real
-  findings from a real diff.
+  findings from a real diff, and **their paths and line numbers are placeholders**. The same warning
+  now sits immediately above the example itself, where it is actually read — it used to live only
+  here, roughly 180 lines away, inside a block an agent opens only if it gets that far.
 
 ---
 

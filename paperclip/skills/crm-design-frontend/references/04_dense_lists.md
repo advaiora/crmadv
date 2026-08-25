@@ -175,10 +175,13 @@ layout frame by frame, so it does not force repeated painting or re-rasterising 
 `backdrop-filter` layers. The trade-off is deliberate and worth knowing: **neighbouring elements jump
 to their final position** instead of growing gradually, because transforms do not move layout.
 
-> ⚠️ `crmadv/archivio-documenti/design-linguaggio-apple-web.md` §3.4 still describes it as *«altezza
-> misurata in JS e animata con `transition: height`»*. **The code wins.** This is a live example of the
-> rule in → [F00:SKILL_LEVEL_ERRORS]: report the divergence, do not correct the document — that
-> document is not yours.
+> ✅ `crmadv/archivio-documenti/design-linguaggio-apple-web.md` §3.4 **used to** describe it as
+> *«altezza misurata in JS e animata con `transition: height`»* — the opposite of what the code does.
+> **Corrected at the source on 25/8/2026**, reason and trade-off included; the two now agree.
+> ⚠️ **The rule it exemplifies is unchanged, and it is why the divergence was caught at all**
+> (→ [F00:SKILL_LEVEL_ERRORS]): when a project document and the code disagree, **the code wins**, and
+> you **report** the divergence rather than editing the document — that document is not yours to
+> correct from inside a skill.
 
 **Three behaviours it already provides**, which you therefore neither reimplement nor break:
 

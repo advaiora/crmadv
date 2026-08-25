@@ -223,11 +223,22 @@ Two things follow from it, and the second is the one that gets missed:
 2. **"The rest" is a boundary in both directions.** It gives you permissions and security *whole*, and
    it takes everything else away from you — including things you are perfectly able to see.
 
-⚠️ **The Reviewer's own brief still overlaps with yours**, because it was written when there was no
-Guardian: `.claude/agents/revisore.md` lists the permission chain as its error #1 and security as its
-point #6. The plan supersedes it on both counts — the §2.2 card of the Reviewer enumerates six areas
-and **security is not among them**. Until that brief is corrected at its source, expect the overlap to
-show up in practice; it is not a licence to widen your own scope. **On Paperclip the split is as
+✅ **The Reviewer's brief has been aligned to it — 25/8/2026.** It was written when there was no
+Guardian and kept everything: `.claude/agents/revisore.md` listed the permission chain as its error #1
+and security as its point #6. Both have been removed from the Reviewer **at the source**, and the file
+now carries the split explicitly, under *«Permessi e sicurezza sono del guardiano»*.
+
+Two details of that correction that change how you read the table below:
+
+- **The Reviewer's error numbering was deliberately not renumbered.** Point #6 was **emptied, not
+  removed**, precisely because this table cites the Reviewer's errors **by number** — `#2`, `#3`,
+  `#4`, `#5`, `#7` still point where they pointed.
+- **The split was transcribed from this very table**, row by row, including the Reviewer's side. So
+  the two documents do not merely agree: one is the source of the other. If you ever need to change
+  where a row sits, changing it here without saying so re-opens the divergence.
+
+→ **So a double report on the same finding is no longer expected.** If you meet one anyway, it is
+worth raising — but as a surprise, not as the known state of things. **On Paperclip the split is as
 follows.**
 
 | Area | Owner | Note |
@@ -283,13 +294,15 @@ Tier 1 = the code or a written project rule · Tier 2 = generated artefact · Ti
 | The Reviewer's card lists six areas and security is **not** one of them, so on Paperclip security sits with the Guardian | plan §2.2, Reviewer card | 1 | HIGH |
 | You run at step 5, before the Reviewer at step 6 | plan §1.2 | 1 | HIGH |
 | The per-area assignment of the table (which of the two owns each row) | the plan's sentence applied to `revisore.md`'s own list | 3 | HIGH — the principle is quoted; only the row-by-row placement is ours |
+| **`revisore.md` aligned to the split on 25/8/2026**: permission chain and security removed from the Reviewer, error numbering left intact (#6 emptied, not removed), and the division transcribed **from this table** | `crmadv/.claude/agents/revisore.md`, section *«Permessi e sicurezza sono del guardiano»* | 1 | HIGH |
 
 **VERIFY-ON-FIELD**
 
-- **The division of labour in PART 4 rests on a quoted rule** (plan §1.2), but `.claude/agents/revisore.md`
-  has **not** been aligned to it, and `metodo-revisione` will be **generated** from that file. Until the
-  source is corrected, a task may show the two roles reporting the same finding twice. If that happens,
-  raise it with the council — do not resolve it by dropping your own check.
+- **The Reviewer's remaining areas** are a moving target in one respect: `metodo-revisione` will be
+  **generated** from `.claude/agents/revisore.md`, and what that file says is what the Reviewer will
+  carry. The split itself is settled → [F04:BOUNDARY_WITH_REVIEWER]; what is not yet settled is how
+  the generator will divide that file between `metodo-*` and `crm-*` material. It changes nothing on
+  your side of the line.
 - The plan lists **three** automatic brakes but the first (the consumption tank) was suspended by
   Jacopo's decision of 24/8/2026: today there are **two**. Do not cite a brake that is not built.
 - The over-size file list is maintained in the roadmap only. Never keep a second copy: two lists

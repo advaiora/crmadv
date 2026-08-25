@@ -196,8 +196,11 @@ alone:
 
 ### The one worth showing in full, because the protocol reversed the answer
 
-`<Alert variant="light">` is recorded in **operating note #14** as *not* themed — a case still to fix.
-Running the absence protocol on it shows the opposite, and the note is **stale on this point**:
+`<Alert variant="light">` **used to be** recorded in **operating note #14** as *not* themed — a case
+still to fix. Running the absence protocol on it showed the opposite, and **the note was corrected at
+its source on 25/8/2026**. The walkthrough is kept here in full because the *method* is the point, not
+the verdict: it is the clearest example in this skill of two searches out of three giving the wrong
+answer.
 
 - **by synonym** — `alert-light` appears nowhere in `globals.css`, `apple-foundation.css`,
   `design-tokens.css` or `tailwind.css`. On that evidence alone, the note looks right.
@@ -306,9 +309,16 @@ to age**. Values, and above all line numbers, are a photograph of one commit. Op
   `src/styles/scss/style.scss` (the `&.alert-light` rule, hardcoded values commented out and replaced
   with `--hk-text-secondary` / `--hk-bg-secondary` / `--hk-border-tertiary`, each marked
   `// <-- THEMED`), plus `src/styles/scss/globals.css` where those three variables are defined once per
-  theme — Tier 1 / **HIGH** `[CODE]`. ⚠️ **This contradicts operating note #14**, which lists
-  `Alert variant="light"` among the uncovered cases. The code wins; the note is stale on that point,
-  and the divergence is reported rather than corrected here (→ [F00:SKILL_LEVEL_ERRORS]).
+  theme — Tier 1 / **HIGH** `[CODE]`. ✅ **Operating note #14 used to contradict this** — it listed
+  `Alert variant="light"` among the uncovered cases — **and was corrected at its source on
+  25/8/2026**: it now describes the `--hk-*` layer and states that the places to look for a colour are
+  **three, not two**. The two sources no longer disagree; the technical fact never changed.
+  ⚠️ **The rule that produced this finding still stands, and it is worth more than the case:** when a
+  document and the code diverge, **the code wins**, and the divergence is reported rather than fixed
+  from inside a skill (→ [F00:SKILL_LEVEL_ERRORS]). Correcting note #14 was the right move precisely
+  because it was done **at the source** — `crm-note-operative` is *generated* from that file and the
+  plan §5.5 gives it to **every** agent, so a stale line there would have been multiplied by the whole
+  company.
 - **`globals.css` themes `.alert` and the variants primary/success/info/warning/danger, each with a
   dark counterpart, and `.alert-light` is not among them**: `globals.css`, the `.alert*` block read
   directly — Tier 1 / **HIGH** `[ABSENT-VERIFIED]` for that scoped claim (enumeration of the selectors
@@ -342,8 +352,9 @@ VERIFY-ON-FIELD:
   class "uncovered", run the third search — over `src/styles/scss/style.scss`, not only over
   `globals.css`.
 - **Operating note #14's list of uncovered cases** should be treated as a lead, not as a finding: one
-  of its entries has been shown stale here, so the others deserve the same protocol before being acted
-  on.
+  of its entries was shown stale here, so the others deserve the same protocol before being acted on.
+  ⚠️ **This stays open even though that one entry was fixed at the source on 25/8/2026** — exactly
+  **one** case was verified, the rest were not, and the correction to the note says so itself.
 - **The exact set of `--surface-*` and `--brand-accent-*` tokens** comes from the design-system
   document rather than from a full read of `globals.css`. Before relying on an unusual one, confirm it
   is defined in both theme blocks.

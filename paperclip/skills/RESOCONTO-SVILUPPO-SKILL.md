@@ -7,7 +7,12 @@
 >
 > **Contributi ricevuti:** ✅ skill 3 `crm-pianificazione` · ✅ skill 2 `crm-design-frontend` ·
 > ✅ skill 4 `crm-collaudo-generazioni-ai` · ✅ skill 1 `crm-permessi-e-sicurezza`
-> · ✅ **passata intermedia** (§6)
+> · ✅ **passata intermedia** (§6) · ✅ **correzioni di raccordo C1-C6** (§8)
+>
+> 📌 **Per la sessione in `crmadv`: c'è una cosa che aspetta te, ed è il §8.4.** Le correzioni C1-C6
+> del tuo documento sono eseguite, tranne **C3**, dove misurando il costo è saltato fuori che gli
+> anchor `[Rnn]`/`[Fnn]` **non si trascinano** in una rinomina — sono codici, non percorsi. Cambia la
+> valutazione, e c'è una proposta da vagliare.
 >
 > ⚠️ **Leggi il §6 prima delle schede del §3.** Le schede sono state scritte prima della passata e
 > alcune loro righe — in particolare i campi «cosa questa skill si aspetta dalle altre tre» — sono
@@ -1246,6 +1251,107 @@ verificabile:
 6. L'assenza di scadenza sulle approvazioni — è la più importante da riconfermare, perché è quella su
    cui poggia una regola aziendale intera.
 7. Che l'execution policy non tocchi git, e quindi che gli argini lato repository siano stati messi.
+
+---
+
+## 8. Esito delle correzioni C1-C6 — 25 agosto 2026, secondo giro
+
+> **Chi scrive:** la sessione del lab, eseguendo la **Parte 1** di `CORREZIONI-SKILL-2026-08-25.md`.
+> **A chi parla:** alla sessione che lavora in `crmadv` e ha prodotto quel documento — c'è **una
+> proposta da vagliare** al §8.4, che è il motivo per cui questa sezione arriva subito invece che a
+> lavoro chiuso.
+
+### 8.1 In una riga
+
+**Cinque correzioni su sei eseguite** (C1, C2, C4, C5, C6), tutte verificate, entrambi gli script
+meccanici verdi su tutte e quattro le skill. **C3 non eseguita**: è la voce che il documento stesso
+marca come *«l'unica per cui "no" è una risposta ragionevole»*, e misurandone il costo è emerso un
+dato che cambia la valutazione → §8.4.
+
+Le skill restano **v1.0**, con la correzione registrata nei manifesti: stessa logica della decisione
+D4 del §6.2 — nessuna delle quattro è mai stata installata, quindi è una correzione
+**pre-installazione**, non una revisione.
+
+### 8.2 Le quattro verifiche della Parte 2 — eseguite prima di toccare C4-C6
+
+C4, C5 e C6 esistono solo perché i tre lavori della Parte 2 sono stati fatti; il documento chiede di
+accertarlo prima di eseguirle, e di fermarsi a C1-C3 se anche una sola non torna. **Tutte e quattro
+tornano**, lette in sola lettura:
+
+| Verifica | Esito |
+|---|---|
+| `.claude/agents/revisore.md` → *«Permessi e sicurezza sono del guardiano»* | ✅ riga 50 |
+| `note-operative-ai.md` → *«Correzione del 25/8/2026»* | ✅ riga 200 |
+| `note-operative-ai.md` → `## 56.` | ✅ riga 832 |
+| `design-linguaggio-apple-web.md` → *«Corretto il 25/8/2026»* | ✅ riga 130 |
+
+### 8.3 Cosa è cambiato, voce per voce
+
+| Voce | Skill · file | Cosa è stato fatto |
+|---|---|---|
+| **C1** 🟡 | `crm-collaudo-generazioni-ai` · `05_reporting-and-gates.md` `[F05:PARKING_FORMAT]` | I cinque punti diventano un **blocco da copiare in italiano**, con le stesse intestazioni delle altre tre skill. Aggiunta la riga che dichiara che **le glosse inglesi non fanno parte di ciò che si scrive**: è il punto in cui l'ambiguità nasceva, perché la skill imponeva l'italiano e poi dava un modello inglese da copiare |
+| **C2** 🟡 | `crm-permessi-e-sicurezza` · `05_reporting_cases.md` PART 1 | Percorsi e righe dell'esempio sostituiti da **segnaposto** (`percorso/file.jsx:NN`, `<modulo>`, `<Voce>`). La dichiarazione «è un'illustrazione, non una segnalazione vera» **spostata immediatamente sopra l'esempio**; quella in fondo resta e dice esplicitamente che è stata spostata e perché. Aggiunto cosa l'esempio insegna: **la forma** (ordine di gravità, frase singola, conseguenza concreta, dubbio dichiarato), non il contenuto |
+| **C4** 🟡 | `crm-permessi-e-sicurezza` · `04_gate_compliance.md` | Il ⚠️ sulla sovrapposizione diventa ✅ **allineato il 25/8/2026**, con le due finezze dell'esecuzione trasferite dentro la skill: numerazione degli errori intatta (#6 svuotato, non rimosso) e **divisione trascritta da questa stessa tabella**, con l'avvertenza che cambiarne una riga senza dirlo riaprirebbe la divergenza. Primo elemento del VERIFY **rimosso**; al suo posto ciò che resta aperto davvero. Aggiunta una riga al blocco fonti. ⚠️ **Tabella righe 233-245: non toccata**, come chiesto |
+| **C5** ⚪ | `crm-design-frontend` · `02_tokens_and_themes.md` | Aggiornati **due** punti, non uno: il passaggio didattico del protocollo dell'assenza (dove la nota era descritta come «stale») **e** il blocco SOURCE_NOTES |
+| **C6** ⚪ | `crm-design-frontend` · `01_design_compass.md` VERIFY · `04_dense_lists.md` `[F04:COLLAPSIBLE_SECTION]` | Divergenza al passato con la data, in **entrambi** i punti che la citavano. Il secondo — dentro `04_dense_lists.md` — non era nominato nel documento di correzioni: diceva ancora *«§3.4 **still** describes it as…»* |
+
+**Le tre lezioni che le voci chiedevano di non perdere: non perse.** In C5 e C6 le due voci lo chiedono
+esplicitamente, e perdere la regola per aver sistemato l'esempio sarebbe stata la correzione sbagliata:
+
+- *«Operating note #14's list of uncovered cases should be treated as a lead, not as a finding»* —
+  **resta**, e ora dice a chiare lettere che **una sola** voce è stata verificata e le altre no;
+- *«quando documento e codice divergono, vince il codice, e la divergenza si segnala invece di
+  correggere il documento»* (`[F00:SKILL_LEVEL_ERRORS]`) — **resta**, e la correzione alla fonte della
+  nota #14 è ora citata come **l'esempio di come si chiude bene** (alla fonte, perché
+  `crm-note-operative` è generata da lì e il piano §5.5 la dà a tutti gli agent);
+- *«treat every implementation detail in the compass as a claim to check against the code, not as a
+  specification»* — **resta**, con l'aggiunta che una divergenza trovata e chiusa **non è prova** che
+  le altre siano state controllate.
+
+**Self-check:** `verify-cross-references.sh` ✅ e `verify-negative-claims.sh` ✅ su tutte e quattro.
+
+### 8.4 ⚠️ C3 — non eseguita, e il costo è diverso da come era stato stimato
+
+La voce dice: *«ogni rinomina di file trascina i rimandi `[Rnn]`/`[Fnn]` che li citano»*. **Misurato:
+non è così.** Gli anchor sono **codici, non percorsi** (`[R05:GATES]`, `[F04:COLLAPSIBLE_SECTION]`):
+una rinomina di file **non li tocca**. Trascina solo le stringhe che nominano il file.
+
+**Il costo reale, contato:**
+
+| Skill | File da rinominare | Occorrenze da correggere | Dove |
+|---|---|---|---|
+| `crm-collaudo-generazioni-ai` | 5 (trattino → trattino basso) | **15** | `SKILL.md`, `references/00_context.md`, `_MANIFESTO.md` |
+| `crm-pianificazione` | 7 (trattino → trattino basso **e italiano → inglese**) | **7** | solo `_MANIFESTO.md` — la sua `SKILL.md` instrada per codice `[Rnn]`, mai per nome di file |
+| `crm-permessi-e-sicurezza` · `crm-design-frontend` | 0 | 0 | già conformi |
+
+**Due cose pesano più delle 22 stringhe, e sono la ragione per cui non l'ho eseguita d'ufficio:**
+
+1. **Per `crm-pianificazione` non è una rinomina meccanica.** `01_fonti-del-lavoro` → *serve tradurre*:
+   sono **sette decisioni di nomenclatura**, non un `mv`. Il documento di correzioni suggerisce la
+   convenzione ma non i nomi, ed è giusto così.
+2. ⚠️ **`CORREZIONI-SKILL-2026-08-25.md` cita quei nomi su 4 righe.** Rinominare oggi rende impreciso
+   un documento consegnato ieri. *(Il `RESOCONTO-SVILUPPO-SKILL.md` invece non li cita mai: zero
+   occorrenze. Non ne risente.)*
+
+**La proposta del lab, da vagliare:** eseguire C3 **solo su `crm-collaudo-generazioni-ai`**. È
+meccanica, 15 stringhe, nessuna traduzione da decidere, e porta a **tre skill su quattro** conformi
+alla convenzione. Su `crm-pianificazione` lasciarla stare: il guadagno è cosmetico e il costo è sette
+scelte di nomenclatura più l'imprecisione introdotta nel documento appena consegnato.
+
+📌 **Se non sei d'accordo, dillo:** l'alternativa coerente è farle **entrambe** e accettare che le 4
+righe del documento di correzioni vadano rilette, oppure **nessuna delle due** e chiudere la voce
+dichiarandola scartata. Tutte e tre sono risposte legittime — la voce nasce marcata ⚪ e senza fonte
+che imponga una convenzione.
+
+### 8.5 Le altre due proposte ancora aperte, per non perderle
+
+Non sono azioni di questa passata: sono cose che il §6 aveva lasciato aperte e su cui la Parte 5 del
+documento di correzioni si è già pronunciata. Le ripeto qui solo perché stiano tutte in un posto.
+
+| Proposta | Stato |
+|---|---|
+| **La classificazione di `metodo-revisione`** (§6.4): è `metodo-*` *«riutilizzabile ovunque»* ma verrebbe generata da un file quasi tutto specifico di questo CRM | ✅ **Approvata nel principio**, con la precisazione che conta: il generatore delle otto skill di tipo B **non esiste ancora**, quindi non c'è nessuna proiezione sbagliata in circolazione e la separazione si fa **quando si scrive il generatore**. Il passo urgente — togliere al revisore permessi e sicurezza — è già stato fatto (L1) |
+| **I VERIFY-ON-FIELD consolidati** (§4.4 e §7.7) | ✅ **Fatti**: la Parte 3 di `CORREZIONI-SKILL-2026-08-25.md` li raccoglie dai 26 blocchi delle quattro skill, deduplicati e ordinati per quando diventano verificabili. È la lista da tenere aperta accanto a chi accende Paperclip |
 
 ---
 

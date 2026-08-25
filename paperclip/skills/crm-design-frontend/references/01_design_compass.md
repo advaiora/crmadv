@@ -213,9 +213,15 @@ VERIFY-ON-FIELD:
   behind it `[NOT-FOUND]` — the absence protocol was not run against the full stylesheet layer, so
   nothing is derived from it here: check the surrounding page before choosing a value, and follow
   whatever the neighbouring pages already do.
-- **The compass and the code have already diverged once**, on the animation technique of
-  `CollapsibleSection` (→ [F04:COLLAPSIBLE_SECTION]). Treat every implementation detail in the compass
-  as a claim to check against the code, not as a specification.
+- **The compass and the code diverged once**, on the animation technique of `CollapsibleSection`
+  (→ [F04:COLLAPSIBLE_SECTION]). ✅ **Closed on 25/8/2026:** `design-linguaggio-apple-web.md` §3.4 no
+  longer says `transition: height` — it describes the real mechanism (height measured once in JS, the
+  inner content animated with `translateY`), **with its reason** (animating height would redo layout
+  every frame and force a re-raster of the bar's `backdrop-filter`) **and its trade-off** (neighbours
+  jump to their final position instead of growing).
+  ⚠️ **The lesson does not close with the case, and it is the part that matters: treat every
+  implementation detail in the compass as a claim to check against the code, not as a specification.**
+  One divergence was found and fixed; that is not evidence that the others were checked.
 
 ------------------------------------------------------------------------------
 

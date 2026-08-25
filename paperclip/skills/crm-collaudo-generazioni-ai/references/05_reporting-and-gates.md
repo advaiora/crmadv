@@ -102,11 +102,31 @@ oversized file not assigned to this task.
 Five points, in this order, inherited from the company's own convention. **A parked item is not "a
 thing I did not do": it is a decision ready to be taken in thirty seconds.**
 
-1. **what I was doing**, and how far I had got;
-2. **what stopped me**, in one sentence;
-3. **the concrete options** — two or three, each with its consequence;
-4. **which one I would choose, and why**;
-5. **what stays blocked** until it is decided.
+⚠️ **The five headings are written in Italian, and you copy them as they are.** They are the text that
+lands on the board's desk, not an explanation for you — and the board reads Italian
+→ [F00:LANGUAGE]. The glosses below each heading are here to tell you what goes in; they are not part
+of what you write.
+
+```markdown
+**Cosa stavo facendo**
+<Il compito e il punto esatto in cui ti sei fermato: quale generazione, quale progetto, quale passo
+della sequenza di preparazione.>
+
+**Cosa mi ha fermato**
+<Una frase. E quale cancello: 🟡 o 🔴.>
+
+**Le opzioni concrete**
+- **A — <nome>**: <cosa comporta, conseguenza concreta.>
+- **B — <nome>**: <cosa comporta, conseguenza concreta.>
+- **C — <nome>**: <solo se esiste davvero. Mai riempire per fare tre.>
+
+**Quale sceglierei io e perché**
+<Una, dichiarata, con la ragione. Se è un 🟡, questa è l'opzione che parte a scadenza.>
+
+**Cosa resta bloccato**
+<Gli identificativi dei compiti fermi e cosa succede se restano fermi. Per questo mestiere, di norma:
+la generazione non è stata giudicata, quindi il compito non può chiudersi.>
+```
 
 ⛔ **Never «cosa vuoi fare?».** A question with no options is the parking format failing: it moves the
 whole problem to a person instead of moving a decision.

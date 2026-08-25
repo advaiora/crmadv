@@ -3,9 +3,13 @@
 > **Chi l'ha scritto:** la sessione che lavora in `crmadv`, eseguendo il §4 di
 > `RESOCONTO-SVILUPPO-SKILL.md`.
 > **A chi va:** Jacopo, che lo riporta nel lab.
+> **⏹️ Stato:** ✅ **chiuso il 25/8/2026** — tutte le voci sono state eseguite o decise. Il quadro sta
+> nella tabella qui sotto; **non resta niente da eseguire.** Quello che segue si legge per capire
+> *perché* una cosa è stata corretta, non per farla.
 >
-> **Come si divide il lavoro, e non c'è una terza possibilità:**
+> **Come si divideva il lavoro:**
 > - **Parte 1 — C1…C6: da eseguire nel lab**, in una sessione unica, mai da dentro `crmadv`.
+>   ✅ Fatto: C1, C2, C4, C5, C6 eseguite dal lab · C3 scartata · C7 aggiunta al controllo finale.
 > - **Parte 2 — L1…L3: già eseguiti in `crmadv` il 25/8/2026.** Sono qui **per informazione**, non
 >   come compiti: **non vanno rifatti, e il lab non scrive in `crmadv`.** La regola della commessa
 >   resta intatta in entrambe le direzioni.
@@ -16,6 +20,71 @@
 > ⚠️ **C4-C6 esistono solo perché la Parte 2 è stata fatta.** Sono punti dentro le skill che
 > descrivono come *ancora aperte* tre divergenze di `crmadv` che adesso sono chiuse. Se per qualsiasi
 > ragione la Parte 2 venisse annullata, **C4-C6 vanno ignorate**.
+
+---
+
+## ✅ Stato di esecuzione — aggiornato il 25/8/2026, a controllo finale fatto
+
+> Chi apre questo documento adesso non deve eseguire niente: **è tutto chiuso.** Questa tabella dice
+> com'è finita ogni voce e chi l'ha eseguita. Il racconto disteso della passata del lab è il **§8** di
+> `RESOCONTO-SVILUPPO-SKILL.md`.
+
+| Voce | Esito | Dove |
+|---|---|---|
+| **C1** 🟡 modello del parcheggio in inglese | ✅ **fatta dal lab** — i cinque punti sono un blocco da copiare in italiano, con la riga che dichiara che le glosse non fanno parte del testo | `crm-collaudo-generazioni-ai/references/05_reporting-and-gates.md` |
+| **C2** 🟡 esempio con `file:riga` reale e falso | ✅ **fatta dal lab** — percorsi a segnaposto, l'avvertenza spostata **sopra** l'esempio, e aggiunto cosa l'esempio insegna (la forma, non il contenuto) | `crm-permessi-e-sicurezza/references/05_reporting_cases.md` |
+| **C3** ⚪ due convenzioni per i nomi dei file | ⛔ **scartata** — decisa in `crmadv` su delega di Jacopo, motivazione per esteso qui sotto nella voce C3 | — |
+| **C4** 🟡 sovrapposizione col revisore | ✅ **fatta dal lab** — ⚠️ diventa ✅ con la data, le due finezze trasferite dentro la skill, primo elemento del VERIFY sostituito. **Tabella righe 233-245 non toccata**, come chiesto | `crm-permessi-e-sicurezza/references/04_gate_compliance.md` |
+| **C5** ⚪ nota #14 segnalata come superata | ✅ **fatta dal lab**, in **due** punti invece di uno (il passaggio didattico e il blocco SOURCE_NOTES) | `crm-design-frontend/references/02_tokens_and_themes.md` |
+| **C6** ⚪ divergenza sull'animazione | ✅ **fatta dal lab**, in **due** punti — il secondo (`04_dense_lists.md`) non era nominato qui: il lab l'ha trovato da sé | `crm-design-frontend/references/01_design_compass.md` · `04_dense_lists.md` |
+| **C7** ⚪ *terzo* punto della stessa divergenza di C6 | ✅ **fatta in `crmadv`** al controllo finale, e ✅ **riportata dal lab** nella propria copia il 25/8/2026: le due copie sono identiche | `crm-design-frontend/references/08_cases.md` |
+| **Il manifesto** — domanda posta al lab | ✅ **risposto: non fa parte del pacchetto.** `_MANIFESTO.md` è contabilità interna del lab, esclusa **meccanicamente** dallo zip. Niente da copiare in `crmadv`, e la domanda non va riaperta — vedi il riquadro in fondo alla scheda C7 | — |
+
+### C7 — il residuo che era sfuggito a tutti e due *(trovato e corretto il 25/8/2026)*
+
+Il caso **P4** di `08_cases.md` diceva ancora, **al presente**, che il documento di design del
+progetto *«was **not** updated and still describes the old technique»*. È falso dal 25/8: quel
+documento è stato corretto (Parte 2, L3). Non era elencato in C6 — l'avevo mancato io scrivendo
+questo documento — e il lab non è andato a cercarlo lì.
+
+Perché valeva la pena correggerlo pur essendo ⚪: è l'unico dei tre punti che **afferma al presente
+che un documento non è stato aggiornato**. Un agent che lo legge può andare a «sistemare» una cosa
+già sistemata — cioè esattamente il lavoro inutile che C5 e C6 esistono per evitare.
+
+**Cosa dice adesso:** che quando il caso è stato scritto il documento descriveva ancora la tecnica
+vecchia — *ed è così che la divergenza è stata scoperta* — e che il 25/8/2026 è stato corretto alla
+fonte. ⚠️ **La lezione è rimasta**, come nelle altre due: quando un documento del progetto e il
+codice non vanno d'accordo, **vince il codice**, e la divergenza si **segnala** invece di correggere
+il documento da dentro una skill.
+
+⚠️ **Questa correzione attraversa il verso della consegna**, ed è l'unica. Le skill nascono nel lab e
+da lì si copiano in `crmadv`: questa è stata scritta **direttamente in `crmadv`**, per scelta
+esplicita di Jacopo, dopo che la cosa era stata segnalata.
+
+✅ **Rientrata il 25/8/2026, stesso giorno.** Il lab ha incollato il testo senza ritocchi e ha
+verificato le due copie con un `diff`: **identiche byte per byte**. Ha aggiornato il proprio
+manifesto della skill 2, dove C7 è registrata come **la prima correzione nata fuori dal lab**, con il
+motivo della deroga; script meccanici verdi, pacchetto rigenerato. **La divergenza non esiste più, e
+la prossima consegna non cancella niente.**
+
+### 📌 Il manifesto delle skill: risposta del lab, e la questione si chiude qui
+
+Chiesto perché `_MANIFESTO.md` compare nel §8.4 del resoconto come file di ogni skill ma **in
+`crmadv` non c'è**. Risposta: **è contabilità interna del lab e non fa parte del pacchetto
+installabile.** Non è una dimenticanza della consegna — **è un'esclusione meccanica**:
+`checks/build-skill-package.ps1` filtra i file col prefisso `_` in due punti (righe 66 e 76), sia
+nella radice sia dentro `references/`. Il pacchetto di ognuna delle quattro contiene **solo
+`SKILL.md` + `references/*.md`**; verificato dal lab aprendo il proprio `dist/crm-design-frontend.zip`
+— dieci file, nessun manifesto.
+
+**Chi lo legge e quando:** le sessioni del lab che riprendono o revisionano quella skill, e Jacopo.
+Registra **come la skill è stata fatta, non come si usa** — meccanismi attivi con le esclusioni
+motivate, convenzioni di forma, definition-of-done, esiti degli script, la misura M7 col suo task, la
+storia delle passate. **Niente lì dentro serve a un agent al lavoro**, e un'installazione che non lo
+trova non se ne accorge: non lo cerca nessuno, perché il pacchetto non lo contiene per costruzione.
+
+⛔ **Quindi: in `crmadv` non manca niente, e questa domanda non va riaperta.** È scritta qui una volta
+sola apposta. *(Il lab ha aggiornato i manifesti per C1-C6 e per C7: da quel lato è tutto registrato.)*
 
 ---
 
@@ -98,10 +167,65 @@
   **questa è la voce meno solida del documento** e la marco come tale: è una scelta di uniformità, non
   un errore accertato.
 - **Gravità:** ⚪ rifinitura.
-- **Se non si corregge:** non succede niente di funzionale. Cambiarli però **costa zero adesso e
-  qualcosa dopo**, perché ogni rinomina di file trascina i rimandi `[Rnn]`/`[Fnn]` che li citano.
-  Se si decide di lasciar perdere, va bene: è l'unica voce di questo documento per cui «no» è una
-  risposta ragionevole.
+- **Se non si corregge:** non succede niente di funzionale. ~~Cambiarli però costa zero adesso e
+  qualcosa dopo, perché ogni rinomina di file trascina i rimandi `[Rnn]`/`[Fnn]` che li citano.~~
+  ⚠️ **Quella frase era sbagliata, e il lab l'ha misurata:** gli anchor `[Rnn]`/`[Fnn]` sono **codici,
+  non percorsi** — una rinomina **non li tocca**. Trascina solo le stringhe che nominano il file.
+  Resta vero il resto: è l'unica voce di questo documento per cui «no» è una risposta ragionevole.
+
+#### ⛔ C3 — CHIUSA come **scartata**, 25/8/2026
+
+> **Chi ha deciso:** la sessione in `crmadv`, su delega esplicita di Jacopo, rispondendo al §8.4 del
+> resoconto. **Non è «rimandata»: è chiusa.** Non va riproposta come lavoro arretrato.
+
+Il lab proponeva di eseguirla **solo su `crm-collaudo-generazioni-ai`** (15 stringhe, meccanico,
+nessuna traduzione da decidere) e di lasciar stare `crm-pianificazione` (7 stringhe, ma **sette
+decisioni di nomenclatura**). Era la proposta giusta finché l'esecuzione stava nel lab. **Non lo è
+più**, e la ragione nasce da *dove* si esegue, non da *cosa* si esegue:
+
+1. ⛔ ~~**Una rinomina è l'unica correzione che una consegna a copia non sa assorbire.** La copia
+   aggiunge i file nuovi e lascia indietro i vecchi: cinque file orfani dentro `references/`, che
+   nessuna `SKILL.md` instrada e che non danno errore.~~
+   **RAGIONE RITIRATA il 25/8/2026 — la premessa era falsa, e me l'ha smontata il lab.** La sua
+   procedura di consegna fa **`rm -rf references/` e poi copia**: una rinomina non lascerebbe
+   orfani, li **cancellerebbe**. Il rischio che avevo descritto esiste solo per chi consegna
+   copiando sopra senza svuotare prima — cioè non per come si consegna davvero.
+   ⚠️ **Resta scritta invece di essere cancellata, e il motivo è il punto:** avevo dedotto il
+   funzionamento di una procedura che vive **nell'altro progetto**, dove non posso vederla, e l'avevo
+   scritta come un fatto invece che come un'ipotesi da verificare. È la regola della nota #56
+   applicata a uno **strumento** invece che a un documento. Se qualcuno riusa questo ragionamento per
+   un'altra decisione, **la premessa sulla consegna additiva va verificata prima**.
+2. **Il guadagno è ⚪ e si vede solo leggendo le quattro skill una accanto all'altra** — cosa che fa
+   una persona in revisione, non un agent al lavoro: ogni skill instrada i propri file da sé ed è
+   internamente coerente. Nessuna delle quattro sbaglia strada per via di un trattino.
+3. **Il momento buono per fissare una convenzione non è adesso, ed è già in calendario.** Le skill
+   saranno **dodici**, non quattro: le altre otto le scriverà il generatore delle skill «di riporto»
+   (Parte 5, approvata). Una convenzione decisa lì nasce applicata a tutte e dodici e costa **zero**
+   rinomine, invece di quattro adesso e otto da ricordarsi dopo.
+
+**Se qualcuno la riaprirà**, il posto giusto è la scrittura di quel generatore — e la strada è quella
+che il lab aveva già misurato bene: **trattino basso e inglese**.
+
+📌 **Una precisazione al §8.4 del resoconto, corretta due volte** — e il modo in cui è andata vale
+più del numero. Il §8.4 dice che `RESOCONTO-SVILUPPO-SKILL.md` non cita mai quei nomi, *«zero
+occorrenze»*. Io ho risposto che **ne cita uno** (riga 1292, `05_reporting-and-gates.md`). Il lab ha
+corretto me: **sono due** — c'è anche la **riga 1329**, `01_fonti-del-lavoro`, che la mia ricerca
+aveva mancato perché **cercavo l'estensione `.md`** e lì il nome è scritto senza. Verificato: è così.
+
+Le ha introdotte entrambe il §8 stesso, che al momento della misura del lab **non esisteva ancora**.
+→ **Un conteggio è un'istantanea, e scade anche mentre lo si scrive**: quella del lab è scaduta nel
+momento in cui ha scritto il documento che la conteneva, e la mia era sbagliata di suo. È la stessa
+regola che le skill insegnano (T8: *«un elenco "le N cose di tipo X" si tratta come istantanea, mai
+come definizione»*), arrivata addosso a chi la stava scrivendo.
+
+**Nel merito non cambia niente, e il numero esatto non vale la caccia.** Nelle due versioni su cui la
+decisione è stata presa erano **sei righe** — quattro qui e due nel resoconto. Oggi sono di più,
+perché questo stesso scambio nomina quei file altre volte, e domani saranno altre ancora.
+
+⛔ **Non aggiornate questo numero.** Sarebbe la terza correzione a un conteggio che si muove da sé, e
+la terza a scadere. Quello che va tenuto è la conclusione, che non si muove: **le occorrenze non erano
+zero**, quindi una rinomina qualche riga la trascinava — e resta comunque il costo minore fra quelli
+in gioco, tanto che non è la ragione per cui C3 è stata scartata.
 
 ---
 
@@ -410,10 +534,17 @@ non c'è nessuna proiezione sbagliata già in circolazione da correggere.
 
 ## Cosa NON ho fatto, e perché
 
-- **Non ho modificato nessuna skill** — nessuno dei file dentro `paperclip/skills/crm-*`. Il §0.3 lo
-  vieta e la ragione è giusta: i controlli meccanici che le tengono in riga vivono nel lab, e una
-  correzione fatta qui diverge in silenzio dalla sorgente. **Le uniche modifiche che ho fatto sono i
-  tre documenti di `crmadv` della Parte 2**, che le skill non sono e che dal lab non si toccano.
+- **Non ho modificato nessuna skill mentre scrivevo questo documento** — nessuno dei file dentro
+  `paperclip/skills/crm-*`. Il §0.3 lo vieta e la ragione è giusta: i controlli meccanici che le
+  tengono in riga vivono nel lab, e una correzione fatta qui diverge in silenzio dalla sorgente. Le
+  uniche modifiche di quel giro sono stati i **tre documenti di `crmadv` della Parte 2**, che le
+  skill non sono e che dal lab non si toccano.
+  ⚠️ **Poi la regola è stata derogata una volta, consapevolmente:** la **C7** è stata scritta
+  direttamente in `08_cases.md`, per scelta esplicita di Jacopo al controllo finale, dopo che la
+  divergenza era stata segnalata. È **l'unica** deroga e riguarda **un paragrafo**.
+  ✅ **Ed è rientrata lo stesso giorno:** il lab l'ha riportata nella propria copia, le due sono
+  identiche byte per byte, ed è registrata nel suo manifesto come la prima correzione nata fuori dal
+  lab. Dettaglio nella scheda C7.
 - **Non ho rimisurato M7.** Il §6.7 spiega perché sarebbe sbagliato: rimisurare dopo aver aggiustato
   misura l'adattamento all'eval, non la skill.
 - **Non ho verificato ciò che richiede Paperclip acceso.** Tutto quel materiale è nella Parte 3.
@@ -427,6 +558,6 @@ versione uscita dalla passata intermedia del 25/8**, il `RESOCONTO-SVILUPPO-SKIL
 `piano-paperclip-2026-08-19.md`, `CLAUDE.md`, `note-operative-ai.md`,
 `design-linguaggio-apple-web.md` e il codice del CRM alla revisione `23c9428`.*
 
-> 📌 **Stato del repository al momento della scrittura:** le modifiche della Parte 2 sono **nei file**
-> ma **non ancora committate**. Chi le cercasse in `git log` non le troverebbe: si verificano
-> **aprendo i file**, con le quattro ricerche della tabella qui sopra.
+> 📌 **Stato del repository — aggiornato.** Al momento della scrittura le modifiche della Parte 2
+> erano nei file ma non committate. **Adesso sono in `git log`**, dentro il commit `bdeb741`. Restano
+> verificabili anche aprendo i file, con le quattro ricerche della tabella qui sopra.
