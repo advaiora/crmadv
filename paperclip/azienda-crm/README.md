@@ -83,13 +83,16 @@ disfare un'azienda costruita storta, molto di più.
 
 ## Come si rigenera il pacchetto
 
-Se toccate i sorgenti in `paperclip/crm/`, **rigenerate lo zip**, altrimenti resta indietro e si
-finisce per allegare la versione vecchia:
+Questa cartella **è il pacchetto**: si allega così com’è, quindi toccando i file si aggiorna da
+sé. Ma i due **ripieghi** che le stanno accanto — `paperclip/azienda-crm.zip`, che serve
+all’importazione automatica, e `paperclip/azienda-crm.md`, il pacchetto srotolato in un unico file
+di testo — quelli no: vanno rigenerati, o restano indietro.
 
 ```
 python paperclip/costruisci-pacchetto.py
 ```
 
-Lo script rifà `paperclip/azienda-crm.zip` con la cartella radice giusta (`crm/`) e i fine-riga in
-stile Unix. **Non usate `Compress-Archive` a mano**: sbaglia il nome della cartella radice, ed è già
-successo.
+Lo script rifà entrambi. Dentro lo zip la cartella radice si chiama **`crm/`** e non `azienda-crm/`:
+non è una svista, è lo `slug` dichiarato in `COMPANY.md`, ed è quello che l’importazione automatica
+cerca. **Non usate `Compress-Archive` a mano**: quella la radice la chiamerebbe come la cartella
+sorgente, ed è già costato un giro di correzioni.

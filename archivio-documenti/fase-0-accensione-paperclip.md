@@ -24,7 +24,7 @@ rifà passi già superati:
 | **10** — la chiave del consiglio (`paperclipai auth login`) | 🗑️ **Eliminato** *(decisione di Jacopo, 26/8/2026)* |
 | **11** — il collegamento MCP fra l'assistente e Paperclip | 🗑️ **Eliminato** *(stessa decisione)* |
 | **12** — la prova che chiude la fase | ⏩ Il criterio resta identico, ma la esegue Jacopo a mano → passo 9 nuovo |
-| — | ➕ **Nuovi: passi 4, 5, 6, 7** — l'azienda si costruisce da un **pacchetto `.zip`**, consegnato a Paperclip come **compito con allegato** *(modo scelto da Jacopo il 26/8)* |
+| — | ➕ **Nuovi: passi 4, 5, 6, 7** — l'azienda si costruisce da un **pacchetto di file**, consegnato a Paperclip come **compito con allegato** *(modo scelto da Jacopo il 26/8)*. Il pacchetto è una **cartella normale**, non uno zip: la finestra dei compiti gli zip li rifiuta |
 
 ### La decisione del 26/8: niente collegamento fra l'assistente e Paperclip
 
@@ -390,13 +390,13 @@ ripiego del passo 6 resta quindi valido in pieno.
 >
 > | Cosa | Dove |
 > |---|---|
-> | Il **pacchetto da allegare**, 48 file | `paperclip/crm/` — **si allega la cartella così com'è** |
+> | Il **pacchetto da allegare**, 48 file | `paperclip/azienda-crm/` — **si allega la cartella così com'è** |
 > | Il **prompt** da incollare | `paperclip/prompt-per-il-compito.md` — **fuori dal pacchetto, apposta** |
-> | Cosa c'è dentro, spiegato | `paperclip/crm/README.md` — **leggilo prima di lanciare** |
+> | Cosa c'è dentro, spiegato | `paperclip/azienda-crm/README.md` — **leggilo prima di lanciare** |
 > | *Ripieghi, se l'allegato non passa* | `paperclip/azienda-crm.zip` e `paperclip/azienda-crm.md` |
 >
 > ⚠️ **La finestra *New task* di Paperclip NON accetta allegati `.zip`** (verificato il 26/8/2026),
-> mentre **accetta le cartelle normali**. Quindi la via buona è allegare `paperclip/crm/` così
+> mentre **accetta le cartelle normali**. Quindi la via buona è allegare `paperclip/azienda-crm/` così
 > com'è. Lo `.zip` resta solo per l'importazione automatica (il ripiego del passo 6), e
 > `azienda-crm.md` è lo stesso pacchetto srotolato in **un unico file di testo** — da usare solo se
 > il caricamento della cartella dovesse appiattire i percorsi o perdere pezzi.

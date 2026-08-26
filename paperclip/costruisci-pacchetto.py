@@ -29,8 +29,12 @@ import sys
 import zipfile
 
 QUI = os.path.dirname(os.path.abspath(__file__))
-SORGENTI = os.path.join(QUI, 'crm')
-RADICE_ZIP = 'crm'  # = slug dell'azienda dichiarato in COMPANY.md
+# La cartella `azienda-crm/` E' il pacchetto: si allega cosi' com'e' alla finestra "New task",
+# che le cartelle le accetta e gli zip no. I due file qui sotto sono ripieghi generati da lei.
+SORGENTI = os.path.join(QUI, 'azienda-crm')
+# ⚠️ La radice DENTRO lo zip non prende il nome della cartella sorgente: dev'essere lo slug
+# dell'azienda dichiarato in COMPANY.md, perche' e' quello che l'importazione automatica cerca.
+RADICE_ZIP = 'crm'
 USCITA = os.path.join(QUI, 'azienda-crm.zip')
 # Ripiego per le finestre che non accettano allegati .zip: lo stesso pacchetto in un solo
 # file di testo, con ogni file fra due delimitatori. Scoperto il 26/8/2026 che la finestra

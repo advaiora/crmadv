@@ -5,8 +5,8 @@
 
 ---
 
-Ti allego il pacchetto che contiene l'azienda di agent da costruire: la cartella `crm/`, con
-dentro `COMPANY.md`, `ISTRUZIONI-PER-AGENT.md` e le sottocartelle `agents/`, `skills/` e
+Ti allego il pacchetto che contiene l'azienda di agent da costruire: una cartella con dentro
+`COMPANY.md`, `ISTRUZIONI-PER-AGENT.md`, `README.md` e le sottocartelle `agents/`, `skills/` e
 `projects/`.
 
 **Prima di tutto leggi `ISTRUZIONI-PER-AGENT.md`.** Contiene il mandato, l'ordine dei passi,
