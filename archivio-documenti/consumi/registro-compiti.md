@@ -63,3 +63,4 @@
 | 2026-08-25 11:50 | controllo qualita e raccordo delle quattro skill Paperclip (+ decisioni e collegamento MCP) | 26h 23m | 38,9 | 0,02 | nessuno | — |
 | 2026-08-25 15:00 | Controllo finale skill Paperclip e lista operativa fase 0 | 2h 41m | 18,6 | 0,12 | nessuno | — |
 | 2026-08-26 11:46 | Pacchetto azienda Paperclip + riscrittura lista fase 0 | 20h 29m | 19,2 | 0,02 | nessuno | — |
+| 2026-08-26 13:06 | Pacchetto Paperclip: verifica sull'export vero e correzione dei campi agent | 47 min | 13,7 | 0,29 | nessuno | — |
