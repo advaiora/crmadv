@@ -5,11 +5,21 @@
 
 ---
 
-Ti allego un pacchetto (`azienda-crm.zip`) che contiene l'azienda di agent da costruire.
+Ti allego il pacchetto che contiene l'azienda di agent da costruire: la cartella `crm/`, con
+dentro `COMPANY.md`, `ISTRUZIONI-PER-AGENT.md` e le sottocartelle `agents/`, `skills/` e
+`projects/`.
 
-**Prima di tutto: aprilo e leggi `ISTRUZIONI-PER-AGENT.md`.** Contiene il mandato, l'ordine dei
-passi, gli endpoint e i limiti. **Quel file comanda su questa descrizione:** se qualcosa qui
-sembra dire il contrario, vale quello.
+**Prima di tutto leggi `ISTRUZIONI-PER-AGENT.md`.** Contiene il mandato, l'ordine dei passi,
+gli endpoint e i limiti. **Quel file comanda su questa descrizione:** se qualcosa qui sembra
+dire il contrario, vale quello.
+
+⚠️ **Comincia col dirmi cosa ti è arrivato davvero**: quanti file vedi, e se le sottocartelle
+si sono conservate o è arrivato tutto appiattito in un elenco unico. Serve saperlo prima,
+perché nel pacchetto ci sono dieci file che si chiamano tutti `AGENTS.md` e quattro che si
+chiamano tutti `SKILL.md`: se i percorsi si sono persi, li distingui dal campo `name` scritto
+nella loro intestazione, non dal nome del file. E se manca `.paperclip.yaml` — comincia con un
+punto, e certi caricamenti saltano questi file — **non fermarti**: dillo e prosegui, quel file
+non serve per creare gli agent.
 
 Il mandato in breve: installa le quattro skill di `skills/`, crea il progetto di `projects/`, poi
 crea i dieci agent descritti in `agents/` — il Capocantiere per primo, perché gli altri nove

@@ -390,16 +390,23 @@ ripiego del passo 6 resta quindi valido in pieno.
 >
 > | Cosa | Dove |
 > |---|---|
-> | I **sorgenti**, 48 file | `paperclip/crm/` |
-> | Il **pacchetto** da allegare | `paperclip/azienda-crm.zip` |
-> | Il **prompt** da incollare | `paperclip/prompt-per-il-compito.md` — **fuori dallo zip, apposta** |
+> | Il **pacchetto da allegare**, 48 file | `paperclip/crm/` — **si allega la cartella così com'è** |
+> | Il **prompt** da incollare | `paperclip/prompt-per-il-compito.md` — **fuori dal pacchetto, apposta** |
 > | Cosa c'è dentro, spiegato | `paperclip/crm/README.md` — **leggilo prima di lanciare** |
+> | *Ripieghi, se l'allegato non passa* | `paperclip/azienda-crm.zip` e `paperclip/azienda-crm.md` |
 >
-> Le due consegne sono **separate e restano separate**: lo zip si allega, il prompt si incolla. Il
-> prompt non va dentro il pacchetto — lì lo leggerebbe solo l'agent, a cui non serve, perché è
-> l'istruzione che dice *cosa fare dell'allegato*.
+> ⚠️ **La finestra *New task* di Paperclip NON accetta allegati `.zip`** (verificato il 26/8/2026),
+> mentre **accetta le cartelle normali**. Quindi la via buona è allegare `paperclip/crm/` così
+> com'è. Lo `.zip` resta solo per l'importazione automatica (il ripiego del passo 6), e
+> `azienda-crm.md` è lo stesso pacchetto srotolato in **un unico file di testo** — da usare solo se
+> il caricamento della cartella dovesse appiattire i percorsi o perdere pezzi.
 >
-> 🔁 **Se tocchi i sorgenti, rigenera lo zip**, altrimenti resti con la versione vecchia:
+> Le due consegne sono **separate e restano separate**: il pacchetto si allega, il prompt si
+> incolla. Il prompt non va dentro il pacchetto — lì lo leggerebbe solo l'agent, a cui non serve,
+> perché è l'istruzione che gli dice *cosa fare dell'allegato*.
+>
+> 🔁 **Se tocchi i sorgenti, rigenera i due ripieghi**, altrimenti restano indietro rispetto alla
+> cartella (che invece si allega direttamente, quindi è sempre aggiornata):
 > ```
 > python paperclip/costruisci-pacchetto.py
 > ```
