@@ -1,377 +1,314 @@
 # Fase 0 — Accendere la macchina, passo per passo
 
 > **A chi serve:** a Jacopo, davanti al terminale. **Cosa copre:** solo la **fase 0** del §9.3 del
-> piano — la macchina, Paperclip acceso, e il collegamento fra l'assistente e l'azienda.
-> **Quanto dura:** mezza giornata, una volta sola.
+> piano — la macchina, Paperclip acceso, e l'azienda costruita dentro Paperclip.
 >
 > **Come è fatta:** un passo per volta. Per ognuno: *cosa fai* · *come si fa* · *come sai che è
-> andata bene* · *cosa fare se non va*. **Vanno eseguiti in quest'ordine**, perché ognuno usa quello
-> prima — la sola eccezione è il passo 9, che si può fare in qualsiasi momento.
->
-> ⚠️ **I comandi vengono dalla documentazione ufficiale** di Paperclip, Tailscale e Claude Code,
-> letta il 25/8/2026 (fonti in fondo).
+> andata bene* · *cosa fare se non va*.
 
 ---
 
-## Prima di cominciare — le tre cose da avere sottomano
+## ⚠️ Riscritta il 26/8/2026 — cosa è cambiato rispetto alla prima versione
 
-1. **Un accesso alla VPS**: indirizzo IP e password di amministratore, o meglio una chiave SSH.
-2. **L'account Claude** con cui Claude Code girerà **sulla VPS**. È un'installazione a sé: la sua
-   autenticazione non è quella del tuo portatile.
-3. **Un'ora e mezza senza interruzioni per i passi 1-7.** Dall'8 in poi si può spezzare.
+La prima versione (25/8) era scritta per una macchina nuda, da preparare a mano, e per un assistente
+collegato a Paperclip. **Nessuna delle due cose è più vera.** Ecco la corrispondenza, così nessuno
+rifà passi già superati:
 
-### Cosa NON c'è in questa lista, e non è una dimenticanza
-
-| Cosa | Quando |
+| Passo di prima | Che fine ha fatto |
 |---|---|
-| **Discord** | Fase 3, non ora (§9.3) |
-| **L'ambiente di sviluppo del CRM** sulla VPS — PostgreSQL, il server dei dati, quello delle pagine | Serve alla **fase 1**, quando un agent dovrà far girare i collaudi. La fase 0 non lo tocca |
-| **Gli argini su git** — `main` protetto, un ramo per lavoro | Prima del **primo compito vero**, non prima del collegamento |
-| **Il salvataggio periodico** della macchina | Appena sulla VPS c'è qualcosa da perdere: fine fase 0 o inizio fase 1 |
+| **1, 2, 3, 5, 6** — creare la VPS, prepararla, Node e pnpm, installare Paperclip, farlo restare acceso | ✅ **Fatti da hPanel.** Hostinger installa e mantiene Paperclip dal pannello. Restano solo delle **verifiche** (passo 1 nuovo) |
+| **4** — Tailscale, la rete privata | 🗑️ **Eliminato.** hPanel espone Paperclip su un indirizzo pubblico con HTTPS: `https://paperclip-pblu.srv1917293.hstgr.cloud`. Una rete privata sopra un indirizzo pubblico non aggiunge niente |
+| **7** — diventare proprietario, aggiungere Claudio | 🟡 **Metà fatto.** Jacopo è già dentro come proprietario. Resta Claudio → passo 2 nuovo |
+| **8** — Claude Code sulla VPS e il repository | 🟡 **Da verificare** → passi 1 e 3 nuovi |
+| **9** — Chromium | ⏩ Invariato, spostato in fondo → passo 8 nuovo |
+| **10** — la chiave del consiglio (`paperclipai auth login`) | 🗑️ **Eliminato** *(decisione di Jacopo, 26/8/2026)* |
+| **11** — il collegamento MCP fra l'assistente e Paperclip | 🗑️ **Eliminato** *(stessa decisione)* |
+| **12** — la prova che chiude la fase | ⏩ Il criterio resta identico, ma la esegue Jacopo a mano → passo 9 nuovo |
+| — | ➕ **Nuovi: passi 4, 5, 6, 7** — l'azienda si costruisce da un **pacchetto `.zip`**, consegnato a Paperclip come **compito con allegato** *(modo scelto da Jacopo il 26/8)* |
 
-### ⚠️ La macchina è stretta: cosa aspettarsi
+### La decisione del 26/8: niente collegamento fra l'assistente e Paperclip
+
+Il piano (§9.4) prevedeva che l'assistente parlasse con l'API di Paperclip e costruisse l'azienda al
+posto vostro. **Jacopo ha deciso di non farlo**: la catena da montare (chiave da riga di comando →
+server MCP → verifica) costa più di quello che rende, visto che l'azienda si costruisce una volta.
+
+**La conseguenza va tenuta a mente, perché cambia il modo di lavorare insieme:** dentro Paperclip
+l'assistente **non vede e non tocca niente**. Non può dire «vedo tre agent», non può correggere una
+configurazione sbagliata, non può accorgersi da solo che qualcosa non è andato. **Ogni verifica di
+questa lista è una cosa che guardi tu a schermo e riferisci.** Dove serve, il passo lo dice.
+
+In cambio: quello che l'assistente produce sono **file**, e i file entrano in Paperclip da soli
+attraverso l'importazione dei pacchetti (passi 4-6). Il lavoro si sposta, non si perde.
+
+### 🔓 Una cosa da sapere sull'indirizzo pubblico
+
+Il piano aveva scelto l'accesso privato per non esporre niente su internet. Con l'indirizzo di
+hPanel, **Paperclip è raggiungibile da chiunque conosca l'indirizzo**, e l'unica difesa è il suo
+login.
+
+Non è un motivo per fermarsi — è la stessa condizione di qualunque servizio web — ma **due
+conseguenze pratiche** valgono da subito:
+
+1. **La password dell'account proprietario è la chiave dell'azienda.** Se qualcuno entra lì, approva
+   al posto vostro. Va lunga, e diversa da tutte le altre.
+2. **`Settings → Access` va guardato ogni tanto**: è l'elenco di chi può entrare. Devono esserci due
+   persone, Jacopo e Claudio. Nessun altro.
+
+Se in futuro doveste volere l'accesso privato, la strada è ancora quella del piano (Tailscale, o il
+firewall di Hostinger che lascia passare solo i vostri indirizzi) — ma è una scelta da fare a mente
+fredda, non un pezzo di questa fase.
+
+---
+
+## ⚠️ La macchina è stretta: cosa aspettarsi
 
 Parti dal **KVM 1** (4 GB) per scelta, contro la raccomandazione del piano che indicava il KVM 4. La
 scelta non si discute qui. Servono però **due cose concrete**:
 
-- **Sulla macchina finiranno due database PostgreSQL, non uno.** Paperclip se ne installa uno proprio
-  (porta `54329`); il CRM ha il suo, e arriverà alla fase 1. Più il server di Paperclip, gli agent, e
-  Chromium per il collaudatore.
+- **Sulla macchina finiranno due database PostgreSQL, non uno.** Paperclip se ne installa uno proprio;
+  il CRM ha il suo, e arriverà alla fase 1. Più il server di Paperclip, gli agent, e Chromium per il
+  collaudatore.
 - **La memoria esaurita non dà un errore che dice «memoria esaurita».** Dà installazioni che muoiono
   a metà senza spiegazione, comandi che tornano indietro muti, la macchina che rallenta invece di
   protestare. **Se in fase 0 succede una cosa così, il primo sospetto è quello, non il comando che
   hai scritto.** Si guarda con `free -h`, colonna *available*.
 
----
+## Cosa NON c'è in questa lista, e non è una dimenticanza
 
-## Passo 1 — Creare la VPS
-
-**Cosa fai:** compri la macchina e la accendi con Ubuntu.
-
-**Come si fa.** Dal pannello del fornitore: **Ubuntu 24.04 LTS**. Il piano non impone la
-distribuzione, ma la guida ufficiale di Paperclip è scritta per Ubuntu 22.04/24.04 — stare lì
-significa che i comandi combaciano invece di andare adattati. Carica la tua chiave SSH se il pannello
-lo permette: eviti di lavorare a password.
-
-**Come sai che è andata bene.** Dal tuo portatile:
-
-```bash
-ssh root@INDIRIZZO-IP
-```
-
-Ti risponde un terminale della macchina nuova.
-
-**Se non va:** quasi sempre la macchina si sta ancora avviando — passano due o tre minuti dalla
-creazione. Se dopo cinque rifiuta ancora, controlla nel pannello che l'IP sia quello giusto e che il
-firewall del fornitore lasci passare la porta 22.
+| Cosa | Quando |
+|---|---|
+| **Discord** | Fase 3, non ora (§9.3) |
+| **L'ambiente di sviluppo del CRM** sulla VPS — PostgreSQL, il server dei dati, quello delle pagine | Serve alla **fase 1**, quando un agent dovrà far girare i collaudi |
+| **Gli argini su git** — `main` protetto, un ramo per lavoro | Prima del **primo compito vero**, non prima dell'azienda |
+| **Il salvataggio periodico** della macchina | Appena sulla VPS c'è qualcosa da perdere: fine fase 0 |
+| **Le altre otto basi di conoscenza** degli agent | Fase 2. Il generatore che le produce non esiste ancora |
 
 ---
 
-## Passo 2 — Mettere in ordine la macchina
+## Passo 1 — Verificare che la macchina sia davvero pronta
 
-**Cosa fai:** aggiorni il sistema e crei un utente normale, per non lavorare da `root`.
+**Cosa fai:** tre controlli su quello che hPanel ha installato. Non è pignoleria: tutto il resto
+poggia qui, e un guaio scoperto adesso costa un minuto invece di mezza giornata.
 
-**Come si fa.** Collegato come `root`:
+### 🔑 Chi ha le chiavi della macchina *(scoperto il 26/8/2026)*
+
+**La VPS l'ha creata e configurata Claudio**, e hPanel è sul suo account. Jacopo non ha né il pannello
+né la password di root. Non è un guaio, ma cambia due cose:
+
+- **I comandi sulla macchina non li può lanciare Jacopo da solo.** Le due strade qui sotto valgono per
+  chi ha l'accesso; per gli altri la terza strada è quella buona.
+- **Esiste una terza strada, ed è la migliore: chiederlo a Paperclip.** Gli agent girano *dentro* la
+  VPS, quindi un compito assegnato a un agent è a tutti gli effetti un terminale — con in più il
+  vantaggio che resta scritto nella bacheca invece che in una finestra che poi si chiude. ⚠️ **Serve
+  però un agent capace di farlo, e all'inizio non c'è**: vedi il passo 2-bis.
+
+### 📍 Dove si scrivono questi comandi
+
+**Non in PowerShell.** PowerShell è il terminale del *tuo computer*: lì `free -h` non esiste, è un
+comando di Linux. Questi comandi vanno scritti **dentro la VPS**, e ci si arriva in due modi.
+
+**Modo 1 — dal pannello di Hostinger (il più semplice, niente da installare).** In hPanel, sulla
+scheda della VPS, c'è un **Browser terminal**: si apre una finestra nera dentro la pagina web e sei
+già dentro la macchina, **come root e senza password** — ti autentica il pannello, perché sei già
+entrato col tuo account Hostinger. Da lì scrivi i comandi.
+
+⭐ **È anche la risposta al problema della password.** Una VPS creata dal pannello ha una password di
+root che non è mai passata per le tue mani: se provi `ssh` te la chiede e tu non ce l'hai. Il
+terminale del browser gira intorno alla cosa. Se un giorno ti servisse davvero SSH, in hPanel c'è la
+voce per **impostare una nuova password di root** — ma per la fase 0 non serve.
+
+**Modo 2 — da PowerShell, con SSH.** PowerShell serve **solo per il primo comando**, quello che ti fa
+entrare:
 
 ```bash
-apt update && apt upgrade -y
-adduser jacopo
-usermod -aG sudo jacopo
-rsync --archive --chown=jacopo:jacopo ~/.ssh /home/jacopo
+ssh root@srv1917293.hstgr.cloud
 ```
 
-L'ultima riga copia la tua chiave SSH sul nuovo utente, così ci entri senza password.
+Questo è **l'indirizzo vero della macchina**, non un segnaposto: si copia così com'è. È lo stesso
+nome dell'indirizzo di Paperclip senza il `paperclip-pblu.` davanti, e corrisponde all'IP
+`191.218.160.114` (verificato il 26/8/2026).
 
-**Come sai che è andata bene.** Da una **seconda finestra** del portatile — non chiudere la prima
-finché non funziona:
+La prima volta ti chiede se ti fidi della macchina: rispondi `yes`. Poi la password di root, quella
+di hPanel — **mentre la digiti non compare niente, nemmeno gli asterischi**: è normale, sta scrivendo
+lo stesso.
+
+> ⚠️ **Sui segnaposto.** Dove in questa lista compare una parola tutta maiuscola con i trattini —
+> come `INDIRIZZO-DEL-REPOSITORY` al passo 3 — **non è un comando da copiare, è un buco da riempire**.
+> Copiarla così com'è dà l'errore `Could not resolve hostname` o simili. Se non sai cosa metterci,
+> chiedi invece di tirare a indovinare.
+
+⭐ **Da quel momento la finestra cambia padrone.** Il testo prima del cursore non è più il tuo
+computer ma la macchina: tutto quello che scrivi finisce **lì**, non su Windows. Per tornare a casa
+si scrive `exit`.
+
+**Come si fa.** I tre controlli, **in quest'ordine** — il riavvio va per ultimo perché ti butta
+fuori:
+
+**Controllo A — quanta memoria è libera davvero:**
 
 ```bash
-ssh jacopo@INDIRIZZO-IP
-sudo whoami
+free -h
 ```
 
-Il secondo comando risponde `root`: l'utente nuovo può amministrare.
+Guarda la colonna **available** della riga `Mem`. È il numero che conta.
 
-> **Perché non si lavora da `root`.** `root` non ha reti di protezione: un comando sbagliato non
-> chiede conferma e non trova niente che lo fermi. Con un utente normale i comandi pericolosi vanno
-> preceduti da `sudo`, che è mezzo secondo per pensarci.
-
----
-
-## Passo 3 — Installare Node e pnpm
-
-**Cosa fai:** metti sulla macchina il motore su cui gira Paperclip.
-
-**Come si fa.** Come `jacopo`:
+**Controllo B — Claude Code sulla VPS.** È il motore che farà lavorare gli agent, ed è
+un'installazione a sé: quella del portatile non conta.
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs git ca-certificates
-sudo npm install -g corepack
-sudo corepack enable
-corepack prepare pnpm@latest --activate
-```
-
-**Come sai che è andata bene:**
-
-```bash
-node --version
-pnpm --version
-git --version
-```
-
-Tre numeri di versione, nessun `command not found`. Node dev'essere **20 o superiore**.
-
-> **Cosa sono.** *Node* esegue il codice di Paperclip. *pnpm* scarica e installa i pezzi di cui
-> Paperclip ha bisogno. *corepack* tiene pnpm aggiornato. Non devi impararli: servono a Paperclip,
-> non a te.
-
----
-
-## Passo 4 — Tailscale: la rete privata fra le tue macchine
-
-**Cosa fai:** metti VPS, portatile e telefono nella stessa rete privata, così si vedono fra loro senza
-che niente sia esposto su internet.
-
-> **Cos'è, in una riga.** Tailscale è un'azienda a sé (`tailscale.com`), che non c'entra con
-> Paperclip: fa solo reti private. Installandola su due macchine, quelle due **si vedono come se
-> fossero nella stessa stanza**, ovunque siano. Niente dominio, niente certificati, nessuna porta
-> aperta verso il mondo, e niente da tenere aperto: funziona da sé.
-
-### L'account: si usa un Gmail personale *(deciso da Jacopo il 25/8/2026)*
-
-Il piano **Personal è gratuito** ed è quello che si ottiene iscrivendosi con un'email personale
-(Gmail, Apple, GitHub). Con un'email aziendale il sistema instraderebbe su **Standard, 8 dollari per
-utente al mese**. **Jacopo e Claudio usano un Gmail privato**, e la questione è chiusa.
-
-**I limiti del piano gratuito non toccano questo impianto:** servono 2 utenti su 6 disponibili, e
-cinque dispositivi (VPS, due portatili, due telefoni) su un numero illimitato.
-
-**E no, Tailscale non può accorgersi che l'uso è di lavoro.** Il traffico è cifrato da un capo
-all'altro, fra le vostre macchine: i loro server sanno **quali dispositivi** sono collegati, non
-**cosa ci passa dentro**. Non esiste un meccanismo con cui possano vedere che dall'altra parte c'è
-Paperclip o un CRM. L'unico segnale che guardano è il dominio dell'email dell'iscrizione.
-
-**Come si fa.** Prima crea l'account su `tailscale.com` — si entra con Google, Microsoft o GitHub,
-non c'è una password nuova da inventare. Poi, **sulla VPS**:
-
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-```
-
-Il secondo comando stampa un indirizzo: aprilo nel browser del portatile e autorizza la macchina.
-
-Poi **sul portatile** installa l'app di Tailscale dal sito ed entra con lo stesso account. E se lo
-vuoi, **sul telefono**: c'è l'app per iPhone e Android, stesso account, due minuti.
-
-Infine chiedi alla VPS qual è il suo indirizzo nella rete privata:
-
-```bash
-tailscale ip -4
-```
-
-⭐ **Segnati quel numero** (una cosa tipo `100.x.y.z`): lo useranno i passi 7, 10 e 11.
-
-### 🛑 Fallo adesso, o fra sei mesi si spegne tutto senza dire perché
-
-**Le chiavi dei dispositivi scadono dopo 180 giorni**, su tutti i piani. Alla scadenza il dispositivo
-**esce dalla rete privata**: non si rompe e non si perde niente, ma smette di collegarsi, **senza
-preavviso e senza un messaggio che spieghi cosa è cambiato**. Sei mesi dopo, quando nessuno si ricorda
-più di questa pagina. Per rientrare basta rifare il login (`sudo tailscale up`, o l'app sul telefono):
-trenta secondi. Il problema non è la fatica, è che nessuno capisce cosa sia successo.
-
-**→ La scadenza si disattiva su TUTTI i dispositivi** *(deciso da Jacopo il 25/8/2026)*. Pannello di
-`tailscale.com`: pagina **Machines** → menu della riga → **Disable Key Expiry**. Disponibile su tutti
-i piani, gratuito compreso. Va rifatto per ogni dispositivo nuovo che entra nella rete.
-
-#### ⚠️ La condizione che tiene in piedi questa scelta, e non va separata da essa
-
-La scadenza serve a **un caso solo**: perdere un dispositivo e **non accorgersene**, o accorgersene e
-non fare niente. È una rete di sicurezza pensata per chi ha centinaia di macchine e non può tenerle a
-mente. Qui siete in due, con cinque dispositivi: se un telefono sparisce ve ne accorgete entro un'ora.
-
-**Quindi la protezione non viene tolta, viene sostituita con una migliore:** se un dispositivo si
-perde, si rompe o si cambia, **va rimosso dal pannello Machines**. Revoca l'accesso **subito**, invece
-di aspettare fino a sei mesi come farebbe la scadenza.
-
-🛑 **Le due cose stanno insieme.** Chi rilegge questa pagina fra un anno non deve trovare solo
-«disattiva la scadenza»: quella da sola sarebbe un peggioramento. La rimozione manuale del dispositivo
-perso **è** ciò che sostituisce la scadenza, non un consiglio in più.
-
-**Come sai che è andata bene.** Dal portatile:
-
-```bash
-ping 100.x.y.z
-```
-
-Risponde. Le due macchine si vedono.
-
-**Se non va:** se `tailscale up` non stampa nessun indirizzo, quasi sempre è già autorizzata —
-controlla con `tailscale status`. Se il ping non passa, verifica sul pannello di `tailscale.com` che
-entrambe le macchine risultino collegate.
-
----
-
-## Passo 5 — Installare Paperclip
-
-**Cosa fai:** scarichi Paperclip, lo installi e lo configuri.
-
-**Come si fa.** Scarica l'installatore ufficiale **verificandone l'impronta** — è la stessa prudenza
-che il §9.4 impone sui pacchetti-sosia:
-
-```bash
-curl -fsSLO https://paperclip.ing/install.sh
-curl -fsSLO https://paperclip.ing/install.sh.sha256
-sha256sum -c install.sh.sha256
-bash install.sh
-```
-
-Il terzo comando deve rispondere `install.sh: OK`. **Se risponde `FAILED`, fermati:** il file
-scaricato non è quello che dice di essere, e non va eseguito.
-
-L'installatore avvia una configurazione a domande. Rispondi:
-
-| Domanda | Risposta | Perché |
-|---|---|---|
-| Modalità di distribuzione | **authenticated** | Per entrare bisogna fare login. Senza, chi arriva alla porta comanda gli agent |
-| Esposizione | **private** (la voce Tailscale, se la propone) | Niente su internet: ci si arriva solo dalla rete privata del passo 4 |
-| Database | **embedded PostgreSQL** | Quello incluso: non devi installarne uno |
-| Archiviazione | **local disk** | |
-
-Poi dichiara l'indirizzo da cui ci si collegherà:
-
-```bash
-paperclipai allowed-hostname 100.x.y.z
-```
-
-**Come sai che è andata bene:**
-
-```bash
-paperclipai doctor
-```
-
-Stampa una diagnosi senza errori. La configurazione finisce in
-`~/.paperclip/instances/default/config.json`.
-
-**Se non va:**
-- `paperclipai: command not found` → l'installatore l'ha messo in `~/.paperclip/cli` e la shell non
-  ci guarda ancora: **chiudi e riapri il collegamento SSH**, che rilegge il percorso.
-- `doctor` si lamenta di *host* o di *auth* → è la modalità sbagliata, o manca l'indirizzo
-  autorizzato. Si corregge senza reinstallare: `paperclipai configure --section server`.
-
-> ⚠️ **Nota per chi legge la guida ufficiale accanto a questa.** La guida Linux di Paperclip configura
-> `authenticated` + **`public`**: esposto su internet, con dominio e reverse proxy. **Noi facciamo
-> diversamente per scelta** (§7.4 e §9.4 del piano): niente indirizzo pubblico della macchina. Se
-> segui la guida alla lettera ti ritrovi il pannello che comanda gli agent su internet — protetto da
-> password, ma esposto.
-
----
-
-## Passo 6 — Farlo restare acceso da solo
-
-**Cosa fai:** fai in modo che Paperclip riparta da sé, invece di spegnersi quando chiudi il terminale.
-
-**Come si fa.** Crea il file di servizio:
-
-```bash
-sudo tee /etc/systemd/system/paperclip.service > /dev/null <<'FINE'
-[Unit]
-Description=Paperclip control plane
-After=network.target
-
-[Service]
-Type=simple
-User=jacopo
-Group=jacopo
-WorkingDirectory=/home/jacopo
-Environment=PAPERCLIP_DEPLOYMENT_MODE=authenticated
-ExecStart=/usr/bin/npx paperclipai run
-Restart=on-failure
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-FINE
-sudo systemctl enable paperclip
-sudo systemctl start paperclip
-```
-
-**Come sai che è andata bene:**
-
-```bash
-systemctl status paperclip
-```
-
-Deve dire `active (running)`. Per vedere cosa scrive, in diretta:
-
-```bash
-sudo journalctl -u paperclip -f
-```
-
-⭐ **Non chiudere questa finestra:** il passo 7 ha bisogno di un indirizzo che compare **proprio qui**.
-
-> **Cos'è `systemd`.** È la parte di Linux che tiene accesi i programmi che devono restare accesi. Un
-> comando lanciato a mano muore quando chiudi il terminale; un *servizio* no — riparte anche dopo un
-> riavvio della macchina. `Restart=on-failure` vuol dire: se Paperclip si pianta, riprovaci da solo
-> dopo cinque secondi.
-
----
-
-## Passo 7 — Diventare il proprietario, e aggiungere Claudio
-
-**Cosa fai:** dichiari che l'azienda è tua, poi inviti la seconda persona.
-
-**Come si fa.** Nella finestra del passo 6, fra le righe del registro, Paperclip stampa **una volta
-sola** un indirizzo per rivendicare la proprietà (*board-claim URL*). Copialo e aprilo nel browser del
-portatile — **adesso ci arrivi**, perché la rete privata del passo 4 è già in piedi.
-
-Nel browser: entra o crea il tuo account se lo chiede, poi premi **Claim ownership** nel pannello
-*Claim Board ownership*.
-
-Poi Claudio: **Settings → Invites**, crea un collegamento d'invito e mandaglielo. Perché possa usarlo
-dev'essere **anche lui nella rete privata** — lo inviti su Tailscale dal pannello di `tailscale.com`,
-e lui fa il passo 4 sulla sua macchina. Quando usa l'invito, la richiesta compare in **Settings →
-Access**, e lì la approvi.
-
-**Come sai che è andata bene.** Entri nell'interfaccia e ti vedi come proprietario. Se Claudio ha già
-accettato, in *Settings → Access* ci sono due persone.
-
-**Se non va:** l'indirizzo del claim è **usa e getta** e scorre via nel registro. Se l'hai perso:
-
-```bash
-sudo journalctl -u paperclip | grep -i claim
-```
-
-⭐ **Da qui in poi Paperclip è raggiungibile anche dal telefono**, se hai fatto anche quel pezzo del
-passo 4: apri `http://100.x.y.z:3100` nel browser del telefono e vedi la bacheca, approvi, commenti.
-
----
-
-## Passo 8 — Claude Code sulla macchina, e il repository
-
-**Cosa fai:** installi Claude Code **sulla VPS** — è quello che gli agent useranno per lavorare — e ci
-porti il codice del CRM.
-
-**Come si fa:**
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash
 claude --version
 ```
 
-Poi l'autenticazione. Lancia `claude` e segui quello che chiede:
+**Controllo C — Paperclip sopravvive a un riavvio.** Serve a sapere se resta acceso da solo o se
+qualcuno deve riaccenderlo a mano ogni volta:
 
 ```bash
-claude
+sudo reboot
 ```
 
-Sulla VPS non c'è un browser, quindi ti mostrerà **un indirizzo da aprire sul portatile**: lo apri,
-autorizzi, e riporti indietro il codice che ti dà.
+⚠️ **Questo comando ti disconnette, ed è normale**: stai spegnendo la macchina su cui sei. La
+finestra si chiude o si blocca. Aspetta due minuti, poi apri
+`https://paperclip-pblu.srv1917293.hstgr.cloud/CRM/org` dal browser — non serve rientrare nel
+terminale per questo controllo.
 
-Infine il repository:
+**Come sai che è andata bene:** A → almeno **1,5 GB** disponibili a macchina ferma. B → stampa un
+numero di versione. C → la bacheca ricompare da sola, senza che tu abbia toccato niente.
+
+**Se non va:**
+
+- **A sotto il mezzo giga:** fermati e dimmelo. Non ha senso proseguire su una macchina già piena.
+- **C non torna su:** vuol dire che Paperclip è acceso ma non **impostato per riaccendersi**. Si
+  risolve, ma va risolto adesso: rientra con `ssh` e dimmi cosa risponde
+  `systemctl status paperclip`.
+- **B dice «command not found»:** Claude Code non è sulla VPS. Si installa con
+  `curl -fsSL https://claude.ai/install.sh | bash`, poi si lancia `claude` e si segue
+  l'autenticazione con l'abbonamento Max. Sulla VPS non c'è un browser: ti darà un indirizzo da
+  aprire sul portatile e un codice da riportare indietro.
+
+**📋 Riferiscimi le tre risposte.** Senza collegamento a Paperclip, questo è l'unico modo che ho di
+sapere com'è messa la macchina.
+
+---
+
+## Passo 2 — Aggiungere Claudio ✅ GIÀ FATTO
+
+> **Verificato il 26/8/2026:** Claudio compare già fra le persone dell'azienda (si vede
+> nell'elenco degli assegnatari di un compito). **Non c'è niente da fare.** Il passo resta scritto
+> solo per chi rileggesse la lista da capo.
+
+**Cosa fai:** l'azienda deve essere di due persone, non di una. È anche metà del criterio che chiude
+la fase (passo 9: «da due computer diversi»).
+
+**Come si fa.** Nell'interfaccia di Paperclip: **Settings → Invites**, crea un collegamento d'invito
+e mandaglielo. Quando lo usa, la richiesta compare in **Settings → Access**, e lì la approvi.
+
+⭐ Rispetto a com'era scritto prima, **non deve fare nient'altro**: l'indirizzo è pubblico, gli basta
+il browser. La rete privata non c'è più.
+
+**Come sai che è andata bene.** In *Settings → Access* ci sono **due persone**.
+
+**Se non va:** l'invito può avere una scadenza. Se Claudio lo apre giorni dopo e non funziona, ne
+generi un altro — non è un guasto.
+
+> 💬 **Questo passo dipende da Claudio**, quindi può restare aperto mentre vai avanti con i passi 3-8.
+> Va chiuso **prima del passo 9**, non prima degli altri.
+
+---
+
+## Passo 2-bis — Il primo agent, che è per forza il CEO
+
+**Cosa fai:** crei a mano il primo agent dell'azienda. Da quel momento hai **le mani sulla macchina
+senza passare da hPanel**: gli assegni un compito e lui esegue.
+
+### ⚠️ Perché va fatto a mano e con attenzione
+
+Due vincoli che si incastrano, e conviene conoscerli prima di premere il pulsante:
+
+1. **Paperclip obbliga il primo agent a essere il CEO.** Il campo *Role* è **bloccato** su `CEO`
+   quando l'azienda è vuota, e non c'è modo di aggirarlo. Quindi **non si può creare un "agent di
+   prova"**: il primo che nasce occupa la casella più alta dell'organigramma, e non è una casella da
+   sprecare.
+2. **Nel piano il CEO non esiste** — il vertice dell'azienda siete voi due, il *consiglio* (§2.1). Il
+   mestiere che gli somiglia di più è il **🧭 Capocantiere** (§2.2): è quello che legge il piano,
+   spacchetta il lavoro, mette in fila i compiti e delega. **È lui a prendersi la casella di CEO.**
+
+> 🗣️ **Il nome lo sceglie Jacopo**, come per ogni cosa nuova di questo progetto. La proposta è
+> *Capocantiere*, perché è il nome che il piano usa già da mesi e che ricorre in tutti i documenti:
+> cambiarlo adesso vorrebbe dire disallineare il piano dall'azienda vera il giorno zero.
+
+### Come si fa
+
+Nella pagina dell'organigramma, pulsante **New Agent**:
+
+| Campo | Cosa mettere | Perché |
+|---|---|---|
+| **Agent name** | `Capocantiere` | Il nome del piano |
+| **Title** | `Decide cosa si fa dopo` | È il sottotitolo che si legge nell'organigramma |
+| **Role** | `CEO` — è bloccato | Vincolo di Paperclip, non una scelta |
+| **Reports to** | vuoto | È il primo, non risponde a nessun agent |
+| **Adapter** | **Claude Code** | È l'unico che usa l'abbonamento Max già autenticato sulla VPS. **Nessuna chiave API** |
+| **Model** | il predefinito | Si tara dopo (§11.2 del piano lo vuole di fascia alta). Adesso non è la battaglia |
+| **Working directory (cwd)** | `/root` | ⚠️ **Non** `/root/crmadv`: quella cartella non esiste ancora, arriva al passo 3 |
+| **Heartbeat enabled** | **spento** | 🛑 Un agent che si sveglia da solo prima che l'azienda esista si mette a fare cose per conto suo. Si accende al passo 9 |
+| **Company skills** | niente | Le basi di conoscenza arrivano col pacchetto del passo 5 |
+
+**Come sai che è andata bene.** L'agent compare nell'organigramma, e **compare anche nell'elenco
+degli assegnatari** quando apri un nuovo compito — accanto a *Me*, *Claudio*, *Reflection Coach* e
+*Summarizer*.
+
+**Se non va:** se il campo *Adapter* non offre Claude Code, vuol dire che Paperclip non lo vede
+installato sulla macchina. È la stessa cosa che verificava il controllo B del passo 1, e va risolta
+prima di proseguire.
+
+> 💡 **Reflection Coach e Summarizer non servono a questo.** Sono i due agent di servizio che
+> Paperclip installa da sé: guardano e riassumono i compiti, non lavorano sulla macchina. Non vanno
+> cancellati, semplicemente non è a loro che si assegnano i compiti operativi.
+
+---
+
+## Passo 2-ter — Il primo compito: farsi raccontare la macchina
+
+**Cosa fai:** usi il Capocantiere come terminale, e recuperi i controlli del passo 1 che senza hPanel
+non potevi fare.
+
+**Come si fa.** Pulsante **New task**:
+
+- **Task title:** `Controllo della macchina`
+- **For:** `Capocantiere`
+- **Add description:** il testo qui sotto, incollato tale e quale
+
+```
+Esegui sulla macchina questi comandi, uno per uno, e riporta l'uscita esatta di ognuno così com'è:
+
+1. free -h
+2. df -h /
+3. claude --version
+4. node --version
+
+Non modificare niente, non installare niente, non correggere niente.
+Se un comando non esiste o dà errore, riporta l'errore testuale invece di cercare una strada alternativa.
+```
+
+**Come sai che è andata bene.** L'agent risponde con quattro uscite. In una volta sola hai scoperto
+**quattro cose**: che gli agent partono, che Claude Code sulla VPS funziona ed è autenticato, quanta
+memoria e quanto disco ci sono.
+
+**📋 Riporta le quattro uscite.** Sono i numeri del passo 1, presi per un'altra strada.
+
+**Se non va:**
+
+- **L'agent non parte** → è l'adattatore. Torna al passo 2-bis.
+- **Parte ma dice che non può eseguire comandi** → l'adattatore è configurato senza accesso alla
+  macchina. Copia cosa ha scritto: è un'opzione da cambiare sulla sua scheda, non un muro.
+
+---
+
+## Passo 3 — Il repository del CRM sulla macchina
+
+**Cosa fai:** porti il codice del CRM sulla VPS. È il materiale su cui gli agent lavoreranno, e
+contiene anche le loro basi di conoscenza.
+
+**Come si fa:**
 
 ```bash
 cd ~
@@ -381,25 +318,145 @@ git clone INDIRIZZO-DEL-REPOSITORY crmadv
 **Come sai che è andata bene:**
 
 ```bash
-claude --version
 ls ~/crmadv/paperclip/skills
 ```
 
-Il primo stampa un numero di versione; il secondo mostra le quattro cartelle delle skill. ⭐ **Se le
-vedi, le skill sono già sulla macchina**: non si trasferiscono a mano, viaggiano dentro il repository.
+Deve mostrare **quattro cartelle**: `crm-collaudo-generazioni-ai`, `crm-design-frontend`,
+`crm-permessi-e-sicurezza`, `crm-pianificazione`.
 
-> **Perché Claude Code va anche qui.** Quello sul tuo portatile sono io, che ti parlo. Quello sulla
-> VPS è il motore che eseguirà il lavoro degli agent. Due installazioni distinte, due autenticazioni
-> distinte.
+⭐ **Se le vedi, le basi di conoscenza sono già sulla macchina**: non si trasferiscono a mano,
+viaggiano dentro il repository.
+
+**Se non va:** se `git clone` chiede una password o rifiuta, è un problema di credenziali git sulla
+VPS, non di Paperclip. Dimmelo e lo risolviamo lì.
 
 ---
 
-## Passo 9 — Chromium per il collaudatore
+## Passo 4 — Esportare il pacchetto di adesso (serve come stampo)
+
+**Cosa fai:** scarichi da Paperclip l'azienda *CRM* così com'è oggi — praticamente vuota. Non serve a
+salvarla: serve a **far vedere all'assistente il formato esatto** che Paperclip si aspetta.
+
+**Perché.** Il pacchetto che ti verrà consegnato al passo 5 dev'essere scritto nella forma precisa
+che Paperclip legge. La documentazione descrive la struttura delle cartelle, **ma non i campi dentro
+i file**. Un pacchetto esportato dal tuo Paperclip, della tua versione, quei campi li ha tutti.
+**Copiare uno stampo vero costa un minuto; indovinare i campi costa un pomeriggio di importazioni
+rifiutate.**
+
+**Come si fa.** Nell'interfaccia: **Company Settings → Company Packages → Export**. Scarichi un
+`.zip`.
+
+**Come sai che è andata bene:** hai un file `.zip` sul portatile. Aprilo e dentro devi trovare almeno
+`COMPANY.md` e `.paperclip.yaml`.
+
+**Poi passalo all'assistente:** mettilo in una cartella del progetto e di' dove, oppure allegalo in
+chat.
+
+**Se non va:** se la voce *Export* non c'è, dì che voci vedi in *Company Settings* — cambiano da una
+versione all'altra, e in quel caso si passa dal comando `paperclipai company export`.
+
+---
+
+## Passo 5 — Il pacchetto dell'azienda *(lo costruisce l'assistente)*
+
+**Cosa fai:** niente. Aspetti.
+
+**Cosa fa l'assistente.** Con lo stampo del passo 4, scrive il pacchetto completo dell'azienda: gli
+agent dell'organigramma con ruolo e istruzioni, i collegamenti fra loro, le quattro basi di
+conoscenza, e il progetto su cui lavoreranno. Tutto in file di testo, dentro un `.zip`.
+
+**Le consegne sono due, non una:**
+
+1. **Il `.zip`** — da allegare al compito. Dentro ha anche un **`README.md`** in italiano: cosa
+   contiene, cosa deve succedere, e cosa resta da regolare a mano dopo (passo 7).
+2. **Il testo del prompt** — già scritto, da incollare nella descrizione del compito. Non è un
+   riassunto del pacchetto: è l'istruzione che dice all'agent **cosa fare dell'allegato**, in che
+   ordine, e **dove fermarsi** (per esempio: non accendere niente, non toccare il repository).
+
+**Come sai che è andata bene:** hai il `.zip` e il testo del prompt, e il `README.md` ti risulta
+comprensibile. **Se leggendolo non capisci cos'è un agent o perché c'è, fermati e chiedi prima di
+lanciare il compito** — correggere un pacchetto prima è banale, disfare un'azienda costruita storta
+no.
+
+---
+
+## Passo 6 — Lanciare il compito che costruisce l'azienda
+
+**Cosa fai:** apri un compito in Paperclip, gli allegi il `.zip`, incolli il prompt, e lo affidi a un
+agent. È lui che costruisce l'organigramma.
+
+> **Perché così e non con l'importazione automatica.** Paperclip sa importare un pacchetto da solo
+> (*Company Settings → Company Packages → Import*): è deterministico, mostra un'anteprima e non
+> sbaglia. **Jacopo ha scelto la strada del compito** (26/8/2026) perché è quella con cui vuole
+> prendere confidenza con lo strumento, ed è anche il primo lavoro vero che l'azienda esegue su sé
+> stessa. L'importazione automatica **resta come ripiego** se il compito si impianta — vedi *«se non
+> va»* qui sotto.
+
+**Come si fa.** Nell'interfaccia, pulsante **New task**:
+
+1. **Task title** — un titolo che si riconosce fra sei mesi, tipo `Costruire l'organigramma da
+   pacchetto`.
+2. **For** — al posto di *Me*, scegli **Agent** e indica l'agent che deve eseguirlo.
+3. **Upload** — allega il `.zip` del passo 5.
+4. **Add description** — incolla il **prompt** del passo 5, senza riscriverlo.
+5. **Create Task**.
+
+⚠️ **Un agent deve già esistere per potergli affidare il compito.** Se in azienda c'è solo l'agent di
+servizio che Paperclip installa da sé, è a lui che va dato: il compito è di configurazione, non di
+sviluppo del CRM.
+
+**Come sai che è andata bene.** Due cose, in quest'ordine:
+
+- **L'agent si sveglia e lavora**: nell'attività del compito vedi cosa fa, passo per passo. Già solo
+  questo è metà della prova del passo 9.
+- **Poi torni su `/CRM/org` e vedi l'organigramma popolato**: gli agent con i loro nomi e ruoli, al
+  posto della pagina quasi vuota di adesso.
+
+**📋 Descrivi cosa vedi** — quanti agent, che nomi, e cosa ha scritto l'agent nel compito. È la
+verifica: dall'esterno l'assistente non vede niente di tutto questo.
+
+**Se non va.** Tre modi di non andare, tre risposte diverse:
+
+- **L'agent non parte proprio** → non è un problema del pacchetto. È l'adattatore o il risveglio:
+  torna al passo 1, controllo B.
+- **Parte e sbaglia** — crea agent a metà, o inventa nomi che nel pacchetto non ci sono → **fermalo e
+  copiami cosa ha scritto.** Quasi sempre è il prompt da stringere, non il pacchetto.
+- **Ci prova due volte e non ne esce** → 🔁 **si passa al ripiego**: *Company Settings → Company
+  Packages → Import*, si sceglie lo stesso `.zip`, si legge l'anteprima e si conferma. Il pacchetto è
+  scritto nel formato che quella funzione si aspetta, quindi non c'è niente da rifare. **Non è una
+  sconfitta: è il motivo per cui il pacchetto è fatto in quel formato invece che a modo mio.**
+
+---
+
+## Passo 7 — Le rifiniture che il pacchetto non porta
+
+**Cosa fai:** tre cose che un pacchetto **non può contenere per costruzione**, e vanno messe a mano —
+qualunque delle due strade del passo 6 tu abbia usato.
+
+**Come si fa.**
+
+1. **L'adattatore di ogni agent.** È il motore che lo fa parlare. Dev'essere **Claude Code**
+   (`claude_local`), che sulla VPS usa l'abbonamento Max già autenticato — **nessuna chiave API,
+   nessun consumo a token.** Controlla agent per agent che sia quello.
+2. **Il tetto di spesa di ogni agent.** I budget non viaggiano nel pacchetto. Vanno rimessi.
+3. **I *heartbeat*** — cioè gli agent che si svegliano da soli. **Lasciali spenti per adesso.** Si
+   accende il primo al passo 9, uno solo, come prova. Un'azienda intera che si sveglia tutta insieme
+   su una macchina da 4 GB è esattamente il modo di scoprire il problema della memoria nel momento
+   peggiore.
+
+⛔ **I segreti non entrano mai in un pacchetto**, ed è giusto così: chiavi e password si mettono solo
+qui, a mano, dentro Paperclip. **Non passano dal repository e non passano dalla chat** — in questo
+progetto una password è già transitata in chat una volta, ed è rimasta nelle trascrizioni sul disco.
+
+**Come sai che è andata bene:** apri un agent a caso e vedi l'adattatore giusto, un tetto di spesa, e
+il risveglio automatico spento.
+
+---
+
+## Passo 8 — Chromium per il collaudatore
 
 **Cosa fai:** installi il browser che l'agent collaudatore userà per guardare il CRM e fare gli
 screenshot.
-
-**Come si fa:**
 
 ```bash
 sudo apt-get install -y chromium-browser
@@ -409,97 +466,30 @@ sudo apt-get install -y chromium-browser
 
 **Se non va:** su alcune Ubuntu il pacchetto si chiama `chromium`. Prova quello.
 
-> Questo passo **non ha vincoli di ordine**: fallo quando vuoi. Serve dalla fase 2 in poi.
+> Serve dalla fase 2 in poi: se sei stanco, questo è il passo che puoi rimandare.
 
 ---
 
-## Passo 10 — La chiave del consiglio
-
-**Cosa fai:** ti autentichi con lo strumento a riga di comando di Paperclip. È da qui che nasce la
-credenziale che userò io per costruire l'azienda.
-
-**Come si fa.** Sul **portatile**:
-
-```bash
-paperclipai auth login --api-base http://100.x.y.z:3100
-```
-
-Si apre il browser su una pagina che dichiara cosa sta chiedendo. Premi **Approve CLI access**.
-
-**Come sai che è andata bene:**
-
-```bash
-paperclipai auth whoami
-```
-
-Ti riconosce.
-
-⛔ **Due regole su questa credenziale, dal §9.2 del piano:**
-
-1. **È una password.** Non finisce in chat e non finisce nel repository. In questo progetto una
-   password è già transitata in chat una volta, ed è rimasta nelle trascrizioni salvate sul disco.
-2. **Le chiavi di Paperclip non hanno poteri limitati** — o possono tutto, o non esistono. Fra le
-   facoltà c'è **approvare**, e approvare è funzione vostra, non mia: tutto l'impianto dei cancelli
-   perde senso se le firma un assistente. **Non è imponibile tecnicamente, regge sul comportamento** —
-   ed è per questo che sta scritta, non nonostante.
-
----
-
-## Passo 11 — Il collegamento fra me e Paperclip
-
-**Cosa fai:** registri il collegamento sul tuo portatile, così posso costruire l'azienda invece di
-farti cliccare tutto a mano.
-
-**Come si fa.** ⚠️ **La forma esatta del comando va riconfermata al momento** (§9.4): questa è quella
-scritta nel piano. Serve la chiave del passo 10.
-
-```bash
-claude mcp add paperclip \
-  --env PAPERCLIP_API_URL=http://100.x.y.z:3100 \
-  --env PAPERCLIP_API_KEY=... \
-  --env PAPERCLIP_COMPANY_ID=... \
-  -- npx -y @paperclipai/mcp-server
-```
-
-⚠️ **Il nome del pacchetto dev'essere esattamente `@paperclipai/mcp-server`**, dall'organizzazione
-`paperclipai`. Cercando «paperclip mcp» escono almeno tre pacchetti **di terzi** con nomi quasi
-identici, e quello che installi **si porta dentro la chiave dell'azienda**.
-
-**Come sai che è andata bene.** Me lo chiedi: faccio una lettura innocua — l'elenco degli agent — e ti
-dico cosa vedo. Se rispondo con un elenco, anche vuoto, il collegamento c'è.
-
-> **Cosa il collegamento NON dà**, perché «pieno potere» suona più largo di quello che è: parla solo
-> con l'API di Paperclip. **Niente comandi sulla VPS**, niente database, niente codice, niente git. Il
-> raggio d'azione è **una configurazione**. Gli agent che poi lavoreranno davvero sul CRM sono
-> contenuti da altro — `main` protetto, un ramo per lavoro, revisione obbligatoria — ed è per questo
-> che quegli argini vanno messi prima del primo compito, non prima del collegamento.
->
-> 📱 **E non funziona dal telefono**, se te lo stai chiedendo: questo collegamento è un programma che
-> gira **sul computer**, accanto a Claude Code, e l'app del telefono non fa girare programmi così. Dal
-> telefono restano l'interfaccia di Paperclip via rete privata (passo 7) e i pulsanti di approvazione
-> dentro Discord (fase 3) — che è poi la cosa che davvero serve fare da fuori.
->
-> ⭐ **La regola d'ingaggio, che vale più del comando** (§9.4): il collegamento **resta acceso**, non
-> si revoca niente a impianto finito. Il confine non è tecnico ma di mandato — **nessuna azione dentro
-> Paperclip che non sia stata chiesta esplicitamente e chiaramente.**
-
----
-
-## Passo 12 — La prova che chiude la fase
+## Passo 9 — La prova che chiude la fase
 
 **Cosa fai:** verifichi il criterio di fine fase del piano, che è uno solo e preciso:
 
 > **Un agent di prova si sveglia, esegue un comando innocuo, e lo vedete succedere da due computer
 > diversi.**
 
-**Come si fa.** Questo passo lo facciamo insieme: creo un agent di prova dal collegamento, gli do un
-compito da nulla, e lo guardiamo partire. **«Da due computer diversi»** significa che anche Claudio,
-dal suo, deve vedere la stessa cosa — è la prova che l'azienda è davvero condivisa e non un
-giocattolo locale.
+**Come si fa.** Adesso lo fai a mano.
 
-**Se non riesce:** ci si ferma qui e si capisce perché. Il piano è netto su questo per la fase 1
-(*«se questa fase non riesce, ci si ferma qui»*), e vale a maggior ragione per la 0: **tutto il resto
-poggia su questa.**
+1. Scegli **un** agent — uno solo — e assegnagli un compito da nulla: leggere un file del repository
+   e dire cosa c'è dentro. Niente che scriva, niente che tocchi git.
+2. Accendi **solo il suo** risveglio automatico.
+3. Guarda l'attività: l'agent parte, fa la cosa, scrive il risultato.
+4. **Chiedi a Claudio di guardare la stessa cosa dal suo computer.**
+
+**Come sai che è andata bene:** lo vedete **tutti e due**. È la prova che l'azienda è davvero
+condivisa e non un giocattolo che gira solo da te.
+
+🛑 **Se non riesce, ci si ferma qui e si capisce perché.** Il piano è netto, e vale a maggior ragione
+per la fase 0: **tutto il resto poggia su questa.**
 
 ---
 
@@ -507,30 +497,29 @@ poggia su questa.**
 
 | Cosa | Perché adesso |
 |---|---|
-| **Il salvataggio periodico della macchina** | Da questo momento sulla VPS c'è la memoria dell'azienda, e presto anche il database di sviluppo del CRM (rischio 8 del piano) |
-| **Riscrivere la regola dei dev server in `CLAUDE.md`** | Diceva «una sola sessione accesa per volta» riferendosi ai vostri computer. Da adesso **riguarda la VPS** (§12.4, conseguenza ③) |
-| **Verificare il «lucchetto di Prisma»** | Il piano lo dava per tornato; è quasi certamente un comportamento di Windows che su Linux non esiste. La fase 0 è il posto per accertarlo (§12.4, conseguenza ②) |
+| **Il salvataggio periodico della macchina** (snapshot da hPanel) | Da questo momento sulla VPS c'è la memoria dell'azienda, e presto il database di sviluppo del CRM (rischio 8 del piano) |
+| **Riscrivere la regola dei dev server in `CLAUDE.md`** | Diceva «una sola sessione accesa per volta» riferendosi ai vostri computer. Da adesso **riguarda la VPS** (§12.4) |
+| **Verificare il «lucchetto di Prisma»** | Il piano lo dava per tornato; è quasi certamente un comportamento di Windows che su Linux non esiste (§12.4) |
 
 ---
 
 ## Fonti
 
-Verificate il 25/8/2026 sulla documentazione ufficiale:
+Documentazione ufficiale di Paperclip, letta il 25 e il 26/8/2026:
 
-- **Paperclip** — [installazione](https://docs.paperclip.ing/guides/getting-started/installation/) ·
-  [modalità di distribuzione](https://docs.paperclip.ing/reference/deploy/deployment-modes/) ·
-  [accesso privato via Tailscale](https://docs.paperclip.ing/reference/deploy/tailscale-private-access/) ·
-  [accesso a più utenti](https://docs.paperclip.ing/how-to/enable-multi-user-login/) ·
-  [autenticazione da riga di comando](https://docs.paperclip.ing/administration/cli-auth/) ·
-  [repository ufficiale](https://github.com/paperclipai/paperclip)
-- **Claude Code** — [installazione e autenticazione](https://code.claude.com/docs/en/setup)
-- **Tailscale** — [piani e prezzi](https://tailscale.com/pricing) ·
-  [scadenza delle chiavi](https://tailscale.com/kb/1028/key-expiry)
-- **Il piano** — `piano-paperclip-2026-08-19.md`: §9.1 (cosa resta manuale), §9.3 (le quattro fasi),
-  §9.4 (il collegamento), §12.4 (l'ambiente sulla VPS), §7.4 (perché Discord e non Telegram).
+- [esportazione e importazione dei pacchetti](https://docs.paperclip.ing/guides/power/export-import/)
+  — la struttura del `.zip`, cosa viaggia e cosa no, e i due modi di importare
+- [gli adattatori](https://docs.paperclip.ing/reference/adapters/overview/) — l'elenco dei motori;
+  Claude Code è `claude_local`
+- [organigramma e agent](https://docs.paperclip.ing/guides/org/agents/) ·
+  [le skill](https://docs.paperclip.ing/reference/skills/) ·
+  [accesso a più utenti](https://docs.paperclip.ing/how-to/enable-multi-user-login/)
+- **Il piano** — `piano-paperclip-2026-08-19.md`: §9.3 (le quattro fasi), §10 (la macchina), §12.4
+  (l'ambiente sulla VPS)
 
-⚠️ **Un punto che da qui non si poteva verificare**, marcato anche nel testo: la forma esatta del
-comando del **passo 11**. Si scopre eseguendo; **se si comporta diversamente, si aggiorna questo
-file** invece di aggirarlo.
+⚠️ **Quello che da qui non si può verificare:** i campi esatti dentro i file del pacchetto. La
+documentazione descrive le cartelle ma non il contenuto dei file. **È il motivo per cui esiste il
+passo 4** — lo stampo vero risolve la domanda invece di lasciarla aperta.
 
-*Scritto il 25 agosto 2026 in `crmadv`. Copre la sola fase 0: le fasi 1-4 restano nel §9.3 del piano.*
+*Riscritto il 26 agosto 2026 in `crmadv`. Copre la sola fase 0: le fasi 1-4 restano nel §9.3 del
+piano.*

@@ -862,3 +862,19 @@ Entrambe erano vere quando sono state scritte, o non sono mai state verificate. 
 - **Una decisione non deve reggersi su una sola premessa non verificata.** Se togliendo quella la conclusione cade, la decisione non e' pronta.
 - **Una ragione ritirata si BARRA, non si cancella.** Chi rilegge deve vedere che era stata considerata e perche' e' caduta: cancellandola, il prossimo la rifa' identica. Vale anche quando la conclusione non cambia.
 - **Un conteggio e' un'istantanea, e scade anche mentre lo si scrive.** Nello stesso giro, il lab aveva contato «zero occorrenze» di certi nomi di file dentro un documento, e le due occorrenze le aveva introdotte **il capitolo che stava scrivendo mentre contava**; io ne ho trovata una sola perche' cercavo il nome **con l'estensione `.md`** e una era scritta senza. Se un numero non serve a decidere, non si insegue: si scrive la conclusione che non si muove (*«non erano zero»*) e si va avanti.
+
+## 58. Un segnaposto dato a chi non lo riconosce diventa un comando sbagliato — e spesso il valore vero ce l'ho gia'
+
+**Contesto:** 26/8/2026, fase 0 di Paperclip, passo 1. Avevo scritto nella lista operativa e ripetuto in chat il comando `ssh root@INDIRIZZO-IP`. Jacopo l'ha copiato **tale e quale** e PowerShell ha risposto `Could not resolve hostname indirizzo-ip`.
+
+**Errore, doppio.**
+1. **Ho consegnato un segnaposto senza dire che era un segnaposto.** Per me `INDIRIZZO-IP` in maiuscolo e' una convenzione ovvia; per chi legge e' testo dentro un blocco di comando, e i blocchi di comando in questo progetto sono fatti apposta per essere copiati con un clic. La convenzione la conosce chi l'ha scritta.
+2. **Il valore vero ce l'avevo gia'**, ed e' la parte peggiore. Jacopo mi aveva dato l'indirizzo di Paperclip — `https://paperclip-pblu.srv1917293.hstgr.cloud/CRM/org` — due messaggi prima. Il nome della macchina era **dentro quell'indirizzo**: bastava togliere il sottodominio. Ho lasciato un buco da riempire in un punto dove non c'era nessun buco.
+
+**Perche' conta piu' del caso:** l'errore non fa danno — da' un messaggio chiaro e si perde un minuto. Fa danno **il momento in cui capita**: e' il primissimo comando di una lista di nove passi, dato a chi si e' dichiarato meno esperto. Un inciampo li' non insegna «ho sbagliato a copiare», insegna «questa lista non funziona», e da quel momento ogni comando successivo viene eseguito con meno fiducia. **Il costo non e' il minuto, e' la fiducia nello strumento.**
+
+**Modo corretto:**
+- **Prima di lasciare un segnaposto, cercare il valore vero in quello che l'utente ha gia' scritto in chat.** Indirizzi, nomi di macchine, percorsi e identificativi molto spesso sono gia' passati: un `grep` mentale sulla conversazione costa meno di un giro di correzione.
+- **Quando il segnaposto e' inevitabile, non lasciarlo dentro il blocco copiabile da solo.** Va accompagnato, nella riga immediatamente sotto, da **dove si trova il valore** (`e' in hPanel, scheda della VPS`) e da **che aspetto ha** (`una cosa tipo 82.29.14.5`). Il blocco si copia; la spiegazione dopo si legge.
+- **Un comando verificabile senza rischi, si verifica.** Risolvere un nome di macchina e' una lettura pubblica, costa una riga e trasforma un'istruzione approssimata in una esatta. Vale per DNS, per l'esistenza di un pacchetto, per la forma di un URL.
+- **Regola generale:** verso un utente meno esperto, **la lista operativa deve contenere comandi eseguibili, non modelli di comando.** Se una riga richiede di essere compilata prima di funzionare, quella riga non e' finita.

@@ -1,0 +1,10 @@
+schema: "paperclip/v1"
+schemaVersion: 6
+company:
+  attachmentMaxBytes: 10485760
+projects:
+  sviluppo-crm:
+    status: "in_progress"
+sidebar:
+  projects:
+    - "sviluppo-crm"

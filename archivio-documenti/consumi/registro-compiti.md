@@ -62,3 +62,4 @@
 | 2026-08-20 09:30 | Pianificazione passaggio a Paperclip: ricerca, piano tecnico, quadro d'insieme HTML, consegna skill al lab | 19h 15m | 18,9 | 0,02 | nessuno | — |
 | 2026-08-25 11:50 | controllo qualita e raccordo delle quattro skill Paperclip (+ decisioni e collegamento MCP) | 26h 23m | 38,9 | 0,02 | nessuno | — |
 | 2026-08-25 15:00 | Controllo finale skill Paperclip e lista operativa fase 0 | 2h 41m | 18,6 | 0,12 | nessuno | — |
+| 2026-08-26 11:46 | Pacchetto azienda Paperclip + riscrittura lista fase 0 | 20h 29m | 19,2 | 0,02 | nessuno | — |
