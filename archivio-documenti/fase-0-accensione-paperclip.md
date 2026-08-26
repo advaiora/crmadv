@@ -332,7 +332,12 @@ VPS, non di Paperclip. Dimmelo e lo risolviamo lì.
 
 ---
 
-## Passo 4 — Esportare il pacchetto di adesso (serve come stampo)
+## Passo 4 — Esportare il pacchetto di adesso (serve come stampo) ✅ GIÀ FATTO
+
+> **Fatto il 26/8/2026.** L'export è stato scaricato, consegnato all'assistente e confrontato con il
+> pacchetto riga per riga. **Il pacchetto è stato corretto di conseguenza** — cosa ne è uscito sta
+> qui sotto, dopo la spiegazione del passo. Non c'è niente da rifare, a meno che Paperclip non venga
+> aggiornato: in quel caso questo passo si ripete, perché lo stampo scade con la versione.
 
 **Cosa fai:** scarichi da Paperclip l'azienda *CRM* così com'è oggi — praticamente vuota. Non serve a
 salvarla: serve a **far vedere all'assistente il formato esatto** che Paperclip si aspetta.
@@ -355,9 +360,47 @@ chat.
 **Se non va:** se la voce *Export* non c'è, dì che voci vedi in *Company Settings* — cambiano da una
 versione all'altra, e in quel caso si passa dal comando `paperclipai company export`.
 
+### 📋 Cosa ha detto lo stampo, e cosa è cambiato nel pacchetto
+
+Il confronto è servito, e va lasciato scritto perché è il genere di cosa che non si ricava
+ragionando. **Quattro campi degli agent erano sbagliati** nel pacchetto del 26/8 mattina:
+
+| Come l'avevo scritto io | Com'è davvero |
+|---|---|
+| `runtimeConfig.heartbeatEnabled: false` | `runtimeConfig.heartbeat.enabled: false` — **annidato**, con accanto `wakeOnDemand` e `intervalSec` |
+| `reportsTo: Capocantiere` (il nome) | `reportsTo` vuole l'**identificativo** dell'agent: va creato prima il Capocantiere e riusato l'ID che torna indietro |
+| *(campo assente)* | `capabilities` è **obbligatorio**: una descrizione delle responsabilità. Ora c'è per tutti e dieci |
+| *(campo assente)* | `icon` è **obbligatorio** e va scelto da un elenco chiuso che dipende dall'installazione (`/llms/agent-icons.txt`). Non può stare nel pacchetto: lo sceglie l'agent, ed è l'unica eccezione dichiarata alla regola «non inventare niente» |
+
+Sono cambiate anche due cose di struttura: la **cartella radice** dentro lo zip deve chiamarsi come
+l'azienda (`crm/`, che è lo `slug` in `COMPANY.md`), e alla radice ci va un **`README.md`**.
+
+⚠️ **Una cosa che sembrava un disastro e non lo era.** Nell'export non c'è nessuna cartella
+`agents/`, e per qualche minuto è sembrato che il formato non trasportasse gli agent — cioè che
+l'importazione automatica non potesse costruire l'organigramma. **Falso:** `agents/<nome>/AGENTS.md`
+è formato ufficiale e l'import li crea. Nell'export non c'erano semplicemente perché **l'azienda non
+ha più nessun agent**: il CEO del tentativo fallito del 20 agosto è stato cancellato davvero. Il
+ripiego del passo 6 resta quindi valido in pieno.
+
 ---
 
-## Passo 5 — Il pacchetto dell'azienda *(lo costruisce l'assistente)*
+## Passo 5 — Il pacchetto dell'azienda *(lo costruisce l'assistente)* ✅ GIÀ FATTO
+
+> **Pronto dal 26/8/2026, corretto sullo stampo del passo 4 lo stesso giorno.**
+>
+> | Cosa | Dove |
+> |---|---|
+> | I **sorgenti**, 49 file | `paperclip/crm/` |
+> | Il **pacchetto** da allegare | `paperclip/azienda-crm.zip` |
+> | Il **prompt** da incollare | `paperclip/crm/PROMPT-DA-INCOLLARE.md` |
+> | Cosa c'è dentro, spiegato | `paperclip/crm/README.md` — **leggilo prima di lanciare** |
+>
+> 🔁 **Se tocchi i sorgenti, rigenera lo zip**, altrimenti resti con la versione vecchia:
+> ```
+> python paperclip/costruisci-pacchetto.py
+> ```
+> **Non usare `Compress-Archive` a mano.** Sbaglia il nome della cartella radice dentro lo zip, che
+> deve chiamarsi `crm/` — ed è già successo una volta.
 
 **Cosa fai:** niente. Aspetti.
 
@@ -367,8 +410,8 @@ conoscenza, e il progetto su cui lavoreranno. Tutto in file di testo, dentro un 
 
 **Le consegne sono due, non una:**
 
-1. **Il `.zip`** — da allegare al compito. Dentro ha anche un **`README.md`** in italiano: cosa
-   contiene, cosa deve succedere, e cosa resta da regolare a mano dopo (passo 7).
+1. **Il `.zip`** — da allegare al compito. Dentro, alla radice, ha un **`README.md`** in italiano:
+   cosa contiene, cosa deve succedere, e cosa resta da regolare a mano dopo (passo 7).
 2. **Il testo del prompt** — già scritto, da incollare nella descrizione del compito. Non è un
    riassunto del pacchetto: è l'istruzione che dice all'agent **cosa fare dell'allegato**, in che
    ordine, e **dove fermarsi** (per esempio: non accendere niente, non toccare il repository).
@@ -411,6 +454,11 @@ sviluppo del CRM.
   questo è metà della prova del passo 9.
 - **Poi torni su `/CRM/org` e vedi l'organigramma popolato**: gli agent con i loro nomi e ruoli, al
   posto della pagina quasi vuota di adesso.
+
+> ⚠️ **Se trovi i dieci agent in attesa di approvazione (`pending_approval`), è andata BENE.** In
+> Paperclip creare un agent è una *richiesta di assunzione*, e può richiedere la firma del consiglio
+> — cioè la tua. L'agent ha l'ordine esplicito di **non approvarsi da solo**, quindi trovarli in
+> coda è l'esito corretto, non un lavoro lasciato a metà. Le firmi tu e l'organigramma si popola.
 
 **📋 Descrivi cosa vedi** — quanti agent, che nomi, e cosa ha scritto l'agent nel compito. È la
 verifica: dall'esterno l'assistente non vede niente di tutto questo.
