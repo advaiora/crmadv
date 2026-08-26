@@ -18,8 +18,11 @@ le quattro basi di conoscenza e il progetto su cui lavoreranno. **Nasce tutto sp
 | `projects/sviluppo-crm/` | Il progetto sotto cui nasceranno i compiti veri |
 | `.paperclip.yaml` | La configurazione tecnica |
 | `ISTRUZIONI-PER-AGENT.md` | Cosa deve fare l'agent che riceve questo pacchetto, in che ordine, e **dove fermarsi** |
-| `PROMPT-DA-INCOLLARE.md` | Il testo breve da incollare nella descrizione del compito |
 | `README.md` | Questo file |
+
+Il **prompt** da incollare nella descrizione del compito **non sta qui dentro**, e non è una
+dimenticanza: serve prima di aprire il pacchetto, non dopo. Sta accanto allo zip, in
+`paperclip/prompt-per-il-compito.md`.
 
 La struttura ricalca quella di un pacchetto esportato da Paperclip, verificata su un export vero
 del 26/8/2026: **cartella radice col nome dell'azienda** (`crm/`), `README.md` e `COMPANY.md` alla

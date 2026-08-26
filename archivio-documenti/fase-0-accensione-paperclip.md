@@ -390,10 +390,14 @@ ripiego del passo 6 resta quindi valido in pieno.
 >
 > | Cosa | Dove |
 > |---|---|
-> | I **sorgenti**, 49 file | `paperclip/crm/` |
+> | I **sorgenti**, 48 file | `paperclip/crm/` |
 > | Il **pacchetto** da allegare | `paperclip/azienda-crm.zip` |
-> | Il **prompt** da incollare | `paperclip/crm/PROMPT-DA-INCOLLARE.md` |
+> | Il **prompt** da incollare | `paperclip/prompt-per-il-compito.md` — **fuori dallo zip, apposta** |
 > | Cosa c'è dentro, spiegato | `paperclip/crm/README.md` — **leggilo prima di lanciare** |
+>
+> Le due consegne sono **separate e restano separate**: lo zip si allega, il prompt si incolla. Il
+> prompt non va dentro il pacchetto — lì lo leggerebbe solo l'agent, a cui non serve, perché è
+> l'istruzione che dice *cosa fare dell'allegato*.
 >
 > 🔁 **Se tocchi i sorgenti, rigenera lo zip**, altrimenti resti con la versione vecchia:
 > ```
