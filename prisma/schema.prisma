@@ -277,6 +277,7 @@ model User {
   createdAiAttachments                  AiConversationAttachment[]  @relation("AiConversationAttachmentCreatedBy")
   createdPerformanceSnapshots           PerformanceSnapshot[]       @relation("PerformanceSnapshotCreatedByUser")
   createdPerformanceMetricSets          PerformanceMetricSet[]      @relation("PerformanceMetricSetCreatedByUser")
+  passwordResetTokens                   PasswordResetToken[]
 }
 
 model TeamInvite {
@@ -300,6 +301,26 @@ model TeamInvite {
   @@index([workspaceId, status, createdAt(sort: Desc)])
   @@index([workspaceId, email, status])
   @@index([workspaceId, expiresAt])
+}
+
+// Un link di reimpostazione password («password dimenticata»): monouso e a
+// scadenza breve. Stessa forma di TeamInvite: a database finisce solo
+// l’impronta del token (`tokenHash`), mai il valore in chiaro che viaggia
+// nell’email. `usedAt` è ciò che rende il link monouso davvero: si valorizza
+// al primo consumo e da quel momento il link non vale più, anche se non è
+// ancora scaduto.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  requestIp String?   @db.VarChar(64)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
 }
 
 model Membership {
