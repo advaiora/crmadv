@@ -341,7 +341,27 @@ export const extractPermissionUsages = (source) => {
 
 const ROUTE_METHOD_PATTERN = /\bapp\.(get|post|put|patch|delete)\b/g;
 const ROUTE_PATH_PATTERN = /'([^']*)'/;
-const ROUTE_GUARD_PATTERN = /\bensure([A-Za-z0-9_$]*)Access\s*\(\s*[^(),]+,\s*(?:'([^']*)'|([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*))/;
+const ROUTE_GUARD_PATTERN = /\bensure([A-Za-z0-9_$]*)Access\s*\(\s*[^(),]+?\s*(?:,\s*(?:'([^']*)'|([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*))\s*)?\)/;
+const GUARD_ALIAS_PATTERN = /\bconst\s+(ensure[A-Za-z0-9_$]*Access)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>\s*ensure[A-Za-z0-9_$]*Access\s*\(\s*[^(),]+,\s*(?:'([^']*)'|([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*))\s*\)/g;
+
+// I cancelli scorciatoia dichiarati dentro il file stesso, del tipo
+//   const ensureAgencySettingsAccess = async (request) =>
+//     ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.manageSettings);
+// Senza risolverli, le rotte che li usano risultano SENZA permesso pur avendone uno —
+// un falso allarme che, se lasciato passare, insegna a non fidarsi della tabella.
+export const collectGuardAliases = (strippedSource, constants = new Map()) => {
+  const aliases = new Map();
+
+  for (const match of strippedSource.matchAll(GUARD_ALIAS_PATTERN)) {
+    const [, name, literal, constantName, property] = match;
+    const key = literal ?? constants.get(constantName)?.get(property);
+    if (key !== undefined) {
+      aliases.set(name, key);
+    }
+  }
+
+  return aliases;
+};
 
 // Le rotte dichiarate in un file di rotte, ciascuna col permesso che chiede. Serve al
 // test tabellare: la tabella attesa sta nel test, qui c'e' solo la lettura.
@@ -349,6 +369,7 @@ const ROUTE_GUARD_PATTERN = /\bensure([A-Za-z0-9_$]*)Access\s*\(\s*[^(),]+,\s*(?
 // non compare nessun cancello — la tabella lo dice apertamente invece di nasconderlo.
 export const extractRoutePermissions = (source, constants = new Map()) => {
   const stripped = stripNonCode(source);
+  const aliases = collectGuardAliases(stripped, constants);
   const anchors = [...stripped.matchAll(ROUTE_METHOD_PATTERN)];
   const routes = [];
 
@@ -360,12 +381,16 @@ export const extractRoutePermissions = (source, constants = new Map()) => {
     const pathMatch = body.match(ROUTE_PATH_PATTERN);
     const guardMatch = body.match(ROUTE_GUARD_PATTERN);
     const [, guardName, literal, constantName, property] = guardMatch ?? [];
+    const guard = guardMatch ? `ensure${guardName}Access` : null;
 
     routes.push({
       method: anchor[1].toUpperCase(),
       path: pathMatch ? pathMatch[1] : null,
-      guard: guardMatch ? `ensure${guardName}Access` : null,
-      permission: literal ?? constants.get(constantName)?.get(property) ?? null,
+      guard,
+      permission: literal
+        ?? constants.get(constantName)?.get(property)
+        ?? aliases.get(guard)
+        ?? null,
     });
   });
 

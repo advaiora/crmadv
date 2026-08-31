@@ -10,6 +10,7 @@ import test from 'node:test';
 import { findUnknownPermissions, formatProblem, CATALOG_PATH } from './rbac-catalog-check.mjs';
 import {
   collectConstantObjects,
+  collectGuardAliases,
   extractCatalogPermissions,
   extractPermissionUsages,
   extractRoutePermissions,
@@ -155,4 +156,31 @@ test('le rotte si leggono col permesso che chiedono, e quelle senza cancello lo 
     },
     { method: 'GET', path: '/agency/ping', guard: null, permission: null },
   ]);
+});
+
+test('i cancelli scorciatoia dichiarati nel file si risolvono al permesso vero', () => {
+  // Senza questo, le quattro rotte delle impostazioni AI risultavano SENZA permesso pur
+  // avendone uno: passano da una scorciatoia locale che il permesso ce l'ha dentro.
+  const sorgente = `
+    const AI_PRODUCTION_PERMISSIONS = { manageSettings: 'ai_production.manage_settings' } as const;
+
+    const ensureAgencySettingsAccess = async (request: FastifyRequest) =>
+      ensureAiProductionAccess(request, AI_PRODUCTION_PERMISSIONS.manageSettings);
+
+    app.put('/agency/settings/runtime', async (request, reply) => {
+      const { workspace } = await ensureAgencySettingsAccess(request);
+    });
+  `;
+  const costanti = collectConstantObjects(stripNonCode(sorgente));
+
+  assert.deepEqual(
+    [...collectGuardAliases(stripNonCode(sorgente), costanti)],
+    [['ensureAgencySettingsAccess', 'ai_production.manage_settings']],
+  );
+  assert.deepEqual(extractRoutePermissions(sorgente, costanti), [{
+    method: 'PUT',
+    path: '/agency/settings/runtime',
+    guard: 'ensureAgencySettingsAccess',
+    permission: 'ai_production.manage_settings',
+  }]);
 });
