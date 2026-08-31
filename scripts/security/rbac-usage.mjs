@@ -311,7 +311,17 @@ const PERMISSION_OBJECT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:PER
 // Finche' il pezzo finale chiedeva `'chiave'` attaccata alla parentesi, il controllo era cieco
 // proprio sulla forma piu' diffusa: provato in isolamento, con la virgola non usciva nessuna
 // chiave, senza la virgola usciva. Da qui il `,?` prima di `\)`.
-const GUARD_CALL_PATTERN = /\b(?:requirePermission|hasPermission)\s*\([^()]*?,[^(),]*?,\s*'([^']*)'\s*,?\s*\)/g;
+//
+// Il `[A-Za-z0-9_$]*` dopo il gruppo dei nomi c'e' perche' un cancello non arriva sempre
+// col suo nome: workspace-dashboard.route.ts riceve requirePermission PER INIEZIONE, come
+// `requirePermissionFn` (riga 16, `typeof requirePermission`), e lo chiama con la chiave
+// scritta li'. Erano due chiamate-cancello vere e invisibili. Misurato sui 242 file .ts del
+// backend: le chiavi di questa forma passano da 4 a 6, nessuna persa, e i soli nomi che il
+// suffisso libero cattura restano requirePermission, hasPermission, requirePermissionFn.
+// In particolare NON entra `hasPermissionKey`, che prende un argomento solo prima della
+// chiave mentre questa forma pretende due virgole: e' la ragione per cui allargare qui non
+// chiude il limite noto scritto piu' sotto.
+const GUARD_CALL_PATTERN = /\b(?:requirePermission|hasPermission)[A-Za-z0-9_$]*\s*\([^()]*?,[^(),]*?,\s*'([^']*)'\s*,?\s*\)/g;
 const ENSURE_CALL_PATTERN = /\bensure[A-Za-z0-9_$]*Access\s*\([^(),]+,\s*'([^']*)'\s*\)/g;
 const PERMISSION_PROPERTY_PATTERN = /\b(?:permission|permissionKey)\s*:\s*'([^']*)'/g;
 
@@ -329,7 +339,8 @@ const PERMISSION_CONSTANT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:_
 // Le chiavi che il codice USA. Cinque forme, tutte quelle presenti oggi nel backend:
 //   1. gli oggetti `X_PERMISSIONS` / `XPermissions` = { ... } as const dei moduli che
 //      riscrivono a mano i propri permessi invece di prenderli dal catalogo centrale;
-//   2. le chiamate dirette a requirePermission / hasPermission con la chiave scritta li';
+//   2. le chiamate dirette a requirePermission / hasPermission con la chiave scritta li',
+//      anche quando il cancello arriva per iniezione sotto un altro nome (requirePermissionFn);
 //   3. le chiamate ai cancelli di modulo, ensureQualcosaAccess(request, 'chiave');
 //   4. le proprieta' `permission:` / `permissionKey:` delle tabelle di navigazione;
 //   5. le costanti di modulo a chiave singola, `const VIEW_PERMISSION = 'departments.view'`.
@@ -338,10 +349,12 @@ const PERMISSION_CONSTANT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:_
 // 'team.invite_accepted', nomi di file, host). Il contesto ristretto e' cio' che rende
 // il controllo utile invece che rumoroso.
 //
-// LIMITE NOTO, dichiarato e non ancora chiuso: la SESTA forma resta fuori.
+// LIMITE NOTO, dichiarato e non ancora chiuso: la SESTA forma resta fuori, e oggi e' la sola.
 // Il modulo Dashboard non chiama i cancelli comuni, ha due helper propri —
-// `hasPermissionKey` / `hasAnyPermissionKey` in server/modules/dashboard/dashboard.policies.ts
-// — che ricevono le chiavi dentro array scritti su piu' righe:
+// `hasPermissionKey` / `hasAnyPermissionKey`, dichiarati in
+// server/modules/dashboard/dashboard.policies.ts e usati anche in dashboard.service.ts —
+// che ricevono le chiavi come argomento singolo o dentro array scritti su piu' righe:
+//   hasPermissionKey(permissionKeys, 'projects.view')
 //   hasAnyPermissionKey(permissionKeys, [
 //     'projects.edit',
 //     'quotes.send',
@@ -349,8 +362,18 @@ const PERMISSION_CONSTANT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:_
 // Nessuna delle cinque forme qui sopra le vede. Misurato sul codice di oggi sono
 // 22 chiavi distinte fra dashboard.policies.ts e dashboard.service.ts (23 contando anche
 // 'modules.view', che a catalogo non c'e' ed e' una questione di prodotto aperta a parte).
+// Il perimetro e' quello e SOLO quello: il terzo file della Dashboard,
+// routes/workspace-dashboard.route.ts, non e' piu' un buco — le sue due chiamate-cancello
+// (team.view, checklists.view) le prende la forma 2 da quando GUARD_CALL_PATTERN accetta
+// anche i nomi iniettati. Prima erano un buco che questo commento non nominava — parlava
+// solo di policies.ts e service.ts — e chi lo leggeva concludeva che fuori dagli helper il
+// controllo coprisse tutto. E' il motivo per cui adesso il perimetro e' scritto per esteso
+// invece che per esempi: un limite dichiarato piu' stretto del vero e' peggio di nessun
+// limite dichiarato, perche' a quello ci si affida.
 // Conseguenza pratica da tenere a mente leggendo un verde di questo controllo: un refuso
-// dentro `resolveRoleTierFromPermissions` passa senza che nessuno lo segnali.
+// dentro `resolveRoleTierFromPermissions` passa senza che nessuno lo segnali — ed e' per
+// questo che rbac-catalog-check.mjs lo ripete a voce nel proprio messaggio di successo,
+// dove qualcuno lo legge davvero, invece di lasciarlo solo qui.
 // Non e' un difetto da chiudere di passaggio: aggiungere la forma-array significa decidere
 // come distinguere un array di permessi da un array di nomi di evento, che e' lo stesso
 // problema gia' risolto altrove col suffisso obbligatorio ma qui non ha un appiglio uguale.

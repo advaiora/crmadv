@@ -7,7 +7,12 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { findUnknownPermissions, formatProblem, CATALOG_PATH } from './rbac-catalog-check.mjs';
+import {
+  findUnknownPermissions,
+  formatProblem,
+  CATALOG_PATH,
+  UNCOVERED_NOTICE,
+} from './rbac-catalog-check.mjs';
 import {
   collectConstantObjects,
   collectGuardAliases,
@@ -123,6 +128,54 @@ test('la virgola finale non disturba nemmeno su una riga sola', () => {
       .map((uso) => uso.key),
     ['quotes.send'],
   );
+});
+
+// Un cancello non arriva sempre col suo nome. La Dashboard riceve requirePermission per
+// iniezione, come `requirePermissionFn`, e lo chiama con la chiave scritta li': finche' la
+// regex pretendeva il nome esatto, erano due chiamate-cancello vere (team.view e
+// checklists.view in routes/workspace-dashboard.route.ts) che il controllo non vedeva — e il
+// limite noto non le nominava, quindi nessuno sapeva di doverle guardare a mano. Il caso di
+// prova sta qui per la stessa ragione di quello sulla virgola: il prossimo ritocco della
+// regex non deve poterle riperdere in silenzio.
+test('un cancello iniettato sotto un altro nome viene letto come quello vero', () => {
+  const iniettato = [
+    'await requirePermissionFn(',
+    '  user.id,',
+    '  workspace.id,',
+    "  'quotes.send',",
+    ');',
+  ].join('\n');
+
+  assert.deepEqual(
+    extractPermissionUsages(iniettato).map((uso) => [uso.key, uso.line]),
+    [['quotes.send', 1]],
+  );
+  assert.deepEqual(
+    extractPermissionUsages("await requirePermissionFn(user.id, workspace.id, 'quotes.send');")
+      .map((uso) => uso.key),
+    ['quotes.send'],
+  );
+});
+
+// Il rovescio della stessa modifica, ed e' la parte che tiene onesto il limite noto: il
+// suffisso libero sui nomi NON deve tirare dentro `hasPermissionKey`, che prende un
+// argomento solo prima della chiave. Se un domani ci entrasse, il controllo comincerebbe a
+// leggere gli helper della Dashboard a meta' — alcune chiamate si', gli array no — e il
+// limite dichiarato nel commento diventerebbe falso senza che nessuno se ne accorga.
+test('il suffisso libero sui nomi non tira dentro gli helper della Dashboard', () => {
+  assert.deepEqual(
+    extractPermissionUsages("if (hasPermissionKey(permissionKeys, 'projects.view')) { return; }"),
+    [],
+  );
+});
+
+// Il verde deve dire anche cio' che non ha potuto guardare. La riga vive in una costante
+// esportata apposta per essere tenuta ferma da qui: senza, una cancellazione distratta la
+// toglierebbe e il messaggio tornerebbe a leggersi come una copertura totale.
+test('il messaggio di successo dichiara cio\' che il controllo non copre', () => {
+  assert.match(UNCOVERED_NOTICE, /hasPermissionKey/);
+  assert.match(UNCOVERED_NOTICE, /hasAnyPermissionKey/);
+  assert.match(UNCOVERED_NOTICE, /scripts\/security\/rbac-usage\.mjs/);
 });
 
 // La forma a costante singola e' quella che i sei moduli di rotte usano davvero

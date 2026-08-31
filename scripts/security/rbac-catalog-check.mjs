@@ -28,6 +28,14 @@ import { extractCatalogPermissions, extractPermissionUsages } from './rbac-usage
 
 export const CATALOG_PATH = 'server/auth/rbac-catalog.ts';
 
+// Cio' che questo controllo NON guarda, in una riga da stampare insieme al verde. Esportata
+// perche' una prova la tiene ferma: e' l'unico pezzo del messaggio che qualcuno potrebbe
+// togliere credendolo rumore, ed e' proprio quello che evita di leggere il verde come una
+// copertura totale. Il perimetro per esteso sta in scripts/security/rbac-usage.mjs.
+export const UNCOVERED_NOTICE = 'Non coperte: le chiavi passate agli helper della Dashboard '
+  + '(hasPermissionKey / hasAnyPermissionKey in dashboard.policies.ts e dashboard.service.ts, '
+  + 'oggi 22 chiavi) - vedi il limite noto in scripts/security/rbac-usage.mjs.';
+
 const SCAN_DIRECTORIES = ['server'];
 const SCANNED_EXTENSIONS = new Set(['.ts', '.tsx', '.mts']);
 
@@ -124,9 +132,14 @@ const run = async () => {
     process.exit(1);
   }
 
+  // Il verde dice cio' che il controllo ha fatto; da solo si legge come "i permessi del
+  // backend sono a posto", che e' di piu'. Il limite noto e' scritto con cura, ma vive in un
+  // commento di rbac-usage.mjs: nessuno lo ha davanti nel momento in cui guarda l'uscita del
+  // comando. La seconda riga serve a far viaggiare il buco insieme al verde.
   process.stdout.write(
     `Controllo dei permessi RBAC passato: ${files.length} file letti, `
-    + `${catalogSize} permessi a catalogo, nessuna chiave sconosciuta.\n`,
+    + `${catalogSize} permessi a catalogo, nessuna chiave sconosciuta.\n`
+    + `${UNCOVERED_NOTICE}\n`,
   );
 };
 
