@@ -184,3 +184,27 @@ test('i cancelli scorciatoia dichiarati nel file si risolvono al permesso vero',
     permission: 'ai_production.manage_settings',
   }]);
 });
+
+test('i permessi si leggono con tutte e due le convenzioni di nome, ma gli eventi del registro restano fuori', () => {
+  // Il vault e' l'unico modulo che scrive `VaultPermissions` invece di `VAULT_PERMISSIONS`:
+  // finche' si accettava solo la seconda forma, le sue sei chiavi non le leggeva nessuno.
+  // Nello stesso file c'e' pero' `VaultAuditActions`, che di permessi non ne contiene: se
+  // entrasse anche quello, il controllo comincerebbe a chiedere al catalogo dei nomi di
+  // evento, e la via d'uscita piu' comoda sarebbe metterceli — cioe' sporcare il catalogo.
+  const sorgente = `
+    export const VaultPermissions = {
+      reveal: 'vault.reveal',
+      manageSettings: 'vault.manage_settings',
+    } as const;
+
+    export const VaultAuditActions = {
+      revealDenied: 'vault.reveal_denied',
+      unlockFail: 'vault.unlock_fail',
+    } as const;
+  `;
+
+  assert.deepEqual(
+    extractPermissionUsages(sorgente).map((uso) => uso.key),
+    ['vault.reveal', 'vault.manage_settings'],
+  );
+});

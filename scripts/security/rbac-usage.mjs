@@ -295,14 +295,19 @@ export const extractCatalogPermissions = (catalogSource) => {
   return keys;
 };
 
-const PERMISSION_OBJECT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*PERMISSIONS)\s*=\s*\{([\s\S]*?)\}\s*as const\s*;/g;
+// Due convenzioni di nome, non una: nove moduli scrivono `WEB_ASSETS_PERMISSIONS`, il vault
+// scrive `VaultPermissions`. Accettando solo la prima, le sei chiavi del vault non venivano
+// lette da nessuno — proprio il modulo dove un permesso sbagliato costa di piu'.
+// Il suffisso resta obbligatorio apposta: nello stesso modulo c'e' `VaultAuditActions`, che
+// contiene 'vault.reveal_denied' e altri NOMI DI EVENTO del registro, non permessi.
+const PERMISSION_OBJECT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:PERMISSIONS|Permissions))\s*=\s*\{([\s\S]*?)\}\s*as const\s*;/g;
 const GUARD_CALL_PATTERN = /\b(?:requirePermission|hasPermission)\s*\([^()]*?,[^(),]*?,\s*'([^']*)'\s*\)/g;
 const ENSURE_CALL_PATTERN = /\bensure[A-Za-z0-9_$]*Access\s*\([^(),]+,\s*'([^']*)'\s*\)/g;
 const PERMISSION_PROPERTY_PATTERN = /\b(?:permission|permissionKey)\s*:\s*'([^']*)'/g;
 
 // Le chiavi che il codice USA. Quattro forme, tutte quelle presenti oggi nel backend:
-//   1. gli oggetti `X_PERMISSIONS = { ... } as const` dei moduli che riscrivono a mano
-//      i propri permessi invece di prenderli dal catalogo centrale;
+//   1. gli oggetti `X_PERMISSIONS` / `XPermissions` = { ... } as const dei moduli che
+//      riscrivono a mano i propri permessi invece di prenderli dal catalogo centrale;
 //   2. le chiamate dirette a requirePermission / hasPermission con la chiave scritta li';
 //   3. le chiamate ai cancelli di modulo, ensureQualcosaAccess(request, 'chiave');
 //   4. le proprieta' `permission:` / `permissionKey:` delle tabelle di navigazione.
