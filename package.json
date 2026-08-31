@@ -28,6 +28,7 @@
     "test:frontend": "vitest run",
     "test:frontend:watch": "vitest",
     "security:vault-hygiene": "node scripts/security/vault-hygiene-check.mjs",
+    "security:rbac-catalog": "node scripts/security/rbac-catalog-check.mjs",
     "mappa": "node scripts/agenti/mappa.mjs",
     "consumi": "node scripts/agenti/consumi.mjs",
     "consumi:compito": "node scripts/agenti/consumi.mjs --compito"
