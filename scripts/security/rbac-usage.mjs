@@ -305,12 +305,24 @@ const GUARD_CALL_PATTERN = /\b(?:requirePermission|hasPermission)\s*\([^()]*?,[^
 const ENSURE_CALL_PATTERN = /\bensure[A-Za-z0-9_$]*Access\s*\([^(),]+,\s*'([^']*)'\s*\)/g;
 const PERMISSION_PROPERTY_PATTERN = /\b(?:permission|permissionKey)\s*:\s*'([^']*)'/g;
 
-// Le chiavi che il codice USA. Quattro forme, tutte quelle presenti oggi nel backend:
+// Le costanti di modulo che tengono UNA chiave sola, la forma piu' diffusa fra i moduli che
+// riscrivono i permessi in casa:
+//   const VIEW_PERMISSION = 'departments.view';
+//   await requirePermission(user.id, workspace.id, VIEW_PERMISSION);
+// Senza questa forma il controllo vedeva la chiamata ma non la chiave, e undici costanti in
+// sei file restavano fuori dal controllo — proprio i moduli che il compito chiede di leggere.
+// Il suffisso _PERMISSION / _PERMISSIONS e' obbligatorio per la stessa ragione del punto 1:
+// in workspace-modules.route.ts convive MODULES_AUDIT_ACTION = 'modules.manage', che e' un
+// nome di evento del registro attivita' e non un permesso.
+const PERMISSION_CONSTANT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:_PERMISSION|_PERMISSIONS))\s*(?::[^=;'"]*)?=\s*'([^']*)'/g;
+
+// Le chiavi che il codice USA. Cinque forme, tutte quelle presenti oggi nel backend:
 //   1. gli oggetti `X_PERMISSIONS` / `XPermissions` = { ... } as const dei moduli che
 //      riscrivono a mano i propri permessi invece di prenderli dal catalogo centrale;
 //   2. le chiamate dirette a requirePermission / hasPermission con la chiave scritta li';
 //   3. le chiamate ai cancelli di modulo, ensureQualcosaAccess(request, 'chiave');
-//   4. le proprieta' `permission:` / `permissionKey:` delle tabelle di navigazione.
+//   4. le proprieta' `permission:` / `permissionKey:` delle tabelle di navigazione;
+//   5. le costanti di modulo a chiave singola, `const VIEW_PERMISSION = 'departments.view'`.
 // Volutamente NON si accetta qualunque stringa con un punto dentro: nel backend ce ne
 // sono a decine che permessi non sono (nomi di evento del registro attivita' come
 // 'team.invite_accepted', nomi di file, host). Il contesto ristretto e' cio' che rende
@@ -340,6 +352,12 @@ export const extractPermissionUsages = (source) => {
   scanCalls(GUARD_CALL_PATTERN, 'requirePermission');
   scanCalls(ENSURE_CALL_PATTERN, 'ensureAccess');
   scanCalls(PERMISSION_PROPERTY_PATTERN, 'permission');
+
+  // Qui l'origine e' il nome della costante, come per gli oggetti X_PERMISSIONS: dice a chi
+  // legge l'errore quale riga cambiare, non solo che una chiave e' sbagliata.
+  for (const match of stripped.matchAll(PERMISSION_CONSTANT_PATTERN)) {
+    usages.push({ key: match[2], line: lineOf(match.index), origin: match[1] });
+  }
 
   return usages;
 };

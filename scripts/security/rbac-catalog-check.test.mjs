@@ -67,7 +67,7 @@ test('i commenti italiani con apostrofo non fanno perdere il codice che li segue
   assert.equal(usi[0].line, 2);
 });
 
-test('le quattro forme d uso vengono tutte riconosciute, con la riga giusta', () => {
+test('le cinque forme d uso vengono tutte riconosciute, con la riga giusta', () => {
   const sorgente = [
     "export const QUOTES_PERMISSIONS = {",
     "  view: 'quotes.view',",
@@ -75,17 +75,55 @@ test('le quattro forme d uso vengono tutte riconosciute, con la riga giusta', ()
     "await requirePermission(user.id, workspace.id, 'quotes.send');",
     "const { workspace } = await ensureQuotesAccess(request, 'quotes.accept');",
     "export const AREE = [{ permission: 'quotes.export_pdf' }];",
+    "const ARCHIVE_PERMISSION = 'quotes.archive';",
   ].join('\n');
 
   assert.deepEqual(
     extractPermissionUsages(sorgente).map((uso) => [uso.key, uso.line]).sort(),
     [
       ['quotes.accept', 5],
+      ['quotes.archive', 7],
       ['quotes.export_pdf', 6],
       ['quotes.send', 4],
       ['quotes.view', 2],
     ],
   );
+});
+
+// La forma a costante singola e' quella che i sei moduli di rotte usano davvero
+// (VIEW_PERMISSION, MANAGE_ROLES_PERMISSION, ...). Finche' restava fuori, il controllo
+// vedeva la CHIAMATA requirePermission(..., VIEW_PERMISSION) ma non la chiave che c'era
+// dentro: undici costanti in sei file passavano senza che nessuno le guardasse.
+test('una costante di modulo con la chiave sbagliata viene nominata per nome', () => {
+  const { problems } = findUnknownPermissions({
+    catalogSource: CATALOGO,
+    files: [{
+      path: 'server/routes/workspace-departments.route.ts',
+      source: [
+        "const VIEW_PERMISSION = 'reparti.vista';",
+        "await requirePermission(user.id, workspace.id, VIEW_PERMISSION);",
+      ].join('\n'),
+    }],
+  });
+
+  assert.equal(problems.length, 1);
+  assert.equal(problems[0].key, 'reparti.vista');
+  assert.equal(problems[0].line, 1);
+  assert.equal(problems[0].origin, 'VIEW_PERMISSION');
+});
+
+// Accanto alle costanti dei permessi vivono quelle degli EVENTI del registro attivita',
+// che hanno la stessa forma e a volte perfino lo stesso valore
+// (MODULES_AUDIT_ACTION = 'modules.manage' in workspace-modules.route.ts). Il suffisso
+// _PERMISSION e' cio' che le tiene separate: senza, il controllo si riempirebbe di
+// segnalazioni false e finirebbe spento.
+test('le costanti che non finiscono in _PERMISSION restano fuori', () => {
+  const sorgente = [
+    "const MODULES_AUDIT_ACTION = 'modules.manage';",
+    "const DEFAULT_LOCALE = 'it.IT';",
+  ].join('\n');
+
+  assert.deepEqual(extractPermissionUsages(sorgente), []);
 });
 
 test('le stringhe col punto che permessi non sono restano fuori', () => {
