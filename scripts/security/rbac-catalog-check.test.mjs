@@ -178,6 +178,17 @@ test('il messaggio di successo dichiara cio\' che il controllo non copre', () =>
   assert.match(UNCOVERED_NOTICE, /scripts\/security\/rbac-usage\.mjs/);
 });
 
+// Il secondo buco, e il piu' grande: il controllo legge solo server/. Dichiarare il primo e
+// tacere questo peggiorerebbe le cose invece di migliorarle — chi legge un verde che nomina
+// UN limite conclude che il resto sia coperto, mentre src/ tiene piu' chiavi scritte a mano
+// del backend. Tenuto fermo qui perche' e' la meta' che si toglie per prima, essendo l'unica
+// che non parla di codice presente in questo file.
+test('il messaggio di successo dichiara anche che il frontend resta fuori', () => {
+  assert.match(UNCOVERED_NOTICE, /src\//);
+  assert.match(UNCOVERED_NOTICE, /server\//);
+  assert.match(UNCOVERED_NOTICE, /CRM-64/);
+});
+
 // La forma a costante singola e' quella che i sei moduli di rotte usano davvero
 // (VIEW_PERMISSION, MANAGE_ROLES_PERMISSION, ...). Finche' restava fuori, il controllo
 // vedeva la CHIAMATA requirePermission(..., VIEW_PERMISSION) ma non la chiave che c'era
