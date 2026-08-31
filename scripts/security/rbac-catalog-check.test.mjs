@@ -90,6 +90,41 @@ test('le cinque forme d uso vengono tutte riconosciute, con la riga giusta', () 
   );
 });
 
+// La formattazione normale del progetto spezza le chiamate su piu' righe, e li' la virgola
+// finale prima della parentesi c'e' sempre. Finche' il controllo pretendeva la parentesi
+// attaccata alla chiave, era cieco proprio sulla forma piu' diffusa: la stessa chiamata
+// dava [] con la virgola e la chiave giusta senza. Il caso di prova tiene tutte e due le
+// scritture accanto, cosi' il prossimo ritocco della regex non puo' riperdere il pezzo.
+test('una chiamata multiriga viene letta con la virgola finale come senza', () => {
+  const conVirgola = [
+    'await requirePermission(',
+    '  user.id,',
+    '  workspace.id,',
+    "  'quotes.send',",
+    ');',
+  ].join('\n');
+  const senzaVirgola = conVirgola.replace("'quotes.send',", "'quotes.send'");
+
+  assert.deepEqual(
+    extractPermissionUsages(conVirgola).map((uso) => [uso.key, uso.line]),
+    [['quotes.send', 1]],
+  );
+  assert.deepEqual(
+    extractPermissionUsages(senzaVirgola).map((uso) => [uso.key, uso.line]),
+    [['quotes.send', 1]],
+  );
+});
+
+// Una chiamata su una riga sola con la virgola finale e' rara ma legale, e la stessa
+// modifica la copre: se un domani sparisse, sparirebbe anche il caso multiriga.
+test('la virgola finale non disturba nemmeno su una riga sola', () => {
+  assert.deepEqual(
+    extractPermissionUsages("await requirePermission(user.id, workspace.id, 'quotes.send',);")
+      .map((uso) => uso.key),
+    ['quotes.send'],
+  );
+});
+
 // La forma a costante singola e' quella che i sei moduli di rotte usano davvero
 // (VIEW_PERMISSION, MANAGE_ROLES_PERMISSION, ...). Finche' restava fuori, il controllo
 // vedeva la CHIAMATA requirePermission(..., VIEW_PERMISSION) ma non la chiave che c'era
