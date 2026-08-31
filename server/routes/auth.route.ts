@@ -23,6 +23,9 @@ import { rbacRepository } from '../repositories/rbac.repository.js';
 import { userRepository } from '../repositories/user.repository.js';
 import { workspaceBrandingService } from '../services/workspace-branding.service.js';
 import {
+  EXISTING_PASSWORD_MIN_LENGTH as LOGIN_MIN_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, PASSWORD_SALT_ROUNDS,
+} from '../auth/password-policy.js';
+import {
   resolveOrCreateWorkspaceForGoogle,
   upsertGoogleUser,
   verifyGoogleAccessToken,
@@ -30,9 +33,6 @@ import {
   type GoogleAuthMode,
 } from '../services/google-auth.service.js';
 
-const PASSWORD_SALT_ROUNDS = 12;
-const MIN_PASSWORD_LENGTH = 8;
-const LOGIN_MIN_PASSWORD_LENGTH = 1;
 const REGISTRATION_GENERIC_ERROR_MESSAGE = 'Errore durante la registrazione';
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const isLikelyJwtToken = (value: string) => value.split('.').length === 3;
