@@ -1,0 +1,65 @@
+#!/bin/sh
+# Guardia contro i push diretti su `main` (CRM-12, 31/8/2026).
+#
+# Perche' esiste: la regola «si lavora su rami, `main` si tocca solo per unione»
+# (CLAUDE.md, metodo di lavoro, punto 2) finora stava solo scritta a parole, e le
+# parole non fermano un `git push`. Non c'e' protezione lato server sulla repo
+# (piano GitHub gratuito), quindi la rete si tende qui, in locale, dove non costa
+# niente. A differenza del `pre-commit` accanto, questo hook BLOCCA davvero:
+# e' tutta la sua ragione d'essere.
+#
+# Attivazione (una volta per clone): git config core.hooksPath .githooks
+#
+# Via d'uscita per l'unione vera, che e' un passaggio dichiarato e non di routine:
+#   UNIONE_MAIN=1 git push origin main
+#
+# git ci passa (remote, url) come argomenti e, sullo standard input, una riga per
+# ogni ref che sta per partire, nella forma:
+#   <ref locale> <sha locale> <ref remoto> <sha remoto>
+# Guardiamo solo il terzo campo: i tag (refs/tags/...) e gli altri rami non ci
+# riguardano e passano lisci.
+
+RAMO_PROTETTO='refs/heads/main'
+trovato=0
+
+while read -r _ref_locale _sha_locale ref_remoto _sha_remoto; do
+  [ -z "$ref_remoto" ] && continue
+  if [ "$ref_remoto" = "$RAMO_PROTETTO" ]; then
+    trovato=1
+  fi
+done
+
+[ "$trovato" -eq 0 ] && exit 0
+
+if [ -n "$UNIONE_MAIN" ] && [ "$UNIONE_MAIN" != "0" ]; then
+  echo "[guardia main] UNIONE_MAIN attivo: push su 'main' consentito." >&2
+  exit 0
+fi
+
+ramo_corrente=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo '(nessun ramo)')
+
+cat >&2 <<MESSAGGIO
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  PUSH SU 'main' RIFIUTATO                                       │
+  └─────────────────────────────────────────────────────────────────┘
+
+  In questo progetto si lavora su rami: 'main' si tocca solo per unione,
+  che e' un passaggio dichiarato e deciso, non un push di routine.
+  (La regola sta in CLAUDE.md, "Metodo di lavoro", punto 2.)
+
+  Cosa fare invece, se stavi solo salvando il tuo lavoro:
+
+      git switch -c <nome-del-ramo>        # se sei ancora su 'main'
+      git push -u origin <nome-del-ramo>
+
+  Sei su: $ramo_corrente
+
+  Se invece questa E' l'unione vera a 'main', e la stai facendo apposta,
+  ripeti il comando cosi':
+
+      UNIONE_MAIN=1 git push origin main
+
+MESSAGGIO
+
+exit 1
