@@ -316,11 +316,24 @@ const PERMISSION_OBJECT_PATTERN = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*(?:PER
 // col suo nome: workspace-dashboard.route.ts riceve requirePermission PER INIEZIONE, come
 // `requirePermissionFn` (riga 16, `typeof requirePermission`), e lo chiama con la chiave
 // scritta li'. Erano due chiamate-cancello vere e invisibili. Misurato sui 242 file .ts del
-// backend: le chiavi di questa forma passano da 4 a 6, nessuna persa, e i soli nomi che il
-// suffisso libero cattura restano requirePermission, hasPermission, requirePermissionFn.
-// In particolare NON entra `hasPermissionKey`, che prende un argomento solo prima della
-// chiave mentre questa forma pretende due virgole: e' la ragione per cui allargare qui non
-// chiude il limite noto scritto piu' sotto.
+// backend: le OCCORRENZE di questa forma passano da 4 a 6 e le CHIAVI DISTINTE da 3 a 5 —
+// entrano 'team.view' e 'checklists.view' — e nessuna si perde. Occorrenze e chiavi non sono
+// la stessa cosa e qui divergono: 'projects.view_all' compare due volte, in
+// agency.service.ts e in projects.service.ts.
+//
+// I nomi che il suffisso libero fa combaciare non sono tre ma CINQUE, e due non rendono
+// nulla. Non rendono nulla per la loro FORMA, non per il loro nome: e' una differenza che
+// conta, perche' chi domani ritocca la regex si appoggia a questo elenco, e un insieme
+// dichiarato piu' stretto del vero e' peggio di nessun insieme dichiarato.
+//   - requirePermission, hasPermission, requirePermissionFn: agganciano, ed e' cio' che
+//     vogliamo;
+//   - `hasPermissionKey` cade sull'arita': prende un argomento solo prima della chiave,
+//     mentre questa forma pretende due virgole. E' la ragione per cui allargare qui NON
+//     chiude il limite noto scritto piu' sotto — quello resta aperto;
+//   - `requirePermissionLegacy` (server/auth/guards.ts:4, importato sotto quel nome, e :41,
+//     dove viene chiamato) passa `permissionKey`, cioe' una VARIABILE e non un letterale,
+//     quindi il pezzo finale `'([^']*)'` non aggancia niente. Se un giorno qualcuno gli
+//     passasse una chiave scritta a mano, questa forma la leggerebbe — ed e' bene cosi'.
 const GUARD_CALL_PATTERN = /\b(?:requirePermission|hasPermission)[A-Za-z0-9_$]*\s*\([^()]*?,[^(),]*?,\s*'([^']*)'\s*,?\s*\)/g;
 const ENSURE_CALL_PATTERN = /\bensure[A-Za-z0-9_$]*Access\s*\([^(),]+,\s*'([^']*)'\s*\)/g;
 const PERMISSION_PROPERTY_PATTERN = /\b(?:permission|permissionKey)\s*:\s*'([^']*)'/g;

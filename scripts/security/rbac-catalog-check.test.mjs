@@ -10,6 +10,7 @@ import test from 'node:test';
 import {
   findUnknownPermissions,
   formatProblem,
+  formatSuccessMessage,
   CATALOG_PATH,
   UNCOVERED_NOTICE,
 } from './rbac-catalog-check.mjs';
@@ -169,13 +170,24 @@ test('il suffisso libero sui nomi non tira dentro gli helper della Dashboard', (
   );
 });
 
-// Il verde deve dire anche cio' che non ha potuto guardare. La riga vive in una costante
-// esportata apposta per essere tenuta ferma da qui: senza, una cancellazione distratta la
-// toglierebbe e il messaggio tornerebbe a leggersi come una copertura totale.
-test('il messaggio di successo dichiara cio\' che il controllo non copre', () => {
-  assert.match(UNCOVERED_NOTICE, /hasPermissionKey/);
-  assert.match(UNCOVERED_NOTICE, /hasAnyPermissionKey/);
-  assert.match(UNCOVERED_NOTICE, /scripts\/security\/rbac-usage\.mjs/);
+// Il verde deve dire anche cio' che non ha potuto guardare — e deve DIRLO, non solo tenerlo
+// in una costante da qualche parte. Queste tre prove girano su formatSuccessMessage, cioe'
+// sul testo composto che `run` si limita a stampare, e non piu' su UNCOVERED_NOTICE da sola.
+// La differenza non e' di stile: asserire sulla sola costante tiene ferma la stringa e lascia
+// libera la sua EMISSIONE, cosi' che togliere dall'uscita la riga che la concatena non fa
+// cadere niente — provato, 74 prove su 74 restavano verdi. Era il guasto che l'export doveva
+// prevenire, e comprava l'apparenza della protezione invece della protezione (CRM-67).
+const messaggioDiSuccesso = () => formatSuccessMessage({ fileCount: 179, catalogSize: 73 });
+
+test('il messaggio di successo stampa cio\' che il controllo non copre', () => {
+  const messaggio = messaggioDiSuccesso();
+
+  // L'inclusione della costante intera e' l'asserzione che vale: qualunque riscrittura che
+  // smetta di stamparla fa cadere questa riga, comunque sia formulato il resto del messaggio.
+  assert.ok(messaggio.includes(UNCOVERED_NOTICE));
+  assert.match(messaggio, /hasPermissionKey/);
+  assert.match(messaggio, /hasAnyPermissionKey/);
+  assert.match(messaggio, /scripts\/security\/rbac-usage\.mjs/);
 });
 
 // Il secondo buco, e il piu' grande: il controllo legge solo server/. Dichiarare il primo e
@@ -183,10 +195,21 @@ test('il messaggio di successo dichiara cio\' che il controllo non copre', () =>
 // UN limite conclude che il resto sia coperto, mentre src/ tiene piu' chiavi scritte a mano
 // del backend. Tenuto fermo qui perche' e' la meta' che si toglie per prima, essendo l'unica
 // che non parla di codice presente in questo file.
-test('il messaggio di successo dichiara anche che il frontend resta fuori', () => {
-  assert.match(UNCOVERED_NOTICE, /src\//);
-  assert.match(UNCOVERED_NOTICE, /server\//);
-  assert.match(UNCOVERED_NOTICE, /CRM-64/);
+test('il messaggio di successo stampa anche che il frontend resta fuori', () => {
+  const messaggio = messaggioDiSuccesso();
+
+  assert.match(messaggio, /src\//);
+  assert.match(messaggio, /server\//);
+  assert.match(messaggio, /CRM-64/);
+});
+
+// I due conteggi, ciascuno al suo posto. Scambiarli darebbe un verde che dichiara 73 file
+// letti e 179 permessi a catalogo: due numeri credibili e sbagliati, che nessuno riguarda.
+test('il messaggio di successo porta i due conteggi, ciascuno al suo posto', () => {
+  const messaggio = messaggioDiSuccesso();
+
+  assert.match(messaggio, /179 file letti/);
+  assert.match(messaggio, /73 permessi a catalogo/);
 });
 
 // La forma a costante singola e' quella che i sei moduli di rotte usano davvero

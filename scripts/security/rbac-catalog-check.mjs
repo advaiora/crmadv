@@ -31,10 +31,23 @@ import { extractCatalogPermissions, extractPermissionUsages } from './rbac-usage
 
 export const CATALOG_PATH = 'server/auth/rbac-catalog.ts';
 
-// Cio' che questo controllo NON guarda, in una riga da stampare insieme al verde. Esportata
-// perche' una prova la tiene ferma: e' l'unico pezzo del messaggio che qualcuno potrebbe
-// togliere credendolo rumore, ed e' proprio quello che evita di leggere il verde come una
-// copertura totale. Il perimetro per esteso sta in scripts/security/rbac-usage.mjs.
+// Cio' che questo controllo NON guarda, in una riga da stampare insieme al verde. E' l'unico
+// pezzo del messaggio che qualcuno potrebbe togliere credendolo rumore, ed e' proprio quello
+// che evita di leggere il verde come una copertura totale. Il perimetro per esteso sta in
+// scripts/security/rbac-usage.mjs.
+//
+// Esportata, ma da sola non basta, ed e' un errore in cui questo file e' gia' caduto: una
+// prova che asserisce sul CONTENUTO della costante tiene ferma la stringa e lascia libera la
+// sua STAMPA. Chi cancellasse la riga che la concatena nell'uscita non farebbe cadere niente,
+// e il verde tornerebbe a leggersi come copertura totale — il guasto esatto che questa
+// costante esiste per prevenire. Per questo il messaggio si compone in formatSuccessMessage
+// qui sotto, che le prove chiamano davvero (CRM-67).
+//
+// Il conteggio preciso delle chiavi Dashboard (22, oggi) NON sta in questa riga: stampato
+// sarebbe un numero esatto che nessuna prova tiene vero, invecchiato in silenzio al primo
+// helper aggiunto — lo stesso ragionamento per cui il frontend si dichiara con «oltre 160»
+// invece che con 164. Vive nel commento del limite noto in scripts/security/rbac-usage.mjs,
+// dove chi lo legge sta gia' guardando il codice che lo produce.
 //
 // I buchi da dichiarare sono DUE, e il secondo e' il piu' grande. Il primo e' una forma che
 // l'estrattore non legge (gli helper della Dashboard); il secondo e' meta' della catena che
@@ -42,9 +55,9 @@ export const CATALOG_PATH = 'server/auth/rbac-catalog.ts';
 // solo il primo sposterebbe il problema invece di chiuderlo: chi legge un verde che dichiara
 // un buco solo conclude che tutto il resto sia coperto.
 export const UNCOVERED_NOTICE = 'Non coperte: le chiavi passate agli helper della Dashboard '
-  + '(hasPermissionKey / hasAnyPermissionKey in dashboard.policies.ts e dashboard.service.ts, '
-  + 'oggi 22 chiavi), e tutto il frontend - questo controllo legge solo server/, mentre src/ '
-  + 'tiene oltre 160 chiavi di permesso scritte a mano (CRM-64). '
+  + '(hasPermissionKey / hasAnyPermissionKey in dashboard.policies.ts e dashboard.service.ts), '
+  + 'e tutto il frontend - questo controllo legge solo server/, mentre src/ tiene oltre 160 '
+  + 'chiavi di permesso scritte a mano (CRM-64). '
   + 'Vedi il limite noto in scripts/security/rbac-usage.mjs.';
 
 // Solo il backend, e non perche' il frontend non conti: li' il guasto e' identico e piu'
@@ -118,6 +131,20 @@ export const findUnknownPermissions = ({ catalogSource, files }) => {
   return { catalogSize: catalog.size, problems };
 };
 
+// Il testo del verde, composto qui e non dentro `run` per una ragione sola: `run` non e'
+// esportata, quindi niente di cio' che compone puo' essere provato. Spostato qui, il messaggio
+// diventa il valore di ritorno di una funzione che le prove chiamano — e togliere la riga del
+// limite noto dall'uscita fa cadere una prova, invece di passare inosservato.
+//
+// Il verde dice cio' che il controllo ha fatto; da solo si legge come "i permessi del backend
+// sono a posto", che e' di piu'. La seconda riga serve a far viaggiare il buco insieme al
+// verde: il limite e' scritto con cura, ma vive in un commento di rbac-usage.mjs, che nessuno
+// ha davanti nel momento in cui guarda l'uscita del comando.
+export const formatSuccessMessage = ({ fileCount, catalogSize }) =>
+  `Controllo dei permessi RBAC passato: ${fileCount} file letti, `
+  + `${catalogSize} permessi a catalogo, nessuna chiave sconosciuta.\n`
+  + `${UNCOVERED_NOTICE}`;
+
 export const formatProblem = (problem) =>
   `${problem.file}:${problem.line} usa il permesso '${problem.key}' (da ${problem.origin}), che non esiste nel catalogo ${CATALOG_PATH}`;
 
@@ -154,15 +181,7 @@ const run = async () => {
     process.exit(1);
   }
 
-  // Il verde dice cio' che il controllo ha fatto; da solo si legge come "i permessi del
-  // backend sono a posto", che e' di piu'. Il limite noto e' scritto con cura, ma vive in un
-  // commento di rbac-usage.mjs: nessuno lo ha davanti nel momento in cui guarda l'uscita del
-  // comando. La seconda riga serve a far viaggiare il buco insieme al verde.
-  process.stdout.write(
-    `Controllo dei permessi RBAC passato: ${files.length} file letti, `
-    + `${catalogSize} permessi a catalogo, nessuna chiave sconosciuta.\n`
-    + `${UNCOVERED_NOTICE}\n`,
-  );
+  process.stdout.write(`${formatSuccessMessage({ fileCount: files.length, catalogSize })}\n`);
 };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
