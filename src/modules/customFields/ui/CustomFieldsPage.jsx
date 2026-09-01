@@ -1,49 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Card, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Badge, Button, Card, Modal, Spinner, Table } from 'react-bootstrap';
 import { ArrowDown, ArrowUp, ListPlus, Pencil, Trash2 } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
 import {
-  createCustomField,
   deleteCustomField,
   listCustomFields,
   reorderCustomFields,
-  updateCustomField,
 } from '../api/customFieldsApi';
-
-const FIELD_TYPE_OPTIONS = [
-  { value: 'text', label: 'Testo breve' },
-  { value: 'textarea', label: 'Testo lungo' },
-  { value: 'number', label: 'Numero' },
-  { value: 'date', label: 'Data' },
-  { value: 'boolean', label: 'Sì / No' },
-  { value: 'select', label: 'Elenco a tendina' },
-];
-
-const TYPE_LABEL = Object.fromEntries(FIELD_TYPE_OPTIONS.map((option) => [option.value, option.label]));
+import CustomFieldDraftModal from './CustomFieldDraftModal';
+import { FIELD_TYPE_LABELS } from './customFieldDraft';
 
 const getErrorMessage = (error, fallback) => error?.message || fallback;
-
-// Trasforma le opzioni [{value,label}] in testo "una per riga" (value | label).
-const optionsToText = (options) =>
-  (Array.isArray(options) ? options : [])
-    .map((option) => (option.label && option.label !== option.value ? `${option.value} | ${option.label}` : option.value))
-    .join('\n');
-
-// Parsa il testo "una per riga" in [{value,label}].
-const textToOptions = (text) =>
-  String(text || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [value, ...rest] = line.split('|');
-      const cleanValue = value.trim();
-      const label = rest.join('|').trim();
-      return { value: cleanValue, label: label || cleanValue };
-    })
-    .filter((option) => option.value);
-
-const emptyDraft = { id: null, label: '', key: '', type: 'text', required: false, active: true, optionsText: '' };
 
 // Pagina di gestione dei campi personalizzati del cliente (Custom Fields, V3).
 const CustomFieldsPage = () => {
@@ -52,8 +19,8 @@ const CustomFieldsPage = () => {
   const [loadError, setLoadError] = useState('');
   const [reordering, setReordering] = useState(false);
 
-  const [draft, setDraft] = useState(null); // null = modale chiusa
-  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingField, setEditingField] = useState(null); // null = creazione
   const [deleting, setDeleting] = useState(null); // definizione in eliminazione
 
   const load = useCallback(async () => {
@@ -73,61 +40,20 @@ const CustomFieldsPage = () => {
     void load();
   }, [load]);
 
-  const isEditing = Boolean(draft?.id);
-  const isSelect = draft?.type === 'select';
+  const openCreate = () => {
+    setEditingField(null);
+    setModalOpen(true);
+  };
 
-  const openCreate = () => setDraft({ ...emptyDraft });
-  const openEdit = (field) =>
-    setDraft({
-      id: field.id,
-      label: field.label,
-      key: field.key,
-      type: field.type,
-      required: field.required,
-      active: field.active,
-      optionsText: optionsToText(field.options),
-    });
+  const openEdit = (field) => {
+    setEditingField(field);
+    setModalOpen(true);
+  };
 
-  const handleSave = async () => {
-    if (!draft?.label.trim()) {
-      toast.error('Etichetta obbligatoria');
-      return;
-    }
-    const payload = {
-      label: draft.label.trim(),
-      type: draft.type,
-      required: draft.required,
-      active: draft.active,
-    };
-    if (draft.type === 'select') {
-      const options = textToOptions(draft.optionsText);
-      if (options.length === 0) {
-        toast.error('Un elenco a tendina richiede almeno un\'opzione');
-        return;
-      }
-      payload.options = options;
-    }
-    // La chiave si invia solo in creazione (in modifica è immutabile).
-    if (!isEditing && draft.key.trim()) {
-      payload.key = draft.key.trim();
-    }
-
-    setSaving(true);
-    try {
-      if (isEditing) {
-        await updateCustomField(draft.id, payload);
-        toast.success('Campo aggiornato');
-      } else {
-        await createCustomField(payload);
-        toast.success('Campo creato');
-      }
-      setDraft(null);
-      await load();
-    } catch (error) {
-      toast.error(getErrorMessage(error, 'Errore salvataggio campo'));
-    } finally {
-      setSaving(false);
-    }
+  const handleSaved = async (definition, { isEditing }) => {
+    setModalOpen(false);
+    toast.success(isEditing ? 'Campo aggiornato' : 'Campo creato');
+    await load();
   };
 
   const handleDelete = async () => {
@@ -162,19 +88,6 @@ const CustomFieldsPage = () => {
       setReordering(false);
     }
   };
-
-  const previewKey = useMemo(() => {
-    if (isEditing || draft?.key) {
-      return draft?.key || '';
-    }
-    // Anteprima dello slug generato dall'etichetta (indicativa; il server è la fonte di verità).
-    return String(draft?.label || '')
-      .toLowerCase()
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '');
-  }, [draft, isEditing]);
 
   return (
     <div className="container-fluid py-4">
@@ -250,7 +163,7 @@ const CustomFieldsPage = () => {
                     </td>
                     <td className="fw-semibold">{field.label}</td>
                     <td className="text-muted"><code>{field.key}</code></td>
-                    <td>{TYPE_LABEL[field.type] || field.type}</td>
+                    <td>{FIELD_TYPE_LABELS[field.type] || field.type}</td>
                     <td>{field.required ? <Badge bg="warning" text="dark">Obbligatorio</Badge> : <span className="text-muted">—</span>}</td>
                     <td>
                       <Badge bg={field.active ? 'success' : 'secondary'}>
@@ -275,74 +188,12 @@ const CustomFieldsPage = () => {
         </Card.Body>
       </Card>
 
-      <Modal show={Boolean(draft)} onHide={() => setDraft(null)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>{isEditing ? 'Modifica campo' : 'Nuovo campo personalizzato'}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Etichetta</Form.Label>
-            <Form.Control
-              value={draft?.label || ''}
-              onChange={(event) => setDraft((current) => ({ ...current, label: event.target.value }))}
-              placeholder="Es. Settore merceologico"
-              autoFocus
-            />
-            {!isEditing && previewKey && (
-              <Form.Text className="text-muted">Chiave tecnica: <code>{previewKey}</code></Form.Text>
-            )}
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>Tipo</Form.Label>
-            <Form.Select
-              value={draft?.type || 'text'}
-              onChange={(event) => setDraft((current) => ({ ...current, type: event.target.value }))}
-            >
-              {FIELD_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-
-          {isSelect && (
-            <Form.Group className="mb-3">
-              <Form.Label>Opzioni <span className="text-muted small">(una per riga; «valore | etichetta»)</span></Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={4}
-                value={draft?.optionsText || ''}
-                onChange={(event) => setDraft((current) => ({ ...current, optionsText: event.target.value }))}
-                placeholder={'alta | Alta\nmedia | Media\nbassa | Bassa'}
-              />
-            </Form.Group>
-          )}
-
-          <Form.Check
-            type="switch"
-            id="cf-required"
-            className="mb-2"
-            label="Campo obbligatorio"
-            checked={Boolean(draft?.required)}
-            onChange={(event) => setDraft((current) => ({ ...current, required: event.target.checked }))}
-          />
-          <Form.Check
-            type="switch"
-            id="cf-active"
-            label="Attivo (mostrato nella scheda cliente)"
-            checked={Boolean(draft?.active)}
-            onChange={(event) => setDraft((current) => ({ ...current, active: event.target.checked }))}
-          />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setDraft(null)} disabled={saving}>
-            Annulla
-          </Button>
-          <Button variant="primary" onClick={() => void handleSave()} disabled={saving}>
-            {saving ? 'Salvataggio…' : 'Salva'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <CustomFieldDraftModal
+        show={modalOpen}
+        field={editingField}
+        onHide={() => setModalOpen(false)}
+        onSaved={handleSaved}
+      />
 
       <Modal show={Boolean(deleting)} onHide={() => setDeleting(null)} centered>
         <Modal.Header closeButton>
