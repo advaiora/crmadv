@@ -10,6 +10,7 @@ const RIGA_SALVATA: ImpostazioniMailRecord = {
   server: 'mail.esempio.it',
   porta: 587,
   connessioneSicura: false,
+  retePrivataConsentita: false,
   utente: 'noreply@esempio.it',
   mittente: 'Studio <noreply@esempio.it>',
   ciphertext: 'cifrata',
@@ -282,4 +283,74 @@ test('la prova scrive nel registro attivita\' anche quando fallisce', async () =
 
   assert.equal(registrati.length, 1);
   assert.equal((registrati[0] as { event: string }).event, 'mail.test');
+});
+
+// ── L'autorizzazione a raggiungere la rete interna ────────────────────────────
+// Il campo attraversa tre facce con lo stesso nome (colonna, corpo di PUT,
+// risposta di GET): se una delle tre lo perde per strada, la maschera salva una
+// spunta che al ricaricamento torna indietro senza dire niente.
+
+test('l\'autorizzazione alla rete interna arriva fino al repository', async () => {
+  const { servizio, salvataggi } = costruisciServizio(RIGA_SALVATA);
+
+  await servizio.salvaImpostazioni({
+    workspaceId: 'ws-1',
+    actorUserId: 'user-1',
+    body: { ...CORPO_VALIDO, retePrivataConsentita: true },
+  });
+
+  assert.equal(salvataggi[0].retePrivataConsentita, true);
+});
+
+test('un corpo che non nomina l\'autorizzazione la lascia spenta', () => {
+  const parsed = salvaImpostazioniMailSchema.parse(CORPO_VALIDO);
+
+  // `default(false)` e non `optional`: una maschera vecchia che non manda il
+  // campo deve ricadere sul blocco, non lasciare passare la prova.
+  assert.equal(parsed.retePrivataConsentita, false);
+});
+
+test('l\'autorizzazione si rilegge dalla riga salvata', async () => {
+  const { servizio } = costruisciServizio({ ...RIGA_SALVATA, retePrivataConsentita: true });
+
+  const impostazioni = await servizio.getImpostazioni('ws-1');
+
+  assert.equal(impostazioni.retePrivataConsentita, true);
+});
+
+test('senza riga a database l\'autorizzazione risulta spenta', async () => {
+  const { servizio } = buildMailServiceConAmbiente();
+
+  const impostazioni = await servizio.getImpostazioni('ws-1');
+
+  assert.equal(impostazioni.retePrivataConsentita, false);
+});
+
+test('accendere l\'autorizzazione resta scritto nel registro attivita\'', async () => {
+  const registrati: Array<{ event: string; metadata?: Record<string, unknown> }> = [];
+  const servizio = buildMailService({
+    repository: {
+      findByWorkspaceId: async () => RIGA_SALVATA,
+      upsert: async () => RIGA_SALVATA,
+      deleteByWorkspaceId: async () => undefined,
+    },
+    crypto: {
+      encrypt: async () => ({ ciphertext: 'x', iv: 'x', authTag: 'x', keyVersion: 1 }),
+      decrypt: async () => 'segreto',
+    },
+    resolveSettings: async () => ({ esito: 'assente' as const }),
+    leggiAmbiente: () => null,
+    registraAudit: (async (input: never) => {
+      registrati.push(input);
+    }) as never,
+  });
+
+  await servizio.salvaImpostazioni({
+    workspaceId: 'ws-1',
+    actorUserId: 'user-1',
+    body: { ...CORPO_VALIDO, retePrivataConsentita: true },
+  });
+
+  const salvataggio = registrati.find((riga) => riga.event === 'mail.save');
+  assert.equal(salvataggio?.metadata?.retePrivataConsentita, true);
 });

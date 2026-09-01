@@ -36,6 +36,12 @@ export const salvaImpostazioniMailSchema = z
     server: z.string().trim().min(1).max(255),
     porta: z.coerce.number().int().min(1).max(65535).default(587),
     connessioneSicura: z.boolean().default(false),
+    /**
+     * Autorizza la prova di connessione a raggiungere un indirizzo della rete
+     * interna. `default(false)` e non `optional`: una maschera vecchia che non
+     * manda il campo deve ricadere sul blocco, non lasciarlo com'era.
+     */
+    retePrivataConsentita: z.boolean().default(false),
     utente: z.string().trim().max(255).nullable().optional(),
     mittente: mittenteSchema,
     /**
@@ -86,6 +92,8 @@ export type ImpostazioniMailPubbliche = {
   server: string;
   porta: number;
   connessioneSicura: boolean;
+  /** Se la prova di connessione puo' raggiungere la rete interna. */
+  retePrivataConsentita: boolean;
   utente: string | null;
   mittente: string;
   aggiornatoIl: string | null;
@@ -144,6 +152,10 @@ export const buildMailService = (
         origineInUso,
         passwordSalvata: false,
         attivo: true,
+        // Senza riga a database non c'e' nessuna autorizzazione dichiarata: la
+        // maschera nasce con la spunta spenta anche quando si precompila con le
+        // variabili d'ambiente.
+        retePrivataConsentita: false,
         ...dallAmbiente(dependencies.leggiAmbiente()),
         aggiornatoIl: null,
       };
@@ -157,6 +169,7 @@ export const buildMailService = (
       server: record.server,
       porta: record.porta,
       connessioneSicura: record.connessioneSicura,
+      retePrivataConsentita: record.retePrivataConsentita,
       utente: record.utente,
       mittente: record.mittente,
       aggiornatoIl: record.updatedAt.toISOString(),
@@ -219,6 +232,7 @@ export const buildMailService = (
         server: dati.server,
         porta: dati.porta,
         connessioneSicura: dati.connessioneSicura,
+        retePrivataConsentita: dati.retePrivataConsentita,
         utente,
         mittente: dati.mittente,
         segreto,
@@ -234,6 +248,7 @@ export const buildMailService = (
           server: dati.server,
           porta: dati.porta,
           connessioneSicura: dati.connessioneSicura,
+          retePrivataConsentita: dati.retePrivataConsentita,
           attivo: dati.attivo,
           // Che la password sia cambiata si annota; il valore no, mai.
           passwordCambiata: passwordDaSalvare !== undefined,

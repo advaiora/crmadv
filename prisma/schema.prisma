@@ -1506,26 +1506,33 @@ model WorkspaceBranding {
 /// spezzerebbe l'unico schema riconoscibile a colpo d'occhio quando si cerca
 /// dove il CRM conserva un segreto.
 model MailServerSettings {
-  id          String @id @default(cuid())
-  workspaceId String @unique
+  id                    String    @id @default(cuid())
+  workspaceId           String    @unique
   /// Spento, il CRM torna a spedire con le variabili d'ambiente senza che la
   /// configurazione vada persa. Serve a due cose che capitano davvero: mettere
   /// in pausa un server che sta rimbalzando le email, e preparare una
   /// configurazione prima di metterla in uso. Senza questo campo l'unico modo
   /// per tornare indietro sarebbe cancellare la riga, e con essa la password.
-  attivo            Boolean   @default(true)
-  server            String    @db.VarChar(255)
-  porta             Int       @default(587)
-  connessioneSicura Boolean   @default(false)
-  utente            String?   @db.VarChar(255)
-  mittente          String    @db.VarChar(255)
-  ciphertext        String?   @db.Text
-  iv                String?   @db.VarChar(255)
-  authTag           String?   @db.VarChar(255)
-  keyVersion        Int?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  attivo                Boolean   @default(true)
+  server                String    @db.VarChar(255)
+  porta                 Int       @default(587)
+  connessioneSicura     Boolean   @default(false)
+  /// Autorizza la «Prova connessione» a raggiungere un indirizzo della rete
+  /// interna. Spento (il default) la prova verso un indirizzo privato viene
+  /// rifiutata senza aprire nessuna connessione: e' cio' che impedisce di usare
+  /// il pulsante come sonda della rete dell'agenzia. Acceso, l'agenzia dichiara
+  /// che il proprio server di posta sta davvero dentro la sua rete — e la
+  /// dichiarazione resta scritta nel registro attivita'.
+  retePrivataConsentita Boolean   @default(false)
+  utente                String?   @db.VarChar(255)
+  mittente              String    @db.VarChar(255)
+  ciphertext            String?   @db.Text
+  iv                    String?   @db.VarChar(255)
+  authTag               String?   @db.VarChar(255)
+  keyVersion            Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model QuoteNotificationSettings {

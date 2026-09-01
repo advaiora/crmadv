@@ -26,6 +26,7 @@ const RIGA: ImpostazioniMailRecord = {
   server: 'mail.database.it',
   porta: 2525,
   connessioneSicura: true,
+  retePrivataConsentita: false,
   utente: 'utente-db',
   mittente: 'da-database@esempio.it',
   ciphertext: 'cifrata',

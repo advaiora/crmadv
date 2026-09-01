@@ -6,6 +6,7 @@ export type ImpostazioniMailRecord = {
   server: string;
   porta: number;
   connessioneSicura: boolean;
+  retePrivataConsentita: boolean;
   utente: string | null;
   mittente: string;
   ciphertext: string | null;
@@ -21,6 +22,7 @@ export type SalvaImpostazioniMailInput = {
   server: string;
   porta: number;
   connessioneSicura: boolean;
+  retePrivataConsentita: boolean;
   utente: string | null;
   mittente: string;
   /**
@@ -47,6 +49,7 @@ export const mailRepository = {
         server: true,
         porta: true,
         connessioneSicura: true,
+        retePrivataConsentita: true,
         utente: true,
         mittente: true,
         ciphertext: true,
@@ -71,6 +74,7 @@ export const mailRepository = {
       server: input.server,
       porta: input.porta,
       connessioneSicura: input.connessioneSicura,
+      retePrivataConsentita: input.retePrivataConsentita,
       utente: input.utente,
       mittente: input.mittente,
     };
@@ -92,6 +96,7 @@ export const mailRepository = {
         server: true,
         porta: true,
         connessioneSicura: true,
+        retePrivataConsentita: true,
         utente: true,
         mittente: true,
         ciphertext: true,
