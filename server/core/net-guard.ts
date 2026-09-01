@@ -49,6 +49,13 @@ export const isPrivateIpv4Address = (host: string): boolean => {
   // 100.64.0.0/10, la fascia che gli operatori usano per il NAT di quartiere:
   // non e' instradabile su internet, quindi da qui dentro punta a una rete
   // altrui, non a un server pubblico.
+  //
+  // ⚠️ E' anche la fascia che usa Tailscale. Se un giorno l'healthcheck di un
+  // sito in gestione comincia a rispondere «host privato» senza che nessuno
+  // abbia toccato quel sito, la causa e' questa riga: vuol dire che il server
+  // del CRM lo raggiungeva attraverso una VPN su questa fascia. Aggiunta
+  // l'1/9/2026 con CRM-28; se il caso si presenta, la decisione da prendere e'
+  // se quella VPN debba essere raggiungibile dai controlli automatici.
   if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) {
     return true;
   }
@@ -151,6 +158,19 @@ export const isPrivateIpv6Address = (host: string): boolean => {
 
   // fc00::/7, gli indirizzi che ognuno si assegna in casa propria.
   if ((gruppi[0] & 0xfe00) === 0xfc00) {
+    return true;
+  }
+
+  // fec0::/10, i vecchi "site-local". Deprecati da RFC 3879, ma qualche rete li
+  // instrada ancora, e una guardia che si fida delle deprecazioni non e' una
+  // guardia.
+  if ((gruppi[0] & 0xffc0) === 0xfec0) {
+    return true;
+  }
+
+  // ff00::/8, multicast: non e' una destinazione TCP sensata, e un server di
+  // posta li' dentro non esiste.
+  if ((gruppi[0] & 0xff00) === 0xff00) {
     return true;
   }
 
@@ -280,27 +300,14 @@ const assertHostResolvesToPublicIp = async (hostname: string): Promise<void> => 
   }
 };
 
-/**
- * Vero se `hostname` sta — o finisce — dentro una rete privata: nome locale noto,
- * suffisso interno, IP privato scritto in chiaro, oppure nome pubblico che risolve a un
- * indirizzo privato.
- *
- * Lo usa la «Prova connessione» del server di posta, che a differenza di `safeFetch`
- * deve rispondere `200` con l'esito negativo invece di interrompere: le serve un
- * booleano, non un'eccezione.
- *
- * ⚠️ Un host che non risolve affatto torna `false`, all'opposto del fail-closed di
- * `safeFetch`. La differenza e' voluta e sta nel danno che si previene: verso un nome che
- * non risolve non si apre nessuna connessione comunque, quindi non c'e' nessuna sonda da
- * chiudere — mentre rispondere "e' un indirizzo di rete privata" a chi ha solo sbagliato a
- * digitare lo manderebbe a cercare un guasto che non esiste. Chi invece deve NEGARE
- * l'accesso a una risorsa usi `safeFetch`/`assertPublicHttpUrl`, che si chiudono anche
- * sul dubbio.
- */
 // Toglie da un pezzo di testo tutto cio' che un IP non puo' contenere: virgolette,
-// parentesi, virgole finali. Resta un candidato che `isIP` sa giudicare.
+// parentesi (anche in mezzo, come in `[::1]:587`), virgole e punti finali. Resta un
+// candidato che `isIP` sa giudicare.
 const ripulisciCandidato = (token: string): string =>
-  token.replace(/^[^0-9a-f:.]+/i, '').replace(/[^0-9a-f:.]+$/i, '');
+  token
+    .replace(/[[\]<>"'(),;]/g, '')
+    .replace(/^[^0-9a-f:.]+/i, '')
+    .replace(/[^0-9a-f:.]+$/i, '');
 
 /**
  * Vero se dentro `testo` compare un indirizzo IP privato o di loopback.
@@ -318,6 +325,13 @@ const ripulisciCandidato = (token: string): string =>
  * che un'espressione sola sbaglia in silenzio. Ogni candidato passa comunque da
  * `isIP`: un falso candidato non costa niente, uno mancato costerebbe il
  * controllo.
+ *
+ * ⚠️ **Guarda solo i numeri.** Nodemailer appende al messaggio la risposta del
+ * server, e il saluto di un server interno di solito contiene un NOME
+ * (`220 srv-posta.interno.local ESMTP`), non un indirizzo: quello passa intero.
+ * Allargare il filtro ai nomi non e' possibile senza inventarsi cosa sia
+ * "interno", quindi il limite resta e va conosciuto: questa funzione toglie gli
+ * indirizzi numerici, non ogni traccia della rete interna.
  */
 export const mentionsPrivateIpAddress = (testo: string): boolean => {
   for (const parola of testo.split(/\s+/)) {
@@ -326,7 +340,21 @@ export const mentionsPrivateIpAddress = (testo: string): boolean => {
       continue;
     }
 
-    const candidati = [token, token.replace(/:\d+$/, ''), token.replace(/\.$/, '')];
+    // Si sbuccia la coda finche' cambia qualcosa, invece di applicare una
+    // trasformazione sola: `10.0.0.5:587.` ha bisogno di perdere il punto finale
+    // PRIMA della porta, e in un passaggio solo nessuno dei due ordini va bene
+    // per entrambi i casi. Tre giri bastano e mettono un limite al ciclo.
+    const candidati = [token];
+    let corrente = token;
+    for (let giro = 0; giro < 3; giro += 1) {
+      const ridotto = corrente.replace(/\.$/, '').replace(/:\d+$/, '');
+      if (ridotto === corrente) {
+        break;
+      }
+      candidati.push(ridotto);
+      corrente = ridotto;
+    }
+
     if (candidati.some((candidato) => isIP(candidato) !== 0 && isBlockedIpAddress(candidato))) {
       return true;
     }
@@ -335,6 +363,23 @@ export const mentionsPrivateIpAddress = (testo: string): boolean => {
   return false;
 };
 
+/**
+ * Vero se `hostname` sta — o finisce — dentro una rete privata: nome locale noto,
+ * suffisso interno, IP privato scritto in chiaro, oppure nome pubblico che risolve a un
+ * indirizzo privato.
+ *
+ * Lo usa la «Prova connessione» del server di posta, che a differenza di `safeFetch`
+ * deve rispondere `200` con l'esito negativo invece di interrompere: le serve un
+ * booleano, non un'eccezione.
+ *
+ * ⚠️ Un host che non risolve affatto torna `false`, all'opposto del fail-closed di
+ * `safeFetch`. La differenza e' voluta e sta nel danno che si previene: verso un nome che
+ * non risolve non si apre nessuna connessione comunque, quindi non c'e' nessuna sonda da
+ * chiudere — mentre rispondere "e' un indirizzo di rete privata" a chi ha solo sbagliato a
+ * digitare lo manderebbe a cercare un guasto che non esiste. Chi invece deve NEGARE
+ * l'accesso a una risorsa usi `safeFetch`/`assertPublicHttpUrl`, che si chiudono anche
+ * sul dubbio.
+ */
 export const isPrivateNetworkHost = async (
   hostname: string,
   risolvi?: RisolutoreDns,

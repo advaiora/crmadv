@@ -171,3 +171,22 @@ test('mentionsPrivateIpAddress: non si allarma per numeri e indirizzi pubblici',
     assert.equal(mentionsPrivateIpAddress(messaggio), false, `atteso ignorato: ${messaggio}`);
   }
 });
+
+test('mentionsPrivateIpAddress: le forme che la revisione aveva trovato scoperte', () => {
+  // Nodemailer oggi non le produce (formatta `indirizzo:porta` senza parentesi),
+  // ma il commento della funzione prometteva di reggere alle parentesi e non ci
+  // riusciva. Adesso ci riesce.
+  for (const messaggio of [
+    'connect ECONNREFUSED [::1]:587',
+    'connect ECONNREFUSED [10.0.0.5]:587',
+    'connect ETIMEDOUT 10.0.0.5:587.',
+    'irraggiungibile (192.168.1.10), riprova',
+  ]) {
+    assert.equal(mentionsPrivateIpAddress(messaggio), true, `atteso riconosciuto: ${messaggio}`);
+  }
+});
+
+test('isPrivateIpv6Address: site-local e multicast', () => {
+  assert.equal(isPrivateIpv6Address('fec0::1'), true);
+  assert.equal(isPrivateIpv6Address('ff02::1'), true);
+});

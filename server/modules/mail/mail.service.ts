@@ -432,6 +432,13 @@ export const buildMailService = (
           riuscita: esito.riuscita,
           origine: esito.origine,
           server: esito.server,
+          // Se al momento della prova la rete interna era autorizzata. Tutta la
+          // difesa poggia sulla tracciabilita' invece che sul blocco — chi ha
+          // `mail.manage` puo' accendere l'interruttore da se' — quindi senza
+          // questo campo chi legge il registro dovrebbe incrociare a mano i
+          // `mail.save` vicini per sapere se quella prova ha davvero raggiunto
+          // un indirizzo interno.
+          retePrivataConsentita: resolved.esito === 'ok' && resolved.retePrivataConsentita === true,
           // Distingue nel registro un rifiuto nostro (`rete_privata`) da un
           // rifiuto del server vero: senza, le due righe sono identiche.
           motivo: esito.riuscita ? null : (esito.motivo ?? null),

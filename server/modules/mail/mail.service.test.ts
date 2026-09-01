@@ -403,7 +403,12 @@ const servizioConGuardiano = (opzioni: {
     resolveSettings: async () => ({
       esito: 'ok' as const,
       source: opzioni.origine,
-      retePrivataConsentita: opzioni.retePrivataConsentita ?? false,
+      // Solo il ramo del database porta l'autorizzazione: con i parametri
+      // dell'ambiente non c'e' nessuna riga su cui accenderla, e il tipo di
+      // `EsitoConfigurazionePosta` lo dice.
+      ...(opzioni.origine === 'database'
+        ? { retePrivataConsentita: opzioni.retePrivataConsentita ?? false }
+        : {}),
       settings: {
         host: '127.0.0.1',
         port: opzioni.porta ?? 1,
@@ -604,4 +609,28 @@ test('con l\'autorizzazione accesa la connessione viene aperta davvero', async (
 
     assert.equal(arrivi(), 1);
   });
+});
+
+test('il registro della prova dice anche se la rete interna era autorizzata', async () => {
+  // Senza questo campo, chi legge il registro e trova una prova riuscita verso
+  // un indirizzo interno deve incrociare a mano i \`mail.save\` vicini per capire
+  // se era stata autorizzata. Tutta la difesa poggia su questa riga.
+  const { servizio: conAutorizzazione, registrati: conRegistro } = servizioConGuardiano({
+    origine: 'database',
+    retePrivataConsentita: true,
+    privato: true,
+  });
+  await conAutorizzazione.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  const { servizio: senzaAutorizzazione, registrati: senzaRegistro } = servizioConGuardiano({
+    origine: 'database',
+    privato: true,
+  });
+  await senzaAutorizzazione.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  const leggi = (righe: Array<{ event: string; metadata?: Record<string, unknown> }>) =>
+    righe.find((riga) => riga.event === 'mail.test')?.metadata?.retePrivataConsentita;
+
+  assert.equal(leggi(conRegistro), true);
+  assert.equal(leggi(senzaRegistro), false);
 });
