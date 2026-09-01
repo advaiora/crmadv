@@ -129,30 +129,66 @@ export const assertPublicHttpUrl = (
   return parsed;
 };
 
-// Secondo strato: risolve il DNS dell'host e blocca se una qualsiasi risoluzione punta a
-// un IP privato/loopback. Chiude il caso "dominio pubblico -> 127.0.0.1 / metadata cloud".
-// Fail-closed: se il DNS non risolve, si blocca.
-const assertHostResolvesToPublicIp = async (hostname: string): Promise<void> => {
+// Secondo strato, in forma di classificazione. Tenuto separato dalle due porte
+// d'ingresso qui sotto perche' i loro chiamanti hanno bisogni opposti: chi segue un URL
+// deve INTERROMPERE (eccezione), chi collauda un server di posta deve DECIDERE (booleano)
+// e rispondere lo stesso, con l'esito scritto dentro. Una sola risoluzione DNS, due letture.
+type EsitoRisoluzione = 'pubblico' | 'privato' | 'non-risolvibile';
+
+const classificaRisoluzione = async (hostname: string): Promise<EsitoRisoluzione> => {
   // Un IP letterale e' gia' stato validato da isBlockedHostname: niente DNS da fare.
   if (isIP(hostname) !== 0) {
-    return;
+    return 'pubblico';
   }
 
   let addresses: Array<{ address: string }>;
   try {
     addresses = await lookup(hostname, { all: true });
   } catch {
-    throw new SsrfBlockedError('Host non risolvibile.');
+    return 'non-risolvibile';
   }
 
   if (addresses.length === 0) {
+    return 'non-risolvibile';
+  }
+
+  return addresses.some((entry) => isBlockedIpAddress(entry.address)) ? 'privato' : 'pubblico';
+};
+
+// Risolve il DNS dell'host e blocca se una qualsiasi risoluzione punta a un IP
+// privato/loopback. Chiude il caso "dominio pubblico -> 127.0.0.1 / metadata cloud".
+// Fail-closed: se il DNS non risolve, si blocca.
+const assertHostResolvesToPublicIp = async (hostname: string): Promise<void> => {
+  const esito = await classificaRisoluzione(hostname);
+
+  if (esito === 'non-risolvibile') {
     throw new SsrfBlockedError('Host non risolvibile.');
   }
 
-  if (addresses.some((entry) => isBlockedIpAddress(entry.address))) {
+  if (esito === 'privato') {
     throw new SsrfBlockedError('Host che risolve a un indirizzo privato.');
   }
 };
+
+/**
+ * Vero se `hostname` sta — o finisce — dentro una rete privata: nome locale noto,
+ * suffisso interno, IP privato scritto in chiaro, oppure nome pubblico che risolve a un
+ * indirizzo privato.
+ *
+ * Lo usa la «Prova connessione» del server di posta, che a differenza di `safeFetch`
+ * deve rispondere `200` con l'esito negativo invece di interrompere: le serve un
+ * booleano, non un'eccezione.
+ *
+ * ⚠️ Un host che non risolve affatto torna `false`, all'opposto del fail-closed di
+ * `safeFetch`. La differenza e' voluta e sta nel danno che si previene: verso un nome che
+ * non risolve non si apre nessuna connessione comunque, quindi non c'e' nessuna sonda da
+ * chiudere — mentre rispondere "e' un indirizzo di rete privata" a chi ha solo sbagliato a
+ * digitare lo manderebbe a cercare un guasto che non esiste. Chi invece deve NEGARE
+ * l'accesso a una risorsa usi `safeFetch`/`assertPublicHttpUrl`, che si chiudono anche
+ * sul dubbio.
+ */
+export const isPrivateNetworkHost = async (hostname: string): Promise<boolean> =>
+  isBlockedHostname(hostname) || (await classificaRisoluzione(hostname)) === 'privato';
 
 type SafeFetchOptions = {
   timeoutMs: number;

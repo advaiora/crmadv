@@ -354,3 +354,147 @@ test('accendere l\'autorizzazione resta scritto nel registro attivita\'', async 
   const salvataggio = registrati.find((riga) => riga.event === 'mail.save');
   assert.equal(salvataggio?.metadata?.retePrivataConsentita, true);
 });
+
+// ── La prova non deve diventare una sonda della rete interna (CRM-28) ─────────
+// Chi ha `mail.manage` sceglie host e porta e legge cosa risponde: senza
+// guardiano, il pulsante «Prova connessione» e' una scansione della rete
+// dell'agenzia con un oracolo che risponde. Il blocco vale solo per la
+// configurazione salvata nel CRM, che e' l'unica dove l'indirizzo lo sceglie chi
+// preme il pulsante.
+
+const AMBIENTE_VUOTO = {
+  crypto: {
+    encrypt: async () => ({ ciphertext: 'x', iv: 'x', authTag: 'x', keyVersion: 1 }),
+    decrypt: async () => 'segreto',
+  },
+  leggiAmbiente: () => null,
+  registraAudit: (async () => undefined) as never,
+};
+
+/**
+ * Un servizio la cui configurazione in uso arriva dall'origine indicata, con il
+ * guardiano della rete privata sostituito da una spia: cosi' i casi si provano
+ * senza un DNS vero davanti, e si puo' verificare CHE COSA gli e' stato chiesto.
+ *
+ * L'host e' sempre `127.0.0.1` su una porta chiusa: nei casi in cui il guardiano
+ * deve lasciar passare, la prova arriva davvero ad aprire una connessione, e
+ * questo e' l'unico indirizzo che rifiuta all'istante invece di far aspettare i
+ * dieci secondi di timeout.
+ */
+const servizioConGuardiano = (opzioni: {
+  origine: 'database' | 'env';
+  retePrivataConsentita?: boolean;
+  privato: boolean;
+}) => {
+  const interrogazioni: string[] = [];
+  const registrati: Array<{ event: string; metadata?: Record<string, unknown> }> = [];
+
+  const servizio = buildMailService({
+    ...AMBIENTE_VUOTO,
+    repository: {
+      findByWorkspaceId: async () => ({
+        ...RIGA_SALVATA,
+        server: '127.0.0.1',
+        retePrivataConsentita: opzioni.retePrivataConsentita ?? false,
+      }),
+      upsert: async () => RIGA_SALVATA,
+      deleteByWorkspaceId: async () => undefined,
+    },
+    resolveSettings: async () => ({
+      esito: 'ok' as const,
+      source: opzioni.origine,
+      settings: {
+        host: '127.0.0.1',
+        port: 1,
+        secure: false,
+        user: null,
+        pass: null,
+        from: 'noreply@esempio.it',
+      },
+    }),
+    hostDiRetePrivata: async (host: string) => {
+      interrogazioni.push(host);
+      return opzioni.privato;
+    },
+    registraAudit: (async (input: never) => {
+      registrati.push(input);
+    }) as never,
+  });
+
+  return { servizio, interrogazioni, registrati };
+};
+
+test('database + indirizzo privato + autorizzazione spenta: rifiutata senza aprire nulla', async () => {
+  const { servizio, interrogazioni } = servizioConGuardiano({ origine: 'database', privato: true });
+
+  const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  assert.equal(esito.riuscita, false);
+  if (esito.riuscita) return;
+  assert.equal(esito.motivo, 'rete_privata');
+  assert.equal(esito.origine, 'database');
+  // `server` resta valorizzato: senza, chi legge non sa quale indirizzo sia
+  // stato rifiutato.
+  assert.equal(esito.server, '127.0.0.1');
+  assert.deepEqual(interrogazioni, ['127.0.0.1']);
+  // Il messaggio non nomina l'interruttore della maschera (l'etichetta vive di
+  // la', e tenerne due copie allineate a mano e' il difetto che si evita) e non
+  // dice a quale IP l'indirizzo abbia risolto (sarebbe l'oracolo, in piccolo).
+  assert.doesNotMatch(esito.errore, /\d+\.\d+\.\d+\.\d+/);
+});
+
+test('database + autorizzazione accesa: il guardiano non viene nemmeno interrogato', async () => {
+  const { servizio, interrogazioni } = servizioConGuardiano({
+    origine: 'database',
+    retePrivataConsentita: true,
+    privato: true,
+  });
+
+  const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  assert.deepEqual(interrogazioni, []);
+  assert.equal(esito.riuscita, false);
+  if (esito.riuscita) return;
+  // Fallisce perche' dall'altra parte non risponde nessuno, NON perche' l'abbiamo
+  // fermata noi: e' la differenza che `motivo` esiste per dire.
+  assert.equal(esito.motivo, undefined);
+});
+
+test('parametri dal file .env: il blocco non si applica', async () => {
+  const { servizio, interrogazioni } = servizioConGuardiano({ origine: 'env', privato: true });
+
+  const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  // Con il `.env` l'indirizzo lo ha scritto chi amministra il server, non chi
+  // preme il pulsante: non c'e' nessuna sonda da chiudere, e bloccare lascerebbe
+  // l'agenzia con la prova ferma e nessuna casella da spuntare.
+  assert.deepEqual(interrogazioni, []);
+  assert.equal(esito.riuscita, false);
+  if (esito.riuscita) return;
+  assert.equal(esito.motivo, undefined);
+});
+
+test('database + indirizzo pubblico: la prova prosegue come prima', async () => {
+  const { servizio, interrogazioni } = servizioConGuardiano({ origine: 'database', privato: false });
+
+  const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  assert.deepEqual(interrogazioni, ['127.0.0.1']);
+  assert.equal(esito.riuscita, false);
+  if (esito.riuscita) return;
+  assert.equal(esito.motivo, undefined);
+});
+
+test('il rifiuto per rete privata resta scritto nel registro attivita\'', async () => {
+  const { servizio, registrati } = servizioConGuardiano({ origine: 'database', privato: true });
+
+  await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+  const prova = registrati.find((riga) => riga.event === 'mail.test');
+  assert.equal(prova?.metadata?.riuscita, false);
+  assert.equal(prova?.metadata?.origine, 'database');
+  assert.equal(prova?.metadata?.server, '127.0.0.1');
+  // Senza `motivo`, nel registro un rifiuto nostro e un rifiuto del server vero
+  // sono due righe identiche.
+  assert.equal(prova?.metadata?.motivo, 'rete_privata');
+});

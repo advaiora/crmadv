@@ -8,6 +8,7 @@ import {
   resolveMailSettingsDettagliato,
   type MailSettings,
 } from '../../core/mail.js';
+import { isPrivateNetworkHost } from '../../core/net-guard.js';
 import { mailCrypto } from './mail.crypto.js';
 import { mailRepository } from './mail.repository.js';
 
@@ -73,7 +74,20 @@ export type OrigineConfigurazione = 'database' | 'env' | 'nessuna' | 'illeggibil
  */
 export type EsitoProva =
   | { riuscita: true; origine: OrigineConfigurazione; server: string | null }
-  | { riuscita: false; origine: OrigineConfigurazione; server: string | null; errore: string };
+  | {
+      riuscita: false;
+      origine: OrigineConfigurazione;
+      server: string | null;
+      /**
+       * Valorizzato SOLO quando la prova e' stata rifiutata prima di aprire la
+       * connessione perche' l'indirizzo e' di rete privata. Assente in ogni
+       * altro fallimento (password illeggibile, nessuna configurazione, rifiuto
+       * del server vero), cosi' chi disegna la maschera puo' aggiungere il
+       * rimando all'interruttore con un `if` che non prende dentro nient'altro.
+       */
+      motivo?: 'rete_privata';
+      errore: string;
+    };
 
 export type ImpostazioniMailPubbliche = {
   /** `true` se esiste una configurazione salvata nel CRM per questo workspace. */
@@ -119,6 +133,15 @@ type MailServiceDependencies = {
    */
   resolveSettings: typeof resolveMailSettingsDettagliato;
   leggiAmbiente: typeof readMailSettingsFromEnv;
+  /**
+   * Il guardiano che dice se un indirizzo finisce in una rete privata. Iniettato
+   * per la stessa ragione degli altri: i casi che contano qui (indirizzo interno
+   * con interruttore spento, e lo stesso con l'interruttore acceso) si devono
+   * poter provare senza un DNS vero davanti, e soprattutto senza che il test
+   * apra davvero una connessione — che e' esattamente cio' che il codice deve
+   * impedire.
+   */
+  hostDiRetePrivata: typeof isPrivateNetworkHost;
   registraAudit: typeof audit.log;
 };
 
@@ -130,6 +153,7 @@ export const buildMailService = (
     crypto: overrides.crypto ?? mailCrypto,
     resolveSettings: overrides.resolveSettings ?? resolveMailSettingsDettagliato,
     leggiAmbiente: overrides.leggiAmbiente ?? readMailSettingsFromEnv,
+    hostDiRetePrivata: overrides.hostDiRetePrivata ?? isPrivateNetworkHost,
     registraAudit: overrides.registraAudit ?? ((input) => audit.log(input)),
   };
 
@@ -298,6 +322,36 @@ export const buildMailService = (
           };
         }
 
+        // ⚠️ Il blocco vale SOLO per la configurazione salvata nel CRM. Con i
+        // parametri del file `.env` l'indirizzo lo ha scritto chi amministra il
+        // server, e chi ha `mail.manage` non puo' puntarlo altrove: li' non c'e'
+        // nessuna sonda da chiudere, e bloccare lascerebbe un'agenzia con la
+        // prova ferma e nessuna casella da spuntare per rimetterla in moto.
+        if (resolved.source === 'database') {
+          const riga = await dependencies.repository.findByWorkspaceId(input.workspaceId);
+          // Riga sparita fra la risoluzione e adesso: si tratta come "non
+          // autorizzato". Il dubbio si chiude, non si apre.
+          const consentita = riga?.retePrivataConsentita ?? false;
+
+          if (!consentita && (await dependencies.hostDiRetePrivata(resolved.settings.host))) {
+            return {
+              riuscita: false as const,
+              origine: resolved.source,
+              // `server` resta valorizzato: senza, chi legge l'esito non sa
+              // QUALE indirizzo sia stato rifiutato.
+              server: resolved.settings.host,
+              motivo: 'rete_privata' as const,
+              // Il messaggio non nomina l'interruttore e non dice a quale IP
+              // l'indirizzo abbia risolto. Il primo perche' l'etichetta vive
+              // nella maschera e scriverla anche qui vorrebbe dire tenerne due
+              // copie allineate a mano; il secondo perche' sarebbe di nuovo
+              // l'oracolo che questo controllo chiude, in piccolo.
+              errore:
+                "L'indirizzo del server di posta è dentro una rete privata. La prova non è stata eseguita: nessuna connessione è stata aperta.",
+            };
+          }
+        }
+
         // Timeout espliciti: da qui in avanti l'indirizzo lo sceglie chi preme
         // il pulsante, e verso un IP filtrato `verify()` resterebbe appeso fino
         // al default di nodemailer (due minuti), con la richiesta aperta e il
@@ -342,6 +396,9 @@ export const buildMailService = (
           riuscita: esito.riuscita,
           origine: esito.origine,
           server: esito.server,
+          // Distingue nel registro un rifiuto nostro (`rete_privata`) da un
+          // rifiuto del server vero: senza, le due righe sono identiche.
+          motivo: esito.riuscita ? null : (esito.motivo ?? null),
         },
         request: input.request,
       });

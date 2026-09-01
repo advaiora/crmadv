@@ -5,6 +5,7 @@ import {
   assertPublicHttpUrl,
   isBlockedHostname,
   isBlockedIpAddress,
+  isPrivateNetworkHost,
 } from './net-guard.js';
 
 test('isBlockedHostname: blocca nomi locali e IP privati/link-local', () => {
@@ -54,4 +55,26 @@ test('assertPublicHttpUrl: http consentito solo quando allowHttp e vero', () => 
   assert.throws(() => assertPublicHttpUrl('http://example.com', { allowHttp: false }), SsrfBlockedError);
   const url = assertPublicHttpUrl('http://example.com', { allowHttp: true });
   assert.equal(url.protocol, 'http:');
+});
+
+test('isPrivateNetworkHost: riconosce nomi locali e IP privati senza toccare il DNS', async () => {
+  for (const host of ['localhost', '127.0.0.1', '10.0.0.5', '192.168.1.1', 'db.internal', 'foo.local']) {
+    assert.equal(await isPrivateNetworkHost(host), true, `atteso privato: ${host}`);
+  }
+});
+
+test('isPrivateNetworkHost: un IP pubblico scritto in chiaro non e\' rete privata', async () => {
+  // IP letterale: nessuna risoluzione DNS da fare, quindi il test non dipende
+  // dalla rete della macchina che lo esegue.
+  assert.equal(await isPrivateNetworkHost('8.8.8.8'), false);
+  assert.equal(await isPrivateNetworkHost('203.0.113.10'), false);
+});
+
+test('isPrivateNetworkHost: un nome che non risolve NON e\' rete privata', async () => {
+  // Fail-open voluto, all'opposto di `safeFetch`: verso un nome che non risolve
+  // non si apre nessuna connessione comunque, quindi non c'e' nessuna sonda da
+  // chiudere — e chiamarlo "rete privata" manderebbe chi ha sbagliato a digitare
+  // a cercare un guasto che non esiste. `.invalid` non risolve per definizione
+  // (RFC 2606), quindi il caso non dipende da quali nomi veri esistano.
+  assert.equal(await isPrivateNetworkHost('questo-nome-non-esiste.invalid'), false);
 });
