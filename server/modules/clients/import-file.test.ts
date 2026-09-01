@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readClientImportFile, sheetToRows } from './import-file.js';
+import { readClientImportFile, readClientImportJsonBody, sheetToRows } from './import-file.js';
 
 // Le stesse anagrafiche, scritte una volta sola: servono a provare che il CSV e
 // l'Excel finiscono nelle stesse identiche righe.
@@ -172,4 +172,18 @@ test('una virgoletta mai chiusa da un messaggio comprensibile, non un errore gre
     () => readClientImportFile(upload(Buffer.from('name,notes\n"Rossi,aperta', 'utf8'), 'clienti.csv')),
     { message: /virgoletta è rimasta aperta/ },
   );
+});
+
+test('la vecchia forma JSON legge il CSV dal corpo e rifiuta i campi sconosciuti', async () => {
+  const source = readClientImportJsonBody({ csv: 'name,email\nRossi,mario@example.com', dryRun: true });
+
+  assert.equal(source.format, 'csv');
+  assert.equal(source.dryRun, true);
+  assert.deepEqual(source.rows[1], ['Rossi', 'mario@example.com']);
+
+  assert.throws(() => readClientImportJsonBody({ csv: 'name', altro: 1 }), {
+    message: /unknown fields/,
+  });
+  assert.throws(() => readClientImportJsonBody({ csv: '   ' }), { message: /csv cannot be empty/ });
+  assert.throws(() => readClientImportJsonBody('name,email'), { message: /must be a JSON object/ });
 });

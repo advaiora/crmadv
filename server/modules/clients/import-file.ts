@@ -177,6 +177,48 @@ export const readClientImportFile = async (upload: ClientImportUpload): Promise<
   return { ...readCsvRows(upload.buffer), dryRun: upload.dryRun };
 };
 
+// La vecchia strada: il CSV dentro il corpo JSON `{csv, dryRun}`. Resta viva
+// finche' il frontend non passa all'allegato, e li' vale ancora il tetto di
+// corpo di Fastify (1 MiB) — e' proprio il limite che l'allegato scavalca.
+// Sta qui, e non piu' in service.ts, perche' anche questa e' trasporto: cosi'
+// tutte e due le strade d'ingresso si leggono nello stesso file.
+export const readClientImportJsonBody = (body: unknown): ClientImportSource => {
+  if (typeof body !== 'object' || body === null) {
+    throw badRequest('Body must be a JSON object');
+  }
+
+  const fields = body as Record<string, unknown>;
+  const unknownFields = Object.keys(fields).filter((key) => key !== 'csv' && key !== 'dryRun');
+  if (unknownFields.length > 0) {
+    throw badRequest('Body contains unknown fields', {
+      unknownFields: unknownFields.sort(),
+    });
+  }
+
+  if (typeof fields.csv !== 'string') {
+    throw badRequest('csv must be a string');
+  }
+
+  const csv = fields.csv.replace(/^\uFEFF/, '').trim();
+  if (!csv) {
+    throw badRequest('csv cannot be empty');
+  }
+
+  if (fields.dryRun !== undefined && typeof fields.dryRun !== 'boolean') {
+    throw badRequest('dryRun must be a boolean');
+  }
+
+  const delimiter = detectCsvDelimiter(csv);
+
+  try {
+    return { format: 'csv', delimiter, rows: parseCsvRows(csv, delimiter), dryRun: fields.dryRun ?? false };
+  } catch (error) {
+    throw badRequest('CSV is malformed', {
+      reason: error instanceof Error ? error.message : 'unknown',
+    });
+  }
+};
+
 // @fastify/multipart fa scattare il tetto DURANTE la lettura dello stream, non
 // prima: l'errore va intercettato dov'e' scritto il buffer, non all'ingresso.
 // Stesso trattamento di sources.route.ts, che e' il precedente in casa.

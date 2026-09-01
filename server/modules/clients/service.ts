@@ -4,12 +4,13 @@ import { audit } from '../../audit/audit.js';
 import { badRequest, isHttpError, notFound } from '../../core/errors.js';
 import { validateAndNormalizePhone } from '../../../core/utils/phone.js';
 import { buildPhoneFieldSchema, PHONE_INVALID_MESSAGE } from './clients.schema.js';
-import { detectCsvDelimiter, parseCsvRows, stringifyCsv } from './csv.js';
+import { stringifyCsv } from './csv.js';
 import {
   readClientImportFile,
-  type ClientImportSource,
+  readClientImportJsonBody,
   type ClientImportUpload,
 } from './import-file.js';
+import { buildImportPreviewRows } from './import-preview.js';
 import { customFieldsService } from '../custom-fields/custom-fields.service.js';
 import {
   clientsRepository,
@@ -97,10 +98,6 @@ type ClientWritePayload = {
 } & ClientAddress;
 
 type ClientPatchPayload = Partial<ClientWritePayload>;
-type ImportClientsBody = {
-  csv: string;
-  dryRun?: boolean;
-};
 type ClientImportError = {
   row: number;
   message: string;
@@ -450,37 +447,6 @@ const parseOptionalClientTypeFilter = (value: unknown): ClientType | undefined =
   }
 
   return value;
-};
-
-const parseImportBody = (body: unknown): ImportClientsBody => {
-  if (!isObject(body)) {
-    throw badRequest('Body must be a JSON object');
-  }
-
-  const unknownFields = Object.keys(body).filter((key) => key !== 'csv' && key !== 'dryRun');
-  if (unknownFields.length > 0) {
-    throw badRequest('Body contains unknown fields', {
-      unknownFields: unknownFields.sort(),
-    });
-  }
-
-  if (typeof body.csv !== 'string') {
-    throw badRequest('csv must be a string');
-  }
-
-  const csv = body.csv.replace(/^\uFEFF/, '').trim();
-  if (!csv) {
-    throw badRequest('csv cannot be empty');
-  }
-
-  if (body.dryRun !== undefined && typeof body.dryRun !== 'boolean') {
-    throw badRequest('dryRun must be a boolean');
-  }
-
-  return {
-    csv,
-    dryRun: body.dryRun ?? false,
-  };
 };
 
 const normalizeImportHeaderToken = (value: string) =>
@@ -1005,32 +971,9 @@ export const clientsService = {
     upload?: ClientImportUpload;
     body?: unknown;
   }) {
-    let source: ClientImportSource;
-
-    if (input.upload) {
-      source = await readClientImportFile(input.upload);
-    } else {
-      const parsedBody = parseImportBody(input.body);
-      const delimiter = detectCsvDelimiter(parsedBody.csv);
-      let parsedRows: string[][];
-
-      try {
-        parsedRows = parseCsvRows(parsedBody.csv, delimiter);
-      } catch (error) {
-        throw badRequest('CSV is malformed', {
-          reason: error instanceof Error ? error.message : 'unknown',
-        });
-      }
-
-      source = {
-        format: 'csv',
-        delimiter,
-        rows: parsedRows,
-        dryRun: parsedBody.dryRun ?? false,
-      };
-    }
-
-    const { format, delimiter, rows, dryRun } = source;
+    const { format, delimiter, rows, dryRun } = input.upload
+      ? await readClientImportFile(input.upload)
+      : readClientImportJsonBody(input.body);
 
     if (rows.length === 0) {
       throw badRequest('Il file non contiene nessuna riga.');
@@ -1142,6 +1085,9 @@ export const clientsService = {
         format,
         delimiter,
         dryRun,
+        // Le righe che entrerebbero: solo in prova, perche' e' li' che servono a
+        // decidere se confermare. A import fatto sarebbero peso inutile.
+        ...(dryRun ? { previewRows: buildImportPreviewRows(validRows) } : {}),
         totalRows: dataRows.length,
         validRows: validRows.length,
         createdRows,

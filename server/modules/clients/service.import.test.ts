@@ -167,3 +167,26 @@ test('un file con la sola intestazione lo dice in italiano', async (t) => {
     { message: /solo la riga di intestazione/ },
   );
 });
+
+test('in prova la risposta elenca anche le righe che entrerebbero', async (t) => {
+  stubDependencies(t);
+
+  const result = await runImport({
+    buffer: await buildXlsx(HEADER, RECORDS),
+    filename: 'clienti.xlsx',
+    dryRun: true,
+  });
+
+  assert.deepEqual(result.summary.previewRows, [
+    { row: 2, type: 'person', name: 'Rossi Mario', email: 'mario@example.com', phone: '+393331234567' },
+    { row: 3, type: 'person', name: 'Bianchi Srl', email: 'info@bianchi.example', phone: '+390212345678' },
+  ]);
+});
+
+test('a import fatto le righe non tornano indietro: sarebbero peso inutile', async (t) => {
+  stubDependencies(t);
+
+  const result = await runImport({ buffer: Buffer.from(CSV_CONTENT, 'utf8'), filename: 'clienti.csv' });
+
+  assert.equal('previewRows' in result.summary, false);
+});
