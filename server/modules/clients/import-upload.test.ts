@@ -158,3 +158,27 @@ test('una richiesta senza file lo dice, invece di rispondere a vuoto', async () 
   assert.match(response.json().message, /Nessun file caricato/);
   await app.close();
 });
+
+// La rotta sceglie la strada guardando `request.isMultipart()`: e' il bivio fra
+// l'allegato e la vecchia forma JSON, e vale la pena vederlo funzionare.
+test('il bivio della rotta: multipart di qua, corpo JSON di la', async () => {
+  const app = Fastify();
+  void app.register(multipart, { limits: { files: 1, fileSize: MAX_IMPORT_FILE_BYTES } });
+  app.post('/clients/import', async (request, reply) => reply.send({ multipart: request.isMultipart() }));
+  await app.ready();
+
+  const allegato = await post(
+    app,
+    buildMultipartBody([{ name: 'file', filename: 'clienti.csv', content: Buffer.from('name\nRossi', 'utf8') }]),
+  );
+  assert.equal(allegato.json().multipart, true);
+
+  const jsonBody = await app.inject({
+    method: 'POST',
+    url: '/clients/import',
+    payload: { csv: 'name\nRossi' },
+  });
+  assert.equal(jsonBody.json().multipart, false);
+
+  await app.close();
+});
