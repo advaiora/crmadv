@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:net';
 import test from 'node:test';
 import { isHttpError } from '../../core/errors.js';
+import type { EsitoConfigurazionePosta } from '../../core/mail.js';
 import { buildMailService, salvaImpostazioniMailSchema } from './mail.service.js';
 import type { ImpostazioniMailRecord, SalvaImpostazioniMailInput } from './mail.repository.js';
 
@@ -400,24 +401,35 @@ const servizioConGuardiano = (opzioni: {
       upsert: async () => RIGA_SALVATA,
       deleteByWorkspaceId: async () => undefined,
     },
-    resolveSettings: async () => ({
-      esito: 'ok' as const,
-      source: opzioni.origine,
-      // Solo il ramo del database porta l'autorizzazione: con i parametri
-      // dell'ambiente non c'e' nessuna riga su cui accenderla, e il tipo di
-      // `EsitoConfigurazionePosta` lo dice.
-      ...(opzioni.origine === 'database'
-        ? { retePrivataConsentita: opzioni.retePrivataConsentita ?? false }
-        : {}),
-      settings: {
+    resolveSettings: async (): Promise<EsitoConfigurazionePosta> => {
+      const settings = {
         host: '127.0.0.1',
         port: opzioni.porta ?? 1,
         secure: false,
         user: null,
         pass: null,
         from: 'noreply@esempio.it',
-      },
-    }),
+      };
+
+      // Solo il ramo del database porta l'autorizzazione: con i parametri
+      // dell'ambiente non c'e' nessuna riga su cui accenderla, e il tipo di
+      // `EsitoConfigurazionePosta` lo dice.
+      //
+      // I due rami sono due oggetti interi e non un campo aggiunto in
+      // condizione: TypeScript non sa restringere un'unione discriminata a
+      // partire da uno spread, quindi solo scrivendoli separati la garanzia
+      // annunciata qui sopra la controlla davvero il compilatore.
+      if (opzioni.origine === 'database') {
+        return {
+          esito: 'ok',
+          source: 'database',
+          retePrivataConsentita: opzioni.retePrivataConsentita ?? false,
+          settings,
+        };
+      }
+
+      return { esito: 'ok', source: 'env', settings };
+    },
     hostDiRetePrivata: async (host: string) => {
       interrogazioni.push(host);
       return opzioni.privato;
