@@ -52,21 +52,21 @@ const ClientNew = () => {
                                         Torna alla lista
                                     </Button>
                                 </>
-                        )}
-                    />
-
-                    <div className="clients-form-shell">
-                        {error && <Alert variant="danger">{error}</Alert>}
-                        <ClientForm
-                            submitLabel="Salva"
-                            onSubmit={handleSubmit}
-                            onCancel={() => history.push('/apps/clients')}
-                            loading={loading}
-                            canCreateCustomFields={hasPermission(access, CLIENTS_PERMISSIONS.edit)}
+                            )}
                         />
+
+                        <div className="clients-form-shell">
+                            {error && <Alert variant="danger">{error}</Alert>}
+                            <ClientForm
+                                submitLabel="Salva"
+                                onSubmit={handleSubmit}
+                                onCancel={() => history.push('/apps/clients')}
+                                loading={loading}
+                                canCreateCustomFields={hasPermission(access, CLIENTS_PERMISSIONS.edit)}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
             )}
         </ClientsModuleGate>
     );
