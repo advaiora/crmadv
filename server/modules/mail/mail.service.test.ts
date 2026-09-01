@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createServer, type Server } from 'node:net';
 import test from 'node:test';
 import { isHttpError } from '../../core/errors.js';
 import { buildMailService, salvaImpostazioniMailSchema } from './mail.service.js';
@@ -376,15 +377,15 @@ const AMBIENTE_VUOTO = {
  * guardiano della rete privata sostituito da una spia: cosi' i casi si provano
  * senza un DNS vero davanti, e si puo' verificare CHE COSA gli e' stato chiesto.
  *
- * L'host e' sempre `127.0.0.1` su una porta chiusa: nei casi in cui il guardiano
- * deve lasciar passare, la prova arriva davvero ad aprire una connessione, e
- * questo e' l'unico indirizzo che rifiuta all'istante invece di far aspettare i
- * dieci secondi di timeout.
+ * L'host e' sempre `127.0.0.1`, su una porta dove sta in ascolto `orecchio` (vedi
+ * sotto): cosi' «non e' stata aperta nessuna connessione» si puo' DIMOSTRARE
+ * contando gli arrivi, invece di dedurlo dal testo dell'esito.
  */
 const servizioConGuardiano = (opzioni: {
   origine: 'database' | 'env';
   retePrivataConsentita?: boolean;
   privato: boolean;
+  porta?: number;
 }) => {
   const interrogazioni: string[] = [];
   const registrati: Array<{ event: string; metadata?: Record<string, unknown> }> = [];
@@ -405,7 +406,7 @@ const servizioConGuardiano = (opzioni: {
       source: opzioni.origine,
       settings: {
         host: '127.0.0.1',
-        port: 1,
+        port: opzioni.porta ?? 1,
         secure: false,
         user: null,
         pass: null,
@@ -497,4 +498,62 @@ test('il rifiuto per rete privata resta scritto nel registro attivita\'', async 
   // Senza `motivo`, nel registro un rifiuto nostro e un rifiuto del server vero
   // sono due righe identiche.
   assert.equal(prova?.metadata?.motivo, 'rete_privata');
+});
+
+/**
+ * Un orecchio in ascolto su `127.0.0.1`, che conta chi bussa e chiude subito.
+ *
+ * E' quello che trasforma «nessuna connessione e' stata aperta» da promessa
+ * scritta nel messaggio d'errore a fatto verificabile: e' il cuore di CRM-28, e
+ * un guardiano che rispondesse la frase giusta DOPO aver aperto la connessione
+ * passerebbe tutti gli altri test di questo file.
+ */
+const conOrecchio = async (prova: (porta: number, arrivi: () => number) => Promise<void>) => {
+  let arrivi = 0;
+  const server: Server = createServer((socket) => {
+    arrivi += 1;
+    // Un saluto SMTP negativo e poi si chiude: nodemailer rinuncia all'istante e
+    // libera i suoi tempi d'attesa. Con un `destroy()` secco la connessione
+    // muore da stabilita, i timer da dieci secondi restano appesi, e il file di
+    // test impiega undici secondi invece di uno.
+    socket.end('421 chiuso\r\n');
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const indirizzo = server.address();
+  if (typeof indirizzo === 'string' || indirizzo === null) throw new Error('porta non assegnata');
+
+  try {
+    await prova(indirizzo.port, () => arrivi);
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+};
+
+test('il rifiuto per rete privata non fa arrivare NIENTE dall\'altra parte', async () => {
+  await conOrecchio(async (porta, arrivi) => {
+    const { servizio } = servizioConGuardiano({ origine: 'database', privato: true, porta });
+
+    const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+    assert.equal(esito.riuscita, false);
+    assert.equal(arrivi(), 0);
+  });
+});
+
+test('con l\'autorizzazione accesa la connessione viene aperta davvero', async () => {
+  await conOrecchio(async (porta, arrivi) => {
+    const { servizio } = servizioConGuardiano({
+      origine: 'database',
+      retePrivataConsentita: true,
+      privato: true,
+      porta,
+    });
+
+    // Il contro-caso del test qui sopra: senza, «zero arrivi» sarebbe vero anche
+    // se la prova non provasse piu' niente per nessuno.
+    await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+    assert.equal(arrivi(), 1);
+  });
 });
