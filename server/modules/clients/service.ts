@@ -5,6 +5,11 @@ import { badRequest, isHttpError, notFound } from '../../core/errors.js';
 import { validateAndNormalizePhone } from '../../../core/utils/phone.js';
 import { buildPhoneFieldSchema, PHONE_INVALID_MESSAGE } from './clients.schema.js';
 import { detectCsvDelimiter, parseCsvRows, stringifyCsv } from './csv.js';
+import {
+  readClientImportFile,
+  type ClientImportSource,
+  type ClientImportUpload,
+} from './import-file.js';
 import { customFieldsService } from '../custom-fields/custom-fields.service.js';
 import {
   clientsRepository,
@@ -992,23 +997,43 @@ export const clientsService = {
   async importClientsFromCsv(input: {
     workspaceId: string;
     actorUserId: string;
-    body: unknown;
     request: FastifyRequest;
+    // Due strade d'ingresso: `upload` e' il file arrivato come allegato (fino a
+    // 20MB, CSV o Excel), `body` e' la vecchia forma JSON `{csv, dryRun}` che
+    // resta viva per chi la chiama ancora. La lettura del file sta in
+    // import-file.ts; qui comincia la validazione, che non cambia.
+    upload?: ClientImportUpload;
+    body?: unknown;
   }) {
-    const parsedBody = parseImportBody(input.body);
-    const delimiter = detectCsvDelimiter(parsedBody.csv);
-    let rows: string[][];
+    let source: ClientImportSource;
 
-    try {
-      rows = parseCsvRows(parsedBody.csv, delimiter);
-    } catch (error) {
-      throw badRequest('CSV is malformed', {
-        reason: error instanceof Error ? error.message : 'unknown',
-      });
+    if (input.upload) {
+      source = await readClientImportFile(input.upload);
+    } else {
+      const parsedBody = parseImportBody(input.body);
+      const delimiter = detectCsvDelimiter(parsedBody.csv);
+      let parsedRows: string[][];
+
+      try {
+        parsedRows = parseCsvRows(parsedBody.csv, delimiter);
+      } catch (error) {
+        throw badRequest('CSV is malformed', {
+          reason: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+
+      source = {
+        format: 'csv',
+        delimiter,
+        rows: parsedRows,
+        dryRun: parsedBody.dryRun ?? false,
+      };
     }
 
+    const { format, delimiter, rows, dryRun } = source;
+
     if (rows.length === 0) {
-      throw badRequest('CSV has no rows');
+      throw badRequest('Il file non contiene nessuna riga.');
     }
 
     const header = assertCsvColumns(rows[0]);
@@ -1021,7 +1046,7 @@ export const clientsService = {
       .filter((entry) => !isEmptyCsvRow(entry.values));
 
     if (dataRows.length === 0) {
-      throw badRequest('CSV has no data rows');
+      throw badRequest('Il file contiene solo la riga di intestazione: nessun cliente da importare.');
     }
 
     // Definizioni dei campi personalizzati lette una sola volta: la validazione
@@ -1071,7 +1096,7 @@ export const clientsService = {
 
     let createdRows = 0;
 
-    if (!parsedBody.dryRun) {
+    if (!dryRun) {
       for (const entry of validRows) {
         try {
           await clientsRepository.create(input.workspaceId, {
@@ -1094,12 +1119,16 @@ export const clientsService = {
     const failedRows = failedRowsCount;
 
     await audit.log({
-      event: 'clients.import',
+      // La prova senza salvare ha un evento suo: e' una lettura, e con
+      // l'anteprima ogni sbirciata prima di confermare diventerebbe una riga di
+      // registro indistinguibile da un import vero.
+      event: dryRun ? 'clients.import.preview' : 'clients.import',
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'Client',
       metadata: {
-        dryRun: parsedBody.dryRun,
+        dryRun,
+        format,
         totalRows: dataRows.length,
         validRows: validRows.length,
         createdRows,
@@ -1110,8 +1139,9 @@ export const clientsService = {
 
     return {
       summary: {
+        format,
         delimiter,
-        dryRun: parsedBody.dryRun,
+        dryRun,
         totalRows: dataRows.length,
         validRows: validRows.length,
         createdRows,
