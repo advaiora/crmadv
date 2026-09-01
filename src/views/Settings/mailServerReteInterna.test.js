@@ -6,7 +6,7 @@
 // legge a cercare la causa nel posto sbagliato.
 import { describe, it, expect } from 'vitest';
 import {
-  AIUTO_RETE_INTERNA,
+  aiutoReteInterna,
   ETICHETTA_RETE_INTERNA,
   rimandoAllInterruttore,
 } from './mailServerReteInterna';
@@ -72,7 +72,45 @@ describe('i testi dell\'interruttore', () => {
     // Il blocco ha un solo punto di applicazione nel backend, dentro
     // `provaConnessione`. Se un domani coprisse anche l'invio, questo test
     // cade ed e' giusto che cada: la riga a schermo starebbe mentendo.
-    expect(AIUTO_RETE_INTERNA).toMatch(/Prova connessione/);
-    expect(AIUTO_RETE_INTERNA).toMatch(/spedizione delle email non cambia/i);
+    for (const origine of ['database', 'env', 'nessuna', 'illeggibile', undefined]) {
+      expect(aiutoReteInterna(origine)).toMatch(/Prova connessione/);
+      expect(aiutoReteInterna(origine)).toMatch(/spedizione delle email non cambia/i);
+    }
+  });
+});
+
+describe('aiutoReteInterna', () => {
+  // ⚠️ Il cuore del rilievo: il filtro del backend esige
+  // `source === 'database'` (mail.net-guard.ts), quindi la riga di aiuto puo'
+  // promettere il rifiuto SOLO quando il CRM sta usando la configurazione
+  // salvata qui. Altrove prometterebbe una protezione che non gira.
+  it('con la configurazione salvata in uso promette il rifiuto senza connessione', () => {
+    expect(aiutoReteInterna('database')).toMatch(
+      /senza aprire nessuna connessione/i,
+    );
+  });
+
+  it('sul ramo .env dice che la prova non filtra niente', () => {
+    const aiuto = aiutoReteInterna('env');
+
+    expect(aiuto).toMatch(/non filtra nessun indirizzo/i);
+    // E soprattutto NON deve promettere il blocco: e' la frase che il revisore
+    // ha fermato il 1/9/2026.
+    expect(aiuto).not.toMatch(/senza aprire nessuna connessione/i);
+  });
+
+  it('dice la stessa cosa quando non c\'e\' configurazione o la password non si legge', () => {
+    // Tre origini diverse, un solo fatto: il filtro non gira. La frase non
+    // nomina il `.env` proprio per restare vera in tutti e tre i casi (e nella
+    // configurazione salvata ma in pausa, che torna origine `env`/`nessuna`).
+    for (const origine of ['nessuna', 'illeggibile', undefined, null]) {
+      expect(aiutoReteInterna(origine)).toBe(aiutoReteInterna('env'));
+    }
+  });
+
+  it('dice che l\'interruttore vale da quando la configurazione e\' quella in uso', () => {
+    // Il raccordo col fatto n. 1 del compito: senza, chi spunta la casella su
+    // un CRM che spedisce col `.env` non sa cosa gli manchi.
+    expect(aiutoReteInterna('env')).toMatch(/da quando questa configurazione è quella in uso/i);
   });
 });

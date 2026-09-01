@@ -368,3 +368,75 @@ describe('interruttore: il server di posta e\' nella rete interna', () => {
     expect(avviso).not.toHaveTextContent(ETICHETTA_RETE_INTERNA);
   });
 });
+
+// ⚠️ Il rilievo della revisione dell'1/9/2026. Il filtro del backend gira solo
+// quando i parametri vengono dal database (`richiedeControlloRetePrivata`,
+// mail.net-guard.ts): sul ramo `.env` la prova si collega comunque. La riga di
+// aiuto sotto l'interruttore deve dire quale dei due mondi si sta guardando,
+// altrimenti un CRM appena installato dichiara attiva una protezione che non
+// c'e' — nessun errore, invisibile, come `posta.gestisci` il 18/8.
+describe('la riga di aiuto dell\'interruttore dice la verita\' su entrambi i rami', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('con la configurazione salvata in uso promette il rifiuto senza connessione', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByText(/senza aprire nessuna connessione/i)).toBeInTheDocument();
+  });
+
+  it('sul ramo .env non promette nessun blocco', async () => {
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        configurata: false,
+        origineInUso: 'env',
+      },
+    });
+
+    render(<MailServerPage />);
+
+    // L'interruttore resta li' — nasconderlo toglierebbe anche la spiegazione
+    // del perche' adesso non serve.
+    expect(await screen.findByLabelText(ETICHETTA_RETE_INTERNA)).toBeInTheDocument();
+    expect(await screen.findByText(/non filtra nessun indirizzo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/senza aprire nessuna connessione/i)).toBeNull();
+  });
+
+  it('anche senza nessuna configurazione non promette nessun blocco', async () => {
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        configurata: false,
+        origineInUso: 'nessuna',
+      },
+    });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByText(/non filtra nessun indirizzo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/senza aprire nessuna connessione/i)).toBeNull();
+  });
+
+  it('con la configurazione salvata ma in pausa segue cio\' che il CRM usa davvero', async () => {
+    // Il caso che si sbaglia per primo: la riga a database c'e', ma con
+    // `attivo` spento il backend ripiega sull'ambiente e il filtro non gira.
+    // `origineInUso` lo racconta gia', ed e' il motivo per cui la riga di aiuto
+    // guarda quello e non `configurata`.
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        attivo: false,
+        origineInUso: 'env',
+      },
+    });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByText(/non filtra nessun indirizzo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/senza aprire nessuna connessione/i)).toBeNull();
+  });
+});

@@ -12,7 +12,7 @@ import {
   campiDaImpostazioni,
   ciSonoModifichePendenti,
 } from './mailServerModifiche';
-import { AIUTO_RETE_INTERNA, ETICHETTA_RETE_INTERNA, rimandoAllInterruttore } from './mailServerReteInterna';
+import { aiutoReteInterna, ETICHETTA_RETE_INTERNA, rimandoAllInterruttore } from './mailServerReteInterna';
 
 const MESSAGGIO_ERRORE = (errore, ripiego) => errore?.message || ripiego;
 
@@ -394,7 +394,7 @@ const MailServerPage = () => {
                           onChange={(event) => aggiorna('retePrivataConsentita', event.target.checked)}
                           label={ETICHETTA_RETE_INTERNA}
                         />
-                        <div className="small text-muted">{AIUTO_RETE_INTERNA}</div>
+                        <div className="small text-muted">{aiutoReteInterna(statoSalvato?.origineInUso)}</div>
                       </Col>
 
                       <Col xs={12}>

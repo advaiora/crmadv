@@ -21,12 +21,49 @@
 export const ETICHETTA_RETE_INTERNA = "Il server di posta è nella rete interna dell'agenzia";
 
 /**
- * La riga di aiuto sotto l'interruttore. Delimita il campo d'azione: il blocco
+ * La riga di aiuto quando il filtro c'e' davvero, cioe' quando il CRM sta
+ * usando la configurazione salvata qui. Delimita il campo d'azione: il blocco
  * ha un solo punto di applicazione nel backend, dentro `provaConnessione`, e
  * non tocca l'invio delle email.
  */
-export const AIUTO_RETE_INTERNA =
+const AIUTO_FILTRO_ATTIVO =
   'Riguarda solo la «Prova connessione»: spento, la prova rifiuta gli indirizzi della rete interna senza aprire nessuna connessione. La spedizione delle email non cambia.';
+
+/**
+ * La riga di aiuto quando il filtro NON gira, e va detto invece di lasciar
+ * credere il contrario.
+ *
+ * ⚠️ Il filtro del backend e' condizionato alla provenienza dei parametri:
+ * `richiedeControlloRetePrivata` (server/modules/mail/mail.net-guard.ts) esige
+ * `source === 'database'`, e non per un capriccio — il ramo del database e'
+ * l'unico in cui l'host lo ha scritto chi preme il pulsante. Con i parametri
+ * del file `.env`, senza nessuna configurazione, o con la password illeggibile,
+ * la prova si collega comunque. Promettere qui una protezione che non gira
+ * sarebbe la stessa bugia silenziosa di `posta.gestisci` del 18/8: nessun
+ * errore, invisibile, e la si scopre solo quando qualcuno ci fa affidamento.
+ *
+ * La frase non nomina il `.env` di proposito: copre anche «nessuna
+ * configurazione», «password illeggibile» e la configurazione salvata ma in
+ * pausa, dove nominarlo sarebbe falso. Quale sia l'origine in uso lo dice gia',
+ * per esteso, la fascia in cima alla pagina (`descriviOrigine`).
+ */
+const AIUTO_FILTRO_INERTE =
+  "Riguarda solo la «Prova connessione», e solo quando il CRM sta usando la configurazione salvata qui. Adesso non è così, quindi la prova non filtra nessun indirizzo: l'interruttore vale da quando questa configurazione è quella in uso. La spedizione delle email non cambia.";
+
+/**
+ * La riga di aiuto sotto l'interruttore, scelta in base a cosa il CRM sta
+ * usando adesso per spedire.
+ *
+ * `origineInUso` e' il predicato giusto e non un'approssimazione: il backend lo
+ * ricava dalla STESSA `resolveSettings` che poi decide se applicare il filtro
+ * (`mail.service.ts`, `getImpostazioni` e `provaConnessione`), quindi
+ * `'database'` qui e filtro attivo la' sono la medesima condizione. Vale anche
+ * per la configurazione in pausa: con `attivo` spento la lettura torna
+ * `assente`, l'origine diventa `'env'` o `'nessuna'`, e infatti il filtro non
+ * gira.
+ */
+export const aiutoReteInterna = (origineInUso) =>
+  origineInUso === 'database' ? AIUTO_FILTRO_ATTIVO : AIUTO_FILTRO_INERTE;
 
 /**
  * La frase da aggiungere all'esito della prova quando il rifiuto viene dal
