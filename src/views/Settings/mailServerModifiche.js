@@ -22,6 +22,7 @@ export const CAMPI_VUOTI = {
   server: '',
   porta: 587,
   connessioneSicura: false,
+  retePrivataConsentita: false,
   utente: '',
   mittente: '',
 };

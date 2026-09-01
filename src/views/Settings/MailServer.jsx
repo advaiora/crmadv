@@ -12,6 +12,7 @@ import {
   campiDaImpostazioni,
   ciSonoModifichePendenti,
 } from './mailServerModifiche';
+import { AIUTO_RETE_INTERNA, ETICHETTA_RETE_INTERNA, rimandoAllInterruttore } from './mailServerReteInterna';
 
 const MESSAGGIO_ERRORE = (errore, ripiego) => errore?.message || ripiego;
 
@@ -174,6 +175,12 @@ const MailServerPage = () => {
         server: campi.server.trim(),
         porta: Number(campi.porta),
         connessioneSicura: campi.connessioneSicura,
+        // ⚠️ Va nominato SEMPRE, anche da spento: nello schema del server e'
+        // `.default(false)` e non `.optional()`, quindi ometterlo non conserva
+        // il valore salvato — lo spegne, e la prova ricomincia a rifiutare senza
+        // che niente dica perche'. E' la regola OPPOSTA a quella di `password`
+        // qui sotto, nello stesso corpo: per questo sta scritto qui.
+        retePrivataConsentita: campi.retePrivataConsentita,
         utente: campi.utente.trim() ? campi.utente.trim() : null,
         mittente: campi.mittente.trim(),
         // Il campo lasciato vuoto NON cancella la password gia' salvata: si
@@ -273,7 +280,7 @@ const MailServerPage = () => {
                 <Alert variant={esitoProva.riuscita ? 'success' : 'danger'}>
                   {esitoProva.riuscita
                     ? `Connessione riuscita: ${descriviProvato(esitoProva)} ha accettato le credenziali. Nessuna email è stata spedita.`
-                    : `Non è stato possibile provare ${descriviProvato(esitoProva)}: ${esitoProva.errore}`}
+                    : `Non è stato possibile provare ${descriviProvato(esitoProva)}: ${esitoProva.errore}${rimandoAllInterruttore(esitoProva)}`}
                 </Alert>
               )}
 
@@ -377,6 +384,17 @@ const MailServerPage = () => {
                           onChange={(event) => aggiorna('connessioneSicura', event.target.checked)}
                           label="TLS diretto (porta 465)"
                         />
+                      </Col>
+
+                      <Col xs={12}>
+                        <Form.Check
+                          type="switch"
+                          id="mail-rete-privata-consentita"
+                          checked={campi.retePrivataConsentita}
+                          onChange={(event) => aggiorna('retePrivataConsentita', event.target.checked)}
+                          label={ETICHETTA_RETE_INTERNA}
+                        />
+                        <div className="small text-muted">{AIUTO_RETE_INTERNA}</div>
                       </Col>
 
                       <Col xs={12}>
