@@ -393,17 +393,17 @@ const servizioConGuardiano = (opzioni: {
   const servizio = buildMailService({
     ...AMBIENTE_VUOTO,
     repository: {
-      findByWorkspaceId: async () => ({
-        ...RIGA_SALVATA,
-        server: '127.0.0.1',
-        retePrivataConsentita: opzioni.retePrivataConsentita ?? false,
-      }),
+      // Non e' da qui che il guardiano legge l'autorizzazione: quella viaggia
+      // insieme ai parametri, dentro `resolveSettings`. Questa riga serve solo
+      // a chi legge le impostazioni.
+      findByWorkspaceId: async () => ({ ...RIGA_SALVATA, server: '127.0.0.1' }),
       upsert: async () => RIGA_SALVATA,
       deleteByWorkspaceId: async () => undefined,
     },
     resolveSettings: async () => ({
       esito: 'ok' as const,
       source: opzioni.origine,
+      retePrivataConsentita: opzioni.retePrivataConsentita ?? false,
       settings: {
         host: '127.0.0.1',
         port: opzioni.porta ?? 1,
@@ -476,14 +476,62 @@ test('parametri dal file .env: il blocco non si applica', async () => {
 });
 
 test('database + indirizzo pubblico: la prova prosegue come prima', async () => {
-  const { servizio, interrogazioni } = servizioConGuardiano({ origine: 'database', privato: false });
+  // L'orecchio saluta con un `421`: la prova fallisce per come ha risposto il
+  // server, non per un rifiuto nostro, e il messaggio di nodemailer non nomina
+  // nessun indirizzo.
+  await conOrecchio(async (porta, arrivi) => {
+    const { servizio, interrogazioni } = servizioConGuardiano({
+      origine: 'database',
+      privato: false,
+      porta,
+    });
+
+    const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
+    assert.deepEqual(interrogazioni, ['127.0.0.1']);
+    assert.equal(arrivi(), 1);
+    assert.equal(esito.riuscita, false);
+    if (esito.riuscita) return;
+    assert.equal(esito.motivo, undefined);
+    // Il messaggio vero del server arriva intero: e' il motivo per cui il
+    // pulsante esiste.
+    assert.match(esito.errore, /421/);
+  });
+});
+
+test('se la connessione finisce su un indirizzo interno, il messaggio non lo riporta', async () => {
+  // Il guardiano ha detto "pubblico" e la connessione e' finita su
+  // `127.0.0.1` lo stesso: e' la forma che prende un DNS che risponde due volte
+  // in modo diverso. Il messaggio di nodemailer sarebbe
+  // «connect ECONNREFUSED 127.0.0.1:1», cioe' l'indirizzo interno servito a chi
+  // stava sondando.
+  const { servizio, registrati } = servizioConGuardiano({ origine: 'database', privato: false });
 
   const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
 
-  assert.deepEqual(interrogazioni, ['127.0.0.1']);
+  assert.equal(esito.riuscita, false);
+  if (esito.riuscita) return;
+  assert.equal(esito.motivo, 'rete_privata');
+  assert.doesNotMatch(esito.errore, /127\.0\.0\.1/);
+  assert.equal(registrati.find((riga) => riga.event === 'mail.test')?.metadata?.motivo, 'rete_privata');
+});
+
+test('chi ha autorizzato la rete interna riceve il messaggio vero, indirizzo compreso', async () => {
+  // Il filtro dell'ultimo momento non si applica a chi ha dichiarato di avere il
+  // server dentro la propria rete: a quel punto «connect ECONNREFUSED
+  // 127.0.0.1:1» e' l'informazione che serve per rimediare, non una fuga.
+  const { servizio } = servizioConGuardiano({
+    origine: 'database',
+    retePrivataConsentita: true,
+    privato: true,
+  });
+
+  const esito = await servizio.provaConnessione({ workspaceId: 'ws-1', actorUserId: 'user-1' });
+
   assert.equal(esito.riuscita, false);
   if (esito.riuscita) return;
   assert.equal(esito.motivo, undefined);
+  assert.match(esito.errore, /127\.0\.0\.1/);
 });
 
 test('il rifiuto per rete privata resta scritto nel registro attivita\'', async () => {

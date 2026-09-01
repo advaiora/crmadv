@@ -1523,6 +1523,13 @@ model MailServerSettings {
   /// il pulsante come sonda della rete dell'agenzia. Acceso, l'agenzia dichiara
   /// che il proprio server di posta sta davvero dentro la sua rete — e la
   /// dichiarazione resta scritta nel registro attivita'.
+  ///
+  /// ⚠️ Governa SOLO la prova, non la spedizione: le email vere continuano a
+  /// partire verso l'indirizzo configurato in ogni caso. E' voluto — spegnere
+  /// anche la spedizione lascerebbe senza posta le agenzie che hanno davvero il
+  /// server dentro la propria rete, che e' proprio il caso che questo campo
+  /// esiste per proteggere. Quello che si chiude qui e' il pulsante che
+  /// RESTITUISCE una risposta a chi lo preme.
   retePrivataConsentita Boolean   @default(false)
   utente                String?   @db.VarChar(255)
   mittente              String    @db.VarChar(255)

@@ -9,6 +9,12 @@ import {
   type MailSettings,
 } from '../../core/mail.js';
 import { isPrivateNetworkHost } from '../../core/net-guard.js';
+import {
+  ERRORE_RETE_PRIVATA,
+  ERRORE_RETE_PRIVATA_ALLA_CONNESSIONE,
+  messaggioDaNascondere,
+  richiedeControlloRetePrivata,
+} from './mail.net-guard.js';
 import { mailCrypto } from './mail.crypto.js';
 import { mailRepository } from './mail.repository.js';
 
@@ -322,34 +328,37 @@ export const buildMailService = (
           };
         }
 
-        // ⚠️ Il blocco vale SOLO per la configurazione salvata nel CRM. Con i
-        // parametri del file `.env` l'indirizzo lo ha scritto chi amministra il
-        // server, e chi ha `mail.manage` non puo' puntarlo altrove: li' non c'e'
-        // nessuna sonda da chiudere, e bloccare lascerebbe un'agenzia con la
-        // prova ferma e nessuna casella da spuntare per rimetterla in moto.
-        if (resolved.source === 'database') {
-          const riga = await dependencies.repository.findByWorkspaceId(input.workspaceId);
-          // Riga sparita fra la risoluzione e adesso: si tratta come "non
-          // autorizzato". Il dubbio si chiude, non si apre.
-          const consentita = riga?.retePrivataConsentita ?? false;
+        // ⚠️ Il blocco vale SOLO per la configurazione salvata nel CRM, ed e'
+        // il confine piu' delicato di questo controllo.
+        //
+        // Il motivo NON e' «con il `.env` l'indirizzo lo ha scritto chi
+        // amministra»: quella e' la conseguenza, non la regola. La regola e' che
+        // oggi il ramo del database e' l'UNICO in cui `settings.host` arriva da
+        // un campo che compila chi preme il pulsante — con il `.env` i parametri
+        // sono presi in blocco dalle variabili d'ambiente, che nessuna rotta
+        // scrive. `source` racconta la provenienza dei parametri, non chi ha
+        // scelto l'host: il giorno in cui si aggiungera' «prova questi parametri
+        // senza salvarli» — funzione naturale su questa pagina — `source` non
+        // sara' `'database'` e questa guardia smettera' di applicarsi senza che
+        // niente diventi rosso. Chi scrive quella funzione deve passare di qui.
+        //
+        // L'altra faccia: bloccare anche il ramo `.env` lascerebbe un'agenzia
+        // con la prova ferma e nessuna casella da spuntare, perche' la casella
+        // vive su una riga di database che in quel caso non esiste.
+        // La regola (quando si controlla, cosa si dice) sta tutta in
+        // `mail.net-guard.ts`: qui resta solo la sequenza.
+        const daControllare = richiedeControlloRetePrivata(resolved);
 
-          if (!consentita && (await dependencies.hostDiRetePrivata(resolved.settings.host))) {
-            return {
-              riuscita: false as const,
-              origine: resolved.source,
-              // `server` resta valorizzato: senza, chi legge l'esito non sa
-              // QUALE indirizzo sia stato rifiutato.
-              server: resolved.settings.host,
-              motivo: 'rete_privata' as const,
-              // Il messaggio non nomina l'interruttore e non dice a quale IP
-              // l'indirizzo abbia risolto. Il primo perche' l'etichetta vive
-              // nella maschera e scriverla anche qui vorrebbe dire tenerne due
-              // copie allineate a mano; il secondo perche' sarebbe di nuovo
-              // l'oracolo che questo controllo chiude, in piccolo.
-              errore:
-                "L'indirizzo del server di posta è dentro una rete privata. La prova non è stata eseguita: nessuna connessione è stata aperta.",
-            };
-          }
+        if (daControllare && (await dependencies.hostDiRetePrivata(resolved.settings.host))) {
+          return {
+            riuscita: false as const,
+            origine: resolved.source,
+            // `server` resta valorizzato: senza, chi legge l'esito non sa QUALE
+            // indirizzo sia stato rifiutato.
+            server: resolved.settings.host,
+            motivo: 'rete_privata' as const,
+            errore: ERRORE_RETE_PRIVATA,
+          };
         }
 
         // Timeout espliciti: da qui in avanti l'indirizzo lo sceglie chi preme
@@ -369,14 +378,41 @@ export const buildMailService = (
             server: resolved.settings.host,
           };
         } catch (error) {
+          const messaggio =
+            error instanceof Error
+              ? error.message
+              : 'Il server di posta ha rifiutato la connessione.';
+
+          // ⚠️ Ultimo filtro, e non e' ridondante. Il controllo qui sopra risolve
+          // il DNS una volta; nodemailer lo risolve una seconda volta per conto
+          // suo. Un nome con TTL zero puo' rispondere pubblico al primo e privato
+          // al secondo, e allora il messaggio di nodemailer — «connect
+          // ECONNREFUSED 10.0.0.5:587» — riporterebbe indietro proprio
+          // l'indirizzo interno che tutto questo lavoro tiene nascosto.
+          //
+          // Non chiude l'attacco (la connessione e' gia' partita: chi prova
+          // impara comunque, dal successo o dal fallimento, che li' c'e'
+          // qualcosa) ma toglie l'informazione. La chiusura vera e' pinzare
+          // l'indirizzo risolto e farlo usare a nodemailer: vive in un compito
+          // suo, perche' passa dalle viscere della libreria.
+          // Solo per chi NON ha autorizzato la rete interna: a chi l'ha
+          // dichiarata spetta il messaggio vero del server, che e' il motivo per
+          // cui il pulsante esiste.
+          if (daControllare && messaggioDaNascondere(messaggio)) {
+            return {
+              riuscita: false as const,
+              origine: resolved.source,
+              server: resolved.settings.host,
+              motivo: 'rete_privata' as const,
+              errore: ERRORE_RETE_PRIVATA_ALLA_CONNESSIONE,
+            };
+          }
+
           return {
             riuscita: false as const,
             origine: resolved.source,
             server: resolved.settings.host,
-            errore:
-              error instanceof Error
-                ? error.message
-                : 'Il server di posta ha rifiutato la connessione.',
+            errore: messaggio,
           };
         } finally {
           transport.close();
