@@ -1,5 +1,6 @@
 export { default as ClientActionsMenu } from './ClientActionsMenu';
 export { default as ClientAvatar } from './ClientAvatar';
+export { default as ClientCustomFieldsSection } from './ClientCustomFieldsSection';
 export { default as ClientEmptyState } from './ClientEmptyState';
 export { default as ClientGridRow } from './ClientGridRow';
 export { default as ClientMobileCard } from './ClientMobileCard';
