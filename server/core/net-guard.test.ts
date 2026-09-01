@@ -106,13 +106,38 @@ test('isPrivateNetworkHost: un nome che risolve solo a indirizzi pubblici passa'
 test('isPrivateIpv6Address: le forme lunghe dello stesso indirizzo non scavalcano il controllo', () => {
   // Il buco trovato in revisione l'1/9/2026: `::ffff:10.0.0.5` e' `10.0.0.5`
   // scritto in un altro modo, e passava.
-  for (const host of ['::1', '0:0:0:0:0:0:0:1', '::', '::ffff:10.0.0.5', '::ffff:127.0.0.1', '::ffff:7f00:1', 'fd00::1', 'febf::1', 'fe80::1%eth0']) {
+  for (const host of [
+    '::1',
+    '0:0:0:0:0:0:0:1',
+    '::',
+    '::ffff:10.0.0.5',
+    '::ffff:127.0.0.1',
+    '::ffff:7f00:1',
+    '0:0:0:0:0:ffff:127.0.0.1',
+    // Le forme che servono un tunnel 6to4 o un traduttore NAT64: su questa
+    // macchina non arrivano da nessuna parte, ma la guardia giudica
+    // l'indirizzo, non la tabella di instradamento di chi la esegue.
+    '::ffff:0:127.0.0.1',
+    '::127.0.0.1',
+    '64:ff9b::10.0.0.5',
+    '2002:0a00:0001::1',
+    'fd00::1',
+    'febf::1',
+    'fe80::1%eth0',
+  ]) {
     assert.equal(isPrivateIpv6Address(host), true, `atteso privato: ${host}`);
   }
 });
 
 test('isPrivateIpv6Address: gli IPv6 pubblici restano pubblici', () => {
-  for (const host of ['2606:4700:4700::1111', '2001:db8::1', '::ffff:8.8.8.8']) {
+  for (const host of [
+    '2606:4700:4700::1111',
+    '2001:db8::1',
+    '::ffff:8.8.8.8',
+    '64:ff9b::8.8.8.8',
+    '2002:5db8:d822::1',
+    '::ffff:0:93.184.216.34',
+  ]) {
     assert.equal(isPrivateIpv6Address(host), false, `atteso pubblico: ${host}`);
   }
 });

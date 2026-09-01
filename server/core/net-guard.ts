@@ -113,11 +113,34 @@ export const isPrivateIpv6Address = (host: string): boolean => {
     return true;
   }
 
-  // `::ffff:a.b.c.d` (IPv4 mappato) e `::a.b.c.d` (IPv4 compatibile): dentro
-  // c'e' un IPv4 vero, e va giudicato con le regole degli IPv4.
-  const mappatoIpv4 = gruppi.slice(0, 5).every((gruppo) => gruppo === 0) && (gruppi[5] === 0xffff || primiSeiVuoti);
-  if (mappatoIpv4) {
-    const ipv4 = [gruppi[6] >> 8, gruppi[6] & 0xff, gruppi[7] >> 8, gruppi[7] & 0xff].join('.');
+  // Le forme che portano un IPv4 dentro un IPv6. Dentro c'e' un indirizzo v4
+  // vero, e va giudicato con le regole degli IPv4 — altrimenti `10.0.0.5`
+  // riscritto in una di queste forme scavalcherebbe il controllo.
+  //
+  // Le prime due (IPv4 mappato e IPv4 compatibile) sono quelle che il sistema
+  // operativo traduce davvero: `net.connect({host:'::ffff:127.0.0.1'})` arriva
+  // a un ascoltatore su `127.0.0.1`, verificato. Le altre tre di solito no —
+  // servono un tunnel 6to4 o un traduttore NAT64 configurati — ma qui si
+  // giudica l'indirizzo, non la tabella di instradamento della macchina che
+  // esegue il controllo: sarebbe una guardia che cambia risposta a seconda di
+  // dove gira.
+  const primiQuattroVuoti = gruppi.slice(0, 4).every((gruppo) => gruppo === 0);
+  const ipv4InCoda = (): string =>
+    [gruppi[6] >> 8, gruppi[6] & 0xff, gruppi[7] >> 8, gruppi[7] & 0xff].join('.');
+
+  // `::ffff:a.b.c.d` mappato, `::a.b.c.d` compatibile, `::ffff:0:a.b.c.d` tradotto.
+  if (primiQuattroVuoti && ((gruppi[4] === 0 && (gruppi[5] === 0xffff || primiSeiVuoti)) || (gruppi[4] === 0xffff && gruppi[5] === 0))) {
+    return isPrivateIpv4Address(ipv4InCoda());
+  }
+
+  // `64:ff9b::/96` e `64:ff9b:1::/48`, i prefissi della traduzione NAT64.
+  if (gruppi[0] === 0x0064 && gruppi[1] === 0xff9b) {
+    return isPrivateIpv4Address(ipv4InCoda());
+  }
+
+  // `2002::/16`, 6to4: l'IPv4 sta nei due gruppi subito dopo il prefisso.
+  if (gruppi[0] === 0x2002) {
+    const ipv4 = [gruppi[1] >> 8, gruppi[1] & 0xff, gruppi[2] >> 8, gruppi[2] & 0xff].join('.');
     return isPrivateIpv4Address(ipv4);
   }
 
