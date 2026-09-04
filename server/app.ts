@@ -8,6 +8,7 @@ import { isHttpError } from "./core/errors.js";
 import { requestContext } from "./core/request-context.js";
 import { fail, ok } from "./core/response.js";
 import { buildCorsDecision, parseAllowedOrigins } from "./core/cors-origins.js";
+import { parseTrustProxy } from "./core/trust-proxy.js";
 import { requireAuth } from "./guards/requireAuth.js";
 import { requireModuleEnabled } from "./guards/requireModule.js";
 import { requirePermission } from "./guards/requirePermission.js";
@@ -112,8 +113,10 @@ const getDatabaseUnavailableDetails = (error: unknown) => {
 };
 
 export const createApp = (options: FastifyServerOptions = {}): FastifyInstance => {
+  const trustProxy = parseTrustProxy();
   const app = Fastify({
     logger: true,
+    trustProxy,
     ...options,
   });
   const corsAllowedOrigins = parseAllowedOrigins();
@@ -125,6 +128,16 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
     },
     "CORS origins configured",
   );
+
+  app.log.info({ trustProxy }, "Trust proxy configured");
+
+  if (process.env.NODE_ENV === "production" && trustProxy === false) {
+    app.log.warn(
+      "TRUST_PROXY is not set. Behind a reverse proxy every request looks like it comes from the proxy: " +
+        "the activity log records the proxy address instead of the real client, and rate limits apply to " +
+        "all users together. Set TRUST_PROXY to the number of trusted proxies in front of the API (1 with Traefik).",
+    );
+  }
 
   if (process.env.NODE_ENV !== "production" && !corsAllowedOriginsSet.has(DEV_EXPECTED_FRONTEND_ORIGIN)) {
     app.log.warn(
