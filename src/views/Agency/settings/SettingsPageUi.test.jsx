@@ -204,16 +204,37 @@ describe('SettingsAiProviderCard', () => {
     expect(screen.getByText('Nessun provider.')).toBeInTheDocument();
   });
 
-  // Il primo badge della card e' quello di stato in cima. Si cerca per posizione
-  // perche' "Configurata" compare anche nella riga di riepilogo dell'AI.
-  it('il badge in cima segue lo stato della ricerca competitor', () => {
+  // In cima alla card ci sono due bollini distinti, uno per funzione. Si cercano
+  // per etichetta e non per posizione: nella card ci sono anche i bollini dei
+  // pannelli annidati ("OpenAI: presente"), e "configurata" da sola compare pure
+  // nella riga di riepilogo dell'AI.
+  const bollinoDiStato = (container, prefisso) =>
+    Array.from(container.querySelectorAll('.badge')).find((badge) =>
+      badge.textContent.startsWith(prefisso));
+
+  it('i due bollini in cima seguono ognuno la propria funzione', () => {
     const { container, rerender } = render(<SettingsAiProviderCard {...cardGenitrice()} />);
-    expect(container.querySelector('.badge')).toHaveTextContent('Non configurata');
+
+    // Il caso che ha motivato la correzione: AI generativa a posto, ricerca
+    // competitor spenta. Con un bollino solo la card diceva "Non configurata"
+    // e sembrava che a mancare fossero le chiavi.
+    expect(bollinoDiStato(container, 'AI generativa:')).toHaveTextContent('AI generativa: configurata');
+    expect(bollinoDiStato(container, 'Ricerca competitor:')).toHaveTextContent('Ricerca competitor: non configurata');
 
     rerender(<SettingsAiProviderCard {...cardGenitrice({
       competitorSearchSettings: { status: 'configured', provider: 'openai_web_search', message: 'Attiva.' },
     })} />);
-    expect(container.querySelector('.badge')).toHaveTextContent('Configurata');
+    expect(bollinoDiStato(container, 'Ricerca competitor:')).toHaveTextContent('Ricerca competitor: configurata');
+  });
+
+  it('il bollino dell AI generativa non segue la ricerca competitor', () => {
+    const { container } = render(<SettingsAiProviderCard {...cardGenitrice({
+      aiStatus: { configured: false, provider: 'openai', model: 'gpt-4o-mini' },
+      competitorSearchSettings: { status: 'configured', provider: 'openai_web_search', message: 'Attiva.' },
+    })} />);
+
+    expect(bollinoDiStato(container, 'AI generativa:')).toHaveTextContent('AI generativa: non configurata');
+    expect(bollinoDiStato(container, 'Ricerca competitor:')).toHaveTextContent('Ricerca competitor: configurata');
   });
 
   it('in sola lettura avvisa e blocca il salvataggio', () => {
