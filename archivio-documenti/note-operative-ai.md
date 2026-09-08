@@ -894,3 +894,37 @@ Entrambe erano vere quando sono state scritte, o non sono mai state verificate. 
 - **«Non c'e' nel campione» ha sempre due spiegazioni**: il formato non lo prevede, oppure **quell'esemplare non ne ha**. Dal solo campione sono indistinguibili, e si separano solo con la documentazione o con un secondo esemplare. Fino ad allora la frase corretta e' condizionale. E' la nota #56 («non l'ho trovato non e' non c'e'») applicata a un formato invece che a una funzione.
 - **Quando lo strumento espone il proprio schema, quella e' la fonte** - e l'indirizzo va scritto nelle istruzioni di chi eseguira' il lavoro, cosi' si corregge da solo anche se io ho sbagliato. Nel pacchetto ci sono `/llms/agent-configuration.txt` e `/llms/agent-icons.txt`, con scritto in chiaro: se il mio schema diverge dal tuo, **vince il tuo**.
 - **Una conclusione che ribalta il piano si verifica PRIMA di riferirla**, non dopo. Verificare costa due minuti; far riprogettare un piano su una premessa falsa costa la sessione di chi ci ha creduto.
+
+## 60. L'API di Paperclip risponde 301 su `http`: aggiungere `-L` PERDE la chiave, e sembra una chiave scaduta
+
+**Contesto:** 8/9/2026, compito CRMA-22. Un agent Paperclip che chiama l'API di Paperclip via `curl` dal contenitore, costruendo la base come documentato nelle istruzioni di run: `PAPERCLIP_API_BASE="${PAPERCLIP_API_URL%/}"; PAPERCLIP_API_BASE="${PAPERCLIP_API_BASE%/api}"`.
+
+**Errore:** la variabile `PAPERCLIP_API_URL` e' in `http://`, e il server risponde `301 Moved Permanently`. Il rimedio istintivo — aggiungere `-L` per seguire il redirect — **non risolve e peggiora la diagnosi**: `curl` scarta l'header `Authorization` quando il redirect cambia schema o host, quindi la seconda richiesta parte senza chiave e la risposta diventa `{"error":"Agent authentication required"}`. Quel messaggio parla di autenticazione, non di redirect: manda a controllare `PAPERCLIP_API_KEY`, i permessi dell'agent e la scadenza della chiave — tre posti dove non c'e' niente da trovare.
+
+**Modo corretto:**
+- **Riscrivere la base in `https` prima della prima chiamata**, non dopo il primo errore: `PB="${PAPERCLIP_API_URL%/}"; PB="${PB%/api}"; PB="${PB/http:/https:}"`.
+- **Regola di lettura:** `Moved Permanently` seguito da `Agent authentication required` **non e'** una chiave scaduta — e' l'header perso in un redirect. La chiave e' buona: e' l'indirizzo a essere sbagliato.
+- Verifica in una riga: `curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PB/api/agents/me"` deve dare `200`. Su base `http` da' `301`, e con `-L` da' `200` con un corpo di errore — motivo per cui il solo codice di stato non basta a dire che va bene.
+
+## 61. In questo contenitore `python3` NON esiste: il JSON delle risposte si legge con `node -e`
+
+**Contesto:** 8/9/2026, compito CRMA-22. Leggere una risposta JSON dell'API di Paperclip (elenco agent, elenco skill, dettaglio di una issue) dentro una pipeline di shell, nel contenitore dove girano gli agent Paperclip.
+
+**Errore:** `... | python3 -c "import json,sys; ..."` risponde `python3: command not found`. Su questa macchina non c'e' ne' `python3` ne' `python`. Il fastidio non e' il comando fallito: e' che **la chiamata HTTP e' gia' stata spesa**, la risposta e' finita in una pipe che si e' rotta, e va rifatta tutta. In un elenco lungo si paga due volte anche l'attesa.
+
+⚠️ Attenzione a una confusione facile: **molte note di questo file descrivono la postazione Windows di Jacopo e Claudio, non il contenitore**. Quello che c'e' installato di la' non dice niente su quello che c'e' installato qui: sono due macchine diverse, e questa nota vale solo per il contenitore.
+
+**Modo corretto:**
+- Usare **Node**, che c'e' sempre perche' e' quello che fa girare il prodotto: `... | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s); console.log(d.name)})"`.
+- Prima di infilare un interprete in una pipeline che consuma una risposta HTTP, **controllare che esista**: `command -v node python3`. Costa niente e non brucia la chiamata.
+
+## 62. Primo commit in un run Paperclip: manca l'identita' git, e un `push` non legato al commit pubblica il ramo SENZA il lavoro
+
+**Contesto:** 8/9/2026, compito CRMA-22. Primo `git commit` dentro un workspace Paperclip appena preparato. Nel contenitore **non c'e' identita' globale**: `git config --global user.name` non risponde niente.
+
+**Errore:** `git commit` si ferma con *«Author identity unknown»* e uscita **128**, quindi il commit non viene creato. Il guasto vero arriva subito dopo: se il `push` **non e' legato al commit**, cioe' se sta in una chiamata successiva, su una riga a parte o incatenato con `;`, parte lo stesso e pubblica il ramo **fermo al commit precedente**. A schermo compare `* [new branch] ...`, che si legge come una pubblicazione riuscita. Il ramo c'e', il lavoro no, e non lo dice nessuno.
+
+**Modo corretto:**
+- **Impostare l'identita' nel repository prima del primo commit, ricavandola invece di inventarla:** `git config user.name "$(git log -1 --format='%an')"` e `git config user.email "$(git log -1 --format='%ae')"`. Il valore giusto e' gia' nella storia del repository.
+- **Legare `commit` e `push` con `&&`, mai con `;` e mai in due chiamate separate.** Va detto perche' e' l'opposto di quello che verrebbe da pensare: `&&` non e' il pericolo, e' la **protezione** — con uscita 128 la catena si ferma da sola e il push non parte. Il pericolo e' il `;`, che tira dritto.
+- **Verifica dopo il push**, perche' `* [new branch]` non prova niente: `git log --oneline -1` deve mostrare il commit appena fatto, non quello di partenza.
