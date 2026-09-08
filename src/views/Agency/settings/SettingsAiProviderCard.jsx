@@ -44,9 +44,17 @@ const SettingsAiProviderCard = ({
               Gestione lato server. La API key e salvata come secret cifrato e non viene mai mostrata in chiaro.
             </div>
           </div>
-          <Badge bg={competitorSearchSettings.status === "configured" ? "success" : "warning"}>
-            {SEARCH_STATUS_LABEL[competitorSearchSettings.status] || "Non configurata"}
-          </Badge>
+          {/* Due bollini, non uno: la card copre due funzioni indipendenti e un
+              bollino solo (era quello della ricerca competitor) faceva leggere
+              "Non configurata" anche con l'AI generativa gia' a posto. */}
+          <div className="d-flex flex-column align-items-end gap-1">
+            <Badge bg={aiStatus.configured ? "success" : "warning"}>
+              AI generativa: {aiStatus.configured ? "configurata" : "non configurata"}
+            </Badge>
+            <Badge bg={competitorSearchSettings.status === "configured" ? "success" : "warning"}>
+              Ricerca competitor: {(SEARCH_STATUS_LABEL[competitorSearchSettings.status] || "Non configurata").toLowerCase()}
+            </Badge>
+          </div>
         </div>
 
         <Row className="g-3 mb-3">
