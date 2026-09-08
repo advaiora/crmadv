@@ -54,6 +54,7 @@ import {
   extractAnthropicToolInput,
   isEmptyStructuredPayload,
 } from './anthropic-json.js';
+import { resolveCompetitorSearchModel } from './competitor-search-model.js';
 import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
@@ -3750,9 +3751,10 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
   runtimeConfig: Awaited<ReturnType<typeof resolveAgencyRuntimeConfig>>;
 }) => {
   const context = buildCompetitorSearchContext(input.project);
-  const model = process.env.AGENCY_COMPETITOR_SEARCH_MODEL?.trim()
-    || input.runtimeConfig.ai.model
-    || 'gpt-4o-mini';
+  const model = resolveCompetitorSearchModel({
+    envModel: process.env.AGENCY_COMPETITOR_SEARCH_MODEL,
+    configuredModel: input.runtimeConfig.ai.model,
+  });
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
