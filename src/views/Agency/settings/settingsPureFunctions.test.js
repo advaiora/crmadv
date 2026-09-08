@@ -17,6 +17,7 @@ describe('buildRuntimeForm', () => {
     expect(form.aiDebugEnabled).toBe(false);
     expect(form.competitorSearchEnabled).toBe(false);
     expect(form.competitorSearchProvider).toBe('none');
+    expect(form.competitorSearchModel).toBe('');
   });
 
   it('ricopia i valori del server quando ci sono', () => {
@@ -33,7 +34,7 @@ describe('buildRuntimeForm', () => {
         defaultMode: 'deep',
         debugEnabled: true,
       },
-      competitorSearch: { enabled: true, provider: 'serpapi' },
+      competitorSearch: { enabled: true, provider: 'serpapi', model: 'claude-sonnet-5' },
     });
 
     expect(form.aiEnabled).toBe(true);
@@ -48,6 +49,40 @@ describe('buildRuntimeForm', () => {
     expect(form.aiDebugEnabled).toBe(true);
     expect(form.competitorSearchEnabled).toBe(true);
     expect(form.competitorSearchProvider).toBe('serpapi');
+    expect(form.competitorSearchModel).toBe('claude-sonnet-5');
+  });
+
+  // Vuoto e' una scelta valida ("usa il modello preferito"), non un buco da
+  // riempire con un default: se il form ci mettesse un modello, salvare
+  // trasformerebbe l'eredita' in una scelta esplicita senza che nessuno l'abbia
+  // chiesto.
+  it('lascia vuoto il modello di ricerca quando il server non ne manda uno', () => {
+    expect(buildRuntimeForm({ competitorSearch: { provider: 'openai_web_search' } })
+      .competitorSearchModel).toBe('');
+  });
+});
+
+describe('getProviderSetupMessage — provider di ricerca', () => {
+  // La ricerca competitor non e' piu' per forza OpenAI: il messaggio deve
+  // nominare il provider davvero configurato, altrimenti contraddice la scheda
+  // di stato che sta subito accanto.
+  it('nomina Anthropic quando la ricerca usa Claude', () => {
+    const message = getProviderSetupMessage(
+      { configured: true },
+      { status: 'configured', provider: 'anthropic_web_search' },
+    );
+
+    expect(message).toContain('Anthropic (Claude) web search');
+    expect(message).not.toContain('OpenAI');
+  });
+
+  it('nomina OpenAI quando la ricerca usa OpenAI', () => {
+    const message = getProviderSetupMessage(
+      { configured: true },
+      { status: 'configured', provider: 'openai_web_search' },
+    );
+
+    expect(message).toContain('OpenAI web search');
   });
 
   it('serializza i modelli per funzione in JSON leggibile', () => {

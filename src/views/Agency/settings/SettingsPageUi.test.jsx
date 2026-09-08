@@ -25,6 +25,7 @@ const form = (overrides = {}) => ({
   anthropicApiKey: '',
   competitorSearchEnabled: false,
   competitorSearchProvider: 'none',
+  competitorSearchModel: '',
   ...overrides,
 });
 
@@ -141,13 +142,19 @@ describe('SettingsAiLimitsPanel', () => {
 });
 
 describe('SettingsCompetitorSearchPanel', () => {
-  it('elenca i provider di ricerca disponibili', () => {
+  const modelliRicerca = [
+    { id: 'gpt-4o-mini', label: 'GPT-4o mini', provider: 'openai' },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', provider: 'anthropic' },
+  ];
+
+  it('elenca i provider di ricerca disponibili, Anthropic compreso', () => {
     render(<SettingsCompetitorSearchPanel form={form()} canManage storageReady onFieldChange={vi.fn()} />);
 
     const menu = screen.getByLabelText('Provider ricerca');
     expect(menu).toHaveValue('none');
     expect(screen.getByRole('option', { name: 'OpenAI web search' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'SerpAPI' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Anthropic (Claude) web search' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'SerpAPI (non implementato)' })).toBeInTheDocument();
   });
 
   it('inoltra interruttore e provider', () => {
@@ -159,6 +166,64 @@ describe('SettingsCompetitorSearchPanel', () => {
 
     expect(onFieldChange).toHaveBeenCalledWith('competitorSearchEnabled', true);
     expect(onFieldChange).toHaveBeenCalledWith('competitorSearchProvider', 'serpapi');
+  });
+
+  // Il menu dei modelli segue il provider scelto: un id Claude mandato a OpenAI
+  // (o viceversa) torna indietro come errore del provider e sembra una chiave
+  // sbagliata, quindi non deve nemmeno essere selezionabile.
+  it('offre solo i modelli del provider di ricerca scelto', () => {
+    render(
+      <SettingsCompetitorSearchPanel
+        form={form({ competitorSearchProvider: 'anthropic_web_search' })}
+        canManage
+        storageReady
+        availableModels={modelliRicerca}
+        providerHasKey={{ openai: true, anthropic: true }}
+        onFieldChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('option', { name: 'Claude Sonnet 5' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'GPT-4o mini' })).not.toBeInTheDocument();
+  });
+
+  it('azzera il modello quando cambiando provider non e piu compatibile', () => {
+    const onFieldChange = vi.fn();
+    render(
+      <SettingsCompetitorSearchPanel
+        form={form({
+          competitorSearchProvider: 'anthropic_web_search',
+          competitorSearchModel: 'claude-sonnet-5',
+        })}
+        canManage
+        storageReady
+        availableModels={modelliRicerca}
+        providerHasKey={{ openai: true, anthropic: true }}
+        onFieldChange={onFieldChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Provider ricerca'), {
+      target: { value: 'openai_web_search' },
+    });
+
+    expect(onFieldChange).toHaveBeenCalledWith('competitorSearchProvider', 'openai_web_search');
+    expect(onFieldChange).toHaveBeenCalledWith('competitorSearchModel', '');
+  });
+
+  it('senza la chiave del provider scelto lo dice, invece di un menu muto', () => {
+    render(
+      <SettingsCompetitorSearchPanel
+        form={form({ competitorSearchProvider: 'anthropic_web_search' })}
+        canManage
+        storageReady
+        availableModels={[]}
+        providerHasKey={{ openai: true, anthropic: false }}
+        onFieldChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Manca la chiave Anthropic/)).toBeInTheDocument();
   });
 });
 

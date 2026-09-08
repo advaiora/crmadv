@@ -125,6 +125,11 @@ const SettingsAiProviderCard = ({
                 form={form}
                 canManage={canManage}
                 storageReady={storageReady}
+                availableModels={activeModels}
+                providerHasKey={{
+                  openai: aiApiKeyConfigured,
+                  anthropic: anthropicApiKeyConfigured,
+                }}
                 onFieldChange={onFieldChange}
               />
             </Col>

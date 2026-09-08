@@ -22,6 +22,10 @@ export const buildRuntimeForm = (runtimeSettings) => ({
   anthropicApiKey: "",
   competitorSearchEnabled: Boolean(runtimeSettings?.competitorSearch?.enabled),
   competitorSearchProvider: runtimeSettings?.competitorSearch?.provider || "none",
+  // Stringa vuota = "usa il modello preferito del workspace". E' una scelta
+  // valida, quindi qui NON si mette un default: il campo deve poter restare
+  // sull'opzione "predefinito".
+  competitorSearchModel: runtimeSettings?.competitorSearch?.model || "",
 });
 
 export const getProviderSetupMessage = (aiStatus, competitorSearchSettings) => {
@@ -30,7 +34,12 @@ export const getProviderSetupMessage = (aiStatus, competitorSearchSettings) => {
   const competitorConfigured = competitorStatus === "configured" || competitorStatus === "configured_not_active";
 
   if (aiConfigured && competitorConfigured) {
-    return "AI generativa e ricerca competitor online sono configurate lato server. Le ricerche useranno OpenAI web search e non genereranno competitor finti.";
+    // Il provider di ricerca non e' piu' per forza OpenAI: si nomina quello
+    // davvero configurato, altrimenti il messaggio contraddice la scheda accanto.
+    const searchProviderLabel = competitorSearchSettings?.provider === "anthropic_web_search"
+      ? "Anthropic (Claude) web search"
+      : "OpenAI web search";
+    return `AI generativa e ricerca competitor online sono configurate lato server. Le ricerche useranno ${searchProviderLabel} e non genereranno competitor finti.`;
   }
 
   if (aiConfigured) {
