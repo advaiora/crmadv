@@ -66,6 +66,10 @@ export const useAgencySettingsSave = ({
         competitorSearch: {
           enabled: runtimeForm.competitorSearchEnabled,
           provider: runtimeForm.competitorSearchProvider,
+          // Stringa vuota = "usa il modello preferito": va mandata comunque,
+          // altrimenti non si potrebbe piu' tornare indietro da una scelta
+          // esplicita.
+          model: runtimeForm.competitorSearchModel || "",
         },
       };
       const saved = await saveAgencyRuntimeSettings(payload);

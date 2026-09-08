@@ -54,7 +54,13 @@ import {
   extractAnthropicToolInput,
   isEmptyStructuredPayload,
 } from './anthropic-json.js';
-import { resolveCompetitorSearchModel } from './competitor-search-model.js';
+import {
+  anthropicWebSearchToolType,
+  COMPETITOR_SEARCH_PROVIDERS,
+  resolveCompetitorSearchModel,
+  resolveCompetitorSearchProvider,
+  type CompetitorSearchEngineProvider,
+} from './competitor-search-model.js';
 import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
@@ -1857,6 +1863,7 @@ const AGENCY_RUNTIME_SETTING_KEYS = {
   anthropicApiKey: 'anthropic_api_key',
   competitorSearchEnabled: 'agency_competitor_search_enabled',
   competitorSearchProvider: 'agency_competitor_search_provider',
+  competitorSearchModel: 'agency_competitor_search_model',
 } as const;
 
 const runtimeSettingsPayloadSchema = z.object({
@@ -1879,7 +1886,19 @@ const runtimeSettingsPayloadSchema = z.object({
   }).optional(),
   competitorSearch: z.object({
     enabled: z.boolean().optional(),
-    provider: z.enum(['none', 'openai_web_search', 'serpapi', 'custom']).optional(),
+    // I due provider con un motore vero sono `openai_web_search` e
+    // `anthropic_web_search`. `serpapi`/`custom` restano accettati perche'
+    // possono essere gia' salvati, ma non hanno implementazione.
+    provider: z.enum([
+      'none',
+      'openai_web_search',
+      'anthropic_web_search',
+      'serpapi',
+      'custom',
+    ]).optional(),
+    // Modello dedicato alla ricerca. Vuoto = eredita il "Modello preferito" del
+    // workspace se e' del provider giusto, altrimenti il default del provider.
+    model: z.string().trim().max(120).optional(),
   }).optional(),
 });
 
@@ -2073,6 +2092,13 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
     AGENCY_RUNTIME_SETTING_KEYS.competitorSearchProvider,
     process.env.AGENCY_COMPETITOR_SEARCH_PROVIDER?.trim() || 'none',
   );
+  // Stringa vuota = "non scelto": si eredita il modello di workspace (se
+  // compatibile col provider) invece di forzarne uno.
+  const competitorSearchModel = getRuntimeSettingString(
+    settingsByKey,
+    AGENCY_RUNTIME_SETTING_KEYS.competitorSearchModel,
+    '',
+  );
 
   return {
     storageReady: Boolean(schemaReady),
@@ -2102,6 +2128,7 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
     competitorSearch: {
       enabled: competitorSearchEnabled,
       provider: competitorSearchProvider,
+      model: competitorSearchModel,
     },
   };
 };
@@ -3745,6 +3772,141 @@ const buildCompetitorSearchContext = (project: AgencyProjectPayload) => {
   };
 };
 
+// Perche' la ricerca non e' utilizzabile, detto all'utente. Il motivo conta:
+// "spenta" e "manca la chiave" chiedono due gesti diversi, e prima erano lo
+// stesso messaggio generico.
+const competitorSearchNotConfiguredMessage = (
+  reason: ReturnType<typeof resolveCompetitorSearchProvider>['reason'],
+  provider: string,
+): string => {
+  switch (reason) {
+    case 'disabled':
+      return 'Ricerca competitor online disattivata. Attivala in Impostazioni AI, oppure inserisci i competitor manualmente.';
+    case 'missing_key':
+      return provider === 'anthropic_web_search'
+        ? 'Ricerca competitor impostata su Anthropic (Claude), ma manca la chiave Anthropic. Inseriscila in Impostazioni AI o scegli OpenAI come provider di ricerca.'
+        : 'Ricerca competitor impostata su OpenAI, ma manca la chiave OpenAI. Inseriscila in Impostazioni AI o scegli Anthropic (Claude) come provider di ricerca.';
+    case 'unsupported_provider':
+      return `Il provider di ricerca "${provider}" non ha ancora un motore in questo CRM. Scegli OpenAI web search o Anthropic (Claude) web search in Impostazioni AI.`;
+    default:
+      return 'Ricerca automatica non ancora configurata. Puoi inserire competitor manualmente o configurare un provider in Impostazioni AI.';
+  }
+};
+
+// Istruzioni e payload della ricerca: identici per i due provider, cosi' la
+// scelta del motore non cambia *cosa* si chiede al modello — cambia solo a chi.
+const COMPETITOR_SEARCH_SYSTEM_PROMPT = [
+  'Sei un market research analyst per agenzie digitali.',
+  'Devi cercare online competitor reali e pertinenti per il progetto.',
+  'Non inventare aziende, URL o prove: inserisci solo competitor trovati tramite ricerca web.',
+  'Escludi directory, marketplace, portali generici e lo stesso dominio del cliente, salvo siano competitor diretti.',
+  'Rispondi solo con JSON valido nel formato {"competitors":[{"name":"","url":"","reason":"","confidence":0.0}],"usedQueries":[],"notes":""}.',
+].join(' ');
+
+const buildCompetitorSearchUserPayload = (
+  context: ReturnType<typeof buildCompetitorSearchContext>,
+) => JSON.stringify({
+  task: 'search_real_competitors',
+  maxCompetitors: 5,
+  language: 'it',
+  context,
+}).slice(0, 18000);
+
+// Schema del JSON atteso, per lo structured output di Claude. Deve descrivere i
+// campi davvero attesi: uno schema vuoto fa rispondere a Claude un oggetto
+// segnaposto (vedi la nota in cima ad anthropic-json.ts).
+const COMPETITOR_SEARCH_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  properties: {
+    competitors: {
+      type: 'array',
+      description: 'I competitor reali trovati online, al massimo 5.',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: "Nome dell'azienda." },
+          url: { type: 'string', description: 'URL del sito ufficiale (http/https).' },
+          reason: { type: 'string', description: 'Perche e un competitor di questo progetto.' },
+          confidence: { type: 'number', description: 'Confidenza da 0 a 1.' },
+        },
+        required: ['name', 'url', 'reason'],
+      },
+    },
+    usedQueries: {
+      type: 'array',
+      description: 'Le query di ricerca effettivamente usate.',
+      items: { type: 'string' },
+    },
+    notes: { type: 'string', description: 'Note brevi sulla ricerca.' },
+  },
+  required: ['competitors'],
+};
+
+// Dal JSON del modello alla risposta dell'endpoint: normalizza gli URL, scarta
+// i domini del cliente e i duplicati, e costruisce il messaggio per l'utente.
+// Condiviso fra i provider, cosi' due motori diversi non possono divergere sul
+// filtro anti-doppioni o sul tetto di 8 suggerimenti.
+const buildCompetitorSearchResult = (input: {
+  provider: CompetitorSearchEngineProvider;
+  model: string;
+  project: AgencyProjectPayload;
+  context: ReturnType<typeof buildCompetitorSearchContext>;
+  parsed: z.infer<typeof competitorSearchResponseSchema>;
+}) => {
+  const blockedHosts = new Set([
+    ...input.project.sources.urls.map((entry) => getUrlHostname(entry.url)),
+    getUrlHostname(input.project.sources.websiteUrl),
+    getUrlHostname(input.project.sources.primaryWebsiteUrl),
+    ...input.project.sources.competitors.map((entry) => getUrlHostname(entry.url)),
+    ...input.project.sources.competitorUrls.map((entry) => getUrlHostname(entry)),
+  ].filter(Boolean));
+  const seenHosts = new Set<string>();
+  const now = new Date().toISOString();
+  const suggestions: AgencyCompetitorSearchSuggestion[] = [];
+
+  for (const entry of input.parsed.competitors) {
+    const url = normalizeHttpUrl(entry.url);
+    const host = getUrlHostname(url);
+    if (!url || !host || blockedHosts.has(host) || seenHosts.has(host)) {
+      continue;
+    }
+    seenHosts.add(host);
+    suggestions.push({
+      id: createSourceId('cmp_ai'),
+      name: entry.name || deriveNameFromUrl(url),
+      url,
+      source: 'ai_search',
+      status: 'suggested',
+      reason: entry.reason || 'Suggerito dalla ricerca AI online.',
+      addedAt: now,
+      confidence: entry.confidence,
+    });
+    if (suggestions.length >= 8) {
+      break;
+    }
+  }
+
+  return {
+    provider: input.provider,
+    providerStatus: 'configured',
+    realSearch: true,
+    model: input.model,
+    suggestions,
+    queryContext: {
+      websiteUrl: input.context.primaryWebsiteUrl,
+      projectName: input.project.name,
+      projectType: input.project.projectType?.key ?? null,
+      clientName: input.project.clientName,
+      manualNotesAvailable: input.project.sources.manualNotes.length > 0,
+    },
+    usedQueries: input.parsed.usedQueries,
+    notes: input.parsed.notes,
+    message: suggestions.length > 0
+      ? `Ricerca online completata: ${suggestions.length} competitor suggeriti. Conferma solo quelli pertinenti.`
+      : 'Ricerca online completata, ma non ho trovato competitor sufficientemente affidabili da proporre.',
+  };
+};
+
 const runAgencyOpenAiCompetitorSearch = async (input: {
   workspaceId: string;
   project: AgencyProjectPayload;
@@ -3752,7 +3914,9 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
 }) => {
   const context = buildCompetitorSearchContext(input.project);
   const model = resolveCompetitorSearchModel({
+    provider: 'openai_web_search',
     envModel: process.env.AGENCY_COMPETITOR_SEARCH_MODEL,
+    searchModel: input.runtimeConfig.competitorSearch.model,
     configuredModel: input.runtimeConfig.ai.model,
   });
   const controller = new AbortController();
@@ -3768,25 +3932,8 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
       tool_choice: 'auto',
       include: ['web_search_call.action.sources'],
       input: [
-        {
-          role: 'system',
-          content: [
-            'Sei un market research analyst per agenzie digitali.',
-            'Devi cercare online competitor reali e pertinenti per il progetto.',
-            'Non inventare aziende, URL o prove: inserisci solo competitor trovati tramite ricerca web.',
-            'Escludi directory, marketplace, portali generici e lo stesso dominio del cliente, salvo siano competitor diretti.',
-            'Rispondi solo con JSON valido nel formato {"competitors":[{"name":"","url":"","reason":"","confidence":0.0}],"usedQueries":[],"notes":""}.',
-          ].join(' '),
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            task: 'search_real_competitors',
-            maxCompetitors: 5,
-            language: 'it',
-            context,
-          }).slice(0, 18000),
-        },
+        { role: 'system', content: COMPETITOR_SEARCH_SYSTEM_PROMPT },
+        { role: 'user', content: buildCompetitorSearchUserPayload(context) },
       ],
     };
     if (modelSupportsReasoningEffort(model)) {
@@ -3819,58 +3966,120 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
       parseJsonObjectFromText(extractOpenAiResponseText(payload)),
     );
 
-    const blockedHosts = new Set([
-      ...input.project.sources.urls.map((entry) => getUrlHostname(entry.url)),
-      getUrlHostname(input.project.sources.websiteUrl),
-      getUrlHostname(input.project.sources.primaryWebsiteUrl),
-      ...input.project.sources.competitors.map((entry) => getUrlHostname(entry.url)),
-      ...input.project.sources.competitorUrls.map((entry) => getUrlHostname(entry)),
-    ].filter(Boolean));
-    const seenHosts = new Set<string>();
-    const now = new Date().toISOString();
-    const suggestions: AgencyCompetitorSearchSuggestion[] = [];
+    return buildCompetitorSearchResult({
+      provider: 'openai_web_search',
+      model,
+      project: input.project,
+      context,
+      parsed,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 
-    for (const entry of parsed.competitors) {
-      const url = normalizeHttpUrl(entry.url);
-      const host = getUrlHostname(url);
-      if (!url || !host || blockedHosts.has(host) || seenHosts.has(host)) {
-        continue;
-      }
-      seenHosts.add(host);
-      suggestions.push({
-        id: createSourceId('cmp_ai'),
-        name: entry.name || deriveNameFromUrl(url),
-        url,
-        source: 'ai_search',
-        status: 'suggested',
-        reason: entry.reason || 'Suggerito dalla ricerca AI online.',
-        addedAt: now,
-        confidence: entry.confidence,
+// Quante volte si prosegue un turno messo in pausa dall'API. Con gli strumenti
+// server-side Anthropic puo' fermarsi con `stop_reason: "pause_turn"` a meta'
+// lavoro: la richiesta va semplicemente rimandata con la risposta parziale in
+// coda. Senza questo, la ricerca tornerebbe vuota senza alcun errore.
+const ANTHROPIC_SEARCH_MAX_CONTINUATIONS = 3;
+const ANTHROPIC_SEARCH_MAX_TOKENS = 4096;
+const ANTHROPIC_SEARCH_MAX_WEB_USES = 6;
+
+const runAgencyAnthropicCompetitorSearch = async (input: {
+  workspaceId: string;
+  project: AgencyProjectPayload;
+  runtimeConfig: Awaited<ReturnType<typeof resolveAgencyRuntimeConfig>>;
+}) => {
+  const context = buildCompetitorSearchContext(input.project);
+  const model = resolveCompetitorSearchModel({
+    provider: 'anthropic_web_search',
+    envModel: process.env.AGENCY_COMPETITOR_SEARCH_MODEL,
+    searchModel: input.runtimeConfig.competitorSearch.model,
+    configuredModel: input.runtimeConfig.ai.model,
+  });
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    getCompetitorSearchTimeoutMs(),
+  );
+
+  try {
+    // Due strumenti insieme: quello server-side di ricerca web (lo esegue
+    // Anthropic, non noi) e quello finto che obbliga la risposta a essere JSON
+    // strutturato — lo stesso meccanismo delle altre generazioni Claude.
+    const tools = [
+      {
+        type: anthropicWebSearchToolType(model),
+        name: 'web_search',
+        max_uses: ANTHROPIC_SEARCH_MAX_WEB_USES,
+      },
+      buildAnthropicJsonTool(COMPETITOR_SEARCH_JSON_SCHEMA),
+    ];
+    const messages: Array<Record<string, unknown>> = [
+      { role: 'user', content: buildCompetitorSearchUserPayload(context) },
+    ];
+
+    let payload: unknown = null;
+    for (let attempt = 0; attempt <= ANTHROPIC_SEARCH_MAX_CONTINUATIONS; attempt += 1) {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': input.runtimeConfig.ai.anthropicApiKey ?? '',
+          'anthropic-version': ANTHROPIC_API_VERSION,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: ANTHROPIC_SEARCH_MAX_TOKENS,
+          system: `${COMPETITOR_SEARCH_SYSTEM_PROMPT} Usa lo strumento web_search per cercare, poi restituisci il risultato chiamando lo strumento ${ANTHROPIC_JSON_TOOL_NAME}.`,
+          tools,
+          messages,
+        }),
+        signal: controller.signal,
       });
-      if (suggestions.length >= 8) {
+
+      if (!response.ok) {
+        let details = '';
+        try {
+          const errorPayload = await response.json() as { error?: { message?: string } };
+          details = errorPayload.error?.message ? `: ${errorPayload.error.message}` : '';
+        } catch {
+          details = '';
+        }
+        throw new Error(`Anthropic Messages API error ${response.status}${details}`);
+      }
+
+      payload = await response.json();
+      const stopReason = isRecord(payload) ? payload.stop_reason : null;
+      if (stopReason !== 'pause_turn') {
         break;
       }
+      // Turno in pausa: si rimanda la stessa conversazione con la risposta
+      // parziale in coda e l'API riprende da dove si era fermata. Nessun
+      // messaggio utente aggiuntivo, altrimenti si confonde il modello.
+      messages.push({
+        role: 'assistant',
+        content: isRecord(payload) && Array.isArray(payload.content) ? payload.content : [],
+      });
     }
 
-    return {
-      provider: 'openai_web_search',
-      providerStatus: 'configured',
-      realSearch: true,
+    // Prima il blocco tool_use (JSON valido per costruzione), poi il testo come
+    // ripiego: se il modello ha risposto a parole nonostante lo strumento, si
+    // prova comunque a leggerlo invece di buttare via una ricerca gia' pagata.
+    const structured = extractAnthropicToolInput(payload);
+    const rawResult = structured && !isEmptyStructuredPayload(structured)
+      ? structured
+      : parseJsonObjectFromText(extractAnthropicTextContent(payload));
+    const parsed = competitorSearchResponseSchema.parse(rawResult);
+
+    return buildCompetitorSearchResult({
+      provider: 'anthropic_web_search',
       model,
-      suggestions,
-      queryContext: {
-        websiteUrl: context.primaryWebsiteUrl,
-        projectName: input.project.name,
-        projectType: input.project.projectType?.key ?? null,
-        clientName: input.project.clientName,
-        manualNotesAvailable: input.project.sources.manualNotes.length > 0,
-      },
-      usedQueries: parsed.usedQueries,
-      notes: parsed.notes,
-      message: suggestions.length > 0
-        ? `Ricerca online completata: ${suggestions.length} competitor suggeriti. Conferma solo quelli pertinenti.`
-        : 'Ricerca online completata, ma non ho trovato competitor sufficientemente affidabili da proporre.',
-    };
+      project: input.project,
+      context,
+      parsed,
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -7888,11 +8097,18 @@ export const agencyService = {
     const project = await this.getProject(input.workspaceId, input.projectId);
     const runtimeConfig = await resolveAgencyRuntimeConfig(input.workspaceId);
     const provider = runtimeConfig.competitorSearch.provider;
-    const enabled = runtimeConfig.competitorSearch.enabled;
-    const hasOpenAiKey = runtimeConfig.ai.apiKeyConfigured;
-    const isConfigured = enabled && provider === 'openai_web_search' && hasOpenAiKey;
+    // Il provider *effettivo*: quello scelto, ma solo se ha la sua chiave.
+    // Prima qui si guardava sempre e solo la chiave OpenAI, quindi con la sola
+    // chiave Anthropic la ricerca risultava non configurata anche a provider
+    // Anthropic selezionato.
+    const resolved = resolveCompetitorSearchProvider({
+      enabled: runtimeConfig.competitorSearch.enabled,
+      provider,
+      openAiKeyConfigured: runtimeConfig.ai.apiKeyConfigured,
+      anthropicKeyConfigured: runtimeConfig.ai.anthropicApiKeyConfigured,
+    });
 
-    if (isConfigured) {
+    if (resolved.provider) {
       if (input.dryRun) {
         return {
           provider,
@@ -7911,34 +8127,37 @@ export const agencyService = {
       }
 
       try {
-        return await runAgencyOpenAiCompetitorSearch({
+        const runSearch = resolved.provider === 'anthropic_web_search'
+          ? runAgencyAnthropicCompetitorSearch
+          : runAgencyOpenAiCompetitorSearch;
+        return await runSearch({
           workspaceId: input.workspaceId,
           project,
           runtimeConfig,
-      });
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : 'Errore sconosciuto';
-      const isTimeout = (error instanceof Error && (
-        error.name === 'AbortError' || detail.toLowerCase().includes('aborted')
-      ));
-      return {
-        provider,
-        providerStatus: isTimeout ? 'configured_timeout' : 'configured_error',
-        realSearch: false,
-        suggestions: [],
-        queryContext: {
-          websiteUrl: project.sources.websiteUrl,
-          projectName: project.name,
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : 'Errore sconosciuto';
+        const isTimeout = (error instanceof Error && (
+          error.name === 'AbortError' || detail.toLowerCase().includes('aborted')
+        ));
+        return {
+          provider,
+          providerStatus: isTimeout ? 'configured_timeout' : 'configured_error',
+          realSearch: false,
+          suggestions: [],
+          queryContext: {
+            websiteUrl: project.sources.websiteUrl,
+            projectName: project.name,
             projectType: project.projectType?.key ?? null,
-          clientName: project.clientName,
-          manualNotesAvailable: project.sources.manualNotes.length > 0,
-        },
-        message: isTimeout
-          ? 'La ricerca online ha richiesto troppo tempo ed e stata interrotta. Riprova tra poco o usa un modello piu veloce nelle Impostazioni AI.'
-          : `Ricerca online configurata, ma la chiamata al provider non e riuscita. Dettaglio tecnico: ${detail}`,
-      };
+            clientName: project.clientName,
+            manualNotesAvailable: project.sources.manualNotes.length > 0,
+          },
+          message: isTimeout
+            ? 'La ricerca online ha richiesto troppo tempo ed e stata interrotta. Riprova tra poco o usa un modello piu veloce nelle Impostazioni AI.'
+            : `Ricerca online configurata, ma la chiamata al provider non e riuscita. Dettaglio tecnico: ${detail}`,
+        };
+      }
     }
-  }
 
     return {
       provider,
@@ -7951,7 +8170,7 @@ export const agencyService = {
         projectType: project.projectType?.key ?? null,
         manualNotesAvailable: project.sources.manualNotes.length > 0,
       },
-      message: 'Ricerca automatica non ancora configurata. Puoi inserire competitor manualmente o configurare un provider in Impostazioni AI.',
+      message: competitorSearchNotConfiguredMessage(resolved.reason, provider),
     };
   },
 
@@ -7959,25 +8178,48 @@ export const agencyService = {
     const runtimeConfig = await resolveAgencyRuntimeConfig(workspaceId);
     const provider = runtimeConfig.competitorSearch.provider;
     const enabled = runtimeConfig.competitorSearch.enabled;
-    const hasOpenAiKey = runtimeConfig.ai.apiKeyConfigured;
-    const hasProviderEnv = enabled && provider === 'openai_web_search' && hasOpenAiKey;
+    const resolved = resolveCompetitorSearchProvider({
+      enabled,
+      provider,
+      openAiKeyConfigured: runtimeConfig.ai.apiKeyConfigured,
+      anthropicKeyConfigured: runtimeConfig.ai.anthropicApiKeyConfigured,
+    });
+    const isAnthropic = provider === 'anthropic_web_search';
+    // La chiave e il modello riportati sono quelli del provider SCELTO, non
+    // sempre quelli di OpenAI: e' la stessa scheda a doverli mostrare per
+    // entrambi i motori.
+    const apiKeyConfigured = isAnthropic
+      ? runtimeConfig.ai.anthropicApiKeyConfigured
+      : runtimeConfig.ai.apiKeyConfigured;
+    const apiKeySource = isAnthropic
+      ? runtimeConfig.ai.anthropicApiKeySource
+      : runtimeConfig.ai.apiKeySource;
+    const model = resolved.provider
+      ? resolveCompetitorSearchModel({
+        provider: resolved.provider,
+        envModel: process.env.AGENCY_COMPETITOR_SEARCH_MODEL,
+        searchModel: runtimeConfig.competitorSearch.model,
+        configuredModel: runtimeConfig.ai.model,
+      })
+      : runtimeConfig.competitorSearch.model || '';
 
     return {
-      status: hasProviderEnv ? 'configured' : 'not_configured',
+      status: resolved.provider ? 'configured' : 'not_configured',
       provider,
       enabled,
+      model,
       serverSideOnly: true,
-      apiKeyConfigured: hasOpenAiKey,
-      apiKeySource: runtimeConfig.ai.apiKeySource,
+      apiKeyConfigured,
+      apiKeySource,
       storageReady: runtimeConfig.storageReady,
       requiredEnv: [
         'AGENCY_COMPETITOR_SEARCH_ENABLED=true',
-        'AGENCY_COMPETITOR_SEARCH_PROVIDER=openai_web_search',
-        'OPENAI_API_KEY',
+        `AGENCY_COMPETITOR_SEARCH_PROVIDER=${isAnthropic ? 'anthropic_web_search' : 'openai_web_search'}`,
+        isAnthropic ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY',
       ],
-      message: hasProviderEnv
-        ? 'Ricerca competitor configurata lato server. Il sistema puo usare OpenAI web search per suggerire competitor reali.'
-        : 'Per cercare competitor online serve un provider configurato lato server. Senza provider puoi inserire competitor manualmente.',
+      message: resolved.provider
+        ? `Ricerca competitor configurata lato server con ${isAnthropic ? 'Anthropic (Claude)' : 'OpenAI'} web search e il modello ${model}.`
+        : competitorSearchNotConfiguredMessage(resolved.reason, provider),
     };
   },
 
@@ -9133,13 +9375,19 @@ export const agencyService = {
       competitorSearch: {
         enabled: competitorSearch.enabled,
         provider: competitorSearch.provider,
+        // Il modello SCELTO (vuoto = eredita quello di workspace), non quello
+        // risolto: il form deve poter restare su "predefinito".
+        model: runtimeConfig.competitorSearch.model,
+        // Il modello che verrebbe usato davvero adesso, per mostrarlo accanto
+        // alla scelta senza doverlo ricalcolare in UI.
+        effectiveModel: competitorSearch.model,
         status: competitorSearch.status,
         apiKeyConfigured: competitorSearch.apiKeyConfigured,
         message: competitorSearch.message,
       },
       availableProviders: {
         ai: ['none', 'openai', 'anthropic'],
-        competitorSearch: ['none', 'openai_web_search', 'serpapi', 'custom'],
+        competitorSearch: COMPETITOR_SEARCH_PROVIDERS,
       },
       // Catalogo curato dei modelli selezionabili, per popolare il select in UI: cosi'
       // non si puo' piu' digitare a mano un id arbitrario (che ripiegherebbe su Opus).
@@ -9197,6 +9445,33 @@ export const agencyService = {
       if (payload.ai.provider && payload.ai.provider !== 'none' && modelOption.provider !== payload.ai.provider) {
         throw badRequest(
           `Il modello "${modelOption.label}" e' del provider "${modelOption.provider}", diverso dal provider selezionato "${payload.ai.provider}". Scegli un modello del provider selezionato.`,
+        );
+      }
+    }
+
+    // Stessa regola per il modello della RICERCA COMPETITOR, con una differenza:
+    // la stringa vuota e' valida e significa "usa il modello preferito del
+    // workspace". Un id fuori catalogo verrebbe scartato in silenzio dal
+    // risolutore, quindi si rifiuta qui invece di salvare una scelta che non
+    // avra' effetto.
+    const competitorSearchModel = payload.competitorSearch?.model;
+    if (competitorSearchModel) {
+      const modelOption = findAgencyCatalogModel(competitorSearchModel);
+      if (!modelOption) {
+        throw badRequest(
+          `Modello ricerca competitor non valido: "${competitorSearchModel}". Scegli un modello dal catalogo o lascia vuoto per usare quello preferito.`,
+          { validModels: AGENCY_AI_MODEL_CATALOG.map((entry) => entry.id) },
+        );
+      }
+      const searchProvider = payload.competitorSearch?.provider;
+      const expectedProvider = searchProvider === 'anthropic_web_search'
+        ? 'anthropic'
+        : searchProvider === 'openai_web_search'
+          ? 'openai'
+          : null;
+      if (expectedProvider && modelOption.provider !== expectedProvider) {
+        throw badRequest(
+          `Il modello "${modelOption.label}" e' del provider "${modelOption.provider}", diverso dal provider di ricerca selezionato "${searchProvider}". Scegli un modello del provider selezionato.`,
         );
       }
     }
@@ -9289,6 +9564,15 @@ export const agencyService = {
         workspaceId: input.workspaceId,
         key: AGENCY_RUNTIME_SETTING_KEYS.competitorSearchProvider,
         valueJson: payload.competitorSearch.provider,
+        isSecret: false,
+      }));
+    }
+
+    if (payload.competitorSearch?.model !== undefined) {
+      writes.push(agencyRepository.upsertAgencyRuntimeSetting({
+        workspaceId: input.workspaceId,
+        key: AGENCY_RUNTIME_SETTING_KEYS.competitorSearchModel,
+        valueJson: payload.competitorSearch.model,
         isSecret: false,
       }));
     }

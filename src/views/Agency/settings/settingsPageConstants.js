@@ -39,9 +39,20 @@ export const SEARCH_STATUS_LABEL = {
 
 export const PROVIDER_LABELS = { openai: "OpenAI", anthropic: "Anthropic (Claude)" };
 
+// I provider della ricerca competitor. I primi due hanno un motore vero dietro;
+// SerpAPI e Custom restano nell'elenco solo perche' possono essere gia' salvati
+// da configurazioni passate — sceglierli lascia la ricerca non configurata.
 export const SEARCH_PROVIDER_OPTIONS = [
   { value: "none", label: "Nessuno" },
   { value: "openai_web_search", label: "OpenAI web search" },
-  { value: "serpapi", label: "SerpAPI" },
-  { value: "custom", label: "Custom" },
+  { value: "anthropic_web_search", label: "Anthropic (Claude) web search" },
+  { value: "serpapi", label: "SerpAPI (non implementato)" },
+  { value: "custom", label: "Custom (non implementato)" },
 ];
+
+// A quale provider AI appartiene ogni provider di ricerca: serve a filtrare i
+// modelli selezionabili e a sapere quale chiave API deve essere presente.
+export const SEARCH_PROVIDER_TO_AI_PROVIDER = {
+  openai_web_search: "openai",
+  anthropic_web_search: "anthropic",
+};
