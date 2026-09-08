@@ -928,3 +928,19 @@ Entrambe erano vere quando sono state scritte, o non sono mai state verificate. 
 - **Impostare l'identita' nel repository prima del primo commit, ricavandola invece di inventarla:** `git config user.name "$(git log -1 --format='%an')"` e `git config user.email "$(git log -1 --format='%ae')"`. Il valore giusto e' gia' nella storia del repository.
 - **Legare `commit` e `push` con `&&`, mai con `;` e mai in due chiamate separate.** Va detto perche' e' l'opposto di quello che verrebbe da pensare: `&&` non e' il pericolo, e' la **protezione** — con uscita 128 la catena si ferma da sola e il push non parte. Il pericolo e' il `;`, che tira dritto.
 - **Verifica dopo il push**, perche' `* [new branch]` non prova niente: `git log --oneline -1` deve mostrare il commit appena fatto, non quello di partenza.
+
+## 63. Push respinto con «Invalid username or token»: spesso il token non e' sbagliato, e' ASSENTE — e il segreto esiste gia' in azienda
+
+**Contesto:** 8/9/2026, compito CRMA-22. Pubblicare un ramo su `https://github.com/advaiora/crmadv` da un run Paperclip.
+
+**Errore:** `git push` si ferma con `remote: Invalid username or token. Password authentication is not supported for Git operations.` Il messaggio parla di credenziali **sbagliate**, e manda a cercare un token scaduto, un URL con le credenziali dentro, o un helper configurato male. Sono tre piste vuote. L'helper in `~/.gitconfig` c'e' ed e' giusto — legge `${GH_TOKEN:-$GITHUB_TOKEN}` — solo che **in questo run nessuna delle due variabili e' impostata**: restituisce una password vuota, e GitHub la riferisce come token non valido.
+
+Due cose rendono la diagnosi piu' lenta di quanto dovrebbe:
+1. **`git fetch` e `git ls-remote` funzionano**, perche' la lettura non chiede credenziali. Rete, remote e nome del ramo sembrano quindi tutti a posto, e si scarta proprio la pista giusta.
+2. **`git config --get-all credential.helper` non mostra niente**, e sembra che l'helper manchi. In realta' e' registrato sotto la sezione per dominio `[credential "https://github.com"]`, quindi la chiave da chiedere e' `credential.https://github.com.helper`.
+
+**Modo corretto:**
+- **Prima di concludere che il token e' sbagliato, controllare che ci sia:** `env | grep -E 'GH_TOKEN|GITHUB_TOKEN'`. Uscita vuota vuol dire **token assente**, che e' un problema diverso e si risolve altrove.
+- **Il segreto di solito esiste gia' a livello azienda**, e quello che manca e' solo il collegamento a questo agent. Si guardano nell'ordine: `GET /api/companies/$PAPERCLIP_COMPANY_ID/secrets/catalog` (qui elenca `GITHUB_TOKEN_CRMADV`) e `GET /api/agents/me/secrets` (qui tornava `[]`).
+- **La via per sbloccarsi e' una proposta, non un messaggio in chat:** `POST /api/agents/me/secret-proposals` con `{"kind":"binding","secretId":"<dal catalogo>","configPath":"env.GITHUB_TOKEN","justification":"..."}`. Resta `pending` finche' un umano approva.
+- **Intanto il lavoro non si perde: si committa lo stesso.** Un ramo locale sopravvive al run. ⚠️ Ma se si e' lavorato in un `git worktree` creato dentro `PAPERCLIP_RUN_SCRATCH_DIR`, quella cartella viene **cancellata da Paperclip alla fine del run**: prima di chiudere si fa `git worktree remove`, cosi' il riferimento del ramo resta nel `.git` condiviso e nessun worktree fantasma lo tiene occupato. Verifica: `git log --oneline -1 <ramo>` dal repository principale.
