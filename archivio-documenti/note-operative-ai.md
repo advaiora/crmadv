@@ -944,3 +944,33 @@ Due cose rendono la diagnosi piu' lenta di quanto dovrebbe:
 - **Il segreto di solito esiste gia' a livello azienda**, e quello che manca e' solo il collegamento a questo agent. Si guardano nell'ordine: `GET /api/companies/$PAPERCLIP_COMPANY_ID/secrets/catalog` (qui elenca `GITHUB_TOKEN_CRMADV`) e `GET /api/agents/me/secrets` (qui tornava `[]`).
 - **La via per sbloccarsi e' una proposta, non un messaggio in chat:** `POST /api/agents/me/secret-proposals` con `{"kind":"binding","secretId":"<dal catalogo>","configPath":"env.GITHUB_TOKEN","justification":"..."}`. Resta `pending` finche' un umano approva.
 - **Intanto il lavoro non si perde: si committa lo stesso.** Un ramo locale sopravvive al run. ⚠️ Ma se si e' lavorato in un `git worktree` creato dentro `PAPERCLIP_RUN_SCRATCH_DIR`, quella cartella viene **cancellata da Paperclip alla fine del run**: prima di chiudere si fa `git worktree remove`, cosi' il riferimento del ramo resta nel `.git` condiviso e nessun worktree fantasma lo tiene occupato. Verifica: `git log --oneline -1 <ramo>` dal repository principale.
+
+## 64. La risposta di un umano puo' NON essere un commento: una conferma accettata non compare nel thread, e contare i commenti fa concludere il contrario
+
+**Contesto:** 8/9/2026, compito CRMA-22. Un run Paperclip si risveglia su un compito lasciato **bloccato** al battito precedente, con `reason: issue_commented` nel payload di risveglio.
+
+**Errore:** si apre il thread per cercare la risposta e si trova **un solo commento, il proprio**, quello di chiusura del run precedente. La conclusione che viene spontanea — «e' l'eco di me stesso, nessuno ha risposto, il blocco non si e' mosso» — e' **falsa**, e nel caso reale lo era: un umano aveva risposto tre minuti dopo la chiusura del run, ma lo aveva fatto **accettando una richiesta di conferma**, e le conferme **non compaiono fra i commenti**.
+
+Il sintomo ingannevole e' proprio la coerenza apparente dei numeri: un commento, autore `agent`, `createdAt 14:17:52` dentro il run precedente. Tutto torna, e la deduzione sbagliata sembra dimostrata.
+
+**Modo corretto:**
+- **Lo stato di un compito non e' l'elenco dei suoi commenti.** Al risveglio si guardano **entrambi** gli elenchi, e quello delle interazioni per primo se il compito era bloccato su una decisione:
+  `curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PB/api/issues/$PAPERCLIP_TASK_ID/interactions"` — leggendo `status`, `resolvedAt` e `response`.
+- **Il confronto che conta e' `resolvedAt` contro la fine del run precedente**, non l'autore del commento: qui `resolvedAt 2026-09-08T14:22:54Z` contro un run chiuso alle `14:19:11` diceva chiaramente che qualcosa era arrivato dopo.
+- **`reason: issue_commented` non e' affidabile per capire cosa e' cambiato:** riporta un motivo, non l'autore ne' l'oggetto. Non usarlo per decidere dove guardare — guarda gli oggetti.
+
+## 65. Una richiesta di conferma ACCETTATA non approva la proposta di segreto: sono due oggetti diversi, e il blocco resta
+
+**Contesto:** 8/9/2026, compito CRMA-22. Un agent bloccato senza token GitHub aveva aperto **due** cose: una proposta di collegamento del segreto (`POST /api/agents/me/secret-proposals`) e, per renderla visibile sulla board, una richiesta di conferma sul compito (`request_confirmation` che puntava a quella proposta).
+
+**Errore:** la richiesta di conferma torna `status: accepted`, con `response: {"version":1,"outcome":"accepted"}` e un umano che l'ha risolta. Sembra lo sblocco: la domanda era «approvare il collegamento del token», e la risposta e' stata «accettato». **Ma il collegamento non e' avvenuto.** Nello stesso momento:
+- `GET /api/agents/me/secret-proposals` → la proposta e' ancora `"status":"pending"`;
+- `env | grep -E 'GH_TOKEN|GITHUB_TOKEN'` → vuoto;
+- `git push --dry-run` → sempre `remote: Invalid username or token`.
+
+La conferma registra che **una persona e' d'accordo**, non che il segreto sia stato collegato. Sono due oggetti in due sistemi diversi: l'accordo sta sul compito, il collegamento sta nei segreti dell'azienda. Chi accetta la scheda in buona fede crede di aver sbloccato, e l'agent che si fida della scheda ci riprova e fallisce di nuovo.
+
+**Modo corretto:**
+- **Dopo una conferma accettata che riguarda un segreto, non ritentare l'azione: verificare prima i due indicatori che contano**, nell'ordine — lo `status` della proposta, e la presenza della variabile nell'ambiente. Se sono `pending` e vuoto, non e' cambiato niente di operativo.
+- **Nel chiedere, dire l'azione esatta invece del suo effetto.** Non «approvare il collegamento del token», ma «aprire i segreti dell'azienda e approvare la proposta `<id>`»: la conferma e' una scheda di accordo, e da sola non esegue niente.
+- ⚠️ **Non chiudere il compito come sbloccato sulla base della conferma.** Il segnale di sblocco e' la variabile presente nell'ambiente del run, e si vede solo al risveglio successivo a un'approvazione vera.
