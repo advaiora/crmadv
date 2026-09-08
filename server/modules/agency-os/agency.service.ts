@@ -60,6 +60,7 @@ import { teamRepository } from '../team/team.repository.js';
 import { createLoggingOpenAiEmbedder, searchProjectSources, searchClientSources } from '../sources/sources.rag.js';
 import { decryptAESGCM, encryptAESGCM } from '../vault/crypto/aesGcm.js';
 import { getOrCreateWorkspaceDEK } from '../vault/keys.js';
+import { readProviderApiKeyFromEnv } from './provider-api-key-env.js';
 import { z } from 'zod';
 import {
   evaluateAgencyOpportunities,
@@ -1977,7 +1978,9 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
     }
   }
 
-  const envOpenAiApiKey = process.env.OPENAI_API_KEY?.trim() || null;
+  // Un segnaposto nel .env (`REPLACE_ME` e simili) non vale come chiave: vedi
+  // provider-api-key-env.ts per il caso reale che ha reso necessario il filtro.
+  const envOpenAiApiKey = readProviderApiKeyFromEnv(process.env.OPENAI_API_KEY);
   const openAiApiKey = dbOpenAiApiKey || envOpenAiApiKey;
   const openAiApiKeySource = dbOpenAiApiKey
     ? 'db'
@@ -1999,7 +2002,7 @@ const resolveAgencyRuntimeConfig = async (workspaceId?: string) => {
       dbAnthropicSecretReadable = false;
     }
   }
-  const envAnthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
+  const envAnthropicApiKey = readProviderApiKeyFromEnv(process.env.ANTHROPIC_API_KEY);
   const anthropicApiKey = dbAnthropicApiKey || envAnthropicApiKey;
   const anthropicApiKeySource = dbAnthropicApiKey
     ? 'db'
