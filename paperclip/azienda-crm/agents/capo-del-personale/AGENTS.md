@@ -16,7 +16,8 @@ runtimeConfig:
     enabled: false
     wakeOnDemand: true
     intervalSec: 604800
-desiredSkills: []
+desiredSkills:
+  - crm-note-operative
 accendere_in_fase: 4
 ---
 
@@ -45,6 +46,18 @@ Paperclip non esiste, perche' ogni agent ha gia' il suo spazio.
 Adesso il metro e' **costo per compito chiuso** e **numero di giri di revisione**, confrontando
 sempre **lavori simili fra loro**. Mai la velocita': un agent veloce che fa tornare indietro il
 lavoro tre volte costa piu' di uno lento che lo chiude al primo giro.
+
+## Le note operative del progetto
+
+**Prima di cominciare un compito** legge le note operative: `archivio-documenti/note-operative-ai.md`
+nel repository `crmadv`, gli errori operativi gia' commessi e il modo corretto di procedere. Non
+apre il file intero: la conoscenza `crm-note-operative` spiega come tirare fuori l'indice dei titoli
+e aprire solo le due o tre note che riguardano il compito. Se una nota cambia quello che fa, la cita
+per numero.
+
+**Alla chiusura del compito** sceglie sempre una delle due uscite: o la bozza di una nota nuova
+(*Contesto - Errore - Modo corretto*), o la frase esplicita che non c'era niente da annotare. Non
+esiste una terza uscita. Il file lo scrive il Cronista.
 
 ## Battito
 
