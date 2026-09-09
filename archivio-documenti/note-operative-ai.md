@@ -981,3 +981,19 @@ La conferma registra che **una persona e' d'accordo**, non che il segreto sia st
 - `env | grep GITHUB_TOKEN` finalmente **risponde**, ed e' questo l'unico indicatore che conta.
 
 Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio si legge prima `PAPERCLIP_WAKE_REASON`**. Se dice `secret_proposal_resolved` si va dritti all'ambiente; se dice altro, il blocco e' quasi sempre ancora in piedi e riaprire il thread e' tempo speso male.
+
+## 66. In questo contenitore `gh` NON esiste: una pull request si apre, si legge e si unisce con l'API REST di GitHub
+
+**Contesto:** 9/9/2026, compito CRMA-22. Da un run Paperclip, chiudere il giro su `advaiora/crmadv`: guardare lo stato di una pull request e unirla a `main` dopo l'approvazione arrivata nel thread.
+
+**Errore:** partire da `gh pr view` / `gh pr merge`, che e' il gesto naturale. Risposta: `/bin/bash: line 1: gh: command not found` (`command -v gh` vuoto, niente in `/usr/bin` ne' in `/usr/local/bin`). E' la stessa famiglia della nota #61 su `python3`: su questa macchina ci sono `git`, `node` e `curl`, non gli strumenti da postazione di lavoro. Il tempo si perde due volte se, non trovando `gh`, si conclude che la pull request va aperta o unita a mano dall'interfaccia web e si chiude il compito chiedendo a un umano di premere il pulsante: **il token che serve e' lo stesso del push** (`$GITHUB_TOKEN`, vedi nota #63) e basta e avanza.
+
+**Modo corretto:**
+- **Tutto il ciclo passa dall'API REST**, con `Authorization: Bearer $GITHUB_TOKEN` e `Accept: application/vnd.github+json` su `https://api.github.com/repos/advaiora/crmadv`:
+  - aprire: `POST .../pulls` con `{"title":...,"head":"<ramo>","base":"main","body":...}`
+  - leggere: `GET .../pulls/<n>` — i campi che decidono sono `mergeable` e `mergeable_state` (`"clean"` = si puo' unire)
+  - unire: `PUT .../pulls/<n>/merge` con `{"merge_method":"squash","commit_title":"...","commit_message":"..."}`
+- **La risposta JSON si legge con `node -e`, non con `python3`** → nota #61.
+- **Il metodo di unione di questo repository e' `squash`:** su `main` i commit uniti si riconoscono dal numero in coda al titolo (`... (#7)`, `... (#5)`). Non lasciare che l'API scelga il default.
+- **La verifica non e' `"merged": true` nella risposta**, che dice solo che la chiamata e' andata a buon fine. La prova e' nel repository: `git fetch origin` e poi `git show origin/main:<file> | grep <qualcosa che hai aggiunto>`. Se il `fetch` non muove `main`, l'unione non c'e'.
+- ⚠️ **L'unione a `main` resta un cancello:** CLAUDE.md e le regole d'azienda dicono che serve l'approvazione, e il fatto che l'API sia raggiungibile non la sostituisce. Qui l'approvazione era il commento «si unisci su main» sul compito.
