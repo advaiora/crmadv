@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ClientForm from './ClientForm';
+import { mapClientToFormValues } from './clientFormValues';
 
 const listCustomFields = vi.fn();
 const createCustomField = vi.fn();
@@ -20,9 +21,9 @@ const campoSettore = {
   active: true,
 };
 
-// Il form non collega tutte le etichette ai campi: il nome si trova risalendo
-// dalla sua etichetta al gruppo che lo contiene.
-const campoNome = () => screen.getByText('Nome e cognome').parentElement.querySelector('input');
+// Ogni gruppo del form ha il suo `controlId`, quindi l'etichetta e' legata al
+// campo e si cerca per etichetta — come farebbe chi usa uno screen reader.
+const campoNome = () => screen.getByLabelText('Nome e cognome');
 
 describe('ClientForm — campi personalizzati', () => {
   beforeEach(() => {
@@ -89,5 +90,88 @@ describe('ClientForm — campi personalizzati', () => {
 
     expect(await screen.findByText('Questo campo è obbligatorio.')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe('ClientForm — PEC, SDI, sito web e referente', () => {
+  beforeEach(() => {
+    listCustomFields.mockReset().mockResolvedValue({ definitions: [] });
+    createCustomField.mockReset();
+  });
+
+  const rendiForm = (props = {}) =>
+    render(<ClientForm submitLabel="Crea cliente" onSubmit={vi.fn()} onCancel={vi.fn()} {...props} />);
+
+  it('i quattro campi si raggiungono dalla loro etichetta', async () => {
+    rendiForm();
+    await waitFor(() => expect(listCustomFields).toHaveBeenCalled());
+
+    expect(screen.getByLabelText('PEC')).toBeInTheDocument();
+    expect(screen.getByLabelText('Codice destinatario SDI')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sito web')).toBeInTheDocument();
+    expect(screen.getByLabelText('Referente')).toBeInTheDocument();
+  });
+
+  it('quello che si scrive nei quattro campi arriva nel salvataggio', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    rendiForm({ onSubmit });
+    await waitFor(() => expect(listCustomFields).toHaveBeenCalled());
+
+    fireEvent.change(campoNome(), { target: { value: 'Trattoria Da Beppe' } });
+    fireEvent.change(screen.getByLabelText('PEC'), { target: { value: 'beppe@pec.it' } });
+    fireEvent.change(screen.getByLabelText('Codice destinatario SDI'), { target: { value: 'abc1234' } });
+    fireEvent.change(screen.getByLabelText('Sito web'), { target: { value: 'www.dabeppe.it' } });
+    fireEvent.change(screen.getByLabelText('Referente'), { target: { value: 'Giuseppe Rossi' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crea cliente' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      pecEmail: 'beppe@pec.it',
+      sdiCode: 'ABC1234',
+      website: 'www.dabeppe.it',
+      contactPerson: 'Giuseppe Rossi',
+    });
+  });
+
+  it('un cliente esistente si riapre coi quattro campi gia compilati', async () => {
+    rendiForm({
+      initialValues: mapClientToFormValues({
+        name: 'Trattoria Da Beppe',
+        pecEmail: 'beppe@pec.it',
+        sdiCode: 'ABC1234',
+        website: 'www.dabeppe.it',
+        contactPerson: 'Giuseppe Rossi',
+      }),
+    });
+    await waitFor(() => expect(listCustomFields).toHaveBeenCalled());
+
+    expect(screen.getByLabelText('PEC')).toHaveValue('beppe@pec.it');
+    expect(screen.getByLabelText('Codice destinatario SDI')).toHaveValue('ABC1234');
+    expect(screen.getByLabelText('Sito web')).toHaveValue('www.dabeppe.it');
+    expect(screen.getByLabelText('Referente')).toHaveValue('Giuseppe Rossi');
+  });
+
+  it('una PEC malformata ferma il salvataggio e lo dice sul campo giusto', async () => {
+    const onSubmit = vi.fn();
+    rendiForm({ onSubmit });
+    await waitFor(() => expect(listCustomFields).toHaveBeenCalled());
+
+    fireEvent.change(campoNome(), { target: { value: 'Trattoria Da Beppe' } });
+    fireEvent.change(screen.getByLabelText('PEC'), { target: { value: 'non-una-pec' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Crea cliente' }));
+
+    expect(await screen.findByText('Inserisci un indirizzo PEC valido.')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('senza PEC ne codice SDI avvisa che non si potra fatturare', async () => {
+    rendiForm();
+    await waitFor(() => expect(listCustomFields).toHaveBeenCalled());
+
+    const avviso = 'Per la fatturazione elettronica serve almeno uno fra PEC e codice destinatario SDI.';
+    expect(screen.getByText(avviso)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Codice destinatario SDI'), { target: { value: 'ABC1234' } });
+    expect(screen.queryByText(avviso)).not.toBeInTheDocument();
   });
 });

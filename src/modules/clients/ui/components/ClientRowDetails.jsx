@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Hash, MapPin, Receipt } from 'lucide-react';
+import { Contact, FileText, Globe, Hash, Landmark, MailCheck, MapPin, Receipt } from 'lucide-react';
 import CopyField from './CopyField';
 import { formatAddress } from '../helpers';
 
@@ -29,6 +29,10 @@ const ClientRowDetails = ({ client }) => {
     <div className="clients-row-detail-grid">
       <CopyField icon={Receipt} label="P.IVA" value={client?.vatNumber || ''} />
       <CopyField icon={Hash} label="Codice fiscale" value={client?.taxCode || ''} />
+      <CopyField icon={MailCheck} label="PEC" value={client?.pecEmail || ''} />
+      <CopyField icon={Landmark} label="Codice destinatario SDI" value={client?.sdiCode || ''} />
+      <CopyField icon={Contact} label="Referente" value={client?.contactPerson || ''} />
+      <CopyField icon={Globe} label="Sito web" value={client?.website || ''} />
       <DetailField icon={MapPin} label="Indirizzo" fullWidth>
         {address || emptyValue}
       </DetailField>

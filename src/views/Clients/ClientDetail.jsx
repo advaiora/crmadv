@@ -11,13 +11,14 @@ import {
 import { Link, useHistory, useLocation, useParams } from 'react-router-dom';
 import {
     ArrowLeft,
+    Contact,
     FolderKanban,
+    Globe,
     ListChecks,
     Mail,
     MapPin,
     Pencil,
     Phone,
-    ReceiptText,
     StickyNote,
     Tag,
     Trash2,
@@ -28,6 +29,7 @@ import { deleteClient, getClient } from '../../modules/clients/ui/clientApi';
 import { listCustomFields } from '../../modules/customFields/api/customFieldsApi';
 import { CLIENTS_PERMISSIONS } from '../../modules/clients/ui/constants';
 import {
+    ClientFiscalCard,
     ClientTypeBadge,
     CopyField,
     PageHeader,
@@ -284,37 +286,20 @@ const ClientDetail = () => {
                                                     label="Telefono"
                                                     value={client.phone}
                                                 />
+                                                <CopyField
+                                                    icon={Contact}
+                                                    label="Referente"
+                                                    value={client.contactPerson}
+                                                />
+                                                <CopyField
+                                                    icon={Globe}
+                                                    label="Sito web"
+                                                    value={client.website}
+                                                />
                                             </Card.Body>
                                         </Card>
 
-                                        <Card className="card-border mb-3">
-                                            <Card.Header className="bg-transparent">
-                                                <h6 className="mb-0 d-inline-flex align-items-center gap-2">
-                                                    <ReceiptText size={15} />
-                                                    Dati fiscali
-                                                </h6>
-                                            </Card.Header>
-                                            <Card.Body>
-                                                {client.vatNumber || client.taxCode ? (
-                                                    <ul className="clients-detail-list">
-                                                        {client.vatNumber && (
-                                                            <li>
-                                                                <span className="text-muted">P.IVA</span>
-                                                                <span>{client.vatNumber}</span>
-                                                            </li>
-                                                        )}
-                                                        {client.taxCode && (
-                                                            <li>
-                                                                <span className="text-muted">Codice fiscale</span>
-                                                                <span>{client.taxCode}</span>
-                                                            </li>
-                                                        )}
-                                                    </ul>
-                                                ) : (
-                                                    <div className="text-muted">Non impostato</div>
-                                                )}
-                                            </Card.Body>
-                                        </Card>
+                                        <ClientFiscalCard client={client} />
 
                                         <Card className="card-border mb-3">
                                             <Card.Header className="bg-transparent">

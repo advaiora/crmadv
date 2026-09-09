@@ -1,7 +1,14 @@
 export { default as ClientActionsMenu } from './ClientActionsMenu';
+export { default as ClientAddressSection } from './ClientAddressSection';
 export { default as ClientAvatar } from './ClientAvatar';
+export { default as ClientContactSection } from './ClientContactSection';
 export { default as ClientCustomFieldsSection } from './ClientCustomFieldsSection';
 export { default as ClientEmptyState } from './ClientEmptyState';
+export { default as ClientFiscalCard } from './ClientFiscalCard';
+export { default as ClientFiscalSection } from './ClientFiscalSection';
+export { default as ClientIdentitySection } from './ClientIdentitySection';
+export { default as ClientNotesSection } from './ClientNotesSection';
+export { default as ClientTagsSection } from './ClientTagsSection';
 export { default as ClientGridRow } from './ClientGridRow';
 export { default as ClientMobileCard } from './ClientMobileCard';
 export { default as ClientRowDetails } from './ClientRowDetails';
