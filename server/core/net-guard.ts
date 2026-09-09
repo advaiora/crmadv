@@ -2,11 +2,15 @@
 //
 // La classificazione di un host come "privato o locale" (e quindi da bloccare) e la
 // validazione di un URL http(s) pubblico sono codice sensibile: devono stare in UN
-// posto solo. Qui vivono i predicati puri (riusati dal logo dei PDF in server/core/pdf.ts)
-// e un `safeFetch` piu' robusto — usato dove il server segue un URL scelto dall'utente
-// (SEO scan e healthcheck dei web asset) — che oltre al controllo dell'hostname risolve
-// il DNS e ri-valida ogni redirect, chiudendo il caso "dominio pubblico che punta a un IP
-// interno".
+// posto solo. Qui vivono i predicati puri (riusati dalla «Prova connessione» del server
+// di posta) e un `safeFetch` piu' robusto — usato ovunque il server segua un URL scelto
+// dall'utente: SEO scan e healthcheck dei web asset, e il logo dei PDF in
+// server/core/pdf.ts — che oltre al controllo dell'hostname risolve il DNS e ri-valida
+// ogni redirect, chiudendo il caso "dominio pubblico che punta a un IP interno".
+//
+// ⚠️ I predicati da soli NON bastano a chi segue un URL: guardano il nome e gli IP
+// scritti in chiaro, non dove quel nome porta davvero. Chi scarica qualcosa usa
+// `safeFetch`, non `isBlockedHostname`.
 
 import { isIP } from 'node:net';
 import { lookup } from 'node:dns/promises';
@@ -288,8 +292,11 @@ const classificaRisoluzione = async (
 // Risolve il DNS dell'host e blocca se una qualsiasi risoluzione punta a un IP
 // privato/loopback. Chiude il caso "dominio pubblico -> 127.0.0.1 / metadata cloud".
 // Fail-closed: se il DNS non risolve, si blocca.
-const assertHostResolvesToPublicIp = async (hostname: string): Promise<void> => {
-  const esito = await classificaRisoluzione(hostname);
+const assertHostResolvesToPublicIp = async (
+  hostname: string,
+  risolvi?: RisolutoreDns,
+): Promise<void> => {
+  const esito = await classificaRisoluzione(hostname, risolvi);
 
   if (esito === 'non-risolvibile') {
     throw new SsrfBlockedError('Host non risolvibile.');
@@ -391,6 +398,20 @@ type SafeFetchOptions = {
   allowHttp?: boolean;
   maxRedirects?: number;
   headers?: Record<string, string>;
+  /**
+   * Segnale del chiamante, in aggiunta al timeout interno. Serve a chi dopo deve
+   * LEGGERE il corpo: il timeout qui dentro si spegne quando la risposta torna, quindi
+   * da solo non copre un server che sgocciola i byte all'infinito. Chi passa un segnale
+   * proprio tiene quella fase sotto controllo (lo fa il logo dei PDF).
+   */
+  signal?: AbortSignal;
+  /**
+   * La risoluzione DNS, iniettabile — stesso motivo di `isPrivateNetworkHost`: il
+   * caso «dominio pubblico che punta a 127.0.0.1» non si puo' provare altrimenti,
+   * servirebbe una zona DNS vera sotto controllo del test. In esercizio non si passa
+   * mai: il valore predefinito e' il risolutore di sistema.
+   */
+  risolviDns?: RisolutoreDns;
 };
 
 // Fetch GET verso un URL scelto dall'utente, con protezione anti-SSRF completa:
@@ -403,18 +424,21 @@ export const safeFetch = async (rawUrl: string, options: SafeFetchOptions): Prom
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+  const signal = options.signal
+    ? AbortSignal.any([controller.signal, options.signal])
+    : controller.signal;
 
   try {
     let currentUrl = rawUrl;
 
     for (let redirectCount = 0; ; redirectCount += 1) {
       const parsed = assertPublicHttpUrl(currentUrl, { allowHttp });
-      await assertHostResolvesToPublicIp(parsed.hostname);
+      await assertHostResolvesToPublicIp(parsed.hostname, options.risolviDns);
 
       const response = await fetch(parsed, {
         method: 'GET',
         redirect: 'manual',
-        signal: controller.signal,
+        signal,
         headers: options.headers,
       });
 

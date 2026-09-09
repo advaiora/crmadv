@@ -8,7 +8,17 @@
 // utility pdfkit generiche (buffer di output, salto pagina). Nulla di specifico dei
 // preventivi resta qui.
 
-import { isBlockedHostname } from './net-guard.js';
+import { type RisolutoreDns, safeFetch } from './net-guard.js';
+
+/**
+ * Opzioni della risoluzione del logo. L'unico campo serve **ai test**: la difesa che
+ * conta — «nome pubblico che risolve a un indirizzo privato» — non si puo' provare
+ * altrimenti, servirebbe una zona DNS vera sotto controllo del test. Chi genera un PDF
+ * non passa niente e prende il risolutore di sistema.
+ */
+type LogoFetchOptions = {
+  risolviDns?: RisolutoreDns;
+};
 
 // Dati brand del workspace usati dai PDF (nome, contatti, logo, colori).
 export type WorkspacePdfData = {
@@ -152,25 +162,6 @@ const parseLogoDataUrl = (logoUrl: string) => {
   }
 };
 
-const isAllowedRemoteImageUrl = (rawUrl: string) => {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    return false;
-  }
-
-  if (parsed.protocol !== 'https:' && !(process.env.NODE_ENV !== 'production' && parsed.protocol === 'http:')) {
-    return false;
-  }
-
-  if (isBlockedHostname(parsed.hostname)) {
-    return false;
-  }
-
-  return true;
-};
-
 const getCachedImageBuffer = (url: string) => {
   const cached = remoteImageCache.get(url);
   if (!cached) {
@@ -199,24 +190,29 @@ const setCachedImageBuffer = (url: string, buffer: Buffer) => {
   });
 };
 
-const fetchLogoBuffer = async (logoUrl: string) => {
-  if (!isAllowedRemoteImageUrl(logoUrl)) {
-    return null;
-  }
-
+const fetchLogoBuffer = async (logoUrl: string, options: LogoFetchOptions = {}) => {
   const cached = getCachedImageBuffer(logoUrl);
   if (cached) {
     return cached;
   }
 
+  // Il timeout dentro `safeFetch` si spegne quando la risposta torna: da solo lascerebbe
+  // scoperta la lettura del corpo, cioe' un server che sgocciola i byte per sempre
+  // tenendo appesa la generazione del PDF. Questo segnale copre l'intero giro, come
+  // faceva l'AbortController che stava qui prima.
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), LOGO_FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(logoUrl, {
-      method: 'GET',
+    // `safeFetch` fa da solo tutto quello che qui veniva scritto a mano — e in piu' le
+    // due cose che mancavano: risolve il DNS (un nome pubblico che punta a 127.0.0.1 o
+    // ai metadati della macchina non passa) e segue i redirect a mano ri-validando ogni
+    // salto. Include il controllo dello schema, http accettato solo fuori produzione:
+    // e' la stessa regola di prima, non un allentamento.
+    const response = await safeFetch(logoUrl, {
+      timeoutMs: LOGO_FETCH_TIMEOUT_MS,
       signal: controller.signal,
-      redirect: 'follow',
+      risolviDns: options.risolviDns,
     });
 
     if (!response.ok) {
@@ -237,6 +233,11 @@ const fetchLogoBuffer = async (logoUrl: string) => {
     setCachedImageBuffer(logoUrl, buffer);
     return buffer;
   } catch {
+    // Comprende `SsrfBlockedError` (host privato, host che risolve a un indirizzo
+    // privato, redirect verso la rete interna, troppi redirect) oltre a timeout ed
+    // errori di rete. Per il PDF sono tutti lo stesso caso: il logo non c'e', si
+    // disegna senza. L'esito non torna a chi ha chiesto il PDF, quindi non c'e' niente
+    // da distinguere nel messaggio.
     return null;
   } finally {
     clearTimeout(timeoutId);
@@ -245,7 +246,7 @@ const fetchLogoBuffer = async (logoUrl: string) => {
 
 // Risolve il logo (data URL o URL https remoto) in un Buffer, o null se assente/non
 // valido/non consentito. Le immagini locali/private sono bloccate (anti-SSRF).
-export const resolveLogoBuffer = async (logoUrl: string | null) => {
+export const resolveLogoBuffer = async (logoUrl: string | null, options: LogoFetchOptions = {}) => {
   if (!logoUrl) {
     return null;
   }
@@ -263,5 +264,5 @@ export const resolveLogoBuffer = async (logoUrl: string | null) => {
     return null;
   }
 
-  return fetchLogoBuffer(normalized);
+  return fetchLogoBuffer(normalized, options);
 };

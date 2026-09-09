@@ -9,6 +9,7 @@ import {
   isPrivateIpv6Address,
   isPrivateNetworkHost,
   mentionsPrivateIpAddress,
+  safeFetch,
 } from './net-guard.js';
 
 test('isBlockedHostname: blocca nomi locali e IP privati/link-local', () => {
@@ -189,4 +190,57 @@ test('mentionsPrivateIpAddress: le forme che la revisione aveva trovato scoperte
 test('isPrivateIpv6Address: site-local e multicast', () => {
   assert.equal(isPrivateIpv6Address('fec0::1'), true);
   assert.equal(isPrivateIpv6Address('ff02::1'), true);
+});
+
+// --- safeFetch: le due aggiunte di CRMA-65 (risolutore iniettabile, segnale del chiamante).
+
+// Sostituisce `fetch` registrando le chiamate; restituisce sempre 200 vuoto.
+const spiaFetch = (risposta: () => Response = () => new Response('', { status: 200 })) => {
+  const originale = globalThis.fetch;
+  const chiamate: Array<{ url: string; init: RequestInit | undefined }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    chiamate.push({ url: String(input), init });
+    return risposta();
+  }) as typeof fetch;
+
+  return { chiamate, ripristina: () => { globalThis.fetch = originale; } };
+};
+
+test('safeFetch: un nome pubblico che risolve a un indirizzo privato non viene chiamato', async () => {
+  const spia = spiaFetch();
+  try {
+    await assert.rejects(
+      safeFetch('https://esempio.com/logo.png', {
+        timeoutMs: 1000,
+        risolviDns: async () => [{ address: '169.254.169.254' }],
+      }),
+      SsrfBlockedError,
+    );
+    assert.equal(spia.chiamate.length, 0);
+  } finally {
+    spia.ripristina();
+  }
+});
+
+test('safeFetch: il segnale del chiamante arriva alla richiesta insieme al timeout interno', async () => {
+  const spia = spiaFetch();
+  const controller = new AbortController();
+  controller.abort();
+
+  try {
+    await safeFetch('https://esempio.com/logo.png', {
+      timeoutMs: 1000,
+      signal: controller.signal,
+      risolviDns: async () => [{ address: '203.0.113.10' }],
+    });
+
+    // Il `fetch` vero rifiuterebbe subito; qui la spia lo lascia passare, e cio' che si
+    // prova e' che il segnale sia stato inoltrato — senza, la lettura del corpo del logo
+    // resterebbe senza tempo massimo.
+    assert.equal(spia.chiamate.length, 1);
+    assert.equal(spia.chiamate[0].init?.signal?.aborted, true);
+  } finally {
+    spia.ripristina();
+  }
 });
