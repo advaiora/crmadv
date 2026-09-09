@@ -79,6 +79,24 @@ Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può
 - **`revisore`** — **chiamalo a ogni tappa conclusa**, non solo prima del commit: (a) subito dopo schema+migrazione, prima di costruirci sopra; (b) subito dopo aver completato il collegamento; (c) prima di proporre il commit. Due chiamate per pezzo di lavoro sono il default, si sale a tre-quattro se si toccano schema, permessi o generazioni AI. Per le **rifattorizzazioni senza schema, permessi o AI** (es. spezzatura di file-mostro), dal 4/8/2026 basta **una revisione sola, a giro completo** — regola allineata alla pratica reale del registro compiti. **Mai su codice a metà.**
 - **`architetto`** — ogni 5-10 sessioni: misura i consumi e **propone** modifiche al team. Non applica mai niente: le modifiche approvate le applica la sessione principale, e si annotano nel registro.
 
+### ⚠️ Gli stessi tre nomi esistono in due sistemi diversi (dal 9/9/2026)
+
+`esploratore`, `revisore` e `architetto` sono **due cose distinte con lo stesso nome**:
+
+- gli **agent di repository** — i file in `.claude/agents/` descritti qui sopra. Girano **dentro** la sessione che li chiama: non hanno un risveglio, non hanno un run, e **non compaiono mai sulla dashboard di Paperclip**. La prova che hanno lavorato sta nei registri di sessione della VPS (`~/.claude/projects/<slug>/<sessione>/subagents/agent-*.jsonl`), non in dashboard;
+- le **schede agente di Paperclip** con lo stesso nome, che lavorano solo se qualcuno assegna loro un compito.
+
+Il 9/9/2026 Jacopo ha aperto la scheda Paperclip «Revisore», l'ha trovata a **zero attività**, e ha ragionevolmente concluso che le revisioni dichiarate non fossero mai avvenute. Erano avvenute — ma con l'altro revisore. **L'ambiguità l'aveva creata chi scriveva.** Quindi: **quando citi una revisione o un'esplorazione, di' sempre quale dei due**, «revisore di repository» oppure «agente Revisore di Paperclip». Mai «il Revisore» e basta.
+
+**Come si sceglie fra i due — regola mista, decisa da Jacopo il 9/9/2026** (le alternative scartate erano "solo repository" e "solo Paperclip"):
+
+| Cosa si sta revisionando | Chi la fa |
+|---|---|
+| Le tappe correnti di un lavoro (collegamento completato, prima del commit, rifattorizzazioni) | **revisore di repository**, dentro la sessione, come sempre |
+| **Schema e migrazioni · permessi e ruoli · sicurezza · unioni a `main`** | **compito Paperclip assegnato all'agente Revisore**, che nasce, gira e si chiude in dashboard |
+
+Il motivo dello sdoppiamento è che le due cose costano diversamente: la revisione dentro la sessione è immediata e non rallenta la catena, quella su Paperclip costa un giro di compito in più ma **lascia una traccia che l'utente può controllare da solo**, senza chiedere all'assistente di autocertificarsi. Si paga quel costo dove sbagliare è caro, non su ogni tappa.
+
 **Mappa del progetto (dal 30/7/2026).** C'è `archivio-documenti/mappa/mappa-progetto.md`, una fotografia strutturale (moduli backend + funzioni esportate, catena permessi, centralini, modelli Prisma, indice dei documenti grossi, file da non aprire interi) prodotta da `npm run mappa` in meno di un secondo. **Non è committata** (è generata, sta in `.gitignore`). **Prima di chiamare l'esploratore o il revisore, rigenerala** (`npm run mappa`): così partono da una mappa fresca invece di aprire i file-mostro. È uno script, il costo in token è nullo — si rigenera senza pensarci. Dal 4/8/2026 la rigenera anche un **hook pre-commit** (`.githooks/pre-commit`, non bloccante, sub-secondo): attivazione una tantum con `git config core.hooksPath .githooks` — già fatta sulla macchina di Jacopo; chi lavora su un altro clone la rifà una volta.
 
 **Consumi.** Si lavora su abbonamento Max 20x (etichetta letta da `/usage` il 3/8/2026; prima nei documenti era scritto "5x" per errore): non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: **`npm run consumi`**. Dal 31/7/2026 il monitor misura **tutti i progetti insieme**, non solo questo: il limite è dell'account, e Jacopo lavora spesso su due progetti in parallelo (in una finestra misurata, il 41% del consumo veniva dall'altro progetto). L'uscita mostra anche la ripartizione per progetto e **il bilancio del team di agent** (quanto sono costati contro quanto hanno tenuto fuori dalla conversazione).
