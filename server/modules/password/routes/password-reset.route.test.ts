@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { HttpError } from '../../../core/errors.js';
+import { resolveRequestClientIp } from '../../vault/rate-limit.js';
 import { buildPasswordResetRoute } from './password-reset.route.js';
 
 // Il servizio ha gia' le sue prove: qui si controlla il cablaggio, cioe' cio'
@@ -246,6 +247,91 @@ test('la conferma non restituisce nessun token di sessione', async () => {
     });
 
     assert.deepEqual(response.json(), { data: { reset: true } });
+  } finally {
+    await chiudi(app);
+  }
+});
+
+// ── Regressione: i rilievi 1 e 2 del Guardiano su CRMA-25 ────────────────────
+// Le prove qui sopra iniettano un risolutore finto, che e' giusto per provare
+// il cablaggio ma non direbbe niente sull'unico input non filtrato della rotta.
+// Queste due usano il risolutore VERO, con la richiesta che arriva davvero
+// dalla rete.
+
+const creaAppConRisolutoreVero = async () => {
+  const richieste: (string | null)[] = [];
+  const chiaviDelLimite: string[] = [];
+  const app = Fastify({ logger: false });
+
+  await app.register(
+    buildPasswordResetRoute({
+      passwordResetServiceApi: {
+        requestReset: async (call: ChiamataRichiesta) => {
+          richieste.push(call.requestIp);
+          return { requested: true as const, previewUrl: null };
+        },
+        checkToken: async () => ({ valid: true as const }),
+        confirmReset: async () => ({ reset: true as const }),
+      } as never,
+      enforceRequestRateLimitFn: ((call: { requestIp: string }) => {
+        chiaviDelLimite.push(call.requestIp);
+      }) as never,
+      enforceConfirmRateLimitFn: (() => {}) as never,
+      resolveClientIpFn: resolveRequestClientIp,
+    }),
+  );
+
+  await app.ready();
+  return { app, richieste, chiaviDelLimite };
+};
+
+test('un X-Forwarded-For troppo lungo per la colonna non arriva al database', async () => {
+  // Il difetto originale: questo valore finiva in `PasswordResetToken.requestIp`
+  // (`VarChar(64)`), PostgreSQL rifiutava l'insert, e poiche' l'insert sta solo
+  // nel ramo «utente trovato» la rotta rispondeva 500 per gli indirizzi
+  // registrati e 200 per gli altri. Cioe' rivelava quali email hanno un account.
+  const { app, richieste } = await creaAppConRisolutoreVero();
+
+  try {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/password/reset/request',
+      payload: { email: 'utente@esempio.it' },
+      headers: { 'x-forwarded-for': 'A'.repeat(100) },
+    });
+
+    assert.equal(response.statusCode, 200);
+
+    const [requestIp] = richieste;
+    assert.equal(richieste.length, 1);
+    assert.ok(
+      requestIp === null || requestIp.length <= 64,
+      `alla riga da salvare e arrivato un indirizzo di ${requestIp?.length} caratteri: l insert esplode e l oracolo di esistenza degli account e riaperto`,
+    );
+  } finally {
+    await chiudi(app);
+  }
+});
+
+test('cambiare X-Forwarded-For a ogni richiesta non regala un secchio nuovo', async () => {
+  const { app, chiaviDelLimite } = await creaAppConRisolutoreVero();
+
+  try {
+    for (const forgiato of ['198.51.100.1', '198.51.100.2', '198.51.100.3']) {
+      await app.inject({
+        method: 'POST',
+        url: '/auth/password/reset/request',
+        payload: { email: 'utente@esempio.it' },
+        headers: { 'x-forwarded-for': forgiato },
+      });
+    }
+
+    assert.equal(chiaviDelLimite.length, 3);
+    assert.equal(
+      new Set(chiaviDelLimite).size,
+      1,
+      `tre richieste dallo stesso chiamante hanno prodotto ${new Set(chiaviDelLimite).size} chiavi diverse: il limite per IP si aggira con un intestazione`,
+    );
   } finally {
     await chiudi(app);
   }

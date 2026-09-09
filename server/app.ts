@@ -8,6 +8,7 @@ import { isHttpError } from "./core/errors.js";
 import { requestContext } from "./core/request-context.js";
 import { fail, ok } from "./core/response.js";
 import { buildCorsDecision, parseAllowedOrigins } from "./core/cors-origins.js";
+import { parseTrustProxy } from "./core/trust-proxy.js";
 import { requireAuth } from "./guards/requireAuth.js";
 import { requireModuleEnabled } from "./guards/requireModule.js";
 import { requirePermission } from "./guards/requirePermission.js";
@@ -47,6 +48,7 @@ const CORS_ALLOW_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const CORS_ALLOW_HEADERS = "Content-Type, Authorization, X-Workspace-Id, X-Workspace-Slug, X-Google-Client-Id-Debug";
 
 const sanitizeErrorMessage = (message: string) => message.replace(/\/\/([^:@/\s]+)(?::[^@/\s]*)?@/g, "//***:***@");
+
 
 const isFastifyClientError = (error: unknown): error is { statusCode: number; code?: string; message?: string } => {
   if (typeof error !== "object" || error === null) {
@@ -114,10 +116,18 @@ const getDatabaseUnavailableDetails = (error: unknown) => {
 };
 
 export const createApp = (options: FastifyServerOptions = {}): FastifyInstance => {
+  const trustProxy = parseTrustProxy(process.env.TRUST_PROXY);
   const app = Fastify({
     logger: true,
+    trustProxy,
     ...options,
   });
+
+  if (trustProxy === true) {
+    app.log.warn(
+      "TRUST_PROXY=true: X-Forwarded-For is trusted from any source, so per-IP rate limits are forgeable. Prefer a proxy address list or a hop count.",
+    );
+  }
   const corsAllowedOrigins = parseAllowedOrigins();
   const corsAllowedOriginsSet = new Set(corsAllowedOrigins);
 
