@@ -8,6 +8,13 @@ import {
   resolveMailSettingsDettagliato,
   type MailSettings,
 } from '../../core/mail.js';
+import { isPrivateNetworkHost } from '../../core/net-guard.js';
+import {
+  ERRORE_RETE_PRIVATA,
+  ERRORE_RETE_PRIVATA_ALLA_CONNESSIONE,
+  messaggioDaNascondere,
+  richiedeControlloRetePrivata,
+} from './mail.net-guard.js';
 import { mailCrypto } from './mail.crypto.js';
 import { mailRepository } from './mail.repository.js';
 
@@ -36,6 +43,12 @@ export const salvaImpostazioniMailSchema = z
     server: z.string().trim().min(1).max(255),
     porta: z.coerce.number().int().min(1).max(65535).default(587),
     connessioneSicura: z.boolean().default(false),
+    /**
+     * Autorizza la prova di connessione a raggiungere un indirizzo della rete
+     * interna. `default(false)` e non `optional`: una maschera vecchia che non
+     * manda il campo deve ricadere sul blocco, non lasciarlo com'era.
+     */
+    retePrivataConsentita: z.boolean().default(false),
     utente: z.string().trim().max(255).nullable().optional(),
     mittente: mittenteSchema,
     /**
@@ -67,7 +80,20 @@ export type OrigineConfigurazione = 'database' | 'env' | 'nessuna' | 'illeggibil
  */
 export type EsitoProva =
   | { riuscita: true; origine: OrigineConfigurazione; server: string | null }
-  | { riuscita: false; origine: OrigineConfigurazione; server: string | null; errore: string };
+  | {
+      riuscita: false;
+      origine: OrigineConfigurazione;
+      server: string | null;
+      /**
+       * Valorizzato SOLO quando la prova e' stata rifiutata prima di aprire la
+       * connessione perche' l'indirizzo e' di rete privata. Assente in ogni
+       * altro fallimento (password illeggibile, nessuna configurazione, rifiuto
+       * del server vero), cosi' chi disegna la maschera puo' aggiungere il
+       * rimando all'interruttore con un `if` che non prende dentro nient'altro.
+       */
+      motivo?: 'rete_privata';
+      errore: string;
+    };
 
 export type ImpostazioniMailPubbliche = {
   /** `true` se esiste una configurazione salvata nel CRM per questo workspace. */
@@ -86,6 +112,8 @@ export type ImpostazioniMailPubbliche = {
   server: string;
   porta: number;
   connessioneSicura: boolean;
+  /** Se la prova di connessione puo' raggiungere la rete interna. */
+  retePrivataConsentita: boolean;
   utente: string | null;
   mittente: string;
   aggiornatoIl: string | null;
@@ -111,6 +139,15 @@ type MailServiceDependencies = {
    */
   resolveSettings: typeof resolveMailSettingsDettagliato;
   leggiAmbiente: typeof readMailSettingsFromEnv;
+  /**
+   * Il guardiano che dice se un indirizzo finisce in una rete privata. Iniettato
+   * per la stessa ragione degli altri: i casi che contano qui (indirizzo interno
+   * con interruttore spento, e lo stesso con l'interruttore acceso) si devono
+   * poter provare senza un DNS vero davanti, e soprattutto senza che il test
+   * apra davvero una connessione — che e' esattamente cio' che il codice deve
+   * impedire.
+   */
+  hostDiRetePrivata: typeof isPrivateNetworkHost;
   registraAudit: typeof audit.log;
 };
 
@@ -122,6 +159,7 @@ export const buildMailService = (
     crypto: overrides.crypto ?? mailCrypto,
     resolveSettings: overrides.resolveSettings ?? resolveMailSettingsDettagliato,
     leggiAmbiente: overrides.leggiAmbiente ?? readMailSettingsFromEnv,
+    hostDiRetePrivata: overrides.hostDiRetePrivata ?? isPrivateNetworkHost,
     registraAudit: overrides.registraAudit ?? ((input) => audit.log(input)),
   };
 
@@ -144,6 +182,10 @@ export const buildMailService = (
         origineInUso,
         passwordSalvata: false,
         attivo: true,
+        // Senza riga a database non c'e' nessuna autorizzazione dichiarata: la
+        // maschera nasce con la spunta spenta anche quando si precompila con le
+        // variabili d'ambiente.
+        retePrivataConsentita: false,
         ...dallAmbiente(dependencies.leggiAmbiente()),
         aggiornatoIl: null,
       };
@@ -157,6 +199,7 @@ export const buildMailService = (
       server: record.server,
       porta: record.porta,
       connessioneSicura: record.connessioneSicura,
+      retePrivataConsentita: record.retePrivataConsentita,
       utente: record.utente,
       mittente: record.mittente,
       aggiornatoIl: record.updatedAt.toISOString(),
@@ -219,6 +262,7 @@ export const buildMailService = (
         server: dati.server,
         porta: dati.porta,
         connessioneSicura: dati.connessioneSicura,
+        retePrivataConsentita: dati.retePrivataConsentita,
         utente,
         mittente: dati.mittente,
         segreto,
@@ -234,6 +278,7 @@ export const buildMailService = (
           server: dati.server,
           porta: dati.porta,
           connessioneSicura: dati.connessioneSicura,
+          retePrivataConsentita: dati.retePrivataConsentita,
           attivo: dati.attivo,
           // Che la password sia cambiata si annota; il valore no, mai.
           passwordCambiata: passwordDaSalvare !== undefined,
@@ -283,6 +328,39 @@ export const buildMailService = (
           };
         }
 
+        // ⚠️ Il blocco vale SOLO per la configurazione salvata nel CRM, ed e'
+        // il confine piu' delicato di questo controllo.
+        //
+        // Il motivo NON e' «con il `.env` l'indirizzo lo ha scritto chi
+        // amministra»: quella e' la conseguenza, non la regola. La regola e' che
+        // oggi il ramo del database e' l'UNICO in cui `settings.host` arriva da
+        // un campo che compila chi preme il pulsante — con il `.env` i parametri
+        // sono presi in blocco dalle variabili d'ambiente, che nessuna rotta
+        // scrive. `source` racconta la provenienza dei parametri, non chi ha
+        // scelto l'host: il giorno in cui si aggiungera' «prova questi parametri
+        // senza salvarli» — funzione naturale su questa pagina — `source` non
+        // sara' `'database'` e questa guardia smettera' di applicarsi senza che
+        // niente diventi rosso. Chi scrive quella funzione deve passare di qui.
+        //
+        // L'altra faccia: bloccare anche il ramo `.env` lascerebbe un'agenzia
+        // con la prova ferma e nessuna casella da spuntare, perche' la casella
+        // vive su una riga di database che in quel caso non esiste.
+        // La regola (quando si controlla, cosa si dice) sta tutta in
+        // `mail.net-guard.ts`: qui resta solo la sequenza.
+        const daControllare = richiedeControlloRetePrivata(resolved);
+
+        if (daControllare && (await dependencies.hostDiRetePrivata(resolved.settings.host))) {
+          return {
+            riuscita: false as const,
+            origine: resolved.source,
+            // `server` resta valorizzato: senza, chi legge l'esito non sa QUALE
+            // indirizzo sia stato rifiutato.
+            server: resolved.settings.host,
+            motivo: 'rete_privata' as const,
+            errore: ERRORE_RETE_PRIVATA,
+          };
+        }
+
         // Timeout espliciti: da qui in avanti l'indirizzo lo sceglie chi preme
         // il pulsante, e verso un IP filtrato `verify()` resterebbe appeso fino
         // al default di nodemailer (due minuti), con la richiesta aperta e il
@@ -300,14 +378,41 @@ export const buildMailService = (
             server: resolved.settings.host,
           };
         } catch (error) {
+          const messaggio =
+            error instanceof Error
+              ? error.message
+              : 'Il server di posta ha rifiutato la connessione.';
+
+          // ⚠️ Ultimo filtro, e non e' ridondante. Il controllo qui sopra risolve
+          // il DNS una volta; nodemailer lo risolve una seconda volta per conto
+          // suo. Un nome con TTL zero puo' rispondere pubblico al primo e privato
+          // al secondo, e allora il messaggio di nodemailer — «connect
+          // ECONNREFUSED 10.0.0.5:587» — riporterebbe indietro proprio
+          // l'indirizzo interno che tutto questo lavoro tiene nascosto.
+          //
+          // Non chiude l'attacco (la connessione e' gia' partita: chi prova
+          // impara comunque, dal successo o dal fallimento, che li' c'e'
+          // qualcosa) ma toglie l'informazione. La chiusura vera e' pinzare
+          // l'indirizzo risolto e farlo usare a nodemailer: vive in un compito
+          // suo, perche' passa dalle viscere della libreria.
+          // Solo per chi NON ha autorizzato la rete interna: a chi l'ha
+          // dichiarata spetta il messaggio vero del server, che e' il motivo per
+          // cui il pulsante esiste.
+          if (daControllare && messaggioDaNascondere(messaggio)) {
+            return {
+              riuscita: false as const,
+              origine: resolved.source,
+              server: resolved.settings.host,
+              motivo: 'rete_privata' as const,
+              errore: ERRORE_RETE_PRIVATA_ALLA_CONNESSIONE,
+            };
+          }
+
           return {
             riuscita: false as const,
             origine: resolved.source,
             server: resolved.settings.host,
-            errore:
-              error instanceof Error
-                ? error.message
-                : 'Il server di posta ha rifiutato la connessione.',
+            errore: messaggio,
           };
         } finally {
           transport.close();
@@ -327,6 +432,16 @@ export const buildMailService = (
           riuscita: esito.riuscita,
           origine: esito.origine,
           server: esito.server,
+          // Se al momento della prova la rete interna era autorizzata. Tutta la
+          // difesa poggia sulla tracciabilita' invece che sul blocco — chi ha
+          // `mail.manage` puo' accendere l'interruttore da se' — quindi senza
+          // questo campo chi legge il registro dovrebbe incrociare a mano i
+          // `mail.save` vicini per sapere se quella prova ha davvero raggiunto
+          // un indirizzo interno.
+          retePrivataConsentita: resolved.esito === 'ok' && resolved.retePrivataConsentita === true,
+          // Distingue nel registro un rifiuto nostro (`rete_privata`) da un
+          // rifiuto del server vero: senza, le due righe sono identiche.
+          motivo: esito.riuscita ? null : (esito.motivo ?? null),
         },
         request: input.request,
       });
