@@ -111,7 +111,7 @@ const AgencyProjectsListPage = () => {
         <div className="border rounded-3 p-4 text-center">
           <h6 className="mb-2">Nessun progetto disponibile</h6>
           <p className="text-muted mb-3">
-            Crea il primo progetto per iniziare a produrre con l'AI.
+            Crea il primo progetto per iniziare a produrre con l&rsquo;AI.
           </p>
           <Button as={Link} to="/agency/projects/new">
             Crea progetto
