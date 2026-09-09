@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { RESET_PURGE_RETENTION_MS } from './password-reset.purge.js';
 import { buildPasswordResetService } from './password-reset.service.js';
 
 // Le prove del recupero password. La piu' importante di tutte e' la prima:
@@ -32,10 +33,12 @@ const creaServizio = (override: {
   emailConsegnata?: boolean;
   aspettaConsegna?: boolean;
   onSend?: () => Promise<void>;
+  purgaFallisce?: boolean;
 } = {}) => {
   const emailInviate: Array<{ toEmail: string; resetLink: string; workspaceId?: string }> = [];
   const righeCreate: Array<{ userId: string; tokenHash: string; expiresAt: Date; requestIp: string | null }> = [];
   const bruciature: Array<{ userId: string }> = [];
+  const purghe: Array<{ expiredBefore: Date }> = [];
   const passwordScritte: Array<{ userId: string; passwordHash: string; passwordChangedAt: Date }> = [];
   const registro: Registrato[] = [];
 
@@ -68,6 +71,13 @@ const creaServizio = (override: {
         return { count: 0 } as never;
       },
       countRecentByIp: async () => override.conteggioPerIp ?? 0,
+      purgeExpired: async (input: { expiredBefore: Date }) => {
+        purghe.push(input);
+        if (override.purgaFallisce) {
+          throw new Error('database non raggiungibile');
+        }
+        return 0;
+      },
     } as never,
     notifierApi: {
       sendResetLink: async (input: never) => {
@@ -114,7 +124,7 @@ const creaServizio = (override: {
     nowFn: () => NOW,
   });
 
-  return { servizio, emailInviate, righeCreate, bruciature, passwordScritte, registro };
+  return { servizio, emailInviate, righeCreate, bruciature, passwordScritte, registro, purghe };
 };
 
 // --- La richiesta del link -------------------------------------------------
@@ -194,6 +204,56 @@ test('superato il tetto per indirizzo IP non parte niente, ma la risposta non ca
   assert.deepEqual(risposta, { requested: true, previewUrl: null });
   assert.deepEqual(emailInviate, []);
   assert.deepEqual(righeCreate, []);
+});
+
+// --- La purga delle righe vecchie ------------------------------------------
+// Qui si prova che la purga sia AGGANCIATA alla richiesta, e dove. Che poi
+// tagli nel punto giusto e non alzi errori e' provato a parte, in
+// `password-reset.purge.test.ts`.
+
+test('la purga parte a ogni richiesta e taglia 24 ore prima di adesso', async () => {
+  const { servizio, purghe } = creaServizio();
+
+  await servizio.requestReset({
+    body: { email: 'utente@esempio.it' },
+    requestIp: '10.0.0.1',
+  });
+
+  assert.equal(purghe.length, 1);
+  assert.equal(
+    NOW.getTime() - purghe[0].expiredBefore.getTime(),
+    RESET_PURGE_RETENTION_MS,
+  );
+});
+
+// La purga sta prima della ricerca dell'utente proprio perche' la paghino tutte
+// e due le strade: se finisse nel ramo «utente trovato» aggiungerebbe tempo
+// solo li', cioe' allargherebbe la differenza che il corpo di risposta identico
+// serve a nascondere.
+test('la purga parte anche per un indirizzo che non esiste', async () => {
+  const { servizio, purghe, righeCreate } = creaServizio({ utente: null });
+
+  await servizio.requestReset({
+    body: { email: 'nessuno@esempio.it' },
+    requestIp: '10.0.0.1',
+  });
+
+  assert.equal(purghe.length, 1);
+  assert.deepEqual(righeCreate, []);
+});
+
+test('una purga che fallisce non fa fallire il recupero password', async () => {
+  const { servizio, emailInviate } = creaServizio({ purgaFallisce: true });
+
+  const risposta = await servizio.requestReset({
+    body: { email: 'utente@esempio.it' },
+    requestIp: '10.0.0.1',
+  });
+
+  // La manutenzione della tabella non deve chiudere fuori dal CRM chi ha perso
+  // la password: il giro prosegue intero, email compresa.
+  assert.deepEqual(risposta, { requested: true, previewUrl: null });
+  assert.equal(emailInviate.length, 1);
 });
 
 test('senza indirizzo pubblico configurato non si inventa un link: lo si registra', async () => {

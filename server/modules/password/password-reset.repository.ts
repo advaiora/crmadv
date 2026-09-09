@@ -111,4 +111,35 @@ export const passwordResetRepository = {
       },
     });
   },
+
+  /**
+   * Cancella le righe ormai inutili a chiunque. Torna quante ne ha tolte.
+   *
+   * Senza questa, la tabella cresceva e non calava mai: nessuno cancellava ne'
+   * i token usati ne' quelli scaduti. Una tabella che cresce all'infinito
+   * peggiora nel tempo proprio `countRecentByIp` qui sopra, che e' l'unica
+   * difesa a database della rotta pubblica.
+   *
+   * ⚠️ SI CANCELLA PER `expiresAt`, NON PER `createdAt`, e non e' un dettaglio.
+   * `countRecentByIp` conta le righe RECENTI per indirizzo IP: se la purga
+   * togliesse righe dentro la sua finestra, chi sta abusando della rotta si
+   * ritroverebbe il contatore azzerato dalla pulizia, cioe' la purga
+   * smonterebbe il tetto. Filtrando su `expiresAt` la cosa e' impossibile per
+   * costruzione: `expiresAt` e' sempre POSTERIORE a `createdAt` (viene
+   * calcolato come `createdAt + durata` alla creazione), quindi una riga con
+   * `expiresAt` piu' vecchio del taglio ha per forza un `createdAt` ancora piu'
+   * vecchio. Il chiamante sceglie il taglio, e il servizio lo tiene ben oltre
+   * la finestra del tetto (`RESET_PURGE_RETENTION_MS`).
+   *
+   * Usa l'indice `@@index([expiresAt])`, che esiste dal 31/8/2026.
+   */
+  async purgeExpired(input: { expiredBefore: Date }) {
+    const result = await prisma.passwordResetToken.deleteMany({
+      where: {
+        expiresAt: { lt: input.expiredBefore },
+      },
+    });
+
+    return result.count;
+  },
 };

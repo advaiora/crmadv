@@ -1,0 +1,34 @@
+-- L'indice che mancava al tetto di richieste per indirizzo IP del recupero
+-- password (CRMA-59).
+--
+-- `passwordResetRepository.countRecentByIp` filtra su "requestIp" +
+-- "createdAt". La tabella aveva tre indici — "tokenHash" (unico), ("userId",
+-- "expiresAt") e ("expiresAt") — e nessuno dei tre copre quella coppia:
+-- PostgreSQL non aveva altra scelta che leggere l'intera tabella. Succedeva a
+-- OGNI richiesta di recupero password, cioe' su una rotta pubblica e non
+-- autenticata che puo' chiamare chiunque: il costo cresce con la tabella, e la
+-- tabella cresce con i tentativi di chi sta abusando proprio di quella rotta.
+--
+-- L'ordine delle colonne non e' scambiabile. "requestIp" sta davanti perche' e'
+-- confrontato per uguaglianza, "createdAt" dietro perche' e' un intervallo
+-- (`>= since`): un indice ("createdAt", "requestIp") servirebbe molto meno,
+-- perche' dopo una colonna usata a intervallo le successive non restringono
+-- piu' la scansione.
+--
+-- ⚠️ Si fa ADESSO perche' oggi la tabella e' vuota — la funzione e' appena nata
+-- e il frontend che la usera' non e' ancora collegato (CRMA-52). Su una tabella
+-- vuota `CREATE INDEX` e' istantaneo e non blocca niente. La stessa istruzione
+-- su una tabella con dati veri prende un lock in scrittura, e a quel punto la
+-- si vorrebbe `CONCURRENTLY` — che pero' Prisma non sa fare dentro una
+-- migrazione, perche' non gira in transazione.
+--
+-- La migrazione e' additiva: nessun DROP, nessuna colonna, nessun vincolo
+-- nuovo. Applicarla non puo' far fallire il codice gia' in produzione, che
+-- semplicemente comincera' a fare la stessa query piu' in fretta.
+--
+-- La purga delle righe vecchie — l'altra meta' di CRMA-59 — NON e' qui: e'
+-- codice, non schema, e vive in `passwordResetRepository.purgeExpired`. Si
+-- appoggia all'indice ("expiresAt") che esiste dal 31/8/2026.
+
+-- CreateIndex
+CREATE INDEX "PasswordResetToken_requestIp_createdAt_idx" ON "public"."PasswordResetToken"("requestIp", "createdAt");

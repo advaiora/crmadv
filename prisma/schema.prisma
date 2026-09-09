@@ -327,7 +327,16 @@ model PasswordResetToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
+  // Serve alla purga (`purgeExpired`), che cancella per finestra su `expiresAt`.
   @@index([expiresAt])
+  // ⚠️ Serve al tetto per indirizzo IP (`countRecentByIp`), che filtra su
+  // `requestIp` + `createdAt`: nessuno degli altri due indici copre quella
+  // coppia, quindi senza questo il conteggio era una scansione dell'intera
+  // tabella a ogni richiesta di recupero password — cioe' su una rotta
+  // pubblica e non autenticata. L'ordine delle colonne non e' scambiabile:
+  // `requestIp` sta davanti perche' e' l'uguaglianza, `createdAt` dietro
+  // perche' e' l'intervallo.
+  @@index([requestIp, createdAt])
 }
 
 model Membership {

@@ -8,6 +8,7 @@ import { prisma } from '../../prisma.js';
 import { membershipRepository } from '../../repositories/membership.repository.js';
 import { userRepository } from '../../repositories/user.repository.js';
 import { passwordResetNotifier } from './password-reset.notifier.js';
+import { purgeStaleResetTokens } from './password-reset.purge.js';
 import { passwordResetRepository } from './password-reset.repository.js';
 import { generateResetToken, hashResetToken } from './password-reset.tokens.js';
 
@@ -243,6 +244,20 @@ export const buildPasswordResetService = (
       }
 
       const now = dependencies.nowFn();
+
+      // La pulizia delle righe vecchie (perche' opportunistica e non
+      // periodica, sta scritto in `password-reset.purge.ts`).
+      //
+      // ⚠️ STA PRIMA DELLA RICERCA DELL'UTENTE APPOSTA: nessuno la sposti nel
+      // ramo «utente trovato» per risparmiare una query. Qui la paga qualunque
+      // richiesta allo stesso modo; la' la pagherebbe solo il ramo gia' piu'
+      // lento, allargando la differenza di tempo che la nota 1 tiene stretta.
+      await purgeStaleResetTokens({
+        repository: dependencies.resetRepositoryApi,
+        now,
+        ...(input.request ? { request: input.request } : {}),
+      });
+
       const user = await dependencies.userRepositoryApi.findByEmail(parsed.data.email);
 
       // Indirizzo che non corrisponde a nessun account: ci si ferma qui, in
