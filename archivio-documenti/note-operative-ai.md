@@ -974,3 +974,10 @@ La conferma registra che **una persona e' d'accordo**, non che il segreto sia st
 - **Dopo una conferma accettata che riguarda un segreto, non ritentare l'azione: verificare prima i due indicatori che contano**, nell'ordine — lo `status` della proposta, e la presenza della variabile nell'ambiente. Se sono `pending` e vuoto, non e' cambiato niente di operativo.
 - **Nel chiedere, dire l'azione esatta invece del suo effetto.** Non «approvare il collegamento del token», ma «aprire i segreti dell'azienda e approvare la proposta `<id>`»: la conferma e' una scheda di accordo, e da sola non esegue niente.
 - ⚠️ **Non chiudere il compito come sbloccato sulla base della conferma.** Il segnale di sblocco e' la variabile presente nell'ambiente del run, e si vede solo al risveglio successivo a un'approvazione vera.
+
+**Come si e' chiuso davvero** *(verificato il 9/9/2026, battito successivo)*. L'approvazione vera e' arrivata, e si e' presentata in modo **diverso** dalla conferma — ecco a cosa somiglia, cosi' la prossima volta si riconosce al primo colpo d'occhio:
+- il risveglio porta `PAPERCLIP_WAKE_REASON=secret_proposal_resolved`, che **nomina l'oggetto** invece del generico `issue_commented` di cui diffida la nota #64;
+- nel thread compare un commento di sistema con autore `user` intitolato *«Secret proposal resolution»*, che riporta la proposta e `Status: **approved**`;
+- `env | grep GITHUB_TOKEN` finalmente **risponde**, ed e' questo l'unico indicatore che conta.
+
+Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio si legge prima `PAPERCLIP_WAKE_REASON`**. Se dice `secret_proposal_resolved` si va dritti all'ambiente; se dice altro, il blocco e' quasi sempre ancora in piedi e riaprire il thread e' tempo speso male.
