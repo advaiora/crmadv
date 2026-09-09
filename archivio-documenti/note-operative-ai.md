@@ -1071,3 +1071,28 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - **Il numero libero si legge sul ramo di destinazione, non sul proprio** — `git show origin/main:archivio-documenti/note-operative-ai.md | grep -n '^## [0-9]' | tail -3` — ed e' il **piu' alto piu' uno**, non il conteggio delle note (il file non e' in ordine numerico). ⚠️ Questo non basta a evitare la collisione: due rami partiti dallo stesso `main` leggono lo stesso "piu' alto" e scelgono lo stesso numero. Con piu' di una pull request di documenti aperta, **il numero va verificato anche contro gli altri rami aperti**: `git log --oneline origin/main..origin/<altro-ramo> -- archivio-documenti/note-operative-ai.md`.
 - **Prima di unire, la prova costa un comando e non tocca l'albero di lavoro:** `git merge-tree --write-tree <ramo-a> <ramo-b>` restituisce l'albero del risultato, e `git show <albero>:archivio-documenti/note-operative-ai.md | grep -c '^## 70\.'` dice se i capitoli 70 sono uno o due. Funziona anche a catena, incapsulando il risultato in un commit di prova con `git commit-tree`: cosi' si verifica l'unione **in sequenza** di tre rami senza fare un solo `checkout`. E' l'unico modo praticabile quando l'albero di lavoro e' occupato da un altro compito, come succede di continuo su Paperclip, dove tutti gli agent condividono la stessa cartella.
 - **La correzione si fa sui rami, prima dell'unione.** Dopo, i due capitoli 70 sono su `main` e ogni citazione «nota #70» resta ambigua per sempre: un numero e' un'identita', non una posizione, e non si rinumera.
+- **Com'e' finita, per chi cerca il precedente:** le due #70 erano un episodio solo con un errore solo, quindi sono diventate **una nota sola** — la **#70** qui sopra, che tiene il caso e la conseguenza sui nomi; il ramo della PR #20 e' stato alleggerito della sua copia. Questa #71 e' nata dopo, ed e' un'altra lezione: non i due sistemi con lo stesso nome, ma il meccanismo che fa collidere due numeri.
+
+## 72. Tre rami di documenti puliti uno per uno non sono puliti in sequenza: la prova va fatta a catena
+
+**Contesto:** 9/9/2026, CRMA-41. Tre pull request di soli documenti aperte insieme, che toccano gli stessi due file (`CLAUDE.md` e `archivio-documenti/team-agenti.md`): PR #19 (le note #70 e #71), PR #20 (la rinomina dei subagent in `-repo`) e PR #21 (la regola mista estesa a tutta la squadra). Prima di mandarle al cancello, verifica che si unissero pulite.
+
+**Errore:** provarle **una alla volta contro `origin/main`**. Tutte e tre risultavano pulite, e il comando usciva `0` per tutte e tre: `git merge-tree --write-tree origin/main <ramo>`. Il risultato tranquillizza ed **e' falso** — la prova a una alla volta confronta ogni ramo con `main`, e **non confronta mai i rami fra loro**. Rifatta a catena, l'unione va in conflitto in **tutti e sei gli ordini possibili**: `CONFLICT (content) in CLAUDE.md` e `in archivio-documenti/team-agenti.md`, sempre fra PR #20 e PR #21, mai per colpa di PR #19. Cambia solo *dove* si rompe — al **passo 2** nei due ordini in cui #20 e #21 sono consecutive, al **passo 3** negli altri quattro — e questo e' proprio il motivo per cui vanno provati tutti: fermarsi al primo ordine che si prova fa sembrare il guasto legato all'ordine, quando non lo e'.
+
+Il conflitto non e' semantico ma **di adiacenza**, ed e' questa la parte che inganna: PR #21 **inserisce una sezione nuova** subito prima del paragrafo «Mappa del progetto», e PR #20 **riscrive quel paragrafo** (`esploratore`/`revisore` diventano `Esploratore Repo`/`Revisore Repo`). Le due modifiche non si contraddicono per niente, ma cadono attaccate, e git le vede come la stessa regione. ⚠️ La risoluzione naturale — «tengo tutte e due» — lascia il paragrafo «Mappa del progetto» **due volte**, una col nome vecchio e una col nome nuovo.
+
+**Modo corretto:**
+- **Con piu' di una pull request di documenti aperta, la prova si fa a catena, non una alla volta.** Non tocca l'albero di lavoro, quindi si puo' fare anche mentre un altro compito lo occupa:
+  ```
+  cur=$(git rev-parse origin/main)
+  for b in origin/<ramo-a> origin/<ramo-b> origin/<ramo-c>; do
+    out=$(git merge-tree --write-tree "$cur" "$b") \
+      || { echo "CONFLITTO su $b"; echo "$out" | grep CONFLICT; break; }
+    cur=$(git commit-tree $(echo "$out" | head -1) -p "$cur" -p "$(git rev-parse $b)" -m prova)
+  done
+  ```
+  I commit di prova restano penzolanti e spariscono da soli: non creano rami e non sporcano niente.
+- **Vanno provati tutti gli ordini**, non uno solo: e' l'unico modo per distinguere «queste due PR si toccano comunque» da «si toccano solo se le unisco in quest'ordine». Sei prove per tre rami costano un secondo.
+- **In un conflitto di adiacenza si tiene la sezione nuova di un ramo *e* la riscrittura del paragrafo dell'altro** — mai le due copie del paragrafo. La verifica che chiude: `git show <albero>:CLAUDE.md | grep -c '^\*\*Mappa del progetto'` deve dire `1`.
+- **Quando si sa che un altro ramo aperto sta riscrivendo un paragrafo, la sezione nuova si inserisce lontano da li'** — un paragrafo piu' su o piu' giu' basta a non generare il conflitto.
+- Per la tecnica `merge-tree`/`commit-tree` applicata alle **voci numerate** (due rami che scelgono lo stesso numero) vedi la **nota #71**: qui il guasto e' un altro, la posizione e non il numero.
