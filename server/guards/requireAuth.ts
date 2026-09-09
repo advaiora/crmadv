@@ -33,7 +33,10 @@ export type AuthIdentity = {
  * ma davanti a un token che non dice quando e' nato l'unica risposta prudente e'
  * non fidarsene.
  */
-const isTokenOlderThanPassword = (
+// Esportata per poterla provare da sola (`requireAuth.test.ts`): il resto della
+// guardia pretende database e JWT veri, questo confronto no — ed e' la parte in
+// cui si sbaglia, non il resto.
+export const isTokenOlderThanPassword = (
   issuedAtSeconds: number | undefined,
   passwordChangedAt: Date | null,
 ) => {
