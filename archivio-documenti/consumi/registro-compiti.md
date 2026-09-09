@@ -66,3 +66,4 @@
 | 2026-08-26 13:06 | Pacchetto Paperclip: verifica sull'export vero e correzione dei campi agent | 47 min | 13,7 | 0,29 | nessuno | — |
 | 2026-09-09 09:17 | Unione dei nove rami della release di settembre (passo zero A1) | 28 min | 11,4 | 0,41 | revisore×1 | -2,9 |
 | 2026-09-09 10:54 | Postazione locale: ambiente CRM su Windows, documenti separati per ambito, credenziali GitHub | 115h 58m | 45,2 | 0,01 | nessuno | voce aggregata: la sessione ha chiuso piu pezzi, non misurati separatamente |
+| 2026-09-09 13:53 | CRMA-25 backend — cambio password con revoca vera, e recupero password | 2 min | 7,3 | 3,66 | nessuno | — |
