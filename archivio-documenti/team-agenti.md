@@ -33,11 +33,11 @@ Più della metà del consumo **non è lavoro nuovo: è la stessa conversazione r
 
 > **Un agent che legge tanto e risponde poco fa RISPARMIARE.**
 
-Quando l'esploratore va a leggersi le 10.000 righe di `agency.service.ts`, quelle righe restano **nel suo contesto** e tornano indietro come mezza pagina di risposta. Non entrano nella sessione principale, quindi non vengono rilette a ogni turno successivo per il resto della giornata.
+Quando l'Esploratore Repo va a leggersi le 10.000 righe di `agency.service.ts`, quelle righe restano **nel suo contesto** e tornano indietro come mezza pagina di risposta. Non entrano nella sessione principale, quindi non vengono rilette a ogni turno successivo per il resto della giornata.
 
 Su queste sessioni il conto è a favore dell'agent con ampio margine. **Il team agentico qui non è una decisione di spesa: è una decisione di capacità** — serve ad arrivare a fine giornata senza sbattere contro il limite.
 
-Corollario, altrettanto importante: un agent che **risponde con papiri** o che **viene chiamato in continuazione** perde tutto questo vantaggio e diventa un costo netto. È il primo controllo che fa l'architetto.
+Corollario, altrettanto importante: un agent che **risponde con papiri** o che **viene chiamato in continuazione** perde tutto questo vantaggio e diventa un costo netto. È il primo controllo che fa l'Architetto Repo.
 
 ### I numeri di partenza (23/7/2026)
 
@@ -61,15 +61,17 @@ Tre agent. **Nessuno dei tre può modificare file**: non hanno gli strumenti di 
 
 | Agent | Quando lo chiami | Cosa ti torna | Modello |
 |---|---|---|---|
-| **esploratore** | *prima* di scrivere codice | la mappa: file da toccare e **lista completa dei punti da collegare** | Sonnet |
-| **revisore** | a ogni tappa di lavoro conclusa | le segnalazioni, dalla più grave alla meno grave | Opus |
-| **architetto** | ogni 5-10 sessioni, o quando i consumi preoccupano | il quadro dei consumi e le **proposte** di modifica al team | Opus |
+| **`esploratore-repo`** | *prima* di scrivere codice | la mappa: file da toccare e **lista completa dei punti da collegare** | Sonnet |
+| **`revisore-repo`** | a ogni tappa di lavoro conclusa | le segnalazioni, dalla più grave alla meno grave | Opus |
+| **`architetto-repo`** | ogni 5-10 sessioni, o quando i consumi preoccupano | il quadro dei consumi e le **proposte** di modifica al team | Opus |
+
+> **Il suffisso `-repo` non è decorativo** *(dal 9/9/2026)*. Su Paperclip esistono agenti con lo **stesso ruolo e lo stesso nome** — Esploratore, Revisore — che però sono un'altra squadra: nascono come compiti in dashboard, hanno un run e lasciano una traccia che l'utente può controllare da solo. I tre di questa tabella girano **dentro** la sessione che li chiama e in dashboard non compaiono mai. Chi cita una revisione deve poter dire quale dei due l'ha fatta, e la divisione del lavoro fra le due squadre sta in `CLAUDE.md`, sezione «Team di agent». **In questo documento, e da qui in avanti, «revisore» senza suffisso non è una citazione valida.**
 
 ### Chi li chiama
 
 **Li chiama l'assistente da solo, non la persona.** Non c'è nessun comando da digitare: la descrizione di ciascun agent dice all'assistente quando usarlo, e in `CLAUDE.md` ci sono le condizioni verificabili che fanno scattare la chiamata (dimensione del file toccato, presenza di un permesso/rotta/tabella nuovi, area del codice, tappa di lavoro raggiunta). Sono scritte come condizioni e non come consigli proprio perché non dipendano da un giudizio a caldo.
 
-> ⚠️ **Il limite onesto:** questo resta un innesco *deciso da un modello*, quindi non è garantito al 100% come lo sarebbe un controllo automatico. Il modo per accorgersene è già dentro il sistema: se l'architetto rileva una **quota subagent vicina a zero**, vuol dire che gli agent esistono ma non li chiama nessuno — e a quel punto o le condizioni sono scritte male, o vanno rese vincolanti in altro modo. È il primo controllo che l'architetto è tenuto a fare.
+> ⚠️ **Il limite onesto:** questo resta un innesco *deciso da un modello*, quindi non è garantito al 100% come lo sarebbe un controllo automatico. Il modo per accorgersene è già dentro il sistema: se l'Architetto Repo rileva una **quota subagent vicina a zero**, vuol dire che gli agent esistono ma non li chiama nessuno — e a quel punto o le condizioni sono scritte male, o vanno rese vincolanti in altro modo. È il primo controllo che l'Architetto Repo è tenuto a fare.
 
 ### Come si incastrano nel lavoro reale
 
@@ -77,16 +79,16 @@ Tre agent. **Nessuno dei tre può modificare file**: non hanno gli strumenti di 
       inizio lavoro                  durante                      fine
            │                            │                          │
     ┌──────▼──────┐              ┌──────▼──────┐            ┌──────▼──────┐
-    │ esploratore │  ──lista──▶  │  si scrive  │  ──────▶   │  revisore   │
+    │ esplor.-repo│  ──lista──▶  │  si scrive  │  ──────▶   │ revis.-repo │
     │  "dove?"    │              │   il codice │            │ "manca?"    │
     └─────────────┘              └─────────────┘            └─────────────┘
            ▲                                                       │
-           └───────── la lista è quella che il revisore spunta ─────┘
+           └───────── la lista è quella che il Revisore Repo spunta ───┘
 ```
 
-**Il punto chiave della coppia:** l'esploratore consegna la lista dei punti da collegare *prima* che si scriva una riga; il revisore non deve *scoprire* cosa mancava, deve **spuntare quella lista**. È un controllo, non un'autopsia. Senza la lista iniziale, qualunque revisione arriva tardi per costruzione.
+**Il punto chiave della coppia:** l'Esploratore Repo consegna la lista dei punti da collegare *prima* che si scriva una riga; il Revisore Repo non deve *scoprire* cosa mancava, deve **spuntare quella lista**. È un controllo, non un'autopsia. Senza la lista iniziale, qualunque revisione arriva tardi per costruzione.
 
-### Il revisore non è legato al commit
+### Il Revisore Repo non è legato al commit
 
 Legge le modifiche **non ancora committate**, quindi funziona in qualsiasi momento. Le tappe giuste:
 
@@ -117,7 +119,7 @@ Legge i registri che Claude Code scrive in locale per ogni sessione (`~/.claude/
 npm run consumi:compito -- "spezzatura ClientsList, giro 2"
 ```
 
-Annota un **pezzo di lavoro concluso** in `archivio-documenti/consumi/registro-compiti.md`: durata, consumo, **velocità (unità/min = consumo/durata, dal 4/8/2026)**, quali agent sono stati usati e quanto hanno fatto risparmiare. La velocità risponde alle domande di **capacità** della finestra (rate × durata contro le 5 ore) e **non giudica gli agent** — per quello valgono risparmio e confronto a parità di compito. Serve a confrontare lavori **simili fra loro** (i giri di spezzatura dei file, per esempio) e capire così se chiamare l'esploratore convenga: non serve un periodo "senza agenti", perché le sessioni variano troppo per tipo di lavoro e la differenza sparirebbe nel rumore. Per difetto conta la sessione in corso; con `--da 10:30` si parte da un'ora precisa, e con `--da`/`--a` in formato ISO si annota anche un lavoro di giorni prima.
+Annota un **pezzo di lavoro concluso** in `archivio-documenti/consumi/registro-compiti.md`: durata, consumo, **velocità (unità/min = consumo/durata, dal 4/8/2026)**, quali agent sono stati usati e quanto hanno fatto risparmiare. La velocità risponde alle domande di **capacità** della finestra (rate × durata contro le 5 ore) e **non giudica gli agent** — per quello valgono risparmio e confronto a parità di compito. Serve a confrontare lavori **simili fra loro** (i giri di spezzatura dei file, per esempio) e capire così se chiamare l'Esploratore Repo convenga: non serve un periodo "senza agenti", perché le sessioni variano troppo per tipo di lavoro e la differenza sparirebbe nel rumore. Per difetto conta la sessione in corso; con `--da 10:30` si parte da un'ora precisa, e con `--da`/`--a` in formato ISO si annota anche un lavoro di giorni prima.
 
 **Da fare a fine sessione**, insieme all'handoff, per ogni pezzo di lavoro chiuso: il registro ha senso solo se si accumula.
 
@@ -128,8 +130,8 @@ Annota un **pezzo di lavoro concluso** in `archivio-documenti/consumi/registro-c
 Il conto è tutto misurato dai registri: quanto contesto un agent ha accumulato leggendo, quanto ne ha riportato indietro, quanto è costato, e quante risposte sono arrivate dopo (ognuna avrebbe riletto quel testo, se fosse rimasto in conversazione). Tre avvertenze per non leggerlo storto:
 
 - È un **tetto massimo**, non un valore prudente: in conversazione quel testo avrebbe fatto scattare la compattazione, che taglia le riletture.
-- Il **team di progetto** e gli agent di serie di Claude Code (`Explore`, `Plan`) sono contati **separatamente**: la domanda "teniamo esploratore e revisore?" si decide sui nostri.
-- Nel registro per compito consumo e risparmio hanno lo **stesso perimetro temporale**, quindi un agent chiamato in chiusura (il revisore, per contratto) risulta piccolo o negativo: le riletture che avrebbe evitato cadono nel compito dopo. Il revisore non si tiene per far risparmiare token, ma per trovare errori.
+- Il **team di progetto** e gli agent di serie di Claude Code (`Explore`, `Plan`) sono contati **separatamente**: la domanda "teniamo Esploratore Repo e Revisore Repo?" si decide sui nostri.
+- Nel registro per compito consumo e risparmio hanno lo **stesso perimetro temporale**, quindi un agent chiamato in chiusura (il Revisore Repo, per contratto) risulta piccolo o negativo: le riletture che avrebbe evitato cadono nel compito dopo. Il Revisore Repo non si tiene per far risparmiare token, ma per trovare errori.
 
 Ognuno legge i propri registri, che stanno sul proprio computer. Il registro su git è ciò che rende confrontabili i numeri delle due persone.
 
@@ -159,16 +161,16 @@ Servono **3-5 letture prese a livelli di carico diversi**. Un campione preso a c
 
 ## 4. Come si modifica il team
 
-**Solo l'architetto propone; nessun agent applica.** Il ciclo:
+**Solo l'Architetto Repo propone; nessun agent applica.** Il ciclo:
 
-1. si chiama l'**architetto** → misura, valuta, propone (massimo tre proposte, ognuna con costo stimato e risparmio atteso);
+1. si chiama l'**`architetto-repo`** → misura, valuta, propone (massimo tre proposte, ognuna con costo stimato e risparmio atteso);
 2. **la persona decide** — è qui, e solo qui, che si spende;
 3. se approvata, la modifica la applica **la sessione principale** (non l'agent);
 4. la decisione si annota nel registro in fondo a questo documento.
 
-L'architetto è tenuto a proporre anche **di spegnere** un agent che non rende, incluso se stesso.
+L'Architetto Repo è tenuto a proporre anche **di spegnere** un agent che non rende, incluso se stesso.
 
-> ⚠️ **Un limite da conoscere, dichiarato apertamente.** I tre agent non hanno gli strumenti `Write`/`Edit`: quello è un blocco vero, non un'istruzione. Ma revisore e architetto hanno accesso a comandi di terminale ristretti (`git diff…` per il revisore, il solo script dei consumi per l'architetto). Se quella restrizione per comando non venisse applicata dallo strumento, resterebbe un margine teorico che **nessuna istruzione può eliminare del tutto**. L'esploratore, che non ha alcun accesso al terminale, è l'unico dei tre in sola lettura al 100%.
+> ⚠️ **Un limite da conoscere, dichiarato apertamente.** I tre agent non hanno gli strumenti `Write`/`Edit`: quello è un blocco vero, non un'istruzione. Ma Revisore Repo e Architetto Repo hanno accesso a comandi di terminale ristretti (`git diff…` per il Revisore Repo, il solo script dei consumi per l'Architetto Repo). Se quella restrizione per comando non venisse applicata dallo strumento, resterebbe un margine teorico che **nessuna istruzione può eliminare del tutto**. L'Esploratore Repo, che non ha alcun accesso al terminale, è l'unico dei tre in sola lettura al 100%.
 
 ---
 
@@ -178,7 +180,7 @@ L'architetto è tenuto a proporre anche **di spegnere** un agent che non rende, 
 
 ### 5.1 Configurazioni di team valutate
 
-**A — "Due occhi" (2 agent, sola lettura).** Esploratore + revisore. Adottata, poi estesa a tre con l'architetto.
+**A — "Due occhi" (2 agent, sola lettura).** Esploratore Repo + Revisore Repo. Adottata, poi estesa a tre con l'Architetto Repo.
 *Motivo della scelta:* miglior rapporto beneficio/costo, rischio nullo perché nessuno scrive, e partenza abbastanza piccola da poter essere valutata sui numeri.
 
 **B — "Squadra di modulo" (5 agent, uno con permesso di scrittura).** Aggiungeva:
@@ -211,7 +213,7 @@ Elencate perché è la domanda che tornerà: *"e se facessimo un agent che…"*.
 
 ### 5.3 Scelte di forma, con il perché
 
-- **L'architetto è un agent, non un comando.** Prima proposta sbagliata e corretta: si era detto che un agent "non può fermarsi a chiedere l'autorizzazione". Vero ma irrilevante — il cancello non sta *dentro* il processo, sta *dopo*: l'agent produce una proposta, la proposta torna alla persona. E un agent **senza strumenti di scrittura** è un freno più solido di un comando che gira nella sessione principale, il quale avrebbe a disposizione *tutti* gli strumenti, scrittura compresa.
+- **L'Architetto Repo è un agent, non un comando.** Prima proposta sbagliata e corretta: si era detto che un agent "non può fermarsi a chiedere l'autorizzazione". Vero ma irrilevante — il cancello non sta *dentro* il processo, sta *dopo*: l'agent produce una proposta, la proposta torna alla persona. E un agent **senza strumenti di scrittura** è un freno più solido di un comando che gira nella sessione principale, il quale avrebbe a disposizione *tutti* gli strumenti, scrittura compresa.
 - **Il conteggio è uno script, non un agent.** Non è un'alternativa più povera: è **lo strumento dell'agent**. Macinare 6.576 chiamate dentro 107 MB di registri è aritmetica — un modello non può leggere 107 MB, sbaglierebbe i conti e costerebbe token per fare addizioni. Il medico è l'agent, il termometro è lo script.
 - **La documentazione sta qui e non in `CLAUDE.md`.** `CLAUDE.md` si carica in ogni sessione: metterci dentro una procedura lunga significa pagarla *sempre*, anche nelle sessioni in cui non serve. In `CLAUDE.md` è rimasto solo un rimando corto.
 - **Gli agent puntano ai file, non li ricopiano.** Il repo si muove in fretta (178 commit, con punte di 20 al giorno): un agent che ricopia "un modulo si fa così: [codice]" è vecchio in poche settimane. Meglio "guarda `web-assets` come modello".
@@ -222,7 +224,7 @@ Onestà di registro, così non si ripete l'errore. La prima analisi (22/7) dicev
 
 **Quella lettura era incompleta**, e i dati misurati il 23/7 l'hanno ribaltata su un punto: guardava solo i token *nuovi* dell'agent, ignorando l'effetto sul contesto della sessione principale. Con il 56% del consumo che viene dalla **rilettura**, un agent che tiene fuori dalla sessione principale 60.000 token di file risparmia quella rilettura su tutti i turni successivi — molto più di quanto costa farlo girare.
 
-Da cui la riformulazione: **su questo progetto l'esploratore probabilmente si ripaga da solo.** Resta da verificare sui numeri, che è esattamente il compito dell'architetto.
+Da cui la riformulazione: **su questo progetto l'Esploratore Repo probabilmente si ripaga da solo.** Resta da verificare sui numeri, che è esattamente il compito dell'Architetto Repo.
 
 ---
 
@@ -249,3 +251,4 @@ Da cui la riformulazione: **su questo progetto l'esploratore probabilmente si ri
 | 24/8/2026 | **Decisione 2 di Paperclip sciolta: nessun monitoraggio dei consumi, per ora.** Il freno automatico sul serbatoio **non si costruisce** e non è più un prerequisito della fase 3; si riprenderà **solo su richiesta esplicita di Jacopo**. ⚠️ Conseguenza: i freni automatici sono **due, non tre**, e il rischio 1 del piano **resta rosso e non mitigato** — il primo sintomo di serbatoio esaurito sarà un blocco a metà lavoro, senza preavviso. **Tutto lo studio fatto (metro, calibrazione a 4 campioni, le due strade — somma delle tre macchine via SSH, oppure segnale di presenza — e le soglie proposte) è conservato in `piano-paperclip-2026-08-19.md` §12.5**, così da non ripartire da zero. | Jacopo |
 | 24/8/2026 | **Decisione 3 di Paperclip sciolta: il collaudatore AI.** ① Fa partire lui le generazioni. ② **Quando interviene non è legato alla V5** — sarebbe limitante, perché nascono funzionalità AI non previste — ma a **cinque innesti osservabili nel diff** (codice che arriva al motore AI anche via catena di import, prompt, schemi di uscita, catalogo/modello/provider, fonti e RAG), riconosciuti da uno script deterministico `npm run tocca-ai`; il collaudo si può **aggiungere** da chiunque ma **togliere solo dal consiglio**, e in dubbio si collauda. ③ **Nessun tetto di spesa come politica**: misurato, un collaudo completo costa **3-9 centesimi di dollaro**. ④ Un **fusibile da 10 $/giorno** solo contro l'avaria, che **non va costruito** — è l'`AiBudget` già presente nel CRM — impostato sulla **utenza CRM dedicata** del collaudatore, che risolve insieme fusibile e classificazione dei consumi (`AiUsageLog` registra già utente, funzione, modello, token e costo). ⚠️ Il fusibile esiste **solo se il collaudatore chiama come utente**: senza utente nel contesto il controllo si salta, e `0` vuol dire «nessun limite», non «bloccato». Dettaglio in `piano-paperclip-2026-08-19.md` §12.6. | Jacopo |
 | 24/8/2026 | **Regola d'ingaggio sul collegamento a Paperclip.** L'azienda si costruisce da una sessione di Claude Code collegata via `@paperclipai/mcp-server` (pacchetto ufficiale; attenzione ai sosia di terzi con nome quasi identico). ⭐ **Il collegamento resta acceso: nessuna revoca a impianto finito, nessuna chiave a scadenza.** Il confine non è tecnico ma di mandato: **l'assistente non esegue nessuna azione dentro Paperclip che non sia stata chiesta esplicitamente**; se la richiesta c'è la esegue per intero, se non c'è non tocca niente. ⚠️ La regola nasce da una correzione di Jacopo: l'assistente aveva costruito di sua iniziativa un impianto di contenimento (chiave a scadenza, finestra di costruzione) partendo dalla supposizione — mai formulata da nessuno — che il controllo dovesse restare tecnicamente in mano alle persone. **Ne segue una regola generale: non aggiungere limitazioni che nessuno ha chiesto.** Procedura, correzioni al §9.1/§9.2 e fonti in `piano-paperclip-2026-08-19.md` §9.4. | Jacopo |
+| 9/9/2026 | **I tre subagent di repository prendono il suffisso `-repo`**: `esploratore-repo`, `revisore-repo`, `architetto-repo` (a schermo: Esploratore Repo, Revisore Repo, Architetto Repo). Gli agenti Paperclip con lo stesso ruolo restano **senza suffisso** (Esploratore, Revisore, Guardiano, Capo del personale). Il motivo: lo stesso giorno Jacopo aveva trovato la scheda Paperclip «Revisore» a zero attività e concluso, ragionevolmente, che le revisioni dichiarate non fossero avvenute — erano avvenute, ma con l'altro revisore. La prima risposta era stata una regola di stile («di' sempre quale dei due»); su sua richiesta è diventata una differenza nei nomi, che non si può dimenticare. ⚠️ **I nomi storici senza suffisso restano riconosciuti da `TEAM_DI_PROGETTO`** (`scripts/agenti/consumi/config.mjs`): i registri di sessione precedenti li contengono, e toglierli farebbe sparire dal bilancio tutto lo storico. **Il registro dei compiti e gli handoff già scritti non sono stati riscritti**: là dentro «revisore» senza suffisso significa il subagent di repository. | Jacopo |

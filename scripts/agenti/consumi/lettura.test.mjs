@@ -55,7 +55,7 @@ describe('leggiChiamate su una cartella-registri finta', () => {
         message: {
           role: 'assistant',
           content: [
-            { type: 'tool_use', id: 'toolu_1', name: 'Agent', input: { subagent_type: 'esploratore', description: 'mappa' } },
+            { type: 'tool_use', id: 'toolu_1', name: 'Agent', input: { subagent_type: 'esploratore-repo', description: 'mappa' } },
           ],
         },
       }) +
@@ -115,7 +115,7 @@ describe('leggiChiamate su una cartella-registri finta', () => {
     const sub = chiamate.find((c) => c.subagent);
     assert.equal(sub.sessione, 'sess-1'); // la cartella nonna, non il sessionId interno
     assert.equal(sub.agente, 'abc123');
-    assert.equal(tipiAgente.get('abc123').tipo, 'esploratore');
+    assert.equal(tipiAgente.get('abc123').tipo, 'esploratore-repo');
     assert.equal(testoFinale.get('abc123').car, 800);
   });
 

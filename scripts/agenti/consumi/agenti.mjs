@@ -146,8 +146,8 @@ export function analizzaAgenti(chiamate, { tipiAgente, lanci, testoFinale }, sol
   }
   agenti.sort((a, b) => a.inizio - b.inizio);
 
-  // Il bilancio si fa a gruppi: la domanda "conviene tenere l'esploratore e il
-  // revisore?" si decide sui NOSTRI agent, non mescolandoli con quelli di serie
+  // Il bilancio si fa a gruppi: la domanda "conviene tenere l'esploratore-repo e il
+  // revisore-repo?" si decide sui NOSTRI agent, non mescolandoli con quelli di serie
   // di Claude Code, che hanno un'economia diversa.
   const bilancio = (elenco) => {
     const buoni = elenco.filter((a) => a.abbinato);

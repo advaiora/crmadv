@@ -810,7 +810,7 @@ Cosi' si distingue in un secondo il proprio danno dalla deriva altrui — e in q
 
 **Modo corretto:**
 - Una contraddizione fra un'istruzione di sessione e `CLAUDE.md` e' **un conflitto da segnalare**, esattamente come quelli fra Jacopo e Claudio: si dice cosa dice l'una, cosa dice l'altra, e si aspetta. Non e' una decisione da prendere per conto proprio, **e va sollevata prima di cominciare il lavoro**, non nel riepilogo finale.
-- Il campanello: se stai per **saltare un passo del metodo** (revisore, esploratore, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
+- Il campanello: se stai per **saltare un passo del metodo** (Revisore Repo, Esploratore Repo, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
 - Prima di dire *"c'e' una regola che me lo vieta"*, **guarda dove sta davvero**: `.claude/settings.json` e `settings.local.json` del progetto, gli stessi due sotto `~/.claude/`, un eventuale `CLAUDE.md` utente. Se non e' in nessuno di quelli, e' il prompt di sessione dell'applicazione: **non e' modificabile ne' da te ne' da un file del repository**, e va detto cosi' — altrimenti Jacopo cerca di togliere una regola che non esiste da nessuna parte.
 
 ---
@@ -1041,3 +1041,17 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - **Il campanello d'allarme generale:** quando falliscono *quasi tutti* i test, comprese cartelle che il lavoro non ha mai toccato, la causa e' l'ambiente, non il codice. La conferma costa dieci secondi — `git diff --name-only origin/main...HEAD | grep <cartella-che-fallisce>`: se non compare, quel file e' identico a `main` e non puo' essere stato rotto dal lavoro in corso. E' lo stesso ragionamento della nota #37 sui rossi da timeout, applicato a una causa diversa.
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
+
+---
+
+## 70. Gli agent si citano col nome intero: dal 9/9/2026 i subagent di repository finiscono in `-repo`
+
+**Contesto:** l'assistente dichiara di aver fatto revisionare un lavoro. Su questo progetto esistono **due squadre con gli stessi ruoli**: i subagent di repository (`.claude/agents/`, girano dentro la sessione, non compaiono in dashboard) e gli agenti Paperclip (nascono come compiti, lasciano traccia in dashboard).
+
+**Errore:** scrivere «il Revisore ha confermato», senza dire quale. Il 9/9/2026 Jacopo ha aperto la scheda Paperclip «Revisore», l'ha trovata a **zero attivita'**, e ha concluso — ragionevolmente — che le revisioni dichiarate non fossero mai avvenute. Erano avvenute, ma con l'altro revisore. Il danno non e' stilistico: e' che l'utente non ha piu' modo di verificare quello che gli si racconta, e la prima cosa che smette di valere e' la parola dell'assistente.
+
+**Modo corretto:**
+- I subagent di repository si chiamano **`esploratore-repo`, `revisore-repo`, `architetto-repo`** (a schermo: Esploratore Repo, Revisore Repo, Architetto Repo). Gli agenti Paperclip restano **senza suffisso**: «agente Revisore di Paperclip», «agente Esploratore», Guardiano, Capo del personale.
+- **Mai «il Revisore» e basta.** Se lo si legge in un documento scritto prima del 9/9/2026 e' quasi sempre il subagent di repository, ma va verificato, non dato per scontato.
+- La prova che un subagent di repository ha lavorato **non sta in dashboard**: sta nei registri di sessione della VPS, `~/.claude/projects/<slug>/<sessione>/subagents/agent-*.jsonl`. Si contano con `grep -oh '"subagent_type":"[a-z-]*"' <slug>/*.jsonl | sort | uniq -c`. Quando l'utente contesta l'attivita' di un agente, si risponde con quei file, non a memoria.
+- Chi fa cosa (revisione dentro la sessione contro compito Paperclip) sta in `CLAUDE.md`, sezione «Team di agent».

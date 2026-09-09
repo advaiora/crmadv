@@ -209,7 +209,7 @@ generated artefact · Tier 3 = inference.
 
 | Claim | Source | Tier | Confidence |
 |---|---|---|---|
-| The report format: path and line, one sentence, concrete consequence, doubt declared, one closing line | `crmadv/.claude/agents/revisore.md`, section «Come rispondere» | 1 | HIGH |
+| The report format: path and line, one sentence, concrete consequence, doubt declared, one closing line | `crmadv/.claude/agents/revisore-repo.md`, section «Come rispondere» | 1 | HIGH |
 | «Se non sai dirlo, la segnalazione probabilmente non vale la pena» | same | 1 | HIGH |
 | «Un revisore che trova sempre qualcosa smette di essere creduto» | same | 1 | HIGH |
 | Nothing found → one line, then stop | same | 1 | HIGH |
@@ -219,7 +219,7 @@ generated artefact · Tier 3 = inference.
 | `isPlatformAdmin` is an identity above workspaces, not a permission | `src/utils/workspaceAccess.js`, with its own comment | 1 | HIGH |
 | Superadmin is `permissions: 'all'` | `server/auth/rbac-catalog.ts` → `SYSTEM_ROLE_DEFINITIONS` | 1 | HIGH |
 | Over-size files are deliberate, listed in the roadmap | `crmadv/CLAUDE.md`, «Dimensione dei file» | 1 | HIGH |
-| Frontend test scarcity is a known accepted choice | `crmadv/.claude/agents/revisore.md`, point 7 | 1 | HIGH |
+| Frontend test scarcity is a known accepted choice | `crmadv/.claude/agents/revisore-repo.md`, point 7 | 1 | HIGH |
 | The severity order in PART 2 | derived: it orders the documented consequences by cost and reversibility | 3 | MEDIUM — reasoned, not quoted from any document |
 
 **VERIFY-ON-FIELD**

@@ -48,9 +48,9 @@ Prima di toccare qualsiasi cosa, scrivi la **coda**: l'elenco ordinato dei pezzi
 Da dove esce la coda, in quest'ordine di precedenza:
 1. i **prossimi passi dell'handoff più recente** in `archivio-documenti/handoff/`;
 2. l'obiettivo su cui si stava lavorando in questa conversazione;
-3. il piano di un esploratore già chiamato in sessione, se c'è.
+3. il piano di un Esploratore Repo già chiamato in sessione, se c'è.
 
-Applica le regole normali del progetto senza sconti — anzi, con più scrupolo, perché **nessuno sta guardando**: `npm run mappa` prima di chiamare gli assistenti secondari, l'esploratore quando ricorrono le sue condizioni, il **revisore a ogni tappa conclusa** (dove non è stato esplicitamente spento per quella fase), i test della sola cartella toccata durante il lavoro e la suite intera una volta sola in fondo.
+Applica le regole normali del progetto senza sconti — anzi, con più scrupolo, perché **nessuno sta guardando**: `npm run mappa` prima di chiamare gli assistenti secondari, l'**Esploratore Repo** quando ricorrono le sue condizioni, il **Revisore Repo a ogni tappa conclusa** (dove non è stato esplicitamente spento per quella fase), i test della sola cartella toccata durante il lavoro e la suite intera una volta sola in fondo.
 
 ## 3. Il ciclo di lavoro, con il cancello
 
