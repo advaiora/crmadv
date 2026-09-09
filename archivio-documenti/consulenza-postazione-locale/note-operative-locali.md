@@ -71,3 +71,22 @@ Nel dubbio vale l'esempio concreto: la regola *«nei comandi per Jacopo niente `
 - **Prima di citare un percorso in un compito, verificare che sia visibile a chi lo riceve.** Paperclip vede il **repository remoto**: un file non committato, o committato su un ramo locale mai pushato, per lui non esiste. Il controllo è `git ls-tree origin/main -- <percorso>`, oppure `git log origin/main -- <percorso>`.
 - **Se il file è di ambito locale, non va citato affatto** in un compito: è fuori dal perimetro di chi sviluppa, e chiedergli di verificarlo contraddice la convenzione stessa.
 - **Nota di merito, che va registrata:** Paperclip ha verificato in cinque modi e **ha chiesto invece di inventare**. È il comportamento giusto, ed è utile saperlo quando si valuta se il team di agent stia funzionando.
+
+---
+
+## L5. Due account GitHub sulla stessa macchina: finché è uno il predefinito è implicito, dal secondo in poi va scritto
+
+**Contesto:** 9/9/2026. Il push verso `advaiora/crmadv` veniva rifiutato con `403 Permission denied to Jagolas23`: l'account personale di Jacopo su quel repository ha **solo lettura**, mentre l'account `advaiora` (che lo amministra) vive sulla stessa macchina. Aggiunto il secondo account, sono cominciati i guai **dalla parte opposta**.
+
+**Errore, in due tempi.**
+1. **Il rimedio brutale sarebbe stato sostituire la credenziale salvata.** Avrebbe funzionato per `crmadv` e **rotto gli altri cinque progetti** di Jacopo, che vivono su `Jagolas23`: la credenziale di `github.com` è una sola, condivisa da tutti i repository che non dicono quale account usare.
+2. **Ma anche la soluzione giusta ha un contraccolpo che non avevo previsto.** Legando `advaiora` a questo repository, la macchina ha cominciato a conoscere **due** account: da quel momento, per ogni indirizzo che non ne indica uno, il gestore credenziali **non può più indovinare** e apre una finestra di scelta. Tutti i repository personali hanno iniziato a chiederla. ⚠️ E quella è una **finestra grafica di Windows, non una domanda nel terminale**: un assistente non può cliccarci dentro, quindi l'operazione gli resta appesa. Il secondo account non ha rotto solo la propria strada: ha reso ambigua quella di tutti gli altri.
+
+**Modo corretto:**
+- **Il predefinito va reso esplicito nel momento in cui smette di essere l'unico.** Una riga globale per l'account di casa, e l'eccezione in locale dove serve:
+  - `git config --global credential.https://github.com.username <account-di-casa>`
+  - `git config credential.https://github.com.username <altro-account>` (dentro il solo repository che lo richiede — in git il locale batte il globale)
+- **Non si sostituisce la credenziale, si etichettano.** Il gestore di Windows tiene voci separate (`git:https://github.com` e `git:https://<account>@github.com`): convivono, e ognuna serve chi la nomina.
+- **Un'operazione che dipende da una finestra grafica non è automatizzabile.** Prima di dire che una configurazione «funziona», va provata **senza interazione possibile**: se compare una richiesta, per un assistente è un blocco, non un passaggio.
+- **La verifica giusta e' un `git push --dry-run`** nel repository che si teme di aver rotto: non modifica niente e mette alla prova proprio l'autenticazione. Farlo **prima** di dichiarare che il resto è salvo, non dopo.
+- **Vale anche al contrario:** un clone nuovo di questo stesso repository nascerebbe con l'account di casa e prenderebbe 403. L'eccezione locale va rimessa a ogni clone.
