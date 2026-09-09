@@ -30,6 +30,8 @@ const creaServizio = (override: {
   baseUrl?: string | null;
   conteggioPerIp?: number;
   emailConsegnata?: boolean;
+  aspettaConsegna?: boolean;
+  onSend?: () => Promise<void>;
 } = {}) => {
   const emailInviate: Array<{ toEmail: string; resetLink: string; workspaceId?: string }> = [];
   const righeCreate: Array<{ userId: string; tokenHash: string; expiresAt: Date; requestIp: string | null }> = [];
@@ -69,6 +71,7 @@ const creaServizio = (override: {
     } as never,
     notifierApi: {
       sendResetLink: async (input: never) => {
+        await override.onSend?.();
         emailInviate.push(input);
         return override.emailConsegnata === false
           ? { delivered: false as const, reason: 'MAIL_NOT_CONFIGURED' as const }
@@ -95,6 +98,13 @@ const creaServizio = (override: {
     }) as never,
     resolveBaseUrlFn: () =>
       override.baseUrl === undefined ? 'https://crm.esempio.it' : override.baseUrl,
+    // ⚠️ Vero per difetto nelle prove, e NON perche' sia il comportamento di
+    // produzione — in produzione e' falso apposta. E' che con `false` la
+    // consegna parte senza essere aspettata, e un test che controlla subito
+    // dopo troverebbe la finta email non ancora spedita: misurerebbe la corsa,
+    // non il codice. La prova del ramo di produzione e' scritta a parte, e
+    // aspetta esplicitamente.
+    shouldAwaitDeliveryFn: () => override.aspettaConsegna ?? true,
     // Il vero `$transaction` vuole un database. Qui si esegue e basta: le prove
     // sull'ordine delle scritture non hanno bisogno del rollback vero, e cio'
     // che conta — che `markUsed` possa dire «ho perso la corsa» — si prova
@@ -222,6 +232,57 @@ test('un utente senza workspace non fa fallire la richiesta, salta solo il regis
   assert.equal(risposta.requested, true);
   assert.equal(emailInviate.length, 1);
   assert.deepEqual(registro, []);
+});
+
+// ⚠️ La prova che chiude l'oracolo dei tempi. Un corpo di risposta identico non
+// basta: se il ramo «utente trovato» aspettasse la consegna dell'email, chi
+// cronometra vedrebbe gli indirizzi registrati impiegare secondi e gli altri
+// millisecondi, e saprebbe di nuovo chi ha un account nel CRM.
+test('in produzione la risposta non aspetta la consegna dell email', async () => {
+  // Uno spedizioniere che non torna finche' non lo si scioglie a mano: e'
+  // l'unico modo per distinguere «non aspettata» da «solo veloce».
+  let sciogliConsegna: () => void = () => {};
+  const consegnaAppesa = new Promise<void>((resolve) => {
+    sciogliConsegna = resolve;
+  });
+
+  const { servizio, emailInviate } = creaServizio({
+    aspettaConsegna: false,
+    onSend: async () => {
+      await consegnaAppesa;
+    },
+  });
+
+  // ⚠️ Corsa contro un timer invece di un semplice `await`: se il codice
+  // tornasse ad aspettare la consegna, un `await` nudo resterebbe appeso per
+  // sempre e la prova morirebbe di timeout — un rosso che sembra un guasto
+  // dell'ambiente (nota operativa #37) invece del difetto che e'. Cosi' invece
+  // fallisce dicendo esattamente cosa e' successo.
+  const esito = await Promise.race([
+    servizio
+      .requestReset({ body: { email: 'utente@esempio.it' }, requestIp: '10.0.0.1' })
+      .then((risposta) => ({ tipo: 'risposta' as const, risposta })),
+    new Promise<{ tipo: 'appesa' }>((resolve) => {
+      setTimeout(() => { resolve({ tipo: 'appesa' }); }, 250);
+    }),
+  ]);
+
+  assert.equal(
+    esito.tipo,
+    'risposta',
+    'la risposta ha aspettato la consegna dell email: l oracolo dei tempi e riaperto',
+  );
+  assert.deepEqual(
+    esito.tipo === 'risposta' ? esito.risposta : null,
+    { requested: true, previewUrl: null },
+  );
+  assert.deepEqual(emailInviate, []);
+
+  // Ma l'email parte lo stesso, dopo.
+  sciogliConsegna();
+  await consegnaAppesa;
+  await new Promise((resolve) => { setImmediate(resolve); });
+  assert.equal(emailInviate.length, 1);
 });
 
 test('un indirizzo email malformato viene rifiutato', async () => {

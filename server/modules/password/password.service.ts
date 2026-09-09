@@ -162,8 +162,11 @@ export const buildPasswordService = (
     await dependencies.userRepositoryApi.updatePasswordHash(user.id, passwordHash, passwordChangedAt);
     await logOutcome('success');
 
-    // La data torna al chiamante perche' la rotta ne ha bisogno per dire il vero
-    // sulla revoca: e' lo stesso istante che fa cadere gli altri token.
+    // ⚠️ La rotta OGGI non usa questa data, e non deve sembrare che le serva:
+    // firma il token nuovo con `signAccessToken`, che si mette da solo un `iat`
+    // successivo. La si restituisce lo stesso perche' e' l'istante esatto da cui
+    // valgono le revoche, e chi un domani volesse rispondere «da quando» ce l'ha
+    // gia' qui invece di doverlo rileggere dal database.
     return { passwordChangedAt };
   },
 });

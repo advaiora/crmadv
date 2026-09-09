@@ -20,11 +20,17 @@ import { generateResetToken, hashResetToken } from './password-reset.tokens.js';
 //
 // 1. LA RISPOSTA E' SEMPRE LA STESSA, indirizzo esistente o no. E' il punto
 //    delicato dell'intera rotta: qualunque differenza — un codice di errore, un
-//    campo in piu', persino una risposta molto piu' veloce — trasforma il
+//    campo in piu', persino una risposta molto piu' lenta — trasforma il
 //    recupero password in un modo per sapere CHI ha un account nel CRM. Per lo
 //    stesso motivo il limite di frequenza conta le richieste RICEVUTE e non
 //    quelle andate a buon fine (vedi `rate-limit.ts`): contare solo le email
 //    spedite renderebbe il 429 lo stesso oracolo.
+//    ⚠️ «Uguale» comprende il TEMPO, e il tempo e' la parte che si dimentica.
+//    Per questo in produzione l'invio dell'email non viene aspettato: era la
+//    differenza grossa, secondi contro millisecondi (vedi `requestReset`).
+//    Resta una differenza minuscola, dovuta alle query di database che il ramo
+//    «utente trovato» fa in piu' e che non si possono togliere: e' scritta li',
+//    non e' stata chiusa, ed e' l'unica strada rimasta.
 // 2. IL TOKEN A DATABASE E' SOLO UN'IMPRONTA. Il valore in chiaro esiste per il
 //    tempo di comporre il link e poi si perde. Chi si portasse via il database
 //    non troverebbe nessun link utilizzabile.
@@ -118,6 +124,10 @@ type PasswordResetServiceDependencies = {
   // e nessun link, senza che il codice abbia niente che non va.
   resolveBaseUrlFn: typeof resolveResetBaseUrl;
   runInTransactionFn: typeof prisma.$transaction;
+  // Se aspettare la consegna dell'email prima di rispondere. Vero solo in
+  // sviluppo, dove serve l'indirizzo dell'anteprima; in produzione aspettarla
+  // rimetterebbe in piedi l'oracolo dei tempi (vedi `requestReset`).
+  shouldAwaitDeliveryFn: () => boolean;
   nowFn: () => Date;
 };
 
@@ -131,6 +141,7 @@ const defaultDependencies: PasswordResetServiceDependencies = {
   hashTokenFn: hashResetToken,
   auditLogFn: (input) => audit.log(input),
   resolveBaseUrlFn: resolveResetBaseUrl,
+  shouldAwaitDeliveryFn: isDevelopment,
   runInTransactionFn: ((callback: unknown) =>
     (prisma.$transaction as (cb: unknown) => Promise<unknown>)(
       callback,
@@ -180,6 +191,19 @@ export const buildPasswordResetService = (
     },
   ) => {
     if (!context.workspaceId) {
+      // ⚠️ Un recupero ANDATO A BUON FINE non puo' sparire del tutto: e' una
+      // password reimpostata da fuori, ed e' la riga che si andrebbe a cercare
+      // il giorno in cui qualcuno chiede «chi ha cambiato questa password?».
+      // Il registro attivita' non la puo' accogliere senza workspace, ma il log
+      // del server non chiede niente a nessuno.
+      if (outcome === 'completed') {
+        context.request?.log?.warn(
+          { userId: context.userId, outcome },
+          'Recupero password completato per un utente senza workspace attivo: '
+            + 'evento non registrabile nel registro attivita',
+        );
+      }
+
       return;
     }
 
@@ -279,24 +303,58 @@ export const buildPasswordResetService = (
         return { requested: true as const, previewUrl: null };
       }
 
-      const delivery = await dependencies.notifierApi.sendResetLink({
-        toEmail: parsed.data.email,
-        ...(workspaceId ? { workspaceId } : {}),
-        resetLink: `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`,
-        expiresAt,
-      });
+      const consegna = () =>
+        dependencies.notifierApi.sendResetLink({
+          toEmail: parsed.data.email,
+          ...(workspaceId ? { workspaceId } : {}),
+          resetLink: `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`,
+          expiresAt,
+        });
 
-      await logReset('requested', {
-        userId: user.id,
-        workspaceId,
-        request: input.request,
-        ...(delivery.delivered ? {} : { reason: delivery.reason ?? 'send_failed' }),
-      });
+      const registraEsito = (delivery: {
+        delivered: boolean;
+        reason?: string;
+      }) =>
+        logReset('requested', {
+          userId: user.id,
+          workspaceId,
+          request: input.request,
+          ...(delivery.delivered ? {} : { reason: delivery.reason ?? 'send_failed' }),
+        });
+
+      // ⚠️ IN PRODUZIONE LA CONSEGNA NON SI ASPETTA, ed e' il punto piu'
+      // importante di tutta la funzione.
+      //
+      // Aspettare `sendResetLink` significa tenere aperta la risposta per tutto
+      // il dialogo col server di posta — centinaia di millisecondi, a volte
+      // secondi. Ma quel dialogo avviene SOLO quando l'indirizzo esiste: chi
+      // cronometra le risposte vedrebbe le richieste per un indirizzo
+      // registrato impiegare molto piu' delle altre, e avrebbe di nuovo il modo
+      // di sapere chi ha un account nel CRM — cioe' esattamente cio' che il
+      // corpo identico della risposta serve a impedire. Un corpo uguale
+      // consegnato in tempi diversi non e' una risposta uguale.
+      //
+      // ⚠️ Cio' che resta, detto invece di essere taciuto: le poche query di
+      // database del ramo «utente trovato» non si possono togliere, quindi una
+      // differenza di tempo minuscola rimane. Sfruttarla e' molto piu' difficile
+      // — sono millisecondi contro secondi, sotto il rumore della rete — ma non
+      // e' zero, e chi legge non deve credere il contrario.
+      if (!dependencies.shouldAwaitDeliveryFn()) {
+        void consegna()
+          .then(registraEsito)
+          .catch(() => registraEsito({ delivered: false, reason: 'send_failed' }));
+
+        return { requested: true as const, previewUrl: null };
+      }
+
+      // In sviluppo si aspetta apposta: il messaggio finisce su una casella
+      // finta e serve l'indirizzo per andarlo a leggere. Qui il cronometro non
+      // e' un problema, perche' non c'e' nessuno da cui difendersi.
+      const delivery = await consegna();
+      await registraEsito(delivery);
 
       return {
         requested: true as const,
-        // In sviluppo il messaggio finisce su una casella finta e questo e'
-        // l'indirizzo per leggerlo. In produzione e' sempre `null`.
         previewUrl: delivery.previewUrl ?? null,
       };
     },
