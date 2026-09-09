@@ -14,7 +14,7 @@ import { IssueList, ModuleSignalList } from "./DiagnosisLists";
 // (snapshot generato dal motore di diagnosi). Sono complementari, non doppioni.
 const DiagnosisPanel = ({ diagnosis, loading, busy, message, error, onReload, onSave, onRegenerate }) => {
   if (loading) {
-    return <p className="mb-0 text-muted small">Caricamento dell'analisi...</p>;
+    return <p className="mb-0 text-muted small">Caricamento dell&rsquo;analisi...</p>;
   }
 
   const output = diagnosis?.output;
@@ -40,7 +40,7 @@ const DiagnosisPanel = ({ diagnosis, loading, busy, message, error, onReload, on
       <Row className="g-3 mb-3">
         <Col md={6} xl={3}>
           <div className="border rounded-3 p-3 h-100">
-            <div className="small text-muted">Stato dell'analisi</div>
+            <div className="small text-muted">Stato dell&rsquo;analisi</div>
             <div className="d-flex align-items-center gap-2 mt-1">
               <span className={`badge ${getReportBadgeClass("reportStatus", output?.diagnosisStatus)}`}>
                 {formatReportLabel(output?.diagnosisStatus)}
