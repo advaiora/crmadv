@@ -5,7 +5,7 @@ import { Download, Plus, TriangleAlert, Upload, Users } from "lucide-react";
 import ClientsModuleGate from "../../modules/clients/ui/ClientsModuleGate";
 import { deleteClient, listClients } from "../../modules/clients/ui/clientApi";
 import { CLIENTS_PERMISSIONS } from "../../modules/clients/ui/constants";
-import { ClientEmptyState, ClientFiltersBar, ClientGridRow, ClientMobileCard, ClientTagsEditorModal, ClientsListPagination, PageHeader } from "../../modules/clients/ui/components";
+import { ClientEmptyState, ClientFiltersBar, ClientGridRow, ClientMobileCard, ClientTagsEditorModal, ClientsImportPreviewModal, ClientsListPagination, PageHeader } from "../../modules/clients/ui/components";
 import { getClientTypeLabel } from "../../modules/clients/ui/helpers";
 import { getSortLabel, parsePageSize, parsePositiveInt, parseSort, parseType } from "../../modules/clients/ui/listQueryParams";
 import { useClientTagsEditor } from "../../modules/clients/ui/useClientTagsEditor";
@@ -195,21 +195,24 @@ const ClientsList = () => {
   );
 
   const triggerImport = () => {
-    if (!fileInputRef.current || csvTransfer.importing) {
+    if (!fileInputRef.current || csvTransfer.previewing || csvTransfer.importing) {
       return;
     }
 
     fileInputRef.current.click();
   };
 
+  // Scegliere il file apre l'anteprima, non l'import: si salva solo confermando
+  // dal modal. L'input viene svuotato subito, altrimenti riscegliere lo stesso
+  // file non farebbe scattare nessun evento.
   const onImportFileChange = async (event) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) {
       return;
     }
 
-    await csvTransfer.importFromFile(file);
-    event.target.value = "";
+    await csvTransfer.requestPreview(file);
   };
 
   const goToPage = (nextPage) => {
@@ -282,12 +285,13 @@ const ClientsList = () => {
                     )}
                     <Button
                       variant="outline-secondary"
-                      disabled={!canCreate || csvTransfer.importing}
+                      disabled={!canCreate || csvTransfer.previewing || csvTransfer.importing}
                       onClick={triggerImport}
+                      title="Importa un file CSV o Excel (.xlsx)"
                       className="d-none d-sm-inline-flex align-items-center gap-2 clients-import-export-btn"
                     >
                       <Upload size={15} />
-                      {csvTransfer.importing ? "Importazione..." : "Importa CSV"}
+                      {csvTransfer.previewing ? "Lettura file..." : "Importa"}
                     </Button>
                     <Button
                       variant="outline-secondary"
@@ -307,7 +311,10 @@ const ClientsList = () => {
                   </>
                 }
               />
-              <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="d-none" onChange={(event) => void onImportFileChange(event)} />
+              {/* Il tipo MIME per esteso oltre all'estensione: senza, Windows nasconde gli .xlsx che il backend sa gia' leggere. */}
+              <input ref={fileInputRef} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="d-none" aria-label="Scegli il file CSV o Excel da importare" onChange={(event) => void onImportFileChange(event)} />
+
+              <ClientsImportPreviewModal preview={csvTransfer.preview} importing={csvTransfer.importing} onCancel={csvTransfer.cancelPreview} onConfirm={csvTransfer.confirmImport} />
 
               <ClientFiltersBar
                 searchValue={searchValue}
@@ -369,6 +376,9 @@ const ClientsList = () => {
                           Riga {entry.row}: {entry.message}
                         </div>
                       ))}
+                      {csvTransfer.actionMessage.hiddenErrors > 0 && (
+                        <div>e altre {csvTransfer.actionMessage.hiddenErrors} righe con errori, non elencate.</div>
+                      )}
                     </div>
                   )}
                 </Alert>
