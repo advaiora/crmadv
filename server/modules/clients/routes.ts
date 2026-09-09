@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { ok } from '../../core/response.js';
+import { readClientImportUpload } from './import-file.js';
 import {
   CLIENTS_PERMISSIONS,
   ensureClientsAccess,
@@ -55,12 +56,17 @@ const clientsRoute: FastifyPluginAsync = async (app) => {
     );
   });
 
+  // Import clienti. Il file arriva come allegato (multipart, CSV o Excel, tetto
+  // 20MB gia' registrato in app.ts): e' la strada che regge i volumi grossi.
+  // La vecchia forma JSON `{csv, dryRun}` resta accettata finche' il frontend
+  // non passa all'allegato, e li' vale ancora il tetto di corpo di Fastify (1MB).
   app.post<{ Body: unknown }>('/clients/import', async (request, reply) => {
     const { user, workspace } = await ensureClientsAccess(request, CLIENTS_PERMISSIONS.create);
+    const upload = request.isMultipart() ? await readClientImportUpload(request) : undefined;
     const result = await clientsService.importClientsFromCsv({
       workspaceId: workspace.id,
       actorUserId: user.id,
-      body: request.body,
+      ...(upload ? { upload } : { body: request.body }),
       request,
     });
 

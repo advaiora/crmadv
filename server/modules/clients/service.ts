@@ -4,7 +4,13 @@ import { audit } from '../../audit/audit.js';
 import { badRequest, isHttpError, notFound } from '../../core/errors.js';
 import { validateAndNormalizePhone } from '../../../core/utils/phone.js';
 import { buildPhoneFieldSchema, PHONE_INVALID_MESSAGE } from './clients.schema.js';
-import { detectCsvDelimiter, parseCsvRows, stringifyCsv } from './csv.js';
+import { stringifyCsv } from './csv.js';
+import {
+  readClientImportFile,
+  readClientImportJsonBody,
+  type ClientImportUpload,
+} from './import-file.js';
+import { buildImportPreviewRows } from './import-preview.js';
 import { customFieldsService } from '../custom-fields/custom-fields.service.js';
 import {
   clientsRepository,
@@ -92,10 +98,6 @@ type ClientWritePayload = {
 } & ClientAddress;
 
 type ClientPatchPayload = Partial<ClientWritePayload>;
-type ImportClientsBody = {
-  csv: string;
-  dryRun?: boolean;
-};
 type ClientImportError = {
   row: number;
   message: string;
@@ -445,37 +447,6 @@ const parseOptionalClientTypeFilter = (value: unknown): ClientType | undefined =
   }
 
   return value;
-};
-
-const parseImportBody = (body: unknown): ImportClientsBody => {
-  if (!isObject(body)) {
-    throw badRequest('Body must be a JSON object');
-  }
-
-  const unknownFields = Object.keys(body).filter((key) => key !== 'csv' && key !== 'dryRun');
-  if (unknownFields.length > 0) {
-    throw badRequest('Body contains unknown fields', {
-      unknownFields: unknownFields.sort(),
-    });
-  }
-
-  if (typeof body.csv !== 'string') {
-    throw badRequest('csv must be a string');
-  }
-
-  const csv = body.csv.replace(/^\uFEFF/, '').trim();
-  if (!csv) {
-    throw badRequest('csv cannot be empty');
-  }
-
-  if (body.dryRun !== undefined && typeof body.dryRun !== 'boolean') {
-    throw badRequest('dryRun must be a boolean');
-  }
-
-  return {
-    csv,
-    dryRun: body.dryRun ?? false,
-  };
 };
 
 const normalizeImportHeaderToken = (value: string) =>
@@ -992,23 +963,20 @@ export const clientsService = {
   async importClientsFromCsv(input: {
     workspaceId: string;
     actorUserId: string;
-    body: unknown;
     request: FastifyRequest;
+    // Due strade d'ingresso: `upload` e' il file arrivato come allegato (fino a
+    // 20MB, CSV o Excel), `body` e' la vecchia forma JSON `{csv, dryRun}` che
+    // resta viva per chi la chiama ancora. La lettura del file sta in
+    // import-file.ts; qui comincia la validazione, che non cambia.
+    upload?: ClientImportUpload;
+    body?: unknown;
   }) {
-    const parsedBody = parseImportBody(input.body);
-    const delimiter = detectCsvDelimiter(parsedBody.csv);
-    let rows: string[][];
-
-    try {
-      rows = parseCsvRows(parsedBody.csv, delimiter);
-    } catch (error) {
-      throw badRequest('CSV is malformed', {
-        reason: error instanceof Error ? error.message : 'unknown',
-      });
-    }
+    const { format, delimiter, rows, dryRun } = input.upload
+      ? await readClientImportFile(input.upload)
+      : readClientImportJsonBody(input.body);
 
     if (rows.length === 0) {
-      throw badRequest('CSV has no rows');
+      throw badRequest('Il file non contiene nessuna riga.');
     }
 
     const header = assertCsvColumns(rows[0]);
@@ -1021,7 +989,7 @@ export const clientsService = {
       .filter((entry) => !isEmptyCsvRow(entry.values));
 
     if (dataRows.length === 0) {
-      throw badRequest('CSV has no data rows');
+      throw badRequest('Il file contiene solo la riga di intestazione: nessun cliente da importare.');
     }
 
     // Definizioni dei campi personalizzati lette una sola volta: la validazione
@@ -1071,7 +1039,7 @@ export const clientsService = {
 
     let createdRows = 0;
 
-    if (!parsedBody.dryRun) {
+    if (!dryRun) {
       for (const entry of validRows) {
         try {
           await clientsRepository.create(input.workspaceId, {
@@ -1094,12 +1062,16 @@ export const clientsService = {
     const failedRows = failedRowsCount;
 
     await audit.log({
-      event: 'clients.import',
+      // La prova senza salvare ha un evento suo: e' una lettura, e con
+      // l'anteprima ogni sbirciata prima di confermare diventerebbe una riga di
+      // registro indistinguibile da un import vero.
+      event: dryRun ? 'clients.import.preview' : 'clients.import',
       actorUserId: input.actorUserId,
       workspaceId: input.workspaceId,
       entityType: 'Client',
       metadata: {
-        dryRun: parsedBody.dryRun,
+        dryRun,
+        format,
         totalRows: dataRows.length,
         validRows: validRows.length,
         createdRows,
@@ -1110,8 +1082,12 @@ export const clientsService = {
 
     return {
       summary: {
+        format,
         delimiter,
-        dryRun: parsedBody.dryRun,
+        dryRun,
+        // Le righe che entrerebbero: solo in prova, perche' e' li' che servono a
+        // decidere se confermare. A import fatto sarebbero peso inutile.
+        ...(dryRun ? { previewRows: buildImportPreviewRows(validRows) } : {}),
         totalRows: dataRows.length,
         validRows: validRows.length,
         createdRows,
