@@ -981,3 +981,31 @@ La conferma registra che **una persona e' d'accordo**, non che il segreto sia st
 - `env | grep GITHUB_TOKEN` finalmente **risponde**, ed e' questo l'unico indicatore che conta.
 
 Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio si legge prima `PAPERCLIP_WAKE_REASON`**. Se dice `secret_proposal_resolved` si va dritti all'ambiente; se dice altro, il blocco e' quasi sempre ancora in piedi e riaprire il thread e' tempo speso male.
+
+## 66. Le istruzioni operative per Jacopo si scrivono per PowerShell su Windows, e non sono finite finche' non sono eseguibili cosi' come sono
+
+**Contesto:** 8/9/2026, giro completo dell'installazione locale del CRM sulla macchina Windows di Jacopo, seguendo `installazione-e-avvio.md` passo per passo. Vale per **chiunque scriva comandi o guide destinati a lui** - le guide di avvio, i passaggi in chat, le liste operative - a prescindere da dove giri chi le scrive.
+
+**Errori, tre, tutti sullo stesso giro.**
+1. **`&&` non esiste in Windows PowerShell 5.1.** Da' un `ParserError`, non un "comando non trovato": a chi legge sembra un guasto della macchina, non un errore di sintassi di chi ha scritto la riga.
+2. **Un segnaposto dentro una TABELLA e' peggio che dentro un blocco di comando.** Una tabella intitolata «cosa scrivere» si legge come una **specifica gia' compilata**, non come un modulo da riempire: il segnaposto ci sparisce dentro perche' e' graficamente identico al contenuto vero delle altre righe. E' la **terza** ricaduta della nota **#58**, dopo il caso dell'`ssh root@INDIRIZZO-IP`.
+3. **Un comando che occupa il terminale va detto che lo occupa.** `npm run dev:api` e `npm run dev` non restituiscono il prompt: servono **due finestre**, una per server. Chi non lo sa pensa che si sia bloccato e interrompe.
+
+**Modo corretto:**
+- **Niente `&&` e `||`**: si concatena con `;`, oppure `comando1; if ($?) { comando2 }`. Niente `2>/dev/null` (in PowerShell e' `2>$null`), niente `export`, niente here-string bash, niente `ls -la`/`head`/`sed`. Se una cosa funziona solo in Git Bash, **dirlo esplicitamente**.
+- **La distinzione che semplifica tutto:** `git`, `npm`, `node`, `npx` sono **programmi**, identici in ogni shell; cambia solo la **colla** fra un comando e l'altro. Il 90% di quello che si consegna e' invariante, e va controllato solo il 10%.
+- **I segnaposto non si mettono nelle tabelle.** In tabella vanno solo valori **veri e completi** (`API_PORT=4000`); le righe che l'utente deve compilare escono dalla tabella e diventano un elenco a parte.
+- **Un valore da generare si mostra con un esempio finto ma realistico**, dichiarato tale - non `<il tuo valore>` ma una stringa della forma e della lunghezza giuste, seguita da *«questo e' inventato, non usarlo»*. Meglio ancora: dare **come si riconosce** quale valore va dove (uno e' di 64 caratteri esadecimali, l'altro di 44 in base64 che finisce con `=`), cosi' l'utente si autocorregge e la domanda non nasce.
+- **Regola generale:** quando lo stesso fraintendimento torna una **terza** volta, non si ripete la regola con piu' enfasi - **si cambia il formato che lo produce**.
+- **Verificare i presupposti invece di ereditarli dalla guida.** Su questa macchina la guida sbagliava tre volte: dava PostgreSQL per installato (non c'era), poi per raggiungibile dal PATH (non lo era, ne' di sistema ne' utente), e indicava una cartella di progetto inesistente. Un prerequisito si controlla, non si assume.
+
+## 67. `/health` risponde `200` anche con il database irraggiungibile: si guarda il campo `db`
+
+**Contesto:** 8/9/2026, verifica finale dell'installazione locale. La guida chiede di controllare che l'API sia viva con una chiamata a `/health`.
+
+**Errore da non fare:** fermarsi al fatto che la chiamata **risponda**. L'API risponde `200` e un corpo JSON ben formato **anche quando il database e' spento o irraggiungibile**: in quel caso il corpo dice `{"status":"ok","db":"down"}`. Chi guarda solo il codice HTTP - o solo la parola `ok` - conclude che tutto funziona, e poi si trova il CRM che si apre e non mostra niente, con l'errore che sembra del frontend.
+
+**Modo corretto:**
+- Il controllo e' **il campo `db`**, che dev'essere `up`. La risposta buona e' `{"status":"ok","db":"up","timestamp":...}`.
+- Se e' `down`, il problema e' `DATABASE_URL` oppure PostgreSQL spento - non l'API e non il frontend.
+- Vale in generale: quando un servizio espone uno stato di salute composito, **il campo dell'inquilino piu' fragile e' quello da leggere**, non lo stato complessivo.
