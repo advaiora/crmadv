@@ -1096,3 +1096,15 @@ Il conflitto non e' semantico ma **di adiacenza**, ed e' questa la parte che ing
 - **In un conflitto di adiacenza si tiene la sezione nuova di un ramo *e* la riscrittura del paragrafo dell'altro** — mai le due copie del paragrafo. La verifica che chiude: `git show <albero>:CLAUDE.md | grep -c '^\*\*Mappa del progetto'` deve dire `1`.
 - **Quando si sa che un altro ramo aperto sta riscrivendo un paragrafo, la sezione nuova si inserisce lontano da li'** — un paragrafo piu' su o piu' giu' basta a non generare il conflitto.
 - Per la tecnica `merge-tree`/`commit-tree` applicata alle **voci numerate** (due rami che scelgono lo stesso numero) vedi la **nota #71**: qui il guasto e' un altro, la posizione e non il numero.
+
+## 73. Un paragrafo che «fa il conto» va riletto contando davvero, quando la lista sotto cambia
+
+**Contesto:** 9/9/2026, PR #21 (`ceo/crma-23-regola-mista-tutto-il-team`), tabella della regola mista in `CLAUDE.md`. Due commit di fila: il primo (`0d07889`) scrive una tabella di **8 righe**; il secondo (`4e96c1c`) aggiunge la riga mancante «Scrittura del codice» **in seconda posizione** e, nello stesso commit, scrive il paragrafo che dimostra la copertura — *«Il conto delle tredici schede, cosi' nessuno resta scoperto»*.
+
+**Errore:** il conto e' stato scritto contando **come se la riga nuova fosse stata aggiunta in fondo**. Ne sono usciti tre numeri sbagliati in una frase sola — *«nove righe coprono nove mestieri, l'**ottava** ne copre due, la **decima** scheda e' il CEO»*, mentre le nove righe coprono **dieci** mestieri, quella doppia e' la **seconda** e il CEO e' l'**undicesima** — e una somma che faceva **12** sotto un titolo che ne dichiarava **13**. Il paragrafo esisteva per un solo scopo, dimostrare che nessun mestiere resta scoperto, e nel dimostrarlo si smentiva. Nessun controllo automatico puo' accorgersene: e' prosa, non codice. L'ha trovato la revisione (CRMA-43), corretto in `7c8d081`.
+
+**Modo corretto:**
+- Quando un commit **inserisce** un elemento in una lista che un testo vicino conta o indicizza per posizione («la terza riga», «le ultime due», «la decima»), rileggere quel testo **contando gli elementi uno per uno sul file finale** — non sul ricordo di com'era la lista prima.
+- **I due segnali che obbligano al ricontrollo**, entrambi visibili nel proprio diff: l'inserimento **non e' in coda**, e nel testo attorno compaiono **numeri ordinali** o un totale. Con tutti e due presenti il ricontrollo non e' facoltativo.
+- **Se il paragrafo dichiara un totale, farlo tornare a mano prima di committare** (qui: 10 mestieri + 1 CEO + 2 agenti in pausa = 13). E' l'unico modo in cui quel tipo di frase puo' essere verificata, e costa dieci secondi contro un rilievo bloccante in revisione.
+- Vale per ogni documento del progetto che tiene un conto dichiarato, non solo per questa tabella: `CLAUDE.md` ne ha piu' d'uno («i cinque ruoli di sistema», «i tre destini possibili di un file fuori norma»).
