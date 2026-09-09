@@ -26,8 +26,10 @@ vi.mock('../../components/guards/ModulePermissionGate', () => ({
 
 import {
   leggiImpostazioniMail,
+  provaServerMail,
   salvaImpostazioniMail,
 } from '../../modules/mail/api/mailApi';
+import { ETICHETTA_RETE_INTERNA } from './mailServerReteInterna';
 
 const IMPOSTAZIONI_SALVATE = {
   configurata: true,
@@ -37,6 +39,7 @@ const IMPOSTAZIONI_SALVATE = {
   server: 'mail.esempio.it',
   porta: 587,
   connessioneSicura: false,
+  retePrivataConsentita: false,
   utente: 'noreply@esempio.it',
   mittente: 'Studio <noreply@esempio.it>',
   aggiornatoIl: '2026-08-18T10:00:00.000Z',
@@ -254,5 +257,186 @@ describe('avviso: la prova collauda la configurazione salvata', () => {
       screen.getByText(/Salva le impostazioni per poter provare la connessione/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Hai modifiche non salvate/i)).not.toBeInTheDocument();
+  });
+});
+
+// L'interruttore che autorizza la prova verso la rete interna dell'agenzia
+// (§7.7 punto 7, opzione B). Il comportamento del server e' di CRM-28 e ha i
+// suoi test la': qui interessa cosa vede e cosa manda la maschera.
+describe('interruttore: il server di posta e\' nella rete interna', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('compare spento, con l\'etichetta decisa sull\'interazione di CRM-26', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+
+    const interruttore = await screen.findByLabelText(ETICHETTA_RETE_INTERNA);
+    expect(interruttore).not.toBeChecked();
+  });
+
+  it('si accende leggendo quello che e\' salvato', async () => {
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: { ...IMPOSTAZIONI_SALVATE, retePrivataConsentita: true },
+    });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByLabelText(ETICHETTA_RETE_INTERNA)).toBeChecked();
+  });
+
+  // ⚠️ Il test che vale piu' di tutti gli altri messi insieme. Nel corpo di
+  // PUT /mail il campo e' `.default(false)`, non `.optional()`: ometterlo non
+  // conserva il valore salvato, lo SPEGNE. E' la regola opposta a quella di
+  // `password`, che sta nello stesso corpo due righe piu' sotto.
+  it('lo manda al server anche quando e\' spento', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+    salvaImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /salva impostazioni/i }));
+
+    await waitFor(() => expect(salvaImpostazioniMail).toHaveBeenCalledTimes(1));
+
+    const inviato = salvaImpostazioniMail.mock.calls[0][0];
+    expect('retePrivataConsentita' in inviato).toBe(true);
+    expect(inviato.retePrivataConsentita).toBe(false);
+  });
+
+  it('acceso e salvato, arriva al server come acceso', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+    salvaImpostazioniMail.mockResolvedValue({
+      impostazioni: { ...IMPOSTAZIONI_SALVATE, retePrivataConsentita: true },
+    });
+
+    render(<MailServerPage />);
+    fireEvent.click(await screen.findByLabelText(ETICHETTA_RETE_INTERNA));
+    fireEvent.click(screen.getByRole('button', { name: /salva impostazioni/i }));
+
+    await waitFor(() => expect(salvaImpostazioniMail).toHaveBeenCalledTimes(1));
+    expect(salvaImpostazioniMail.mock.calls[0][0].retePrivataConsentita).toBe(true);
+  });
+
+  // Il raccordo col fatto n.1 del compito: la prova gira sul server e collauda
+  // il salvato. Chi spunta e preme subito deve leggere che non e' ancora
+  // valido, altrimenti conclude che l'autorizzazione non funzioni.
+  it('spuntato e non salvato, la pagina avvisa che la prova riguarda il salvato', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+    fireEvent.click(await screen.findByLabelText(ETICHETTA_RETE_INTERNA));
+
+    expect(await screen.findByText(/Hai modifiche non salvate/i)).toBeInTheDocument();
+  });
+
+  it('sul rifiuto per rete privata l\'esito rimanda all\'interruttore', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+    provaServerMail.mockResolvedValue({
+      riuscita: false,
+      origine: 'database',
+      server: 'mail.interno.lan',
+      motivo: 'rete_privata',
+      errore:
+        "L'indirizzo del server di posta è dentro una rete privata. La prova non è stata eseguita: nessuna connessione è stata aperta.",
+    });
+
+    render(<MailServerPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /prova connessione/i }));
+
+    // Il messaggio del server resta intero, e la frase nostra gli si aggiunge
+    // in coda: sono due cose diverse, il cosa e il come si rimedia.
+    const avviso = (await screen.findByText(/dentro una rete privata/i)).closest('.alert');
+    expect(avviso).toHaveTextContent(ETICHETTA_RETE_INTERNA);
+    expect(avviso).toHaveTextContent(/salva/i);
+  });
+
+  it('su un rifiuto qualunque non nomina l\'interruttore', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+    provaServerMail.mockResolvedValue({
+      riuscita: false,
+      origine: 'database',
+      server: 'mail.esempio.it',
+      errore: 'Il server ha rifiutato le credenziali.',
+    });
+
+    render(<MailServerPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /prova connessione/i }));
+
+    const avviso = (await screen.findByText(/rifiutato le credenziali/i)).closest('.alert');
+    expect(avviso).not.toHaveTextContent(ETICHETTA_RETE_INTERNA);
+  });
+});
+
+// ⚠️ Il rilievo della revisione dell'1/9/2026. Il filtro del backend gira solo
+// quando i parametri vengono dal database (`richiedeControlloRetePrivata`,
+// mail.net-guard.ts): sul ramo `.env` la prova si collega comunque. La riga di
+// aiuto sotto l'interruttore deve dire quale dei due mondi si sta guardando,
+// altrimenti un CRM appena installato dichiara attiva una protezione che non
+// c'e' — nessun errore, invisibile, come `posta.gestisci` il 18/8.
+describe('la riga di aiuto dell\'interruttore dice la verita\' su entrambi i rami', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('con la configurazione salvata in uso promette il rifiuto senza connessione', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByText(/senza aprire nessuna connessione/i)).toBeInTheDocument();
+  });
+
+  it('sul ramo .env non promette nessun blocco', async () => {
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        configurata: false,
+        origineInUso: 'env',
+      },
+    });
+
+    render(<MailServerPage />);
+
+    // L'interruttore resta li' — nasconderlo toglierebbe anche la spiegazione
+    // del perche' adesso non serve.
+    expect(await screen.findByLabelText(ETICHETTA_RETE_INTERNA)).toBeInTheDocument();
+    expect(await screen.findByText(/non filtra nessun indirizzo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/senza aprire nessuna connessione/i)).toBeNull();
+  });
+
+  it('anche senza nessuna configurazione non promette nessun blocco', async () => {
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        configurata: false,
+        origineInUso: 'nessuna',
+      },
+    });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByText(/non filtra nessun indirizzo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/senza aprire nessuna connessione/i)).toBeNull();
+  });
+
+  it('con la configurazione salvata ma in pausa segue cio\' che il CRM usa davvero', async () => {
+    // Il caso che si sbaglia per primo: la riga a database c'e', ma con
+    // `attivo` spento il backend ripiega sull'ambiente e il filtro non gira.
+    // `origineInUso` lo racconta gia', ed e' il motivo per cui la riga di aiuto
+    // guarda quello e non `configurata`.
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        attivo: false,
+        origineInUso: 'env',
+      },
+    });
+
+    render(<MailServerPage />);
+
+    expect(await screen.findByText(/non filtra nessun indirizzo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/senza aprire nessuna connessione/i)).toBeNull();
   });
 });
