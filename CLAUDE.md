@@ -8,6 +8,27 @@ Due persone, **a staffetta** (una alla volta):
 - **Jacopo** — lavora durante la settimana (lun-ven). Meno esperto di programmazione: può chiedere spiegazioni su meccaniche di base.
 - **Claudio** — lavora nel weekend (sab-dom). Più esperto.
 
+## Due assistenti in due posti diversi — e i documenti che valgono solo per uno (dall'8/9/2026)
+
+Sul progetto lavorano **due assistenti, in due ambienti diversi, con mestieri diversi**:
+
+- **Lo sviluppo** avviene dentro **Paperclip, sulla VPS** (Linux). È l'assistente che scrive il codice, apre i rami, committa e propone le unioni. È il caso normale, ed è quello per cui è scritto **tutto il resto di questo documento**.
+- **La consulenza** avviene sul **PC Windows di Jacopo**, in un clone locale di questo repository. Legge il codice per rispondere a domande, ragiona sulle scelte, prepara i testi dei compiti da affidare a Paperclip e verifica cosa è tornato indietro. **Non sviluppa.**
+
+⚠️ **Perché serve una regola, e non è una formalità.** I documenti della postazione locale contengono frasi come *«in questa fase l'assistente non scrive nel repository»*: vere per la postazione, **disastrose se le applicasse chi il codice lo deve scrivere per mestiere**. Un assistente che ci inciampasse dentro senza riconoscerne la natura potrebbe fermarsi, o peggio riscriverle. Quindi:
+
+**I documenti che servono solo alla postazione locale stanno in `archivio-documenti/consulenza-postazione-locale/` e portano in cima la riga**
+
+`<!-- AMBITO-DOCUMENTO: consulenza-postazione-locale -->`
+
+**Chi sviluppa ignora completamente quella cartella e ogni file che porta quella riga:** non li legge come regole, non li applica, non li aggiorna, non li cita come prassi del progetto, non ne tiene conto nelle proprie decisioni. Non descrivono il prodotto e non descrivono come si lavora al CRM: descrivono come lavora **una postazione**.
+
+**Criterio meccanico per capire in quale dei due casi sei, senza chiederlo a nessuno:** sistema **Linux** e cartella sulla VPS → sei lo sviluppo, quei file **non ti riguardano**. Sistema **Windows** e cartella sotto `C:\Users\jacop\` → sei la consulenza, quei file sono per te.
+
+**I documenti condivisi restano condivisi.** `archivio-documenti/note-operative-ai.md` continua a valere per tutti e va aggiornato come sempre; solo le note di ambito locale vanno in `consulenza-postazione-locale/note-operative-locali.md`, con numerazione separata `L1, L2, …` — perché le note condivise sono numerate in sequenza, e due contesti che ne aggiungono in parallelo si scontrerebbero sullo stesso numero.
+
+⚠️ **Il test per decidere dove va una nota è uno solo: *cambierebbe quello che fa un agent che sviluppa dentro Paperclip?*** Se sì è **condivisa**, anche quando parla di Windows: le guide di avvio per Jacopo le scrive Paperclip, quindi le regole su come si scrivono (niente `&&` in PowerShell, i segnaposto, i comandi che occupano il terminale — nota **#67**) servono a lui. Se invece la nota descrive **dove gira l'assistente locale** — le cartelle sul PC, il suo terminale, il fatto che abbia accesso alla macchina di Jacopo — allora è locale. Il criterio esteso, con gli esempi, sta in cima a `note-operative-locali.md`.
+
 ## Metodo di lavoro
 
 1. **Si lavora uno alla volta** e si passa il testimone con l'handoff.
