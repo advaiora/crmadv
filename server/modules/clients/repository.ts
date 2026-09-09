@@ -34,17 +34,12 @@ type CreateClientInput = {
   // viaggiano da soli, senza obbligare `service.ts` a nominarli prima che
   // esistano a schermo. Chi non li passa scrive `null`, che e' il valore giusto.
   //
-  // ⚠️ LA CATENA SI FERMA QUI, ED E' VOLUTO — ma va chiuso, o i campi non
-  // arrivano mai a chi usa il CRM. `service.ts` ha i propri elenchi espliciti,
-  // e nessuno di questi quattro nomi ci compare ancora. Chi collega la maschera
-  // (punto 5 della release) deve toccare, in `server/modules/clients/service.ts`:
-  //   - `mapClient` (~riga 653): la risposta dell'API. Senza questo il valore si
-  //     legge dal database e si butta via un livello dopo — stesso sintomo del
-  //     campo dimenticato nel `select`, un piano piu' in alto.
-  //   - la lettura del payload di creazione (~riga 774) e della patch (~riga 814):
-  //     senza queste il campo non si puo' nemmeno scrivere dall'API.
-  //   - `CSV_HEADER_COLUMNS` (~riga 38) e `toExportCsvRow` (~riga 602): l'export.
-  //   - il registro attivita' (~righe 1123 e 1208): quali campi risultano cambiati.
+  // ✅ La catena e' stata chiusa il 9/9/2026 (CRMA-58): in `service.ts` i quattro
+  // nomi sono ora in `CLIENT_BODY_FIELDS`, nei due parser del corpo, in
+  // `mapClient`, nelle due direzioni del CSV e nel registro attivita'. Le regole
+  // di forma (PEC, codice SDI, sito) stanno in `field-rules.ts`, provate a parte.
+  // ⚠️ Un campo NUOVO va comunque collegato in tutti quei punti: qui e nel
+  // `select` si salva e si rilegge, ma senza `service.ts` non arriva a schermo.
   pecEmail?: string | null;
   sdiCode?: string | null;
   website?: string | null;
