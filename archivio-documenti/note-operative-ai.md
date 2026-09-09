@@ -1041,17 +1041,3 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - **Il campanello d'allarme generale:** quando falliscono *quasi tutti* i test, comprese cartelle che il lavoro non ha mai toccato, la causa e' l'ambiente, non il codice. La conferma costa dieci secondi — `git diff --name-only origin/main...HEAD | grep <cartella-che-fallisce>`: se non compare, quel file e' identico a `main` e non puo' essere stato rotto dal lavoro in corso. E' lo stesso ragionamento della nota #37 sui rossi da timeout, applicato a una causa diversa.
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
-
----
-
-## 70. Gli agent si citano col nome intero: dal 9/9/2026 i subagent di repository finiscono in `-repo`
-
-**Contesto:** l'assistente dichiara di aver fatto revisionare un lavoro. Su questo progetto esistono **due squadre con gli stessi ruoli**: i subagent di repository (`.claude/agents/`, girano dentro la sessione, non compaiono in dashboard) e gli agenti Paperclip (nascono come compiti, lasciano traccia in dashboard).
-
-**Errore:** scrivere «il Revisore ha confermato», senza dire quale. Il 9/9/2026 Jacopo ha aperto la scheda Paperclip «Revisore», l'ha trovata a **zero attivita'**, e ha concluso — ragionevolmente — che le revisioni dichiarate non fossero mai avvenute. Erano avvenute, ma con l'altro revisore. Il danno non e' stilistico: e' che l'utente non ha piu' modo di verificare quello che gli si racconta, e la prima cosa che smette di valere e' la parola dell'assistente.
-
-**Modo corretto:**
-- I subagent di repository si chiamano **`esploratore-repo`, `revisore-repo`, `architetto-repo`** (a schermo: Esploratore Repo, Revisore Repo, Architetto Repo). Gli agenti Paperclip restano **senza suffisso**: «agente Revisore di Paperclip», «agente Esploratore», Guardiano, Capo del personale.
-- **Mai «il Revisore» e basta.** Se lo si legge in un documento scritto prima del 9/9/2026 e' quasi sempre il subagent di repository, ma va verificato, non dato per scontato.
-- La prova che un subagent di repository ha lavorato **non sta in dashboard**: sta nei registri di sessione della VPS, `~/.claude/projects/<slug>/<sessione>/subagents/agent-*.jsonl`. Si contano con `grep -oh '"subagent_type":"[a-z-]*"' <slug>/*.jsonl | sort | uniq -c`. Quando l'utente contesta l'attivita' di un agente, si risponde con quei file, non a memoria.
-- Chi fa cosa (revisione dentro la sessione contro compito Paperclip) sta in `CLAUDE.md`, sezione «Team di agent».
