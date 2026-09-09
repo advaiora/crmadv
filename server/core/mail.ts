@@ -44,7 +44,33 @@ export type MailSettingsSource = 'database' | 'env' | 'ethereal';
  * manderebbe chi amministra a riscrivere parametri che erano gia' giusti.
  */
 export type EsitoConfigurazionePosta =
-  | { esito: 'ok'; settings: MailSettings; source: Exclude<MailSettingsSource, 'ethereal'> }
+  | {
+      esito: 'ok';
+      source: 'database';
+      settings: MailSettings;
+      /**
+       * Se questa configurazione autorizza la «Prova connessione» a raggiungere
+       * un indirizzo della rete interna.
+       *
+       * Viaggia INSIEME a `settings`, ed e' il motivo per cui questa variante e'
+       * separata da quella dell'ambiente: leggerlo con una seconda
+       * interrogazione lascerebbe una finestra in cui l'host viene da una lettura
+       * e il permesso di provarlo da un'altra. Qui e' obbligatorio, cosi' la
+       * garanzia la da' il tipo invece della buona volonta' di chi scrive.
+       */
+      retePrivataConsentita: boolean;
+    }
+  | {
+      esito: 'ok';
+      source: 'env';
+      settings: MailSettings;
+      /**
+       * Assente di proposito: con i parametri del file `.env` non c'e' nessuna
+       * riga di database su cui accendere niente, e l'host non lo sceglie chi
+       * preme il pulsante.
+       */
+      retePrivataConsentita?: undefined;
+    }
   | { esito: 'assente' }
   | { esito: 'illeggibile' };
 
@@ -168,6 +194,7 @@ export const readMailSettingsFromDatabase = async (
   return {
     esito: 'ok',
     source: 'database',
+    retePrivataConsentita: record.retePrivataConsentita,
     settings: {
       host: record.server,
       port: record.porta,

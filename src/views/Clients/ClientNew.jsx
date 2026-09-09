@@ -6,6 +6,7 @@ import ClientForm from '../../modules/clients/ui/ClientForm';
 import ClientsModuleGate from '../../modules/clients/ui/ClientsModuleGate';
 import { createClient } from '../../modules/clients/ui/clientApi';
 import { CLIENTS_PERMISSIONS } from '../../modules/clients/ui/constants';
+import { hasPermission } from '../../utils/workspaceAccess';
 import { PageHeader } from '../../modules/clients/ui/components';
 import '../../modules/clients/ui/clients-ui.css';
 
@@ -33,37 +34,40 @@ const ClientNew = () => {
 
     return (
         <ClientsModuleGate requiredPermission={CLIENTS_PERMISSIONS.create}>
-            <div className="container-fluid clients-page-container">
-                <div className="clients-page-shell">
-                    <PageHeader
-                        icon={Users}
-                        title="Nuovo cliente"
-                        subtitle="Compila i dati anagrafici e i contatti principali."
-                        breadcrumbs={[
-                            { label: 'Clienti', to: '/apps/clients' },
-                            { label: 'Nuovo', active: true },
-                        ]}
-                        actions={(
-                            <>
-                                <Button as={Link} to="/apps/clients" variant="outline-secondary" className="d-inline-flex align-items-center gap-2">
-                                    <ArrowLeft size={15} />
-                                    Torna alla lista
-                                </Button>
-                            </>
-                        )}
-                    />
-
-                    <div className="clients-form-shell">
-                        {error && <Alert variant="danger">{error}</Alert>}
-                        <ClientForm
-                            submitLabel="Salva"
-                            onSubmit={handleSubmit}
-                            onCancel={() => history.push('/apps/clients')}
-                            loading={loading}
+            {({ access }) => (
+                <div className="container-fluid clients-page-container">
+                    <div className="clients-page-shell">
+                        <PageHeader
+                            icon={Users}
+                            title="Nuovo cliente"
+                            subtitle="Compila i dati anagrafici e i contatti principali."
+                            breadcrumbs={[
+                                { label: 'Clienti', to: '/apps/clients' },
+                                { label: 'Nuovo', active: true },
+                            ]}
+                            actions={(
+                                <>
+                                    <Button as={Link} to="/apps/clients" variant="outline-secondary" className="d-inline-flex align-items-center gap-2">
+                                        <ArrowLeft size={15} />
+                                        Torna alla lista
+                                    </Button>
+                                </>
+                            )}
                         />
+
+                        <div className="clients-form-shell">
+                            {error && <Alert variant="danger">{error}</Alert>}
+                            <ClientForm
+                                submitLabel="Salva"
+                                onSubmit={handleSubmit}
+                                onCancel={() => history.push('/apps/clients')}
+                                loading={loading}
+                                canCreateCustomFields={hasPermission(access, CLIENTS_PERMISSIONS.edit)}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
         </ClientsModuleGate>
     );
 };

@@ -92,10 +92,28 @@ export const deleteClient = (clientId) =>
         headers: getHeaders(),
     });
 
-export const importClients = (payload) =>
-    apiPost('/clients/import', payload, {
+// Import clienti: il file viaggia come allegato (multipart), non piu' dentro il
+// corpo JSON. E' la strada che regge i file grossi — il tetto e' 20MB lato
+// server, contro l'unico MB che reggeva il corpo — e l'unica che regge un
+// `.xlsx`, che essendo binario non si puo' leggere come testo.
+//
+// ⚠️ `dryRun` e' l'interruttore fra i due passi: `true` chiede l'anteprima e non
+// salva niente, `false` salva. Viaggia come campo del modulo, quindi come
+// stringa: il backend riconosce 'true' e '1' (readBooleanField in
+// import-file.ts), e qualunque altra cosa — compreso un campo assente — vale
+// `false`. Sta prima del file per rispecchiare l'ordine gia' provato dal
+// backend, dove il campo precede l'allegato.
+export const importClients = (file, { dryRun = false } = {}) => {
+    const formData = new FormData();
+    formData.append('dryRun', dryRun ? 'true' : 'false');
+    formData.append('file', file);
+
+    // Nessun Content-Type a mano: con un body FormData l'apiClient non lo
+    // imposta, e ci pensa il browser ad aggiungerlo col boundary giusto.
+    return apiPost('/clients/import', formData, {
         headers: getHeaders(),
     });
+};
 
 export const exportClients = async (params) => {
     const response = await apiFetch(withQuery('/clients/export', params), {

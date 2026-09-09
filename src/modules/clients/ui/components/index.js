@@ -1,5 +1,6 @@
 export { default as ClientActionsMenu } from './ClientActionsMenu';
 export { default as ClientAvatar } from './ClientAvatar';
+export { default as ClientCustomFieldsSection } from './ClientCustomFieldsSection';
 export { default as ClientEmptyState } from './ClientEmptyState';
 export { default as ClientGridRow } from './ClientGridRow';
 export { default as ClientMobileCard } from './ClientMobileCard';
@@ -8,6 +9,7 @@ export { default as ClientFiltersBar } from './ClientFiltersBar';
 export { default as ClientTags } from './ClientTags';
 export { default as ClientTagsEditorModal } from './ClientTagsEditorModal';
 export { default as ClientTypeBadge } from './ClientTypeBadge';
+export { default as ClientsImportPreviewModal } from './ClientsImportPreviewModal';
 export { default as ClientsListPagination } from './ClientsListPagination';
 export { default as CopyField } from './CopyField';
 export { default as PageHeader } from './PageHeader';

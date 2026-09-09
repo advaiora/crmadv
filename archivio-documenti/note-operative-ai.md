@@ -1025,3 +1025,19 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - Il controllo e' **il campo `db`**, che dev'essere `up`. La risposta buona e' `{"status":"ok","db":"up","timestamp":...}`.
 - Se e' `down`, il problema e' `DATABASE_URL` oppure PostgreSQL spento - non l'API e non il frontend.
 - Vale in generale: quando un servizio espone uno stato di salute composito, **il campo dell'inquilino piu' fragile e' quello da leggere**, non lo stato complessivo.
+
+## 69. In questo contenitore `NODE_ENV=production`: i test frontend danno 623 rossi finti, e `npm install` salta meta' degli strumenti
+
+**Contesto:** 9/9/2026, verifica dell'unione dei nove rami della release di settembre. Serviva far girare le due suite di test su un checkout senza `node_modules`.
+
+**Due errori distinti, stessa causa.** La variabile d'ambiente `NODE_ENV` vale `production` in questo contenitore, e nessuno dei due sintomi la nomina:
+
+1. **`npm install` installa solo 449 pacchetti e `node_modules/.bin` esce senza `tsx`, `vitest`, `eslint`, `stylelint`.** Con `NODE_ENV=production` npm applica `omit=dev`, quindi le **devDependencies non vengono installate** — cioe' esattamente tutti gli strumenti di verifica. L'uscita e' `exit 0`: nessun errore, solo attrezzi mancanti. Il sintomo che si vede dopo e' `sh: 1: prisma: not found` oppure ogni singolo file di test che fallisce con un laconico `'test failed'`.
+2. **`npm run test:frontend` da 623 fallimenti su 980, con `TypeError: React.act is not a function`.** In React 19 `act` e' esportato **solo dal build di sviluppo**. Con `NODE_ENV=production` Vite risolve `react.production.js`, dove `act` non esiste, e **ogni test che monta un componente muore** — comprese aree che non c'entrano niente con il lavoro in corso. Sembra che il ramo abbia distrutto il frontend: e' invece un artefatto dell'ambiente.
+
+**Modo corretto:**
+- Installare con `NODE_ENV=development npm install --include=dev`. Controllo che vale piu' del conteggio dei pacchetti: `ls node_modules/.bin | grep -E "^(tsx|vitest|eslint|stylelint)$"` deve tornare **quattro righe**.
+- Lanciare le suite con `NODE_ENV=test npm run test:frontend` (e lo stesso per `test:integration`).
+- **Il campanello d'allarme generale:** quando falliscono *quasi tutti* i test, comprese cartelle che il lavoro non ha mai toccato, la causa e' l'ambiente, non il codice. La conferma costa dieci secondi — `git diff --name-only origin/main...HEAD | grep <cartella-che-fallisce>`: se non compare, quel file e' identico a `main` e non puo' essere stato rotto dal lavoro in corso. E' lo stesso ragionamento della nota #37 sui rossi da timeout, applicato a una causa diversa.
+
+**Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.

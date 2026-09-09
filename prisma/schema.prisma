@@ -277,6 +277,7 @@ model User {
   createdAiAttachments                  AiConversationAttachment[]  @relation("AiConversationAttachmentCreatedBy")
   createdPerformanceSnapshots           PerformanceSnapshot[]       @relation("PerformanceSnapshotCreatedByUser")
   createdPerformanceMetricSets          PerformanceMetricSet[]      @relation("PerformanceMetricSetCreatedByUser")
+  passwordResetTokens                   PasswordResetToken[]
 }
 
 model TeamInvite {
@@ -300,6 +301,26 @@ model TeamInvite {
   @@index([workspaceId, status, createdAt(sort: Desc)])
   @@index([workspaceId, email, status])
   @@index([workspaceId, expiresAt])
+}
+
+// Un link di reimpostazione password («password dimenticata»): monouso e a
+// scadenza breve. Stessa forma di TeamInvite: a database finisce solo
+// l’impronta del token (`tokenHash`), mai il valore in chiaro che viaggia
+// nell’email. `usedAt` è ciò che rende il link monouso davvero: si valorizza
+// al primo consumo e da quel momento il link non vale più, anche se non è
+// ancora scaduto.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  requestIp String?   @db.VarChar(64)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
 }
 
 model Membership {
@@ -1506,26 +1527,40 @@ model WorkspaceBranding {
 /// spezzerebbe l'unico schema riconoscibile a colpo d'occhio quando si cerca
 /// dove il CRM conserva un segreto.
 model MailServerSettings {
-  id          String @id @default(cuid())
-  workspaceId String @unique
+  id                    String    @id @default(cuid())
+  workspaceId           String    @unique
   /// Spento, il CRM torna a spedire con le variabili d'ambiente senza che la
   /// configurazione vada persa. Serve a due cose che capitano davvero: mettere
   /// in pausa un server che sta rimbalzando le email, e preparare una
   /// configurazione prima di metterla in uso. Senza questo campo l'unico modo
   /// per tornare indietro sarebbe cancellare la riga, e con essa la password.
-  attivo            Boolean   @default(true)
-  server            String    @db.VarChar(255)
-  porta             Int       @default(587)
-  connessioneSicura Boolean   @default(false)
-  utente            String?   @db.VarChar(255)
-  mittente          String    @db.VarChar(255)
-  ciphertext        String?   @db.Text
-  iv                String?   @db.VarChar(255)
-  authTag           String?   @db.VarChar(255)
-  keyVersion        Int?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  attivo                Boolean   @default(true)
+  server                String    @db.VarChar(255)
+  porta                 Int       @default(587)
+  connessioneSicura     Boolean   @default(false)
+  /// Autorizza la «Prova connessione» a raggiungere un indirizzo della rete
+  /// interna. Spento (il default) la prova verso un indirizzo privato viene
+  /// rifiutata senza aprire nessuna connessione: e' cio' che impedisce di usare
+  /// il pulsante come sonda della rete dell'agenzia. Acceso, l'agenzia dichiara
+  /// che il proprio server di posta sta davvero dentro la sua rete — e la
+  /// dichiarazione resta scritta nel registro attivita'.
+  ///
+  /// ⚠️ Governa SOLO la prova, non la spedizione: le email vere continuano a
+  /// partire verso l'indirizzo configurato in ogni caso. E' voluto — spegnere
+  /// anche la spedizione lascerebbe senza posta le agenzie che hanno davvero il
+  /// server dentro la propria rete, che e' proprio il caso che questo campo
+  /// esiste per proteggere. Quello che si chiude qui e' il pulsante che
+  /// RESTITUISCE una risposta a chi lo preme.
+  retePrivataConsentita Boolean   @default(false)
+  utente                String?   @db.VarChar(255)
+  mittente              String    @db.VarChar(255)
+  ciphertext            String?   @db.Text
+  iv                    String?   @db.VarChar(255)
+  authTag               String?   @db.VarChar(255)
+  keyVersion            Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model QuoteNotificationSettings {

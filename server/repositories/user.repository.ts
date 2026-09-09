@@ -57,6 +57,18 @@ export const userRepository = {
     return Boolean(user?.isPlatformAdmin);
   },
 
+  // Restituisce `userSelect`, che NON contiene nessun hash: una funzione che
+  // scrive una password non deve poterne far uscire una. (`updateVaultPasswordHash`
+  // qui sotto restituisce invece `loginUserSelect`; non fa danno perche' il
+  // chiamante scarta il risultato, ma non e' il dettaglio da copiare.)
+  updatePasswordHash(userId: string, passwordHash: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+      select: userSelect,
+    });
+  },
+
   updateVaultPasswordHash(userId: string, vaultPasswordHash: string) {
     return prisma.user.update({
       where: { id: userId },

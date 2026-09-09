@@ -46,6 +46,19 @@ export const isPrivateIpv4Address = (host: string): boolean => {
   if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
     return true;
   }
+  // 100.64.0.0/10, la fascia che gli operatori usano per il NAT di quartiere:
+  // non e' instradabile su internet, quindi da qui dentro punta a una rete
+  // altrui, non a un server pubblico.
+  //
+  // ⚠️ E' anche la fascia che usa Tailscale. Se un giorno l'healthcheck di un
+  // sito in gestione comincia a rispondere «host privato» senza che nessuno
+  // abbia toccato quel sito, la causa e' questa riga: vuol dire che il server
+  // del CRM lo raggiungeva attraverso una VPN su questa fascia. Aggiunta
+  // l'1/9/2026 con CRM-28; se il caso si presenta, la decisione da prendere e'
+  // se quella VPN debba essere raggiungibile dai controlli automatici.
+  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) {
+    return true;
+  }
   if (parts[0] === 192 && parts[1] === 168) {
     return true;
   }
@@ -53,14 +66,115 @@ export const isPrivateIpv4Address = (host: string): boolean => {
   return false;
 };
 
+/**
+ * Espande un IPv6 nei suoi otto gruppi da 16 bit, o `null` se non e' un IPv6.
+ *
+ * Serve perche' lo stesso indirizzo si scrive in molti modi — `::1`,
+ * `0:0:0:0:0:0:0:1`, `::ffff:127.0.0.1`, `::ffff:7f00:1` — e giudicarlo dai
+ * primi caratteri della stringa vuol dire riconoscerne uno e lasciar passare
+ * gli altri quattro. E' esattamente cosi' che `::ffff:10.0.0.5` scavalcava il
+ * guardiano della «Prova connessione» il 1/9/2026: bastava riscrivere
+ * `10.0.0.5` in un'altra forma.
+ */
+const espandiIpv6 = (host: string): number[] | null => {
+  // La zona (`fe80::1%eth0`) non cambia l'indirizzo: si toglie prima.
+  const senzaZona = host.trim().toLowerCase().split('%')[0];
+  if (isIP(senzaZona) !== 6) {
+    return null;
+  }
+
+  // Coda in forma IPv4 (`::ffff:127.0.0.1`): diventa due gruppi esadecimali.
+  let testo = senzaZona;
+  const codaIpv4 = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(testo);
+  if (codaIpv4) {
+    const ottetti = codaIpv4[1].split('.').map((parte) => Number.parseInt(parte, 10));
+    const alto = ((ottetti[0] << 8) | ottetti[1]).toString(16);
+    const basso = ((ottetti[2] << 8) | ottetti[3]).toString(16);
+    testo = `${testo.slice(0, codaIpv4.index)}${alto}:${basso}`;
+  }
+
+  const [sinistra, destra] = testo.split('::');
+  const teste = sinistra ? sinistra.split(':') : [];
+  const code = destra !== undefined && destra ? destra.split(':') : [];
+  const riempimento = destra === undefined ? [] : new Array(8 - teste.length - code.length).fill('0');
+  const gruppi = [...teste, ...riempimento, ...code];
+  if (gruppi.length !== 8) {
+    return null;
+  }
+
+  return gruppi.map((gruppo) => Number.parseInt(gruppo || '0', 16));
+};
+
 export const isPrivateIpv6Address = (host: string): boolean => {
-  const normalized = host.trim().toLowerCase();
-  return (
-    normalized === '::1' ||
-    normalized.startsWith('fe80:') ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd')
-  );
+  const gruppi = espandiIpv6(host);
+  if (!gruppi) {
+    return false;
+  }
+
+  const primiSeiVuoti = gruppi.slice(0, 6).every((gruppo) => gruppo === 0);
+
+  // `::` (indirizzo non specificato) e `::1` (loopback), in qualunque forma
+  // siano scritti. `::` non e' un indirizzo innocuo: connettercisi significa
+  // connettersi a 127.0.0.1.
+  if (primiSeiVuoti && gruppi[6] === 0 && gruppi[7] <= 1) {
+    return true;
+  }
+
+  // Le forme che portano un IPv4 dentro un IPv6. Dentro c'e' un indirizzo v4
+  // vero, e va giudicato con le regole degli IPv4 — altrimenti `10.0.0.5`
+  // riscritto in una di queste forme scavalcherebbe il controllo.
+  //
+  // Le prime due (IPv4 mappato e IPv4 compatibile) sono quelle che il sistema
+  // operativo traduce davvero: `net.connect({host:'::ffff:127.0.0.1'})` arriva
+  // a un ascoltatore su `127.0.0.1`, verificato. Le altre tre di solito no —
+  // servono un tunnel 6to4 o un traduttore NAT64 configurati — ma qui si
+  // giudica l'indirizzo, non la tabella di instradamento della macchina che
+  // esegue il controllo: sarebbe una guardia che cambia risposta a seconda di
+  // dove gira.
+  const primiQuattroVuoti = gruppi.slice(0, 4).every((gruppo) => gruppo === 0);
+  const ipv4InCoda = (): string =>
+    [gruppi[6] >> 8, gruppi[6] & 0xff, gruppi[7] >> 8, gruppi[7] & 0xff].join('.');
+
+  // `::ffff:a.b.c.d` mappato, `::a.b.c.d` compatibile, `::ffff:0:a.b.c.d` tradotto.
+  if (primiQuattroVuoti && ((gruppi[4] === 0 && (gruppi[5] === 0xffff || primiSeiVuoti)) || (gruppi[4] === 0xffff && gruppi[5] === 0))) {
+    return isPrivateIpv4Address(ipv4InCoda());
+  }
+
+  // `64:ff9b::/96` e `64:ff9b:1::/48`, i prefissi della traduzione NAT64.
+  if (gruppi[0] === 0x0064 && gruppi[1] === 0xff9b) {
+    return isPrivateIpv4Address(ipv4InCoda());
+  }
+
+  // `2002::/16`, 6to4: l'IPv4 sta nei due gruppi subito dopo il prefisso.
+  if (gruppi[0] === 0x2002) {
+    const ipv4 = [gruppi[1] >> 8, gruppi[1] & 0xff, gruppi[2] >> 8, gruppi[2] & 0xff].join('.');
+    return isPrivateIpv4Address(ipv4);
+  }
+
+  // fe80::/10 link-local.
+  if (gruppi[0] >= 0xfe80 && gruppi[0] <= 0xfebf) {
+    return true;
+  }
+
+  // fc00::/7, gli indirizzi che ognuno si assegna in casa propria.
+  if ((gruppi[0] & 0xfe00) === 0xfc00) {
+    return true;
+  }
+
+  // fec0::/10, i vecchi "site-local". Deprecati da RFC 3879, ma qualche rete li
+  // instrada ancora, e una guardia che si fida delle deprecazioni non e' una
+  // guardia.
+  if ((gruppi[0] & 0xffc0) === 0xfec0) {
+    return true;
+  }
+
+  // ff00::/8, multicast: non e' una destinazione TCP sensata, e un server di
+  // posta li' dentro non esiste.
+  if ((gruppi[0] & 0xff00) === 0xff00) {
+    return true;
+  }
+
+  return false;
 };
 
 // Vero se una stringa IP (v4 o v6) e' privata/loopback/link-local e quindi da bloccare.
@@ -129,30 +243,148 @@ export const assertPublicHttpUrl = (
   return parsed;
 };
 
-// Secondo strato: risolve il DNS dell'host e blocca se una qualsiasi risoluzione punta a
-// un IP privato/loopback. Chiude il caso "dominio pubblico -> 127.0.0.1 / metadata cloud".
-// Fail-closed: se il DNS non risolve, si blocca.
-const assertHostResolvesToPublicIp = async (hostname: string): Promise<void> => {
-  // Un IP letterale e' gia' stato validato da isBlockedHostname: niente DNS da fare.
+// Secondo strato, in forma di classificazione. Tenuto separato dalle due porte
+// d'ingresso qui sotto perche' i loro chiamanti hanno bisogni opposti: chi segue un URL
+// deve INTERROMPERE (eccezione), chi collauda un server di posta deve DECIDERE (booleano)
+// e rispondere lo stesso, con l'esito scritto dentro. Una sola risoluzione DNS, due letture.
+type EsitoRisoluzione = 'pubblico' | 'privato' | 'non-risolvibile';
+
+/**
+ * La risoluzione DNS, iniettabile. Il caso per cui questo secondo strato
+ * esiste — «dominio pubblico che punta a 10.0.0.5» — non si puo' provare
+ * altrimenti: servirebbe una zona DNS vera sotto controllo del test.
+ */
+export type RisolutoreDns = (
+  hostname: string,
+  options: { all: true },
+) => Promise<Array<{ address: string }>>;
+
+const classificaRisoluzione = async (
+  hostname: string,
+  risolvi: RisolutoreDns = lookup as RisolutoreDns,
+): Promise<EsitoRisoluzione> => {
+  // Un IP letterale non ha niente da risolvere: si giudica direttamente. NON si
+  // da' per scontato che l'abbia gia' filtrato `isBlockedHostname` — quella era
+  // una precondizione scritta qui e da rispettare altrove, cioe' una trappola
+  // per il chiamante successivo.
   if (isIP(hostname) !== 0) {
-    return;
+    return isBlockedIpAddress(hostname) ? 'privato' : 'pubblico';
   }
 
   let addresses: Array<{ address: string }>;
   try {
-    addresses = await lookup(hostname, { all: true });
+    addresses = await risolvi(hostname, { all: true });
   } catch {
-    throw new SsrfBlockedError('Host non risolvibile.');
+    return 'non-risolvibile';
   }
 
   if (addresses.length === 0) {
+    return 'non-risolvibile';
+  }
+
+  return addresses.some((entry) => isBlockedIpAddress(entry.address)) ? 'privato' : 'pubblico';
+};
+
+// Risolve il DNS dell'host e blocca se una qualsiasi risoluzione punta a un IP
+// privato/loopback. Chiude il caso "dominio pubblico -> 127.0.0.1 / metadata cloud".
+// Fail-closed: se il DNS non risolve, si blocca.
+const assertHostResolvesToPublicIp = async (hostname: string): Promise<void> => {
+  const esito = await classificaRisoluzione(hostname);
+
+  if (esito === 'non-risolvibile') {
     throw new SsrfBlockedError('Host non risolvibile.');
   }
 
-  if (addresses.some((entry) => isBlockedIpAddress(entry.address))) {
+  if (esito === 'privato') {
     throw new SsrfBlockedError('Host che risolve a un indirizzo privato.');
   }
 };
+
+// Toglie da un pezzo di testo tutto cio' che un IP non puo' contenere: virgolette,
+// parentesi (anche in mezzo, come in `[::1]:587`), virgole e punti finali. Resta un
+// candidato che `isIP` sa giudicare.
+const ripulisciCandidato = (token: string): string =>
+  token
+    .replace(/[[\]<>"'(),;]/g, '')
+    .replace(/^[^0-9a-f:.]+/i, '')
+    .replace(/[^0-9a-f:.]+$/i, '');
+
+/**
+ * Vero se dentro `testo` compare un indirizzo IP privato o di loopback.
+ *
+ * Serve a non ritrasmettere a chi ha premuto un pulsante il messaggio d'errore di
+ * una libreria che ha appena parlato con la rete interna. Il caso concreto e' il
+ * messaggio di nodemailer — `connect ECONNREFUSED 10.0.0.5:587` — quando l'host
+ * passa il controllo ma la libreria risolve il DNS una seconda volta per conto
+ * suo e ottiene una risposta diversa: senza questo, l'indirizzo interno tornava
+ * indietro dalla porta accanto.
+ *
+ * Si lavora per parole invece che con una sola espressione regolare perche' un
+ * IPv6 non ha confini di parola (`::1:587` non e' delimitato da niente) e
+ * perche' la porta appiccicata in fondo va tolta prima di giudicare — due cose
+ * che un'espressione sola sbaglia in silenzio. Ogni candidato passa comunque da
+ * `isIP`: un falso candidato non costa niente, uno mancato costerebbe il
+ * controllo.
+ *
+ * ⚠️ **Guarda solo i numeri.** Nodemailer appende al messaggio la risposta del
+ * server, e il saluto di un server interno di solito contiene un NOME
+ * (`220 srv-posta.interno.local ESMTP`), non un indirizzo: quello passa intero.
+ * Allargare il filtro ai nomi non e' possibile senza inventarsi cosa sia
+ * "interno", quindi il limite resta e va conosciuto: questa funzione toglie gli
+ * indirizzi numerici, non ogni traccia della rete interna.
+ */
+export const mentionsPrivateIpAddress = (testo: string): boolean => {
+  for (const parola of testo.split(/\s+/)) {
+    const token = ripulisciCandidato(parola);
+    if (!token) {
+      continue;
+    }
+
+    // Si sbuccia la coda finche' cambia qualcosa, invece di applicare una
+    // trasformazione sola: `10.0.0.5:587.` ha bisogno di perdere il punto finale
+    // PRIMA della porta, e in un passaggio solo nessuno dei due ordini va bene
+    // per entrambi i casi. Tre giri bastano e mettono un limite al ciclo.
+    const candidati = [token];
+    let corrente = token;
+    for (let giro = 0; giro < 3; giro += 1) {
+      const ridotto = corrente.replace(/\.$/, '').replace(/:\d+$/, '');
+      if (ridotto === corrente) {
+        break;
+      }
+      candidati.push(ridotto);
+      corrente = ridotto;
+    }
+
+    if (candidati.some((candidato) => isIP(candidato) !== 0 && isBlockedIpAddress(candidato))) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Vero se `hostname` sta — o finisce — dentro una rete privata: nome locale noto,
+ * suffisso interno, IP privato scritto in chiaro, oppure nome pubblico che risolve a un
+ * indirizzo privato.
+ *
+ * Lo usa la «Prova connessione» del server di posta, che a differenza di `safeFetch`
+ * deve rispondere `200` con l'esito negativo invece di interrompere: le serve un
+ * booleano, non un'eccezione.
+ *
+ * ⚠️ Un host che non risolve affatto torna `false`, all'opposto del fail-closed di
+ * `safeFetch`. La differenza e' voluta e sta nel danno che si previene: verso un nome che
+ * non risolve non si apre nessuna connessione comunque, quindi non c'e' nessuna sonda da
+ * chiudere — mentre rispondere "e' un indirizzo di rete privata" a chi ha solo sbagliato a
+ * digitare lo manderebbe a cercare un guasto che non esiste. Chi invece deve NEGARE
+ * l'accesso a una risorsa usi `safeFetch`/`assertPublicHttpUrl`, che si chiudono anche
+ * sul dubbio.
+ */
+export const isPrivateNetworkHost = async (
+  hostname: string,
+  risolvi?: RisolutoreDns,
+): Promise<boolean> =>
+  isBlockedHostname(hostname) || (await classificaRisoluzione(hostname, risolvi)) === 'privato';
 
 type SafeFetchOptions = {
   timeoutMs: number;

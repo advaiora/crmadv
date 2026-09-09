@@ -6,6 +6,7 @@ export type ImpostazioniMailRecord = {
   server: string;
   porta: number;
   connessioneSicura: boolean;
+  retePrivataConsentita: boolean;
   utente: string | null;
   mittente: string;
   ciphertext: string | null;
@@ -21,6 +22,7 @@ export type SalvaImpostazioniMailInput = {
   server: string;
   porta: number;
   connessioneSicura: boolean;
+  retePrivataConsentita: boolean;
   utente: string | null;
   mittente: string;
   /**
@@ -37,24 +39,37 @@ export type SalvaImpostazioniMailInput = {
   } | null;
 };
 
+/**
+ * Le colonne che escono da questo repository — una volta sola, perche' le due
+ * query che le chiedono devono restituire la stessa cosa.
+ *
+ * ⚠️ Quando si aggiunge un campo a `ImpostazioniMailRecord` va aggiunto anche
+ * qui, o si ottiene un campo che si salva e non si rilegge: un guasto che non
+ * da' nessun errore e si vede solo ricaricando la maschera. Il test
+ * «ogni campo del record e' chiesto al database» in `mail.repository.test.ts`
+ * esiste apposta per non lasciarlo scoprire a chi usa il CRM.
+ */
+export const CAMPI_LETTI = {
+  workspaceId: true,
+  attivo: true,
+  server: true,
+  porta: true,
+  connessioneSicura: true,
+  retePrivataConsentita: true,
+  utente: true,
+  mittente: true,
+  ciphertext: true,
+  iv: true,
+  authTag: true,
+  keyVersion: true,
+  updatedAt: true,
+} as const;
+
 export const mailRepository = {
   async findByWorkspaceId(workspaceId: string): Promise<ImpostazioniMailRecord | null> {
     return prisma.mailServerSettings.findUnique({
       where: { workspaceId },
-      select: {
-        workspaceId: true,
-        attivo: true,
-        server: true,
-        porta: true,
-        connessioneSicura: true,
-        utente: true,
-        mittente: true,
-        ciphertext: true,
-        iv: true,
-        authTag: true,
-        keyVersion: true,
-        updatedAt: true,
-      },
+      select: CAMPI_LETTI,
     });
   },
 
@@ -71,6 +86,7 @@ export const mailRepository = {
       server: input.server,
       porta: input.porta,
       connessioneSicura: input.connessioneSicura,
+      retePrivataConsentita: input.retePrivataConsentita,
       utente: input.utente,
       mittente: input.mittente,
     };
@@ -86,20 +102,7 @@ export const mailRepository = {
         ...comuni,
         ...(input.segreto ?? {}),
       },
-      select: {
-        workspaceId: true,
-        attivo: true,
-        server: true,
-        porta: true,
-        connessioneSicura: true,
-        utente: true,
-        mittente: true,
-        ciphertext: true,
-        iv: true,
-        authTag: true,
-        keyVersion: true,
-        updatedAt: true,
-      },
+      select: CAMPI_LETTI,
     });
   },
 
