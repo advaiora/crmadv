@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { auditInterceptorExtension } from './audit/audit-interceptor.js';
 
 type PrismaGlobal = typeof globalThis & {
   __prisma?: PrismaClient;
@@ -7,6 +8,10 @@ type PrismaGlobal = typeof globalThis & {
 const globalForPrisma = globalThis as PrismaGlobal;
 let prismaClient: PrismaClient | null = null;
 
+// `$extends` restituisce un tipo suo, che non è PrismaClient: è attrito di tipi,
+// non di funzionamento — il client esteso espone gli stessi modelli e le stesse
+// operazioni. Si riporta a PrismaClient qui, in un punto solo e dichiarato,
+// invece di far scoprire il tipo nuovo ai cinquanta file che importano `prisma`.
 const createPrismaClient = (databaseUrl: string) =>
   new PrismaClient({
     log: ['warn', 'error'],
@@ -15,7 +20,7 @@ const createPrismaClient = (databaseUrl: string) =>
         url: databaseUrl,
       },
     },
-  });
+  }).$extends(auditInterceptorExtension) as unknown as PrismaClient;
 
 const getInitializedPrisma = () => {
   if (prismaClient) {

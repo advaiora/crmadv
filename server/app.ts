@@ -3,9 +3,10 @@ import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import { Prisma } from "@prisma/client";
 import { audit } from "./audit/audit.js";
+import { flushRequestAuditTrail } from "./audit/audit-flush.js";
 import { readHeaderValue } from "./auth/devAuth.js";
 import { isHttpError } from "./core/errors.js";
-import { requestContext } from "./core/request-context.js";
+import { requestContext, type RequestStore } from "./core/request-context.js";
 import { fail, ok } from "./core/response.js";
 import { buildCorsDecision, parseAllowedOrigins } from "./core/cors-origins.js";
 import { requireAuth } from "./guards/requireAuth.js";
@@ -112,6 +113,12 @@ const getDatabaseUnavailableDetails = (error: unknown) => {
   return details;
 };
 
+// Lo store di contesto della richiesta, tenuto da parte per l'hook onResponse che
+// scrive il Registro attività. WeakMap e non una proprietà sulla richiesta: la
+// voce sparisce da sé quando Fastify lascia andare l'oggetto, senza rischio di
+// tenere in vita richieste concluse.
+const auditStoreByRequest = new WeakMap<object, RequestStore>();
+
 export const createApp = (options: FastifyServerOptions = {}): FastifyInstance => {
   const app = Fastify({
     logger: true,
@@ -140,7 +147,10 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
   app.addHook("onRequest", async (request, reply) => {
     // Apre lo store di contesto per questa richiesta: l'autenticazione vi scriverà
     // lo userId, che i livelli profondi (es. log costi AI) potranno leggere.
-    requestContext.start();
+    // Il riferimento allo store resta appeso alla richiesta perché l'hook
+    // onResponse, che chiude il Registro attività, gira dopo che la risposta è
+    // partita e lì AsyncLocalStorage può non trovare più niente.
+    auditStoreByRequest.set(request, requestContext.start());
 
     const requestOriginRaw = typeof request.headers.origin === "string" ? request.headers.origin : null;
     const corsDecision = buildCorsDecision(requestOriginRaw, corsAllowedOriginsSet);
@@ -267,6 +277,30 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
 
     request.log.error(error, "Unhandled server error");
     return fail(reply, 500, "INTERNAL_SERVER_ERROR", "Internal server error");
+  });
+
+  // Chiusura del Registro attività: le scritture raccolte dall'intercettore
+  // durante la richiesta diventano righe di registro adesso, a risposta mandata.
+  // Qui, e non prima, per tre motivi: le transazioni sono chiuse (quindi non si
+  // registra ciò che è stato annullato, né si urta un vincolo di chiave esterna
+  // su righe non ancora visibili), si conosce l'esito della richiesta, e il costo
+  // della scrittura non si somma al tempo di risposta.
+  app.addHook("onResponse", async (request, reply) => {
+    const store = auditStoreByRequest.get(request);
+    if (!store) {
+      return;
+    }
+
+    auditStoreByRequest.delete(request);
+
+    await flushRequestAuditTrail({
+      store,
+      succeeded: reply.statusCode < 400,
+      ipAddress: request.ip,
+      userAgent: readHeaderValue(request, "user-agent"),
+      route: request.url,
+      log: request.log,
+    });
   });
 
   app.setNotFoundHandler((_request, reply) => fail(reply, 404, "NOT_FOUND", "Resource not found"));

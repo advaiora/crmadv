@@ -140,6 +140,11 @@ const googleAuthRoute: FastifyPluginAsync = async (app) => {
               action: 'auth.google',
               entityType: 'user',
               entityId: upsertedUser.user.id,
+              // Come per la registrazione: siamo dentro la transazione che crea
+              // utente e workspace, quindi non si passa dall'aiutante audit.log e
+              // IP e programma si scrivono a mano.
+              ipAddress: request.ip,
+              userAgent: readSingleHeaderValue(request.headers['user-agent']),
               metadata: {
                 workspaceSlug: workspaceResolution.workspace.slug,
                 mode,
