@@ -1076,15 +1076,20 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 **Modo corretto:**
 - Davanti a un conflitto su un file a voci numerate, la domanda non e' *quale delle due tengo* ma **se sono una lezione o due**: uno stesso episodio con uno stesso errore e' **una nota sola**, anche quando due rami l'hanno scritta due volte in parallelo; due lezioni davvero distinte diventano #N e #N+1, e la seconda **rimanda alla prima invece di ripeterne il contesto**.
 - **Il numero libero si legge sul ramo di destinazione, non sul proprio** — `git show origin/main:archivio-documenti/note-operative-ai.md | grep -n '^## [0-9]' | tail -3` — ed e' il **piu' alto piu' uno**, non il conteggio delle note (il file non e' in ordine numerico). ⚠️ Questo non basta a evitare la collisione: due rami partiti dallo stesso `main` leggono lo stesso "piu' alto" e scelgono lo stesso numero. Con piu' di una pull request di documenti aperta, **il numero va verificato anche contro gli altri rami aperti**: `git log --oneline origin/main..origin/<altro-ramo> -- archivio-documenti/note-operative-ai.md`.
-  ⚠️ **Correzione del 9/9/2026 (CRMA-54): «gli altri rami aperti» vuol dire TUTTI i rami remoti, non solo quelli con una pull request.** Questa riga diceva «con piu' di una pull request aperta», e non basta: quel giorno la catena era `main` → PR #19 (`cronista/crma-36-…`, note #70-#72) → `cronista/crma-51-…` (note #73-#79), e **il secondo ramo non aveva ancora nessuna PR**. Chi si fosse fermato alle PR avrebbe letto «72» e scelto #73, che era gia' preso. Il comando che non sbaglia guarda tutti i rami in una volta, e costa un secondo:
+  ⚠️ **Correzione del 9/9/2026 (CRMA-54 e CRMA-57): «gli altri rami aperti» vuol dire TUTTI i rami, remoti E locali — non solo quelli con una pull request.** Questa riga diceva «con piu' di una pull request di documenti aperta», e quel giorno le due letture comode hanno sbagliato tutte e due, per motivi diversi:
+  - **Le pull request non bastano** (CRMA-54): la catena era `main` → PR #19 (`cronista/crma-36-…`, note #70-#72) → `cronista/crma-51-…` (note #73-#79), e **il secondo ramo non aveva ancora nessuna PR**. Chi si fosse fermato alle PR avrebbe letto «72» e scelto #73, che era gia' preso.
+  - **Nemmeno `origin/*` basta** (CRMA-57): su Paperclip gli agent condividono **un solo albero di lavoro**, e i rami degli altri restano **locali** finche' qualcuno non li pubblica. Nello stesso giro il piu' alto risultava **#69** su `origin/main` e **#73** sui rami remoti, mentre il ramo **locale** `cronista/crma-51` era gia' arrivato alla **#79** — pubblicato solo qualche minuto dopo. Due letture, due numeri, **entrambi gia' presi**.
+
+  Il comando che non sbaglia guarda **`git branch -a`**, non `-r`, e costa un secondo:
   ```
   git fetch origin
-  for b in $(git branch -r --format='%(refname:short)' | grep -v HEAD); do
+  for b in $(git branch -a --format='%(refname:short)' | grep -v HEAD); do
     git show "$b:archivio-documenti/note-operative-ai.md" 2>/dev/null \
       | grep -oE '^## [0-9]+\.' | grep -oE '[0-9]+' | sort -n | tail -1 \
       | sed "s|^|$b |"
-  done | sort -k2 -rn | head -3
+  done | sort -k2 -rn | head -5
   ```
+  ⚠️ **E il risultato scade.** Vale nell'istante in cui lo esegui, non per tutto il compito: va rifatto **come ultimo gesto prima di consegnare**, ed e' la nota **#82**. Infine, quando la nota nuova va in coda a un ramo che ne ha gia' aggiunte, **si parte da quel ramo invece che da `main`**: il conflitto non nasce proprio, e il CEO unisce una catena sola.
 - **Prima di unire, la prova costa un comando e non tocca l'albero di lavoro:** `git merge-tree --write-tree <ramo-a> <ramo-b>` restituisce l'albero del risultato, e `git show <albero>:archivio-documenti/note-operative-ai.md | grep -c '^## 70\.'` dice se i capitoli 70 sono uno o due. Funziona anche a catena, incapsulando il risultato in un commit di prova con `git commit-tree`: cosi' si verifica l'unione **in sequenza** di tre rami senza fare un solo `checkout`. E' l'unico modo praticabile quando l'albero di lavoro e' occupato da un altro compito, come succede di continuo su Paperclip, dove tutti gli agent condividono la stessa cartella.
 - **La correzione si fa sui rami, prima dell'unione.** Dopo, i due capitoli 70 sono su `main` e ogni citazione «nota #70» resta ambigua per sempre: un numero e' un'identita', non una posizione, e non si rinumera.
 - **Com'e' finita, per chi cerca il precedente:** le due #70 erano un episodio solo con un errore solo, quindi sono diventate **una nota sola** — la **#70** qui sopra, che tiene il caso e la conseguenza sui nomi; il ramo della PR #20 e' stato alleggerito della sua copia. Questa #71 e' nata dopo, ed e' un'altra lezione: non i due sistemi con lo stesso nome, ma il meccanismo che fa collidere due numeri.
@@ -1202,7 +1207,7 @@ npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
 - ⚠️ `--from-schema-datamodel` (i due schemi) **non e'** `--from-schema-datasource` (schema contro database vero, quello della #16): si somigliano e fanno cose diverse.
 - ⚠️ Questo confronto **non** prova che la migrazione si applichi davvero su un database esistente: quello resta da fare dove un database c'e' (note **#15** e **#16**).
 
-## 80. Una bozza da depositare puo' essere gia' stata depositata da un altro run: si cerca il suo CONTENUTO sui rami, non il suo numero
+## 81. Una bozza da depositare puo' essere gia' stata depositata da un altro run: si cerca il suo CONTENUTO sui rami, non il suo numero
 
 **Contesto:** 9/9/2026, CRMA-54. Il compito chiedeva, fra le altre cose, di depositare in coda a questo file «la bozza di nota operativa consegnata nel commento di chiusura di CRMA-49», con un numero «che non sia gia' usato da un'altra nota» — e avvertiva che una collisione era gia' successa una volta (e' la nota **#71**).
 
@@ -1222,5 +1227,23 @@ npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
   ```
   Il titolo porta la lezione, quindi l'elenco dei titoli basta a riconoscere un doppione senza aprire niente.
 - **La provenienza scritta nel compito e' una pista, non un fatto** (e' la **#56** applicata alle issue invece che ai documenti): se il compito indicato non ha commenti, la bozza si cerca **sui compiti vicini** — il padre, i fratelli, quelli chiusi dall'ultimo giro — prima di dichiararla mancante.
-- **Quando la catena delle note vive su rami non ancora uniti, la nota nuova si scrive in cima a quella catena, non su `main`.** Appendere a `main` lascia il file con un salto visibile (qui sarebbe stato #69 → #80) e produce un conflitto garantito in coda al file, perche' tutte le note si aggiungono nello stesso punto. Costa un `git worktree` sulla punta della catena, ed e' la **#71** applicata *prima* dell'unione invece che dopo.
-- **Il risultato di questo giro, per chi cerca il precedente:** la bozza di CRMA-42 **non** e' stata ridepositata — vive come **#74** e basta. Questa #80 e' l'altra lezione, quella che il giro ha prodotto davvero.
+- **Quando la catena delle note vive su rami non ancora uniti, la nota nuova si scrive in cima a quella catena, non su `main`.** Appendere a `main` lascia il file con un salto visibile (qui sarebbe stato #69 → #81) e produce un conflitto garantito in coda al file, perche' tutte le note si aggiungono nello stesso punto. Costa un `git worktree` sulla punta della catena, ed e' la **#71** applicata *prima* dell'unione invece che dopo.
+- **Il risultato di questo giro, per chi cerca il precedente:** la bozza di CRMA-42 **non** e' stata ridepositata — vive come **#74** e basta. Questa #81 e' l'altra lezione, quella che il giro ha prodotto davvero.
+- ⚠️ **Questa nota e' nata #80 ed e' diventata #81 il 9/9/2026, prima di qualsiasi unione.** Il numero #80 era stato scelto sul ramo `cronista/crma-57-nota-prova-piu-grande` **tre minuti prima**, per una lezione diversa, e la revisione l'ha intercettato. Non contraddice la regola «un numero non si rinumera» (**#71**): quella regola protegge le **citazioni**, e una nota mai arrivata su `main` non e' ancora citata da nessuno. La finestra in cui rinumerare costa zero e' esattamente questa, e si chiude con l'unione — il perche' sta nella **#82**.
+
+## 82. Un controllo di unicita' vale solo nell'istante in cui lo esegui: su un albero condiviso si rifa' alla consegna, non alla scrittura
+
+**Contesto:** 9/9/2026, CRMA-54 e CRMA-57. Due run in parallelo, stesso albero di lavoro condiviso, **stesso commit di partenza** (`109d46f`, note fino alla #79). Tutti e due dovevano aggiungere una nota in coda a questo file; tutti e due **hanno eseguito il controllo del numero libero** prescritto dalla **#71**; tutti e due hanno letto «79» e scelto **#80**. I due depositi distano **tre minuti e venti**: `c1d5d80` alle 13:44:00 e `44d7267` alle 13:47:20.
+
+**Errore:** trattare il controllo di unicita' come una **proprieta' del numero** invece che come una **fotografia con una data di scadenza**. Il controllo non era sbagliato: era vero alle 13:44 e falso alle 13:47, e nessuno dei due run poteva vedere l'altro, perche' al momento della lettura il ramo dell'altro **non esisteva ancora**. Aggravante specifica di questo file: la collisione **non produce conflitto git** — due `## 80.` in punti diversi si fondono in silenzio. Misurato: `git merge-tree --write-tree 44d7267 origin/cronista/crma-57-nota-prova-piu-grande` esce con l'albero `b776b12`, e li' dentro `grep -cE '^## 80\.'` risponde **2**; l'unico conflitto che git segnala su quell'unione e' un altro, testuale, sul paragrafo della #71.
+
+**Modo corretto:**
+- **Il controllo del numero si rifa' come ultimo gesto prima di consegnare**, dopo `git fetch origin`, non quando si scrive la nota. Fra la scrittura e la consegna passano minuti, e in quei minuti su Paperclip pubblicano altri run. Il comando e' quello della **#71** (con `git branch -a`, locali compresi).
+- **Chi revisiona lo rifa' una terza volta**, perche' fra la consegna e la revisione passa altro tempo ancora. La prova che chiude la questione va fatta **contro ogni altro ramo aperto che tocca lo stesso file**, non solo contro `main`:
+  ```
+  git merge-tree --write-tree <mio-ramo> <altro-ramo>
+  git show <albero>:archivio-documenti/note-operative-ai.md | grep -cE '^## <N>\.'
+  ```
+  Se risponde `2`, la collisione c'e' e va sciolta **prima** dell'unione. E' andata cosi' questa volta: la revisione l'ha intercettata, e la nota nata #80 su CRMA-54 e' diventata la **#81**.
+- **Finche' la nota non e' su `main`, rinumerarla costa zero; dopo, non si puo' piu'.** Non e' in contrasto con «un numero non si rinumera» (**#71**): quella regola protegge le citazioni, e una nota non ancora unita non e' citata da nessuno. Quindi la collisione si scioglie **sui rami**, ed e' l'ultimo momento in cui si puo'.
+- **Vale per ogni identificatore scelto leggendo lo stato corrente**, non solo per i numeri delle note: il prossimo numero di migrazione, una chiave nel catalogo RBAC, un numero di versione. La domanda giusta non e' «questo numero e' libero?» ma «**questo numero e' ancora libero adesso che sto per unire?**».
