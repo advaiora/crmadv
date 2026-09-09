@@ -232,6 +232,13 @@ model User {
   googleSub                             String?                     @unique
   name                                  String?
   passwordHash                          String?
+  // Quando la password dell'account e' stata cambiata l'ultima volta. Serve a
+  // invalidare i JWT emessi PRIMA di quel momento: il token e' senza stato e
+  // dura 7 giorni, quindi senza questa data cambiare la password non caccia
+  // fuori nessuno. `null` = mai cambiata da quando esiste la colonna, e allora
+  // non c'e' niente da revocare. La revoca vera la collega il compito del
+  // recupero password (punto 2 della release).
+  passwordChangedAt                     DateTime?
   vaultPasswordHash                     String?
   role                                  String                      @default("member")
   isPlatformAdmin                       Boolean                     @default(false)
@@ -347,6 +354,16 @@ model Client {
   phone           String?
   vatNumber       String?
   taxCode         String?
+  // Fatturazione elettronica: senza almeno uno fra PEC e codice destinatario
+  // SDI a un cliente non si puo' emettere fattura. I nomi restano in inglese
+  // come i vicini (regola ②-bis di CLAUDE.md); le etichette a schermo saranno
+  // «PEC» e «Codice destinatario SDI».
+  pecEmail        String?
+  sdiCode         String?
+  website         String?
+  // Persona di riferimento presso il cliente («referente» a schermo): un nome,
+  // non un utente del CRM — il cliente non ha accesso.
+  contactPerson   String?
   street          String?
   city            String?
   zip             String?
