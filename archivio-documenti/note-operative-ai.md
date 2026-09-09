@@ -941,6 +941,7 @@ Due cose rendono la diagnosi piu' lenta di quanto dovrebbe:
 
 **Modo corretto:**
 - **Prima di concludere che il token e' sbagliato, controllare che ci sia:** `env | grep -E 'GH_TOKEN|GITHUB_TOKEN'`. Uscita vuota vuol dire **token assente**, che e' un problema diverso e si risolve altrove.
+- ⚠️ **Guardare QUALE delle due, non solo se ce n'e' una** *(aggiunto il 9/9/2026, CRMA-24)*: `env | grep -c` risponde `1` sia con l'una sia con l'altra, ed e' proprio il controllo che ha fatto credere a un run di avere `GITHUB_TOKEN` mentre aveva solo `GH_TOKEN`. La forma che risponde davvero e' `env | grep -oE '^(GH_TOKEN|GITHUB_TOKEN)='`. **Cambia da run a run** — misurato: il run di CRMA-24 aveva `GH_TOKEN` e non `GITHUB_TOKEN`, quello di CRMA-51 l'esatto contrario. Nei comandi si usa quindi la stessa forma del credential helper, `TOK="${GH_TOKEN:-$GITHUB_TOKEN}"`, mai il nome secco di una delle due → nota **#66**.
 - **Il segreto di solito esiste gia' a livello azienda**, e quello che manca e' solo il collegamento a questo agent. Si guardano nell'ordine: `GET /api/companies/$PAPERCLIP_COMPANY_ID/secrets/catalog` (qui elenca `GITHUB_TOKEN_CRMADV`) e `GET /api/agents/me/secrets` (qui tornava `[]`).
 - **La via per sbloccarsi e' una proposta, non un messaggio in chat:** `POST /api/agents/me/secret-proposals` con `{"kind":"binding","secretId":"<dal catalogo>","configPath":"env.GITHUB_TOKEN","justification":"..."}`. Resta `pending` finche' un umano approva.
 - **Intanto il lavoro non si perde: si committa lo stesso.** Un ramo locale sopravvive al run. ⚠️ Ma se si e' lavorato in un `git worktree` creato dentro `PAPERCLIP_RUN_SCRATCH_DIR`, quella cartella viene **cancellata da Paperclip alla fine del run**: prima di chiudere si fa `git worktree remove`, cosi' il riferimento del ramo resta nel `.git` condiviso e nessun worktree fantasma lo tiene occupato. Verifica: `git log --oneline -1 <ramo>` dal repository principale.
@@ -957,7 +958,12 @@ Il sintomo ingannevole e' proprio la coerenza apparente dei numeri: un commento,
 - **Lo stato di un compito non e' l'elenco dei suoi commenti.** Al risveglio si guardano **entrambi** gli elenchi, e quello delle interazioni per primo se il compito era bloccato su una decisione:
   `curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PB/api/issues/$PAPERCLIP_TASK_ID/interactions"` — leggendo `status`, `resolvedAt` e `response`.
 - **Il confronto che conta e' `resolvedAt` contro la fine del run precedente**, non l'autore del commento: qui `resolvedAt 2026-09-08T14:22:54Z` contro un run chiuso alle `14:19:11` diceva chiaramente che qualcosa era arrivato dopo.
-- **`reason: issue_commented` non e' affidabile per capire cosa e' cambiato:** riporta un motivo, non l'autore ne' l'oggetto. Non usarlo per decidere dove guardare — guarda gli oggetti.
+- **`reason: issue_commented` non e' affidabile per capire cosa e' cambiato:** riporta un motivo, non l'autore ne' l'oggetto. Non usarlo per decidere dove guardare — guarda gli oggetti. ⚠️ **Un `issue_commented` che non corrisponde a nessun commento nuovo e' un indizio forte**: quasi sempre il risveglio viene da un'**interazione risolta**.
+
+**Il seguito, perche' la stessa nota e' stata applicata a meta'** *(aggiunto il 9/9/2026, CRMA-24)*. Un run sapeva che le conferme non compaiono nel thread — questa nota — e ha comunque cercato **solo fra i commenti**: il commento piu' recente era il proprio, quindi «nessuno ha ancora risposto», e ha aperto una **seconda** conferma che chiedeva la stessa identica cosa. Un heartbeat intero speso ad aspettare un permesso **gia' concesso 21 minuti prima**. Le due cose da aggiungere al modo corretto qui sopra:
+
+- **Prima dei commenti, non insieme ai commenti.** Su un compito che ha una conferma in sospeso, `GET /api/issues/{id}/interactions` si legge **per primo**, guardando `status`, `resolvedByUserId` e `resolvedAt`.
+- **Il testo che e' stato accettato E' il mandato.** Se la conferma diceva «se accetti, lo faccio io», allora tocca a te: riproporre la domanda non e' prudenza, e' un giro a vuoto. ⚠️ Unica eccezione nota, ed e' un'altra cosa: una conferma che riguarda un **segreto** non collega niente → nota **#65**.
 
 ## 65. Una richiesta di conferma ACCETTATA non approva la proposta di segreto: sono due oggetti diversi, e il blocco resta
 
@@ -986,10 +992,11 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 
 **Contesto:** 9/9/2026, compito CRMA-22. Da un run Paperclip, chiudere il giro su `advaiora/crmadv`: guardare lo stato di una pull request e unirla a `main` dopo l'approvazione arrivata nel thread.
 
-**Errore:** partire da `gh pr view` / `gh pr merge`, che e' il gesto naturale. Risposta: `/bin/bash: line 1: gh: command not found` (`command -v gh` vuoto, niente in `/usr/bin` ne' in `/usr/local/bin`). E' la stessa famiglia della nota #61 su `python3`: su questa macchina ci sono `git`, `node` e `curl`, non gli strumenti da postazione di lavoro. Il tempo si perde due volte se, non trovando `gh`, si conclude che la pull request va aperta o unita a mano dall'interfaccia web e si chiude il compito chiedendo a un umano di premere il pulsante: **il token che serve e' lo stesso del push** (`$GITHUB_TOKEN`, vedi nota #63) e basta e avanza.
+**Errore:** partire da `gh pr view` / `gh pr merge`, che e' il gesto naturale. Risposta: `/bin/bash: line 1: gh: command not found` (`command -v gh` vuoto, niente in `/usr/bin` ne' in `/usr/local/bin`). E' la stessa famiglia della nota #61 su `python3`: su questa macchina ci sono `git`, `node` e `curl`, non gli strumenti da postazione di lavoro. Il tempo si perde due volte se, non trovando `gh`, si conclude che la pull request va aperta o unita a mano dall'interfaccia web e si chiude il compito chiedendo a un umano di premere il pulsante: **il token che serve e' lo stesso del push** (vedi nota #63 — attenzione al nome della variabile, il punto qui sotto) e basta e avanza.
 
 **Modo corretto:**
-- **Tutto il ciclo passa dall'API REST**, con `Authorization: Bearer $GITHUB_TOKEN` e `Accept: application/vnd.github+json` su `https://api.github.com/repos/advaiora/crmadv`:
+- ⚠️ **Il nome della variabile non e' garantito** *(correzione del 9/9/2026, CRMA-24: prima questa nota diceva secco `$GITHUB_TOKEN`, e cosi' com'era mandava fuori strada)*. In alcuni run e' impostata `GH_TOKEN`, in altri `GITHUB_TOKEN`, mai per forza quella che ti aspetti. Con il nome sbagliato `curl` manda un `Bearer ` **vuoto** e GitHub risponde `Bad credentials` — messaggio che manda a cercare un token scaduto, pista vuota e per giunta smentita dal `git push` andato a buon fine trenta secondi prima (il push non se ne accorge perche' passa dal credential helper, che le prova entrambe). Si parte sempre da `TOK="${GH_TOKEN:-$GITHUB_TOKEN}"` e si usa `Bearer $TOK`. Come si verifica quale c'e': nota **#63**.
+- **Tutto il ciclo passa dall'API REST**, con `Authorization: Bearer $TOK` e `Accept: application/vnd.github+json` su `https://api.github.com/repos/advaiora/crmadv`:
   - aprire: `POST .../pulls` con `{"title":...,"head":"<ramo>","base":"main","body":...}`
   - leggere: `GET .../pulls/<n>` — i campi che decidono sono `mergeable` e `mergeable_state` (`"clean"` = si puo' unire)
   - unire: `PUT .../pulls/<n>/merge` con `{"merge_method":"squash","commit_title":"...","commit_message":"..."}`
@@ -1108,3 +1115,80 @@ Il conflitto non e' semantico ma **di adiacenza**, ed e' questa la parte che ing
 - **I due segnali che obbligano al ricontrollo**, entrambi visibili nel proprio diff: l'inserimento **non e' in coda**, e nel testo attorno compaiono **numeri ordinali** o un totale. Con tutti e due presenti il ricontrollo non e' facoltativo.
 - **Se il paragrafo dichiara un totale, farlo tornare a mano prima di committare** (qui: 10 mestieri + 1 CEO + 2 agenti in pausa = 13). E' l'unico modo in cui quel tipo di frase puo' essere verificata, e costa dieci secondi contro un rilievo bloccante in revisione.
 - Vale per ogni documento del progetto che tiene un conto dichiarato, non solo per questa tabella: `CLAUDE.md` ne ha piu' d'uno («i cinque ruoli di sistema», «i tre destini possibili di un file fuori norma»).
+
+## 74. Censire «le N cose di tipo X» in un repository: la catena degli import si calcola, non si legge a occhio
+
+**Contesto:** 9/9/2026, CRMA-42. Censire i cinque innesti AI dentro `server/**` — cioe' tutti i file che arrivano al motore AI anche per catena di import indiretta — partendo da un elenco gia' scritto in un documento del 19/8.
+
+**Errore:** ricostruire la catena **a occhio**, leggendo le righe `import` a mano e ragionando su quali file «probabilmente» arrivino al motore. Costa molti giri di `grep`, produce una lista **incompleta**, e soprattutto non e' ricalcolabile domani: fra un mese e' di nuovo un documento invecchiato, che e' esattamente quello che la nota **#56** dice di non produrre. Nel caso concreto avrebbe mancato `server/app.ts:38` — e il difetto era nello strumento improvvisato, non nel repository: il primo script leggeva gli import solo fra **apici singoli**, e quella riga usa le **virgolette doppie**. Un file «non trovato» che invece c'era, e nessun errore da nessuna parte.
+
+**Modo corretto:**
+- Calcolare la **chiusura transitiva del grafo degli import, in tutti e due i versi** (chi importa X, e cosa importa X) con venti righe di `node -e`. Su `server/**` costa meno di un secondo e da' numeri piccoli e verificabili — qui **13** e **29**.
+- ⚠️ Nel regexp degli import **accettare entrambi gli apici** (`['"]`) e risolvere le estensioni `.js` → `.ts`: sono i due punti in cui uno script fatto in fretta perde file in silenzio, senza sbagliare — semplicemente non li trova.
+- La differenza che conta non e' la velocita': e' che una lista **calcolata** si rifa' quando il codice cambia, mentre una lista **letta** invecchia dal giorno dopo. Se il censimento serve piu' di una volta, si scrive lo script.
+
+## 75. I numeri di `costs/*` di Paperclip non sono una spesa: si guarda `billingType` e `model` prima di citarli
+
+**Contesto:** 9/9/2026, CRMA-40. Misurare quanto e' costato ogni mestiere leggendo `GET /api/companies/{id}/costs/by-agent` e `/costs/by-agent-model`.
+
+**Errore (visto prima di scriverlo nel referto):** `costCents` vale **0 per ogni agente**, e `costs/summary` riporta `spendCents: 0`. Preso alla lettera il referto avrebbe detto «la squadra e' costata zero» — falso. Gli agent girano su abbonamento (`billingType: "subscription_included"` sul 100% delle righe): consumano la finestra del piano, che Paperclip **non converte in euro**. Stessa trappola sul modello: `costs/by-agent-model` torna `model: "unknown"` su tutte le righe, quindi la ripartizione fra Opus e Fable **non esiste**, non e' solo difficile. E un terzo inganno nello stesso endpoint: il costo si registra **a run concluso**, percio' gli agent con run falliti in avvio o ancora in corso **non compaiono affatto** — e «non compare in tabella» somiglia moltissimo a «ha consumato zero». Il 9/9 erano 23 run su 103 senza consumo attribuito, e tre mestieri interi assenti dalla tabella pur avendo risvegli.
+
+**Modo corretto:**
+- Prima di citare un numero di `costs/*`, guardare `billingType`. Se e' `subscription_included`, **l'unica valuta comparabile sono i token** (`outputTokens`, `inputTokens`, `cachedInputTokens`): si scrive «token», non «costo», e non si traduce in euro.
+- Se `model` e' `unknown`, la ripartizione per modello si dichiara **non ricavabile**, invece di stimarla.
+- Incrociare sempre `costs/by-agent` con `heartbeat-runs`: le righe mancanti in `costs` sono agent con run non conclusi, **non** agent inattivi.
+- **Corollario su `npm run consumi`:** eseguito dentro il contenitore Paperclip legge `~/.claude/projects` **del contenitore**, cioe' i soli run Paperclip di questa macchina — non lo storico della postazione Windows. Il 9/9 diceva «4 chiamate in tutto» mentre il registro compiti ne contava 66. Lo storico vero sta in `archivio-documenti/consumi/registro-compiti.md`, e il perimetro va dichiarato ogni volta che si cita il monitor (stesso errore di perimetro della nota **#38**).
+- Vale la regola generale della **#39**: prima di fidarsi di un numero si guarda **com'e' fatta la riga**, non solo cosa contiene. Qui nessun endpoint dava errore — davano numeri plausibili che volevano dire un'altra cosa.
+
+## 76. I test del backend NON girano con Vitest: `npx vitest run server/...` da' un rosso finto che sembra un file di test mancante
+
+**Contesto:** 9/9/2026, CRMA-24. Verificare un test appena scritto sotto `server/`, con in testa che «nel progetto i test si lanciano con vitest» — vero, ma **solo per il frontend**.
+
+**Errore:** lanciato `npx vitest run server/modules/clients/repository.test.ts`. Risposta: `No test files found, exiting with code 1`. Sembra che il file non esista o sia scritto male, e si va a cercare il difetto in un file che sta benissimo. In realta' l'`include` di Vitest e' `src/**/*.{test,spec}.{js,jsx,ts,tsx}` (`vite.config.js:68`): **`server/` e' fuori perimetro per costruzione**, e un percorso fuori dall'`include` non produce un errore, produce «nessun file».
+
+**Modo corretto:**
+- La regola mnemonica e' **`src/` → Vitest, `server/` → `node --test`**. Il backend ha un runner suo.
+- Un file solo: `node --test --import tsx "server/modules/clients/repository.test.ts"`. Tutto: `npm run test:unit`, oppure `npm run test:backend` che aggiunge script e smoke (`package.json`).
+- ⚠️ In questo contenitore va anteposto `NODE_ENV=test`, altrimenti si ricade nei rossi finti della nota **#69**.
+- Come si distingue il guasto: quando il rosso e' **`No test files found`** non e' la nota #69 (rossi finti da `NODE_ENV`) ne' la **#51** (la suite lenta in contesa) — e' il **runner sbagliato**, e si riconosce dal fatto che il conteggio dei test e' zero invece che rosso.
+
+## 77. Su un ramo che aspetta di essere unito, prima di dichiararlo finito si guarda se sono cambiate le REGOLE, non solo se il codice va ancora in merge
+
+**Contesto:** 9/9/2026, CRMA-24. Lavoro di schema consegnato e pull request aperta; mentre il ramo aspettava, su `main` e' arrivata una regola nuova — quale revisore deve passare su schema e migrazioni (commit `1198512`, `CLAUDE.md`).
+
+**Errore:** dare per finito un lavoro gia' consegnato e limitarsi a rispondere al commento che ti sveglia. La consegna era corretta **secondo le regole del momento in cui e' stata fatta**, ma per un ramo aperto il momento che conta e' **l'unione**, non la consegna. Senza guardare cosa si era mosso su `main`, il lavoro di schema si sarebbe chiuso **saltando un cancello di revisione diventato obbligatorio nel frattempo** — senza accorgersene e senza che niente desse errore.
+
+**Modo corretto:**
+- Prima di dichiarare finito un ramo in attesa: `git diff $(git merge-base origin/main HEAD) origin/main -- CLAUDE.md`. Costa un comando.
+- ⚠️ **Il caso che sembra piu' innocuo e' proprio quello da guardare.** Un `main` che si e' mosso **solo su `CLAUDE.md`** non da' conflitti e non tocca un solo file di codice: `git merge-tree` dice «pulito» ed e' vero. Ma e' l'unico caso in cui il cambiamento riguarda **come si lavora** — cioe' esattamente la cosa che il diff del codice non puo' mostrare.
+- Si applica anche ai documenti che spostano un cancello o un mestiere: `archivio-documenti/team-agenti.md` insieme a `CLAUDE.md`.
+
+## 78. Un comando da cinque minuti non si incanala in `tail`: si salva l'uscita intera su file, e poi si filtra
+
+**Contesto:** 9/9/2026, revisione di CRMA-24. Serviva sapere se `npx tsc --noEmit` segnalasse errori **nei file del commit**, distinguendoli dalla baseline del progetto.
+
+**Errore:** lanciato `npx tsc --noEmit 2>&1 | tail -30`. Sono tornate le ultime 30 righe: abbastanza per vedere *che* ci sono errori, inutili per contarli e per sapere in quali file stanno. Il resto lo aveva **gia' buttato via `tail`**, quindi e' servita **una seconda esecuzione da cinque minuti** per riavere cio' che la prima aveva prodotto e scartato. Effetto secondario che inganna due volte: `| tail` **maschera il codice di uscita** del comando a monte — l'esito riportato era `exit 0` con 233 errori sotto.
+
+**Modo corretto:**
+- Quando il comando costa minuti, **si redirige l'uscita intera su file** — `npx tsc --noEmit > "$PAPERCLIP_RUN_SCRATCH_DIR/tsc-full.txt" 2>&1` — e si filtra il file quante volte serve: conteggio, elenco dei file, ricerca mirata, senza rilanciare niente. **Il filtro si sceglie dopo aver visto i dati, non prima.**
+- Vale per `tsc --noEmit` (che la nota **#52** dice gia' di non lanciare due volte nello stesso comando), per le suite di test e per ogni build.
+- Se il codice di uscita serve, leggerlo **prima** della pipe (`${PIPESTATUS[0]}`) o non incanalare affatto: con `| tail` il codice che arriva e' quello di `tail`, cioe' sempre `0`.
+
+## 79. Verificare una migrazione contro lo schema SENZA database: `migrate diff` fra due schemi, non fra schema e datasource
+
+**Contesto:** 9/9/2026, CRMA-35. Revisionare una migrazione dentro il contenitore degli agent Paperclip, dove `DATABASE_URL` non esiste (`npx prisma migrate status` → `P1012, Environment variable not found`).
+
+**Errore:** dare per scontato che, senza database, il controllo *«ogni campo dello schema e' nel `.sql`, e ogni istruzione del `.sql` e' nello schema»* si possa fare solo **leggendo i due file e confrontandoli a occhio**. Su cinque colonne funziona; su una migrazione vera con rinomine, indici e default e' il punto in cui la revisione smette di essere una prova e diventa un'impressione. La nota **#16** copre come *generare* una migrazione, e la sua ricetta usa `--from-schema-datasource`, che **il database ce l'ha come premessa**: a chi deve solo verificare non serve.
+
+**Modo corretto:** `prisma migrate diff` sa lavorare fra **due schemi** senza toccare nessun database, e le due versioni dello schema si tirano fuori da git:
+
+```
+git show origin/main:prisma/schema.prisma   > vecchio.prisma
+git show origin/<ramo>:prisma/schema.prisma > nuovo.prisma
+npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
+                        --to-schema-datamodel nuovo.prisma --script
+```
+
+- Si confronta l'uscita con il `migration.sql` committato **togliendo i commenti** (`grep -v '^--'`) e **ordinando le righe**: l'ordine dei blocchi `AlterTable` fra tabelle indipendenti non conta. Identici = migrazione fedele allo schema, provata in **tutte e due** le direzioni con un comando solo. Diversi = il posto esatto dove guardare.
+- ⚠️ `--from-schema-datamodel` (i due schemi) **non e'** `--from-schema-datasource` (schema contro database vero, quello della #16): si somigliano e fanno cose diverse.
+- ⚠️ Questo confronto **non** prova che la migrazione si applichi davvero su un database esistente: quello resta da fare dove un database c'e' (note **#15** e **#16**).
