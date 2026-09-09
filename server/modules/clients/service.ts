@@ -4,6 +4,11 @@ import { audit } from '../../audit/audit.js';
 import { badRequest, isHttpError, notFound } from '../../core/errors.js';
 import { validateAndNormalizePhone } from '../../../core/utils/phone.js';
 import { buildPhoneFieldSchema, PHONE_INVALID_MESSAGE } from './clients.schema.js';
+import {
+  normalizeEmailValue,
+  normalizeSdiCodeValue,
+  normalizeWebsiteValue,
+} from './field-rules.js';
 import { stringifyCsv } from './csv.js';
 import {
   readClientImportFile,
@@ -32,7 +37,13 @@ const MAX_ZIP_LENGTH = 20;
 const MAX_NOTES_LENGTH = 4000;
 const MAX_TAGS = 30;
 const MAX_TAG_LENGTH = 40;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Larghi apposta: a schermo questi due campi non hanno nessun tetto, e un tetto
+// che solo il server conosce si manifesta come un salvataggio che fallisce senza
+// che si capisca perche'. Servono a fermare l'incollaggio assurdo, non a
+// disciplinare: 2048 e' la lunghezza oltre la quale un indirizzo smette di
+// funzionare nei browser, 160 e' lo stesso tetto del nome del cliente.
+const MAX_WEBSITE_LENGTH = 2048;
+const MAX_CONTACT_PERSON_LENGTH = MAX_NAME_LENGTH;
 
 const SORT_FIELDS: ClientSortField[] = ['name', 'createdAt', 'updatedAt'];
 const CSV_HEADER_COLUMNS = [
@@ -42,6 +53,10 @@ const CSV_HEADER_COLUMNS = [
   'phone',
   'vatNumber',
   'taxCode',
+  'pecEmail',
+  'sdiCode',
+  'website',
+  'contactPerson',
   'street',
   'city',
   'zip',
@@ -64,6 +79,14 @@ const CLIENT_BODY_FIELDS = [
   'phone',
   'vatNumber',
   'taxCode',
+  // I quattro campi di fatturazione e contatto (CRMA-24). Il form del browser li
+  // manda SEMPRE tutti e quattro, anche a `null` per chi non li compila: finche'
+  // non erano in questo elenco, `assertNoUnknownFields` respingeva con 400 ogni
+  // salvataggio di cliente, non solo quelli che li valorizzavano.
+  'pecEmail',
+  'sdiCode',
+  'website',
+  'contactPerson',
   'address',
   'notes',
   'tags',
@@ -93,6 +116,10 @@ type ClientWritePayload = {
   phone: string | null;
   vatNumber: string | null;
   taxCode: string | null;
+  pecEmail: string | null;
+  sdiCode: string | null;
+  website: string | null;
+  contactPerson: string | null;
   notes: string | null;
   tags: string[];
 } & ClientAddress;
@@ -147,6 +174,19 @@ const CSV_IMPORT_HEADER_ALIAS_MAP: Record<string, CsvHeaderColumn> = {
   partitaiva: 'vatNumber',
   taxcode: 'taxCode',
   codicefiscale: 'taxCode',
+  pec: 'pecEmail',
+  pecemail: 'pecEmail',
+  emailpec: 'pecEmail',
+  sdi: 'sdiCode',
+  sdicode: 'sdiCode',
+  codicesdi: 'sdiCode',
+  codicedestinatario: 'sdiCode',
+  website: 'website',
+  sito: 'website',
+  sitoweb: 'website',
+  contactperson: 'contactPerson',
+  referente: 'contactPerson',
+  personadiriferimento: 'contactPerson',
   street: 'street',
   address: 'street',
   via: 'street',
@@ -272,22 +312,15 @@ const parseClientType = (
   return value;
 };
 
-const normalizeEmail = (value: unknown, fieldName: string) => {
-  const normalized = normalizeOptionalString(value, fieldName, {
-    maxLength: MAX_EMAIL_LENGTH,
-  });
-
-  if (!normalized) {
-    return null;
-  }
-
-  const lowered = normalized.toLowerCase();
-  if (!EMAIL_REGEX.test(lowered)) {
-    throw badRequest(`${fieldName} must be a valid email`);
-  }
-
-  return lowered;
-};
+// Vale per `email` e per `pecEmail`: la PEC e' un indirizzo di posta a tutti gli
+// effetti, cambia solo il nome del campo nel messaggio d'errore.
+const normalizeEmail = (value: unknown, fieldName: string) =>
+  normalizeEmailValue(
+    normalizeOptionalString(value, fieldName, {
+      maxLength: MAX_EMAIL_LENGTH,
+    }),
+    fieldName,
+  );
 
 const normalizePhoneForStorage = (phone: string | null, country?: string | null) => {
   if (!phone) {
@@ -565,6 +598,10 @@ const toImportBodyFromCsvRow = (header: CsvImportHeaderCell[], row: string[]) =>
   const phone = byColumn.get('phone') ?? '';
   const vatNumber = byColumn.get('vatNumber') ?? '';
   const taxCode = byColumn.get('taxCode') ?? '';
+  const pecEmail = byColumn.get('pecEmail') ?? '';
+  const sdiCode = byColumn.get('sdiCode') ?? '';
+  const website = byColumn.get('website') ?? '';
+  const contactPerson = byColumn.get('contactPerson') ?? '';
   const notes = byColumn.get('notes') ?? '';
   const tags = parseTagsCell(byColumn.get('tags'));
 
@@ -575,6 +612,10 @@ const toImportBodyFromCsvRow = (header: CsvImportHeaderCell[], row: string[]) =>
     phone,
     vatNumber,
     taxCode,
+    pecEmail,
+    sdiCode,
+    website,
+    contactPerson,
     notes,
     tags,
     address: {
@@ -611,6 +652,10 @@ const toExportCsvRow = (
     record.phone ?? '',
     record.vatNumber ?? '',
     record.taxCode ?? '',
+    record.pecEmail ?? '',
+    record.sdiCode ?? '',
+    record.website ?? '',
+    record.contactPerson ?? '',
     record.street ?? '',
     record.city ?? '',
     record.zip ?? '',
@@ -659,6 +704,10 @@ const mapClient = (record: ClientRecord, options: MapClientOptions = {}) => ({
   phone: record.phone,
   vatNumber: record.vatNumber,
   taxCode: record.taxCode,
+  pecEmail: record.pecEmail,
+  sdiCode: record.sdiCode,
+  website: record.website,
+  contactPerson: record.contactPerson,
   address: {
     street: record.street,
     city: record.city,
@@ -777,6 +826,20 @@ export const clientsService = {
       taxCode: normalizeOptionalString(body.taxCode, 'taxCode', {
         maxLength: MAX_TAX_CODE_LENGTH,
       }),
+      pecEmail: normalizeEmail(body.pecEmail, 'pecEmail'),
+      sdiCode: normalizeSdiCodeValue(
+        normalizeOptionalString(body.sdiCode, 'sdiCode'),
+        'sdiCode',
+      ),
+      website: normalizeWebsiteValue(
+        normalizeOptionalString(body.website, 'website', {
+          maxLength: MAX_WEBSITE_LENGTH,
+        }),
+        'website',
+      ),
+      contactPerson: normalizeOptionalString(body.contactPerson, 'contactPerson', {
+        maxLength: MAX_CONTACT_PERSON_LENGTH,
+      }),
       notes: normalizeOptionalString(body.notes, 'notes', {
         maxLength: MAX_NOTES_LENGTH,
       }),
@@ -820,6 +883,32 @@ export const clientsService = {
     if ('taxCode' in body) {
       patch.taxCode = normalizeOptionalString(body.taxCode, 'taxCode', {
         maxLength: MAX_TAX_CODE_LENGTH,
+      });
+    }
+
+    if ('pecEmail' in body) {
+      patch.pecEmail = normalizeEmail(body.pecEmail, 'pecEmail');
+    }
+
+    if ('sdiCode' in body) {
+      patch.sdiCode = normalizeSdiCodeValue(
+        normalizeOptionalString(body.sdiCode, 'sdiCode'),
+        'sdiCode',
+      );
+    }
+
+    if ('website' in body) {
+      patch.website = normalizeWebsiteValue(
+        normalizeOptionalString(body.website, 'website', {
+          maxLength: MAX_WEBSITE_LENGTH,
+        }),
+        'website',
+      );
+    }
+
+    if ('contactPerson' in body) {
+      patch.contactPerson = normalizeOptionalString(body.contactPerson, 'contactPerson', {
+        maxLength: MAX_CONTACT_PERSON_LENGTH,
       });
     }
 
@@ -1122,6 +1211,10 @@ export const clientsService = {
         ...(created.phone ? ['phone'] : []),
         ...(created.vatNumber ? ['vatNumber'] : []),
         ...(created.taxCode ? ['taxCode'] : []),
+        ...(created.pecEmail ? ['pecEmail'] : []),
+        ...(created.sdiCode ? ['sdiCode'] : []),
+        ...(created.website ? ['website'] : []),
+        ...(created.contactPerson ? ['contactPerson'] : []),
         ...(created.street ? ['address.street'] : []),
         ...(created.city ? ['address.city'] : []),
         ...(created.zip ? ['address.zip'] : []),
@@ -1210,6 +1303,18 @@ export const clientsService = {
     }
     if ('taxCode' in patch && current.taxCode !== updated.taxCode) {
       changedFields.push('taxCode');
+    }
+    if ('pecEmail' in patch && current.pecEmail !== updated.pecEmail) {
+      changedFields.push('pecEmail');
+    }
+    if ('sdiCode' in patch && current.sdiCode !== updated.sdiCode) {
+      changedFields.push('sdiCode');
+    }
+    if ('website' in patch && current.website !== updated.website) {
+      changedFields.push('website');
+    }
+    if ('contactPerson' in patch && current.contactPerson !== updated.contactPerson) {
+      changedFields.push('contactPerson');
     }
     if ('notes' in patch && current.notes !== updated.notes) {
       changedFields.push('notes');
