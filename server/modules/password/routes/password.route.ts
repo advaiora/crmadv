@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { signAccessToken } from '../../../auth/jwt.js';
 import { ok } from '../../../core/response.js';
 import { requireAuth } from '../../../guards/requireAuth.js';
 import { requireWorkspace } from '../../../guards/requireWorkspace.js';
@@ -29,6 +30,7 @@ type PasswordRouteDependencies = {
   requireWorkspaceFn: typeof requireWorkspace;
   passwordServiceApi: typeof passwordService;
   enforceRateLimitFn: typeof enforcePasswordChangeRateLimit;
+  signAccessTokenFn: typeof signAccessToken;
 };
 
 const defaultDependencies: PasswordRouteDependencies = {
@@ -36,6 +38,7 @@ const defaultDependencies: PasswordRouteDependencies = {
   requireWorkspaceFn: requireWorkspace,
   passwordServiceApi: passwordService,
   enforceRateLimitFn: enforcePasswordChangeRateLimit,
+  signAccessTokenFn: signAccessToken,
 };
 
 export const buildPasswordRoute = (
@@ -67,12 +70,28 @@ export const buildPasswordRoute = (
         body: request.body,
       });
 
-      // Le sessioni gia' aperte — questa compresa — restano valide: vedi la nota
-      // 2 in `password.service.ts`. Lo si dice nella risposta perche' la maschera
-      // lo possa dire all'utente, invece di lasciarglielo credere risolto.
+      // Le altre sessioni sono cadute davvero (nota 2 in `password.service.ts`):
+      // ogni token emesso prima di `passwordChangedAt` viene rifiutato dalla
+      // guardia. Ma questa richiesta arriva DA una di quelle sessioni, e il suo
+      // token e' vecchio quanto le altre: senza un token nuovo, chi cambia la
+      // propria password si troverebbe buttato fuori dalla richiesta successiva.
+      //
+      // ⚠️ Il campo si chiama `token` come nella risposta dell'accesso
+      // (`server/routes/auth.route.ts`): la maschera deve sostituire quello che
+      // ha in memoria, esattamente come fa dopo il login. Se non lo fa, il CRM
+      // non si rompe — riporta al login, e la password nuova funziona.
+      const token = await dependencies.signAccessTokenFn({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        workspaceId: workspace.id,
+        workspaceSlug: workspace.slug,
+      });
+
       return ok(reply, {
         changed: true,
-        otherSessionsRevoked: false,
+        otherSessionsRevoked: true,
+        token,
       });
     },
   );

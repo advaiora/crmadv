@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../prisma.js';
 
 const userSelect = {
@@ -8,6 +9,19 @@ const userSelect = {
   isPlatformAdmin: true,
   themePreference: true,
   avatarUrl: true,
+} as const;
+
+// L'utente come lo vede la guardia di autenticazione: `userSelect` piu' la data
+// dell'ultimo cambio password, che serve a decidere se il token in mano al
+// chiamante e' piu' vecchio della password.
+//
+// ⚠️ `passwordChangedAt` NON va aggiunta a `userSelect`: quella select esce dalle
+// risposte del profilo (`/auth/me`), e quando l'utente ha cambiato la password
+// e' un dato che il CRM non ha motivo di pubblicare. La guardia lo legge da qui
+// e lo scarta prima di restituire l'utente al resto del codice.
+const authIdentitySelect = {
+  ...userSelect,
+  passwordChangedAt: true,
 } as const;
 
 const loginUserSelect = {
@@ -25,6 +39,13 @@ export const userRepository = {
     return prisma.user.findUnique({
       where: { id: userId },
       select: userSelect,
+    });
+  },
+
+  findAuthIdentityById(userId: string) {
+    return prisma.user.findUnique({
+      where: { id: userId },
+      select: authIdentitySelect,
     });
   },
 
@@ -61,10 +82,28 @@ export const userRepository = {
   // scrive una password non deve poterne far uscire una. (`updateVaultPasswordHash`
   // qui sotto restituisce invece `loginUserSelect`; non fa danno perche' il
   // chiamante scarta il risultato, ma non e' il dettaglio da copiare.)
-  updatePasswordHash(userId: string, passwordHash: string) {
-    return prisma.user.update({
+  // Scrive SEMPRE anche `passwordChangedAt`: e' quella data a far cadere le
+  // sessioni aperte con la password vecchia (`server/guards/requireAuth.ts`).
+  // Lasciarla facoltativa avrebbe voluto dire un chiamante che se la dimentica e
+  // una revoca che non avviene, senza nessun errore a segnalarlo.
+  //
+  // ⚠️ Non usarla per la password della cassaforte: quella ha
+  // `updateVaultPasswordHash` qui sotto e non deve buttare fuori nessuno.
+  //
+  // Il `tx` facoltativo serve al recupero password: bruciare il token e scrivere
+  // la password nuova devono riuscire o fallire INSIEME. Senza transazione
+  // esistono due finali storti, e il secondo e' grave: token bruciato e password
+  // vecchia (l'utente resta fuori e il suo link non vale piu'), oppure password
+  // nuova e token ancora vergine (un link al portatore riutilizzabile).
+  updatePasswordHash(
+    userId: string,
+    passwordHash: string,
+    passwordChangedAt: Date = new Date(),
+    tx?: Prisma.TransactionClient,
+  ) {
+    return (tx ?? prisma).user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: { passwordHash, passwordChangedAt },
       select: userSelect,
     });
   },

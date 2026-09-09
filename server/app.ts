@@ -15,6 +15,7 @@ import { requireWorkspace } from "./guards/requireWorkspace.js";
 import { prisma } from "./prisma.js";
 import authRoute from "./routes/auth.route.js";
 import passwordRoute from "./modules/password/routes/password.route.js";
+import passwordResetRoute from "./modules/password/routes/password-reset.route.js";
 import workspaceBrandingRoute from "./routes/workspace-branding.route.js";
 import workspaceModulesRoute from "./routes/workspace-modules.route.js";
 import workspaceRolesRoute from "./routes/workspace-roles.route.js";
@@ -284,6 +285,8 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
 
   void app.register(authRoute);
   void app.register(passwordRoute);
+  // Rotte PUBBLICHE (nessun `requireAuth`): vedi la testata del file.
+  void app.register(passwordResetRoute);
   void app.register(workspaceBrandingRoute);
   void app.register(workspaceModulesRoute);
   void app.register(workspaceQuotesRoute);

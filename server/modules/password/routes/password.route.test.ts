@@ -18,15 +18,16 @@ type ChangeCall = {
 
 const createTestApp = async (input: {
   changeOwnPasswordImpl?: (call: ChangeCall) => Promise<void>;
-  requireAuthImpl?: () => Promise<{ id: string }>;
+  requireAuthImpl?: () => Promise<{ id: string; email: string; role: string }>;
 } = {}) => {
   const changeCalls: ChangeCall[] = [];
   const app = Fastify({ logger: false });
 
   await app.register(
     buildPasswordRoute({
-      requireAuthFn: (input.requireAuthImpl ?? (async () => ({ id: 'user-1' }))) as never,
-      requireWorkspaceFn: (async () => ({ id: 'workspace-1' })) as never,
+      requireAuthFn: (input.requireAuthImpl
+        ?? (async () => ({ id: 'user-1', email: 'utente@esempio.it', role: 'MEMBER' }))) as never,
+      requireWorkspaceFn: (async () => ({ id: 'workspace-1', slug: 'workspace-uno' })) as never,
       passwordServiceApi: {
         changeOwnPassword: async (call: ChangeCall) => {
           changeCalls.push({
@@ -38,6 +39,10 @@ const createTestApp = async (input: {
         },
       } as never,
       enforceRateLimitFn: () => undefined,
+      // ⚠️ Va iniettato anche qui, non solo dove lo si verifica: il vero
+      // `signAccessToken` pretende `AUTH_JWT_SECRET` nell'ambiente e
+      // fallirebbe, facendo diventare 500 ogni prova di questo file.
+      signAccessTokenFn: (async () => 'token-nuovo-finto') as never,
     }),
   );
 
@@ -74,9 +79,13 @@ test('la rotta risponde a POST /auth/password/change e passa utente e workspace 
   }
 });
 
-// Il campo esiste per non far credere risolto cio' che non lo e': finche' il JWT
-// resta senza revoca, cambiare la password non chiude le altre sessioni.
-test('la risposta dichiara che le altre sessioni NON sono state chiuse', async () => {
+// Il campo esiste per non far credere risolto cio' che non lo e'. Dal 9/9/2026
+// (CRMA-25) dice `true`, e dirlo e' una responsabilita': la revoca avviene
+// perche' `passwordChangedAt` viene scritta al cambio e confrontata con l'`iat`
+// del token in `server/guards/requireAuth.ts`. Se un domani quel confronto
+// sparisse, questa prova resterebbe verde mentendo — per questo l'altra meta'
+// della cosa e' provata in `server/guards/requireAuth.test.ts`.
+test('la risposta dichiara che le altre sessioni sono state chiuse, e consegna un token nuovo', async () => {
   resetPasswordRateLimitStoreForTests();
   const { app } = await createTestApp();
 
@@ -88,7 +97,14 @@ test('la risposta dichiara che le altre sessioni NON sono state chiuse', async (
     });
 
     assert.deepEqual(response.json(), {
-      data: { changed: true, otherSessionsRevoked: false },
+      data: {
+        changed: true,
+        otherSessionsRevoked: true,
+        // Senza questo campo chi ha appena cambiato la password verrebbe
+        // buttato fuori dalla propria stessa richiesta: il suo token e' vecchio
+        // quanto quelli che sono appena stati invalidati.
+        token: 'token-nuovo-finto',
+      },
     });
   } finally {
     await closeApp(app);

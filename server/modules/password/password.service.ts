@@ -23,15 +23,15 @@ import { userRepository } from '../../repositories/user.repository.js';
 //    la cosa naturale da scrivere, ed e' cio' che fa l'accesso — significherebbe
 //    disconnettere dal CRM chi sbaglia semplicemente a digitare: non vedrebbe
 //    l'errore, vedrebbe la schermata di accesso. Quindi 400.
-// 2. LE SESSIONI GIA' APERTE RESTANO VALIDE. Il JWT e' senza stato e dura 7 giorni
-//    (`server/auth/jwt.ts`); non c'e' tabella sessioni, ne' denylist, ne' `tokenVersion`.
-//    Cambiare la password NON caccia fuori nessuno. E' una decisione presa, non una
-//    dimenticanza: revocare richiede una colonna su `User` (`passwordChangedAt`) su
-//    cui appoggiarsi. ⚠️ Dal 9/9/2026 (CRMA-24) quella colonna ESISTE, ma e' ancora
-//    vuota per tutti: nessuno la scrive e nessuno la legge. Finche' il compito del
-//    recupero password non la collega — scriverla qui al cambio, confrontarla con
-//    l'`iat` del token in `server/auth/jwt.ts` — il comportamento resta questo, e
-//    va detto a schermo.
+// 2. LE ALTRE SESSIONI VENGONO CHIUSE — dal 9/9/2026 (CRMA-25) e' vero davvero.
+//    Il JWT resta senza stato e dura 7 giorni (`server/auth/jwt.ts`): non c'e'
+//    tabella sessioni ne' denylist. La revoca si ottiene scrivendo qui
+//    `User.passwordChangedAt` (la colonna arrivata con CRMA-24) e confrontandola
+//    in `server/guards/requireAuth.ts` con l'`iat` del token: ogni token emesso
+//    prima della password nuova smette di valere, ovunque fosse.
+//    ⚠️ Chi cambia la password sta pero' lui stesso dentro una di quelle sessioni:
+//    la rotta gli consegna un token nuovo (`routes/password.route.ts`), altrimenti
+//    si autosloggherebbe cambiando la propria password.
 // 3. NON SI TOCCA `vaultPasswordHash`. E' un'altra password (le Credenziali).
 //    Nota pero' la conseguenza, gia' vera oggi: chi non ha impostato una password
 //    di cassaforte propria la sblocca con quella dell'account, quindi cambiare
@@ -158,8 +158,13 @@ export const buildPasswordService = (
     }
 
     const passwordHash = await dependencies.hashPasswordFn(parsed.newPassword, PASSWORD_SALT_ROUNDS);
-    await dependencies.userRepositoryApi.updatePasswordHash(user.id, passwordHash);
+    const passwordChangedAt = new Date();
+    await dependencies.userRepositoryApi.updatePasswordHash(user.id, passwordHash, passwordChangedAt);
     await logOutcome('success');
+
+    // La data torna al chiamante perche' la rotta ne ha bisogno per dire il vero
+    // sulla revoca: e' lo stesso istante che fa cadere gli altri token.
+    return { passwordChangedAt };
   },
 });
 
