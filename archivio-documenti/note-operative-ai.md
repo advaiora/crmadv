@@ -1041,3 +1041,19 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - **Il campanello d'allarme generale:** quando falliscono *quasi tutti* i test, comprese cartelle che il lavoro non ha mai toccato, la causa e' l'ambiente, non il codice. La conferma costa dieci secondi — `git diff --name-only origin/main...HEAD | grep <cartella-che-fallisce>`: se non compare, quel file e' identico a `main` e non puo' essere stato rotto dal lavoro in corso. E' lo stesso ragionamento della nota #37 sui rossi da timeout, applicato a una causa diversa.
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
+
+## 70. «Revisore» esiste in due sistemi diversi: dichiarare un lavoro senza dire quale sembra dichiarare il falso
+
+**Contesto:** 9/9/2026, CRMA-23. Nei commenti sull'unione dei nove rami della release avevo scritto piu' volte «il Revisore ha esaminato...». Jacopo e' andato a controllare in dashboard la scheda dell'agente Revisore, l'ha trovata a **zero attivita'**, e ha ragionevolmente concluso che le revisioni dichiarate non fossero mai avvenute.
+
+**Errore:** i tre ruoli `esploratore`, `revisore`, `architetto` esistono **in due sistemi diversi con lo stesso nome** — i subagent di repository (`.claude/agents/`, imposti da `CLAUDE.md`) e le schede agente di Paperclip. Le revisioni c'erano state davvero, ma con i subagent di repository, che **girano dentro la sessione e non compaiono mai in dashboard**. Scrivendo «il Revisore» senza specificare quale, avevo prodotto una dichiarazione che l'unica verifica disponibile all'utente smentiva. Il danno non e' formale: mette l'utente nella posizione di dover scegliere se credermi.
+
+**Modo corretto:**
+- **Dire sempre quale dei due**: «revisore di repository» oppure «agente Revisore di Paperclip». Mai «il Revisore» e basta. Vale identico per esploratore e architetto. La regola sta in `CLAUDE.md`, sezione *«Gli stessi tre nomi esistono in due sistemi diversi»*, insieme alla tabella che dice **quale dei due usare** per cosa (dal 9/9/2026: schema, permessi, sicurezza e unioni a `main` vanno all'agente Paperclip).
+- **La prova che un subagent di repository ha lavorato sta nei registri di sessione sulla VPS**, non in dashboard. Due posti, e servono entrambi:
+  - **quante volte e' stato chiamato**, dal transcript della sessione madre:
+    `grep -rhoo '"subagent_type":"[a-z]*"' ~/.claude/projects/<slug>/ | sort | uniq -c`
+  - **cosa gli era stato chiesto**, dal file di fianco al registro del subagent: `~/.claude/projects/<slug>/<sessione>/subagents/agent-*.meta.json` contiene `agentType` e `description` gia' pronti da citare. Per CRMA-23 quel file dice `{"agentType":"revisore","description":"Revisione unione nove rami"}` — una riga che chiude la discussione, mentre il conteggio da solo non dice di che lavoro si trattasse.
+- ⚠️ **Il conteggio va fatto ricorsivo** (`grep -r`): la cartella dello slug ha il layout a cartelle-per-sessione descritto nella **nota #36**, e fermarsi ai `.jsonl` di primo livello e' esattamente l'errore che li' aveva falsato la quota subagent a 0.
+- **Quando l'utente contesta l'attivita' di un agente, non rispondere a memoria**: quei file sono verificabili in dieci secondi e la risposta cambia natura.
+- **Il principio generale**, che vale oltre questo caso: quando dichiaro un lavoro fatto da qualcun altro, devo chiedermi *dove andrebbe a controllare l'utente* — e se la' non si vede niente, dirlo io per primo invece di lasciarglielo scoprire.
