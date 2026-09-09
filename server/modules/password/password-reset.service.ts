@@ -199,209 +199,209 @@ export const buildPasswordResetService = (
   };
 
   return {
-  /**
-   * Chiede il link. Risposta identica per chiunque: vedi la nota 1 qui sopra.
-   *
-   * Il `delivery` che torna NON dice se l'indirizzo esiste: dice se il canale di
-   * posta e' configurato, cosa che il chiamante sa gia' per conto suo e che in
-   * sviluppo serve a mostrare l'anteprima del messaggio.
-   */
-  async requestReset(input: {
-    request?: FastifyRequest;
-    body: unknown;
-    requestIp: string | null;
-  }) {
-    const parsed = requestResetSchema.safeParse(input.body);
-    if (!parsed.success) {
-      throw badRequest('Richiesta di recupero password non valida', {
-        issues: parsed.error.flatten(),
-      });
-    }
+    /**
+     * Chiede il link. Risposta identica per chiunque: vedi la nota 1 qui sopra.
+     *
+     * Il `delivery` che torna NON dice se l'indirizzo esiste: dice se il canale di
+     * posta e' configurato, cosa che il chiamante sa gia' per conto suo e che in
+     * sviluppo serve a mostrare l'anteprima del messaggio.
+     */
+    async requestReset(input: {
+      request?: FastifyRequest;
+      body: unknown;
+      requestIp: string | null;
+    }) {
+      const parsed = requestResetSchema.safeParse(input.body);
+      if (!parsed.success) {
+        throw badRequest('Richiesta di recupero password non valida', {
+          issues: parsed.error.flatten(),
+        });
+      }
 
-    const now = dependencies.nowFn();
-    const user = await dependencies.userRepositoryApi.findByEmail(parsed.data.email);
+      const now = dependencies.nowFn();
+      const user = await dependencies.userRepositoryApi.findByEmail(parsed.data.email);
 
-    // Indirizzo che non corrisponde a nessun account: ci si ferma qui, in
-    // silenzio, e si risponde come se fosse andato tutto bene.
-    if (!user) {
-      return { requested: true as const, previewUrl: null };
-    }
-
-    // Il tetto a database (nota in cima). Sta DOPO la ricerca dell'utente solo
-    // perche' prima non servirebbe a niente, e comunque non cambia la risposta:
-    // chi lo supera riceve lo stesso `requested: true`, altrimenti il muro
-    // direbbe che quell'indirizzo esiste.
-    if (input.requestIp) {
-      const recentFromIp = await dependencies.resetRepositoryApi.countRecentByIp({
-        requestIp: input.requestIp,
-        since: new Date(now.getTime() - RESET_IP_DB_WINDOW_MS),
-      });
-
-      if (recentFromIp >= RESET_IP_DB_MAX_REQUESTS) {
+      // Indirizzo che non corrisponde a nessun account: ci si ferma qui, in
+      // silenzio, e si risponde come se fosse andato tutto bene.
+      if (!user) {
         return { requested: true as const, previewUrl: null };
       }
-    }
 
-    // I link chiesti prima muoiono adesso. Senza questo, ogni richiesta
-    // lascerebbe in giro un link ancora buono, e ne basta uno finito nelle mani
-    // sbagliate.
-    await dependencies.resetRepositoryApi.invalidateOutstanding({
-      userId: user.id,
-      usedAt: now,
-    });
+      // Il tetto a database (nota in cima). Sta DOPO la ricerca dell'utente solo
+      // perche' prima non servirebbe a niente, e comunque non cambia la risposta:
+      // chi lo supera riceve lo stesso `requested: true`, altrimenti il muro
+      // direbbe che quell'indirizzo esiste.
+      if (input.requestIp) {
+        const recentFromIp = await dependencies.resetRepositoryApi.countRecentByIp({
+          requestIp: input.requestIp,
+          since: new Date(now.getTime() - RESET_IP_DB_WINDOW_MS),
+        });
 
-    const token = dependencies.generateTokenFn();
-    const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MS);
+        if (recentFromIp >= RESET_IP_DB_MAX_REQUESTS) {
+          return { requested: true as const, previewUrl: null };
+        }
+      }
 
-    await dependencies.resetRepositoryApi.create({
-      userId: user.id,
-      tokenHash: dependencies.hashTokenFn(token),
-      expiresAt,
-      requestIp: input.requestIp,
-    });
+      // I link chiesti prima muoiono adesso. Senza questo, ogni richiesta
+      // lascerebbe in giro un link ancora buono, e ne basta uno finito nelle mani
+      // sbagliate.
+      await dependencies.resetRepositoryApi.invalidateOutstanding({
+        userId: user.id,
+        usedAt: now,
+      });
 
-    // Il workspace serve al server di posta, che e' configurato per workspace
-    // (`server/core/mail.ts`): senza, l'email partirebbe sempre dalle variabili
-    // d'ambiente ignorando la pagina «Server di posta».
-    const workspaceId = await dependencies.membershipRepositoryApi.findPrimaryWorkspaceId(user.id);
+      const token = dependencies.generateTokenFn();
+      const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MS);
 
-    const baseUrl = dependencies.resolveBaseUrlFn();
-    if (!baseUrl) {
-      // Nessun indirizzo pubblico configurato: il link non si puo' comporre. Si
-      // registra e si esce con la solita risposta — l'utente non ha modo di
-      // rimediare, ma il registro attivita' dice perche' non e' arrivato niente.
-      await logReset('failed', {
+      await dependencies.resetRepositoryApi.create({
+        userId: user.id,
+        tokenHash: dependencies.hashTokenFn(token),
+        expiresAt,
+        requestIp: input.requestIp,
+      });
+
+      // Il workspace serve al server di posta, che e' configurato per workspace
+      // (`server/core/mail.ts`): senza, l'email partirebbe sempre dalle variabili
+      // d'ambiente ignorando la pagina «Server di posta».
+      const workspaceId = await dependencies.membershipRepositoryApi.findPrimaryWorkspaceId(user.id);
+
+      const baseUrl = dependencies.resolveBaseUrlFn();
+      if (!baseUrl) {
+        // Nessun indirizzo pubblico configurato: il link non si puo' comporre. Si
+        // registra e si esce con la solita risposta — l'utente non ha modo di
+        // rimediare, ma il registro attivita' dice perche' non e' arrivato niente.
+        await logReset('failed', {
+          userId: user.id,
+          workspaceId,
+          request: input.request,
+          reason: 'base_url_not_configured',
+        });
+        return { requested: true as const, previewUrl: null };
+      }
+
+      const delivery = await dependencies.notifierApi.sendResetLink({
+        toEmail: parsed.data.email,
+        ...(workspaceId ? { workspaceId } : {}),
+        resetLink: `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`,
+        expiresAt,
+      });
+
+      await logReset('requested', {
         userId: user.id,
         workspaceId,
         request: input.request,
-        reason: 'base_url_not_configured',
+        ...(delivery.delivered ? {} : { reason: delivery.reason ?? 'send_failed' }),
       });
-      return { requested: true as const, previewUrl: null };
-    }
 
-    const delivery = await dependencies.notifierApi.sendResetLink({
-      toEmail: parsed.data.email,
-      ...(workspaceId ? { workspaceId } : {}),
-      resetLink: `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`,
-      expiresAt,
-    });
+      return {
+        requested: true as const,
+        // In sviluppo il messaggio finisce su una casella finta e questo e'
+        // l'indirizzo per leggerlo. In produzione e' sempre `null`.
+        previewUrl: delivery.previewUrl ?? null,
+      };
+    },
 
-    await logReset('requested', {
-      userId: user.id,
-      workspaceId,
-      request: input.request,
-      ...(delivery.delivered ? {} : { reason: delivery.reason ?? 'send_failed' }),
-    });
-
-    return {
-      requested: true as const,
-      // In sviluppo il messaggio finisce su una casella finta e questo e'
-      // l'indirizzo per leggerlo. In produzione e' sempre `null`.
-      previewUrl: delivery.previewUrl ?? null,
-    };
-  },
-
-  /**
-   * Dice se un link e' ancora buono, senza consumarlo.
-   *
-   * Serve alla pagina `/reset-password`, che altrimenti farebbe scegliere e
-   * digitare due volte una password nuova per poi annunciare che il link era
-   * scaduto. ⚠️ Non e' una falla: chi chiama questa rotta il token ce l'ha gia'
-   * in mano, quindi non impara niente che non sapesse.
-   */
-  async checkToken(input: { body: unknown }) {
-    const parsed = z.object({ token: z.string().trim().min(1) }).strict().safeParse(input.body);
-    if (!parsed.success) {
-      return { valid: false as const };
-    }
-
-    const record = await dependencies.resetRepositoryApi.findByTokenHash(
-      dependencies.hashTokenFn(parsed.data.token),
-    );
-
-    if (!record || record.usedAt || record.expiresAt.getTime() <= dependencies.nowFn().getTime()) {
-      return { valid: false as const };
-    }
-
-    return { valid: true as const };
-  },
-
-  /** Reimposta davvero la password. Transazione: vedi la nota 3 in cima. */
-  async confirmReset(input: {
-    request?: FastifyRequest;
-    body: unknown;
-  }) {
-    const parsed = confirmResetSchema.safeParse(input.body);
-    if (!parsed.success) {
-      throw badRequest('Reimpostazione della password non valida', {
-        issues: parsed.error.flatten(),
-      });
-    }
-
-    const now = dependencies.nowFn();
-    const tokenHash = dependencies.hashTokenFn(parsed.data.token);
-    const record = await dependencies.resetRepositoryApi.findByTokenHash(tokenHash);
-
-    if (!record || record.usedAt || record.expiresAt.getTime() <= now.getTime()) {
-      throw invalidResetToken();
-    }
-
-    const passwordHash = await dependencies.hashPasswordFn(
-      parsed.data.newPassword,
-      PASSWORD_SALT_ROUNDS,
-    );
-
-    const consumed = await dependencies.runInTransactionFn(async (tx) => {
-      // ⚠️ Il secondo controllo, dentro la transazione e sulla riga: `markUsed`
-      // scrive solo se `usedAt` e' ancora nullo e torna `false` se non ha
-      // toccato niente. E' cio' che rende il token monouso davvero, quando due
-      // richieste con lo stesso token arrivano nello stesso istante — il
-      // controllo qui sopra le lascerebbe passare entrambe.
-      const burned = await dependencies.resetRepositoryApi.markUsed(
-        { tokenId: record.id, usedAt: now },
-        tx,
-      );
-
-      if (!burned) {
-        return false;
+    /**
+     * Dice se un link e' ancora buono, senza consumarlo.
+     *
+     * Serve alla pagina `/reset-password`, che altrimenti farebbe scegliere e
+     * digitare due volte una password nuova per poi annunciare che il link era
+     * scaduto. ⚠️ Non e' una falla: chi chiama questa rotta il token ce l'ha gia'
+     * in mano, quindi non impara niente che non sapesse.
+     */
+    async checkToken(input: { body: unknown }) {
+      const parsed = z.object({ token: z.string().trim().min(1) }).strict().safeParse(input.body);
+      if (!parsed.success) {
+        return { valid: false as const };
       }
 
-      // La stessa data che fa cadere le sessioni aperte con la password vecchia
-      // (`server/guards/requireAuth.ts`). Chi ha perso la password non ha una
-      // sessione da salvare, quindi qui — a differenza del cambio password —
-      // non si consegna nessun token nuovo.
-      await dependencies.userRepositoryApi.updatePasswordHash(
+      const record = await dependencies.resetRepositoryApi.findByTokenHash(
+        dependencies.hashTokenFn(parsed.data.token),
+      );
+
+      if (!record || record.usedAt || record.expiresAt.getTime() <= dependencies.nowFn().getTime()) {
+        return { valid: false as const };
+      }
+
+      return { valid: true as const };
+    },
+
+    /** Reimposta davvero la password. Transazione: vedi la nota 3 in cima. */
+    async confirmReset(input: {
+      request?: FastifyRequest;
+      body: unknown;
+    }) {
+      const parsed = confirmResetSchema.safeParse(input.body);
+      if (!parsed.success) {
+        throw badRequest('Reimpostazione della password non valida', {
+          issues: parsed.error.flatten(),
+        });
+      }
+
+      const now = dependencies.nowFn();
+      const tokenHash = dependencies.hashTokenFn(parsed.data.token);
+      const record = await dependencies.resetRepositoryApi.findByTokenHash(tokenHash);
+
+      if (!record || record.usedAt || record.expiresAt.getTime() <= now.getTime()) {
+        throw invalidResetToken();
+      }
+
+      const passwordHash = await dependencies.hashPasswordFn(
+        parsed.data.newPassword,
+        PASSWORD_SALT_ROUNDS,
+      );
+
+      const consumed = await dependencies.runInTransactionFn(async (tx) => {
+        // ⚠️ Il secondo controllo, dentro la transazione e sulla riga: `markUsed`
+        // scrive solo se `usedAt` e' ancora nullo e torna `false` se non ha
+        // toccato niente. E' cio' che rende il token monouso davvero, quando due
+        // richieste con lo stesso token arrivano nello stesso istante — il
+        // controllo qui sopra le lascerebbe passare entrambe.
+        const burned = await dependencies.resetRepositoryApi.markUsed(
+          { tokenId: record.id, usedAt: now },
+          tx,
+        );
+
+        if (!burned) {
+          return false;
+        }
+
+        // La stessa data che fa cadere le sessioni aperte con la password vecchia
+        // (`server/guards/requireAuth.ts`). Chi ha perso la password non ha una
+        // sessione da salvare, quindi qui — a differenza del cambio password —
+        // non si consegna nessun token nuovo.
+        await dependencies.userRepositoryApi.updatePasswordHash(
+          record.userId,
+          passwordHash,
+          now,
+          tx,
+        );
+
+        // Gli altri link ancora aperti di questo utente muoiono con il giro.
+        await dependencies.resetRepositoryApi.invalidateOutstanding(
+          { userId: record.userId, usedAt: now },
+          tx,
+        );
+
+        return true;
+      });
+
+      if (!consumed) {
+        throw invalidResetToken();
+      }
+
+      const workspaceId = await dependencies.membershipRepositoryApi.findPrimaryWorkspaceId(
         record.userId,
-        passwordHash,
-        now,
-        tx,
       );
 
-      // Gli altri link ancora aperti di questo utente muoiono con il giro.
-      await dependencies.resetRepositoryApi.invalidateOutstanding(
-        { userId: record.userId, usedAt: now },
-        tx,
-      );
+      await logReset('completed', {
+        userId: record.userId,
+        workspaceId,
+        request: input.request,
+      });
 
-      return true;
-    });
-
-    if (!consumed) {
-      throw invalidResetToken();
-    }
-
-    const workspaceId = await dependencies.membershipRepositoryApi.findPrimaryWorkspaceId(
-      record.userId,
-    );
-
-    await logReset('completed', {
-      userId: record.userId,
-      workspaceId,
-      request: input.request,
-    });
-
-    return { reset: true as const };
-  },
+      return { reset: true as const };
+    },
   };
 };
 
