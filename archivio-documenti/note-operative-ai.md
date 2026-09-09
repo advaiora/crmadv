@@ -1192,3 +1192,24 @@ npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
 - Si confronta l'uscita con il `migration.sql` committato **togliendo i commenti** (`grep -v '^--'`) e **ordinando le righe**: l'ordine dei blocchi `AlterTable` fra tabelle indipendenti non conta. Identici = migrazione fedele allo schema, provata in **tutte e due** le direzioni con un comando solo. Diversi = il posto esatto dove guardare.
 - ⚠️ `--from-schema-datamodel` (i due schemi) **non e'** `--from-schema-datasource` (schema contro database vero, quello della #16): si somigliano e fanno cose diverse.
 - ⚠️ Questo confronto **non** prova che la migrazione si applichi davvero su un database esistente: quello resta da fare dove un database c'e' (note **#15** e **#16**).
+
+## 80. Correggendo un rilievo di «prova falsa» la prova nuova si arrotonda verso l'alto: si copia dalla fonte, non si riformula a memoria
+
+**Contesto:** 9/9/2026, CRMA-48 / CRMA-50 (ricontrollo della PR #21). Una revisione aveva bocciato una clausola di `CLAUDE.md` perche' motivata con un fatto falso; la correzione doveva sostituire la motivazione sbagliata con quella vera, documentata da una nota operativa.
+
+**Errore:** riscrivendo, la prova e' stata **arrotondata verso l'alto**. «Una sessione del 7/8 ha chiuso l'handoff con *verifica a schermo non fatta*» e' diventato «il 7 e l'8/8 hanno chiuso **due** handoff». Il secondo handoff non esiste: l'8/8 quella sessione il muro l'aveva **aggirato**, verificando il dato a database (nota **#50**). Nessuno se ne accorge leggendo, perche' la frase gonfiata e' piu' convincente di quella vera; se ne accorge solo chi va a cercare i file. **E' l'errore piu' insidioso proprio nelle correzioni**, perche' li' la fretta e' di far sparire il rilievo, e una prova al plurale sembra chiuderlo meglio di una al singolare.
+
+**Modo corretto:**
+- Quando si corregge un rilievo di *prova falsa*, la frase nuova si scrive **copiando dalla fonte**, non riformulandola a memoria: e' la memoria di com'era il fatto, non il fatto, a produrre il plurale.
+- Ogni numero che compare — quanti handoff, quante sessioni, quante volte — si **conta con un comando prima di scriverlo**. Qui bastano due comandi, e in due secondi dicono che il caso e' uno solo:
+
+```
+git log --all -i -S "verifica a schermo non fatta"
+git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti/handoff/ | sort -u
+```
+
+- ⚠️ **`-S` distingue maiuscole e minuscole**: senza `-i` la ricerca in minuscolo **non trova** l'handoff, perche' la riga comincia con `**Verifica a schermo non fatta:**` — e un «nessun risultato» viene letto come «non c'e'», che e' l'errore opposto e altrettanto falso.
+- ⚠️ **I commit che tornano non sono i casi**: quel primo comando ne restituisce **quattro**, e contarli rida' un numero gonfiato. Si aggiunge `--name-only` e si guarda **il file**: due commit sono l'aggiunta (`24105a7`) e la cancellazione (`a9e8626`, la cartella tiene solo le ultime 3 versioni) dello **stesso** handoff; gli altri due sono la clausola di `CLAUDE.md` sotto revisione e la nota #50 che cita la frase. L'handoff e' **uno solo** — `archivio-documenti/handoff/handoff-2026-08-07-1730.md:58`.
+- Il secondo comando elenca gli handoff **mai esistiti**, cancellati compresi: 61 file, 12 nella prima decade di agosto, **nessuno datato 08-08**. E' la prova che regge il negativo, e nessun `grep` sull'albero di lavoro puo' darla, perche' li' gli handoff vecchi non ci sono piu'.
+- **Se il conto esatto non riesce, si scrive al singolare il caso che si e' verificato** e si lascia perdere il plurale: una prova piccola e vera regge, una grande e gonfiata fa ripartire il giro di revisione che si stava chiudendo.
+- Parente stretta della **#73** (un paragrafo che «fa il conto» va riletto contando davvero): li' il numero si sfalsa perche' la lista sotto e' cambiata, qui perche' la prova viene ricordata invece che riletta. Stesso rimedio: contare sul file, non a memoria.
