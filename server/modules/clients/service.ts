@@ -37,8 +37,13 @@ const MAX_ZIP_LENGTH = 20;
 const MAX_NOTES_LENGTH = 4000;
 const MAX_TAGS = 30;
 const MAX_TAG_LENGTH = 40;
-const MAX_WEBSITE_LENGTH = 255;
-const MAX_CONTACT_PERSON_LENGTH = 160;
+// Larghi apposta: a schermo questi due campi non hanno nessun tetto, e un tetto
+// che solo il server conosce si manifesta come un salvataggio che fallisce senza
+// che si capisca perche'. Servono a fermare l'incollaggio assurdo, non a
+// disciplinare: 2048 e' la lunghezza oltre la quale un indirizzo smette di
+// funzionare nei browser, 160 e' lo stesso tetto del nome del cliente.
+const MAX_WEBSITE_LENGTH = 2048;
+const MAX_CONTACT_PERSON_LENGTH = MAX_NAME_LENGTH;
 
 const SORT_FIELDS: ClientSortField[] = ['name', 'createdAt', 'updatedAt'];
 const CSV_HEADER_COLUMNS = [

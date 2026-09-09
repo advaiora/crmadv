@@ -24,18 +24,37 @@ export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // quando l'Agenzia delle Entrate scarta la fattura.
 export const SDI_CODE_REGEX = /^[A-Z0-9]{6,7}$/;
 
-// Schema facoltativo (solo http/https), almeno un punto nel nome a dominio,
-// niente spazi. Volutamente permissiva: "advaiora.com" e
-// "https://www.advaiora.com/contatti" sono due modi legittimi di scrivere lo
-// stesso sito, e il CRM non deve costringere a uno dei due.
-export const WEBSITE_REGEX = /^(https?:\/\/)?[^\s./]+(\.[^\s./]+)+(\/\S*)?$/i;
-
 const HTTP_SCHEME_REGEX = /^https?:\/\//i;
-// Uno schema diverso da http/https non e' un indirizzo di sito, e un giorno
-// finirebbe dentro un `href` (`javascript:`, `data:`, `mailto:`). Il "due punti"
-// seguito da una CIFRA e' invece la porta di un indirizzo legittimo
-// ("advaiora.com:8080"), e resta ammesso.
-const FOREIGN_SCHEME_REGEX = /^[^\s/]*:(?!\d)/;
+// Cosa segue i due punti quando NON sono uno schema ma una porta: solo cifre,
+// e poi la fine o l'inizio del percorso ("advaiora.com:8080/contatti").
+const PORT_AFTER_COLON_REGEX = /^\d+([/?#]|$)/;
+
+/**
+ * Il sito non ha vincoli di FORMA, e non e' una dimenticanza: il form a schermo
+ * non ne ha nessuno e lo dichiara nel suo test («sito web e referente non hanno
+ * vincoli di forma», `src/modules/clients/ui/clientFormValidation.test.js`).
+ * Un server piu' severo del browser renderebbe non salvabile una scheda appena
+ * dichiarata valida — e in un CRM d'agenzia «da definire» o «in costruzione»
+ * sono contenuti legittimi di quel campo.
+ *
+ * L'unica cosa che resta fuori e' uno SCHEMA diverso da http/https
+ * (`javascript:`, `data:`, `vbscript:`): non e' un indirizzo di sito, e il
+ * giorno in cui quel valore diventera' un collegamento cliccabile sarebbe la
+ * strada per farci passare del codice. Il "due punti" di una porta non e' uno
+ * schema e resta ammesso.
+ */
+const hasForeignScheme = (value: string) => {
+  if (HTTP_SCHEME_REGEX.test(value)) {
+    return false;
+  }
+
+  const colonIndex = value.indexOf(':');
+  if (colonIndex === -1) {
+    return false;
+  }
+
+  return !PORT_AFTER_COLON_REGEX.test(value.slice(colonIndex + 1));
+};
 
 /**
  * Un'email gia' ripulita (trim e lunghezza li fa chi chiama): la abbassa e ne
@@ -77,11 +96,7 @@ export const normalizeWebsiteValue = (value: string | null, fieldName: string) =
     return null;
   }
 
-  if (!HTTP_SCHEME_REGEX.test(value) && FOREIGN_SCHEME_REGEX.test(value)) {
-    throw badRequest(`${fieldName} must be a valid web address`);
-  }
-
-  if (!WEBSITE_REGEX.test(value)) {
+  if (hasForeignScheme(value)) {
     throw badRequest(`${fieldName} must be a valid web address`);
   }
 

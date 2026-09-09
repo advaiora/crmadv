@@ -53,27 +53,42 @@ test('sito web: accetta sia il dominio nudo sia l\'indirizzo completo, senza ris
   );
 });
 
-test('sito web: il testo libero non e\' un indirizzo', () => {
-  assert.throws(() => normalizeWebsiteValue('chiedere a Maria', 'website'), {
-    message: 'website must be a valid web address',
-    statusCode: 400,
-  });
+test('sito web: il testo libero passa, come nel form', () => {
+  // Il server non puo' essere piu' severo del browser: `clientFormValidation.js`
+  // non mette nessun vincolo di forma sul sito, e una scheda dichiarata valida a
+  // schermo deve potersi salvare.
+  assert.equal(normalizeWebsiteValue('da definire', 'website'), 'da definire');
+  assert.equal(normalizeWebsiteValue('in costruzione', 'website'), 'in costruzione');
 });
 
 test('sito web: gli schemi che non sono siti restano fuori', () => {
-  assert.throws(() => normalizeWebsiteValue('javascript:alert(1)', 'website'), {
-    statusCode: 400,
-  });
-  // Con un punto dentro passerebbe il solo controllo di forma: serve quello
-  // sullo schema, altrimenti finirebbe dentro un collegamento.
-  assert.throws(() => normalizeWebsiteValue('javascript:alert(document.domain)', 'website'), {
-    statusCode: 400,
-  });
-  assert.throws(() => normalizeWebsiteValue('mailto:info@advaiora.com', 'website'), {
-    statusCode: 400,
-  });
+  for (const valore of [
+    'javascript:alert(1)',
+    'javascript:alert(document.domain)',
+    // La cifra subito dopo i due punti e' il travestimento da porta: senza
+    // guardare cosa viene DOPO le cifre, questo passerebbe.
+    'javascript:1;alert(document.domain)',
+    'JavaScript:1;alert(document.cookie)',
+    'vbscript:1;msgbox(1)',
+    'data:1;text/html,x',
+    'mailto:info@advaiora.com',
+  ]) {
+    assert.throws(
+      () => normalizeWebsiteValue(valore, 'website'),
+      { statusCode: 400 },
+      `"${valore}" doveva essere respinto`,
+    );
+  }
 });
 
 test('sito web: la porta non e\' uno schema estraneo', () => {
   assert.equal(normalizeWebsiteValue('advaiora.com:8080', 'website'), 'advaiora.com:8080');
+  assert.equal(
+    normalizeWebsiteValue('advaiora.com:8080/contatti', 'website'),
+    'advaiora.com:8080/contatti',
+  );
+  assert.equal(
+    normalizeWebsiteValue('https://www.advaiora.com/contatti?utm=x', 'website'),
+    'https://www.advaiora.com/contatti?utm=x',
+  );
 });
