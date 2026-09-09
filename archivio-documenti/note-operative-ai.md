@@ -894,3 +894,90 @@ Entrambe erano vere quando sono state scritte, o non sono mai state verificate. 
 - **«Non c'e' nel campione» ha sempre due spiegazioni**: il formato non lo prevede, oppure **quell'esemplare non ne ha**. Dal solo campione sono indistinguibili, e si separano solo con la documentazione o con un secondo esemplare. Fino ad allora la frase corretta e' condizionale. E' la nota #56 («non l'ho trovato non e' non c'e'») applicata a un formato invece che a una funzione.
 - **Quando lo strumento espone il proprio schema, quella e' la fonte** - e l'indirizzo va scritto nelle istruzioni di chi eseguira' il lavoro, cosi' si corregge da solo anche se io ho sbagliato. Nel pacchetto ci sono `/llms/agent-configuration.txt` e `/llms/agent-icons.txt`, con scritto in chiaro: se il mio schema diverge dal tuo, **vince il tuo**.
 - **Una conclusione che ribalta il piano si verifica PRIMA di riferirla**, non dopo. Verificare costa due minuti; far riprogettare un piano su una premessa falsa costa la sessione di chi ci ha creduto.
+
+## 60. L'API di Paperclip risponde 301 su `http`: aggiungere `-L` PERDE la chiave, e sembra una chiave scaduta
+
+**Contesto:** 8/9/2026, compito CRMA-22. Un agent Paperclip che chiama l'API di Paperclip via `curl` dal contenitore, costruendo la base come documentato nelle istruzioni di run: `PAPERCLIP_API_BASE="${PAPERCLIP_API_URL%/}"; PAPERCLIP_API_BASE="${PAPERCLIP_API_BASE%/api}"`.
+
+**Errore:** la variabile `PAPERCLIP_API_URL` e' in `http://`, e il server risponde `301 Moved Permanently`. Il rimedio istintivo — aggiungere `-L` per seguire il redirect — **non risolve e peggiora la diagnosi**: `curl` scarta l'header `Authorization` quando il redirect cambia schema o host, quindi la seconda richiesta parte senza chiave e la risposta diventa `{"error":"Agent authentication required"}`. Quel messaggio parla di autenticazione, non di redirect: manda a controllare `PAPERCLIP_API_KEY`, i permessi dell'agent e la scadenza della chiave — tre posti dove non c'e' niente da trovare.
+
+**Modo corretto:**
+- **Riscrivere la base in `https` prima della prima chiamata**, non dopo il primo errore: `PB="${PAPERCLIP_API_URL%/}"; PB="${PB%/api}"; PB="${PB/http:/https:}"`.
+- **Regola di lettura:** `Moved Permanently` seguito da `Agent authentication required` **non e'** una chiave scaduta — e' l'header perso in un redirect. La chiave e' buona: e' l'indirizzo a essere sbagliato.
+- Verifica in una riga: `curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PB/api/agents/me"` deve dare `200`. Su base `http` da' `301`, e con `-L` da' `200` con un corpo di errore — motivo per cui il solo codice di stato non basta a dire che va bene.
+
+## 61. In questo contenitore `python3` NON esiste: il JSON delle risposte si legge con `node -e`
+
+**Contesto:** 8/9/2026, compito CRMA-22. Leggere una risposta JSON dell'API di Paperclip (elenco agent, elenco skill, dettaglio di una issue) dentro una pipeline di shell, nel contenitore dove girano gli agent Paperclip.
+
+**Errore:** `... | python3 -c "import json,sys; ..."` risponde `python3: command not found`. Su questa macchina non c'e' ne' `python3` ne' `python`. Il fastidio non e' il comando fallito: e' che **la chiamata HTTP e' gia' stata spesa**, la risposta e' finita in una pipe che si e' rotta, e va rifatta tutta. In un elenco lungo si paga due volte anche l'attesa.
+
+⚠️ Attenzione a una confusione facile: **molte note di questo file descrivono la postazione Windows di Jacopo e Claudio, non il contenitore**. Quello che c'e' installato di la' non dice niente su quello che c'e' installato qui: sono due macchine diverse, e questa nota vale solo per il contenitore.
+
+**Modo corretto:**
+- Usare **Node**, che c'e' sempre perche' e' quello che fa girare il prodotto: `... | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s); console.log(d.name)})"`.
+- Prima di infilare un interprete in una pipeline che consuma una risposta HTTP, **controllare che esista**: `command -v node python3`. Costa niente e non brucia la chiamata.
+
+## 62. Primo commit in un run Paperclip: manca l'identita' git, e un `push` non legato al commit pubblica il ramo SENZA il lavoro
+
+**Contesto:** 8/9/2026, compito CRMA-22. Primo `git commit` dentro un workspace Paperclip appena preparato. Nel contenitore **non c'e' identita' globale**: `git config --global user.name` non risponde niente.
+
+**Errore:** `git commit` si ferma con *«Author identity unknown»* e uscita **128**, quindi il commit non viene creato. Il guasto vero arriva subito dopo: se il `push` **non e' legato al commit**, cioe' se sta in una chiamata successiva, su una riga a parte o incatenato con `;`, parte lo stesso e pubblica il ramo **fermo al commit precedente**. A schermo compare `* [new branch] ...`, che si legge come una pubblicazione riuscita. Il ramo c'e', il lavoro no, e non lo dice nessuno.
+
+**Modo corretto:**
+- **Impostare l'identita' nel repository prima del primo commit, ricavandola invece di inventarla:** `git config user.name "$(git log -1 --format='%an')"` e `git config user.email "$(git log -1 --format='%ae')"`. Il valore giusto e' gia' nella storia del repository.
+- **Legare `commit` e `push` con `&&`, mai con `;` e mai in due chiamate separate.** Va detto perche' e' l'opposto di quello che verrebbe da pensare: `&&` non e' il pericolo, e' la **protezione** — con uscita 128 la catena si ferma da sola e il push non parte. Il pericolo e' il `;`, che tira dritto.
+- **Verifica dopo il push**, perche' `* [new branch]` non prova niente: `git log --oneline -1` deve mostrare il commit appena fatto, non quello di partenza.
+
+## 63. Push respinto con «Invalid username or token»: spesso il token non e' sbagliato, e' ASSENTE — e il segreto esiste gia' in azienda
+
+**Contesto:** 8/9/2026, compito CRMA-22. Pubblicare un ramo su `https://github.com/advaiora/crmadv` da un run Paperclip.
+
+**Errore:** `git push` si ferma con `remote: Invalid username or token. Password authentication is not supported for Git operations.` Il messaggio parla di credenziali **sbagliate**, e manda a cercare un token scaduto, un URL con le credenziali dentro, o un helper configurato male. Sono tre piste vuote. L'helper in `~/.gitconfig` c'e' ed e' giusto — legge `${GH_TOKEN:-$GITHUB_TOKEN}` — solo che **in questo run nessuna delle due variabili e' impostata**: restituisce una password vuota, e GitHub la riferisce come token non valido.
+
+Due cose rendono la diagnosi piu' lenta di quanto dovrebbe:
+1. **`git fetch` e `git ls-remote` funzionano**, perche' la lettura non chiede credenziali. Rete, remote e nome del ramo sembrano quindi tutti a posto, e si scarta proprio la pista giusta.
+2. **`git config --get-all credential.helper` non mostra niente**, e sembra che l'helper manchi. In realta' e' registrato sotto la sezione per dominio `[credential "https://github.com"]`, quindi la chiave da chiedere e' `credential.https://github.com.helper`.
+
+**Modo corretto:**
+- **Prima di concludere che il token e' sbagliato, controllare che ci sia:** `env | grep -E 'GH_TOKEN|GITHUB_TOKEN'`. Uscita vuota vuol dire **token assente**, che e' un problema diverso e si risolve altrove.
+- **Il segreto di solito esiste gia' a livello azienda**, e quello che manca e' solo il collegamento a questo agent. Si guardano nell'ordine: `GET /api/companies/$PAPERCLIP_COMPANY_ID/secrets/catalog` (qui elenca `GITHUB_TOKEN_CRMADV`) e `GET /api/agents/me/secrets` (qui tornava `[]`).
+- **La via per sbloccarsi e' una proposta, non un messaggio in chat:** `POST /api/agents/me/secret-proposals` con `{"kind":"binding","secretId":"<dal catalogo>","configPath":"env.GITHUB_TOKEN","justification":"..."}`. Resta `pending` finche' un umano approva.
+- **Intanto il lavoro non si perde: si committa lo stesso.** Un ramo locale sopravvive al run. ⚠️ Ma se si e' lavorato in un `git worktree` creato dentro `PAPERCLIP_RUN_SCRATCH_DIR`, quella cartella viene **cancellata da Paperclip alla fine del run**: prima di chiudere si fa `git worktree remove`, cosi' il riferimento del ramo resta nel `.git` condiviso e nessun worktree fantasma lo tiene occupato. Verifica: `git log --oneline -1 <ramo>` dal repository principale.
+
+## 64. La risposta di un umano puo' NON essere un commento: una conferma accettata non compare nel thread, e contare i commenti fa concludere il contrario
+
+**Contesto:** 8/9/2026, compito CRMA-22. Un run Paperclip si risveglia su un compito lasciato **bloccato** al battito precedente, con `reason: issue_commented` nel payload di risveglio.
+
+**Errore:** si apre il thread per cercare la risposta e si trova **un solo commento, il proprio**, quello di chiusura del run precedente. La conclusione che viene spontanea — «e' l'eco di me stesso, nessuno ha risposto, il blocco non si e' mosso» — e' **falsa**, e nel caso reale lo era: un umano aveva risposto tre minuti dopo la chiusura del run, ma lo aveva fatto **accettando una richiesta di conferma**, e le conferme **non compaiono fra i commenti**.
+
+Il sintomo ingannevole e' proprio la coerenza apparente dei numeri: un commento, autore `agent`, `createdAt 14:17:52` dentro il run precedente. Tutto torna, e la deduzione sbagliata sembra dimostrata.
+
+**Modo corretto:**
+- **Lo stato di un compito non e' l'elenco dei suoi commenti.** Al risveglio si guardano **entrambi** gli elenchi, e quello delle interazioni per primo se il compito era bloccato su una decisione:
+  `curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PB/api/issues/$PAPERCLIP_TASK_ID/interactions"` — leggendo `status`, `resolvedAt` e `response`.
+- **Il confronto che conta e' `resolvedAt` contro la fine del run precedente**, non l'autore del commento: qui `resolvedAt 2026-09-08T14:22:54Z` contro un run chiuso alle `14:19:11` diceva chiaramente che qualcosa era arrivato dopo.
+- **`reason: issue_commented` non e' affidabile per capire cosa e' cambiato:** riporta un motivo, non l'autore ne' l'oggetto. Non usarlo per decidere dove guardare — guarda gli oggetti.
+
+## 65. Una richiesta di conferma ACCETTATA non approva la proposta di segreto: sono due oggetti diversi, e il blocco resta
+
+**Contesto:** 8/9/2026, compito CRMA-22. Un agent bloccato senza token GitHub aveva aperto **due** cose: una proposta di collegamento del segreto (`POST /api/agents/me/secret-proposals`) e, per renderla visibile sulla board, una richiesta di conferma sul compito (`request_confirmation` che puntava a quella proposta).
+
+**Errore:** la richiesta di conferma torna `status: accepted`, con `response: {"version":1,"outcome":"accepted"}` e un umano che l'ha risolta. Sembra lo sblocco: la domanda era «approvare il collegamento del token», e la risposta e' stata «accettato». **Ma il collegamento non e' avvenuto.** Nello stesso momento:
+- `GET /api/agents/me/secret-proposals` → la proposta e' ancora `"status":"pending"`;
+- `env | grep -E 'GH_TOKEN|GITHUB_TOKEN'` → vuoto;
+- `git push --dry-run` → sempre `remote: Invalid username or token`.
+
+La conferma registra che **una persona e' d'accordo**, non che il segreto sia stato collegato. Sono due oggetti in due sistemi diversi: l'accordo sta sul compito, il collegamento sta nei segreti dell'azienda. Chi accetta la scheda in buona fede crede di aver sbloccato, e l'agent che si fida della scheda ci riprova e fallisce di nuovo.
+
+**Modo corretto:**
+- **Dopo una conferma accettata che riguarda un segreto, non ritentare l'azione: verificare prima i due indicatori che contano**, nell'ordine — lo `status` della proposta, e la presenza della variabile nell'ambiente. Se sono `pending` e vuoto, non e' cambiato niente di operativo.
+- **Nel chiedere, dire l'azione esatta invece del suo effetto.** Non «approvare il collegamento del token», ma «aprire i segreti dell'azienda e approvare la proposta `<id>`»: la conferma e' una scheda di accordo, e da sola non esegue niente.
+- ⚠️ **Non chiudere il compito come sbloccato sulla base della conferma.** Il segnale di sblocco e' la variabile presente nell'ambiente del run, e si vede solo al risveglio successivo a un'approvazione vera.
+
+**Come si e' chiuso davvero** *(verificato il 9/9/2026, battito successivo)*. L'approvazione vera e' arrivata, e si e' presentata in modo **diverso** dalla conferma — ecco a cosa somiglia, cosi' la prossima volta si riconosce al primo colpo d'occhio:
+- il risveglio porta `PAPERCLIP_WAKE_REASON=secret_proposal_resolved`, che **nomina l'oggetto** invece del generico `issue_commented` di cui diffida la nota #64;
+- nel thread compare un commento di sistema con autore `user` intitolato *«Secret proposal resolution»*, che riporta la proposta e `Status: **approved**`;
+- `env | grep GITHUB_TOKEN` finalmente **risponde**, ed e' questo l'unico indicatore che conta.
+
+Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio si legge prima `PAPERCLIP_WAKE_REASON`**. Se dice `secret_proposal_resolved` si va dritti all'ambiente; se dice altro, il blocco e' quasi sempre ancora in piedi e riaprire il thread e' tempo speso male.
