@@ -7,17 +7,13 @@ import {
   provaServerMail,
   salvaImpostazioniMail,
 } from '../../modules/mail/api/mailApi';
+import {
+  CAMPI_VUOTI,
+  campiDaImpostazioni,
+  ciSonoModifichePendenti,
+} from './mailServerModifiche';
 
 const MESSAGGIO_ERRORE = (errore, ripiego) => errore?.message || ripiego;
-
-const CAMPI_VUOTI = {
-  attivo: true,
-  server: '',
-  porta: 587,
-  connessioneSicura: false,
-  utente: '',
-  mittente: '',
-};
 
 /**
  * Cosa sta usando il CRM adesso per spedire. E' la prima cosa da dire in questa
@@ -118,14 +114,9 @@ const MailServerPage = () => {
 
   const applicaStato = (impostazioni) => {
     setStatoSalvato(impostazioni ?? null);
-    setCampi({
-      attivo: impostazioni?.attivo ?? true,
-      server: impostazioni?.server ?? '',
-      porta: impostazioni?.porta ?? 587,
-      connessioneSicura: impostazioni?.connessioneSicura ?? false,
-      utente: impostazioni?.utente ?? '',
-      mittente: impostazioni?.mittente ?? '',
-    });
+    // Stessa mappatura usata dal confronto delle modifiche pendenti: se le due
+    // divergessero, la pagina segnalerebbe modifiche appena aperta.
+    setCampi(campiDaImpostazioni(impostazioni));
     setPassword('');
   };
 
@@ -150,6 +141,14 @@ const MailServerPage = () => {
   const origine = useMemo(
     () => descriviOrigine(statoSalvato?.origineInUso ?? 'nessuna', statoSalvato),
     [statoSalvato],
+  );
+
+  // La prova gira sul server e il server prova cio' che e' salvato: se la
+  // maschera dice altro, chi preme «Prova connessione» deve saperlo prima di
+  // leggere l'esito. Vedi mailServerModifiche.js per il perche' del confronto.
+  const modifichePendenti = useMemo(
+    () => ciSonoModifichePendenti({ campi, statoSalvato, password }),
+    [campi, statoSalvato, password],
   );
 
   const aggiorna = (campo, valore) => {
@@ -407,6 +406,9 @@ const MailServerPage = () => {
                         variant="outline-secondary"
                         onClick={() => void onProva()}
                         disabled={occupato || !statoSalvato?.configurata}
+                        aria-describedby={
+                          modifichePendenti ? 'mail-modifiche-pendenti' : undefined
+                        }
                       >
                         {prova && <Spinner animation="border" size="sm" className="me-2" />}
                         Prova connessione
@@ -429,6 +431,23 @@ const MailServerPage = () => {
                       <div className="small text-muted mt-2">
                         Salva le impostazioni per poter provare la connessione.
                       </div>
+                    )}
+
+                    {/* Un Alert e non una riga muta come quella qui sopra: quella
+                        informa, questa deve fermare la mano prima che si legga
+                        un esito riferito ad altri parametri. Il colore arriva da
+                        `variant`, cioe' dai token del tema — l'unica classe di
+                        testo con abbastanza contrasto in chiaro e in scuro. */}
+                    {modifichePendenti && (
+                      <Alert
+                        id="mail-modifiche-pendenti"
+                        variant="warning"
+                        className="small mt-3 mb-0"
+                      >
+                        Hai modifiche non salvate: la prova collauda la configurazione{' '}
+                        <strong>salvata</strong>, non quella che vedi qui. Salva prima di
+                        provare.
+                      </Alert>
                     )}
                   </Form>
                 </Card.Body>

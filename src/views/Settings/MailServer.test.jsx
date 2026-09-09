@@ -163,3 +163,96 @@ describe('Server di posta', () => {
     expect(inviato.porta).toBe(587);
   });
 });
+
+// Il caso del §7.7 punto 9. Il confronto campo per campo ha il suo test
+// accanto (mailServerModifiche.test.js): qui interessa solo che la pagina lo
+// usi davvero, e che senza modifiche non dica niente di nuovo.
+describe('avviso: la prova collauda la configurazione salvata', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('appena aperta la pagina non compare nessun avviso', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+
+    await screen.findByRole('button', { name: /prova connessione/i });
+    expect(screen.queryByText(/Hai modifiche non salvate/i)).not.toBeInTheDocument();
+  });
+
+  it('correggendo la porta senza salvare avvisa che la prova riguarda il salvato', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+
+    const porta = await screen.findByLabelText('Porta');
+    fireEvent.change(porta, { target: { value: '465' } });
+
+    await screen.findByText(/Hai modifiche non salvate/i);
+
+    // La frase deve dire di quale configurazione parla l'esito: senza
+    // "salvata" l'avviso non chiude il malinteso del §7.7 punto 9.
+    const avviso = document.getElementById('mail-modifiche-pendenti');
+    expect(avviso).toHaveTextContent(/configurazione salvata/i);
+  });
+
+  it('il pulsante «Prova connessione» resta premibile: l\'avviso non lo spegne', async () => {
+    // Opzione B, decisa dal consiglio l'1/9/2026: si avvisa, non si blocca.
+    // Chi vuole sapere se il server salvato risponde ancora deve poterlo fare
+    // anche con la maschera sporca.
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+
+    render(<MailServerPage />);
+
+    const porta = await screen.findByLabelText('Porta');
+    fireEvent.change(porta, { target: { value: '465' } });
+
+    const prova = await screen.findByRole('button', { name: /prova connessione/i });
+    expect(prova).toBeEnabled();
+    expect(prova).toHaveAttribute('aria-describedby', 'mail-modifiche-pendenti');
+  });
+
+  it('salvando, l\'avviso sparisce', async () => {
+    leggiImpostazioniMail.mockResolvedValue({ impostazioni: IMPOSTAZIONI_SALVATE });
+    salvaImpostazioniMail.mockResolvedValue({
+      impostazioni: { ...IMPOSTAZIONI_SALVATE, porta: 465 },
+    });
+
+    render(<MailServerPage />);
+
+    const porta = await screen.findByLabelText('Porta');
+    fireEvent.change(porta, { target: { value: '465' } });
+    expect(await screen.findByText(/Hai modifiche non salvate/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /salva impostazioni/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Hai modifiche non salvate/i)).not.toBeInTheDocument(),
+    );
+  });
+
+  it('senza niente di salvato resta il solo avviso di prima', async () => {
+    // Il caso «non c'e' ancora niente» ha gia' il suo avviso e il pulsante
+    // spento: due frasi sullo stesso posto direbbero la stessa cosa due volte.
+    leggiImpostazioniMail.mockResolvedValue({
+      impostazioni: {
+        ...IMPOSTAZIONI_SALVATE,
+        configurata: false,
+        origineInUso: 'env',
+        passwordSalvata: false,
+        aggiornatoIl: null,
+      },
+    });
+
+    render(<MailServerPage />);
+
+    const porta = await screen.findByLabelText('Porta');
+    fireEvent.change(porta, { target: { value: '465' } });
+
+    expect(
+      screen.getByText(/Salva le impostazioni per poter provare la connessione/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Hai modifiche non salvate/i)).not.toBeInTheDocument();
+  });
+});
