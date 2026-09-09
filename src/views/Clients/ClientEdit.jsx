@@ -113,6 +113,9 @@ const ClientEdit = () => {
                                     state: { fromListSearch: listSearch },
                                 })}
                                 loading={saving}
+                                // La pagina e' gia' dietro clients.edit: chi la vede puo' anche
+                                // creare una definizione di campo personalizzato.
+                                canCreateCustomFields
                             />
                         )}
                     </div>
