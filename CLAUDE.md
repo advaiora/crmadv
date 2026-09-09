@@ -27,7 +27,7 @@ Sul progetto lavorano **due assistenti, in due ambienti diversi, con mestieri di
 
 **I documenti condivisi restano condivisi.** `archivio-documenti/note-operative-ai.md` continua a valere per tutti e va aggiornato come sempre; solo le note di ambito locale vanno in `consulenza-postazione-locale/note-operative-locali.md`, con numerazione separata `L1, L2, …` — perché le note condivise sono numerate in sequenza, e due contesti che ne aggiungono in parallelo si scontrerebbero sullo stesso numero.
 
-⚠️ **Il test per decidere dove va una nota è uno solo: *cambierebbe quello che fa un agent che sviluppa dentro Paperclip?*** Se sì è **condivisa**, anche quando parla di Windows: le guide di avvio per Jacopo le scrive Paperclip, quindi le regole su come si scrivono (niente `&&` in PowerShell, i segnaposto, i comandi che occupano il terminale — nota **#66**) servono a lui. Se invece la nota descrive **dove gira l'assistente locale** — le cartelle sul PC, il suo terminale, il fatto che abbia accesso alla macchina di Jacopo — allora è locale. Il criterio esteso, con gli esempi, sta in cima a `note-operative-locali.md`.
+⚠️ **Il test per decidere dove va una nota è uno solo: *cambierebbe quello che fa un agent che sviluppa dentro Paperclip?*** Se sì è **condivisa**, anche quando parla di Windows: le guide di avvio per Jacopo le scrive Paperclip, quindi le regole su come si scrivono (niente `&&` in PowerShell, i segnaposto, i comandi che occupano il terminale — nota **#67**) servono a lui. Se invece la nota descrive **dove gira l'assistente locale** — le cartelle sul PC, il suo terminale, il fatto che abbia accesso alla macchina di Jacopo — allora è locale. Il criterio esteso, con gli esempi, sta in cima a `note-operative-locali.md`.
 
 ## Metodo di lavoro
 

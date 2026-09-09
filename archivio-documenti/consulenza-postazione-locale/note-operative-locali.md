@@ -21,7 +21,7 @@ Prima di scrivere una nota, la domanda è una sola:
 - **Sì** → va nel file **condiviso** `note-operative-ai.md`, con la numerazione progressiva. Ci finisce tutto ciò che riguarda **il prodotto** (come si comporta il codice, cosa mente, dove sono le trappole) e tutto ciò che riguarda **le istruzioni scritte per Jacopo** — le guide di avvio le scrive Paperclip, quindi le regole su come si scrivono servono a lui.
 - **No, ha senso solo su questa postazione** → resta **qui**, con la numerazione `L`. Ci finisce ciò che dipende da **dove giro io**: le due cartelle sul PC, il mio terminale, il fatto che ho accesso alla macchina di Jacopo, il modo in cui preparo i compiti da dargli in pasto.
 
-Nel dubbio vale l'esempio concreto: la regola *«nei comandi per Jacopo niente `&&`»* è **condivisa** (la #66), perché Paperclip scrive guide per Windows. La constatazione *«io ci casco perché il mio terminale è Git Bash»* è **locale**, perché descrive me, non il progetto.
+Nel dubbio vale l'esempio concreto: la regola *«nei comandi per Jacopo niente `&&`»* è **condivisa** (la #67), perché Paperclip scrive guide per Windows. La constatazione *«io ci casco perché il mio terminale è Git Bash»* è **locale**, perché descrive me, non il progetto.
 
 ---
 
@@ -31,7 +31,7 @@ Nel dubbio vale l'esempio concreto: la regola *«nei comandi per Jacopo niente `
 
 **Errore:** **io lavoro con lo strumento Bash (Git Bash), dove `&&` funziona.** La forma bash è quella che mi viene naturale perché è quella che provo, e non è quella che l'utente esegue. Non è distrazione: è una differenza sistematica fra il mio ambiente e il suo, che si manifesta ogni volta che consegno un comando.
 
-**Modo corretto:** le regole vere — cosa si può scrivere e cosa no, i segnaposto, i comandi che occupano il terminale — stanno nella **nota condivisa #66**, perché servono anche a chi scrive le guide da dentro Paperclip. Qui resta solo la causa, che è mia: **prima di consegnare un comando, chiedersi in quale shell verrà eseguito**, e non fidarsi del fatto che a me sia andato bene.
+**Modo corretto:** le regole vere — cosa si può scrivere e cosa no, i segnaposto, i comandi che occupano il terminale — stanno nella **nota condivisa #67**, perché servono anche a chi scrive le guide da dentro Paperclip. Qui resta solo la causa, che è mia: **prima di consegnare un comando, chiedersi in quale shell verrà eseguito**, e non fidarsi del fatto che a me sia andato bene.
 
 ---
 
