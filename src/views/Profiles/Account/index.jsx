@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { toggleCollapsedNav } from '../../../redux/action/Theme';
 import { useWorkspaceAccess } from '../../../hooks/useWorkspaceAccess';
+import ChangePasswordCard from './ChangePasswordCard';
 
 const MODULE_ROUTES = {
   dashboard: '/dashboard',
@@ -187,11 +188,21 @@ const Account = ({ toggleCollapsedNav }) => {
       <div className="hk-pg-header pt-7 pb-4">
         <h1 className="pg-title">Account e Accesso</h1>
         <p>
-          Ruoli, permessi e moduli realmente disponibili nel workspace corrente.
+          La password dell&apos;account, e il quadro di ruoli, permessi e moduli realmente
+          disponibili nel workspace corrente.
         </p>
       </div>
 
       <div className="hk-pg-body">
+        {/* Fuori dai rami di caricamento ed errore di proposito: cambiare la propria
+            password non dipende dal quadro dei permessi, e se quella lettura fallisce
+            l'utente non deve restare senza il solo comando che questa pagina ha. */}
+        <Row className="g-3 mb-3">
+          <Col lg={8}>
+            <ChangePasswordCard />
+          </Col>
+        </Row>
+
         {loading && (
           <div className="d-flex align-items-center gap-2 text-muted py-4">
             <Spinner animation="border" size="sm" />

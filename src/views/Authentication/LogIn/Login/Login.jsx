@@ -9,6 +9,7 @@ import { useSession } from "../../../../hooks/useSession";
 import { authenticateWithGoogle, GoogleAuthError } from "../../../../utils/googleAuthClient";
 import { requestGoogleIdToken } from "../../../../utils/googleIdentity";
 import { getClientRuntimeConfig } from "../../../../utils/runtimeConfig";
+import ForgotPasswordModal from "./ForgotPasswordModal";
 import AdvaioraLogoBlack from "../../../../assets/img/AdvaioraLogo-Black.png";
 
 const loginSchema = z.object({
@@ -58,7 +59,7 @@ const resolveGoogleLoginError = (error) => {
   });
 };
 
-const Login = ({ history }) => {
+const Login = ({ history, location }) => {
   const { login } = useSession();
 
   const [email, setEmail] = useState("");
@@ -68,6 +69,13 @@ const Login = ({ history }) => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+
+  // Chi arriva da `/reset-password` ha appena scelto una password nuova e non ha
+  // una sessione: la conferma non ne apre nessuna, per scelta del server. Senza
+  // questa riga atterrerebbe su una schermata di accesso muta, senza sapere se
+  // il cambio sia andato a buon fine.
+  const passwordJustReset = location?.state?.passwordReset === true;
 
   const { apiBaseUrl, googleClientId, googleRedirectUri, googleDebugRawResponse } = getClientRuntimeConfig();
   const isBusy = loading || googleLoading;
@@ -251,6 +259,12 @@ const Login = ({ history }) => {
                       </p>
                     </div>
 
+                    {passwordJustReset && !error && (
+                      <Alert variant="success" className="py-2">
+                        Password aggiornata. Entra con quella nuova.
+                      </Alert>
+                    )}
+
                     {error && (
                       <Alert variant="danger" className="py-2">
                         <div>{error}</div>
@@ -325,6 +339,17 @@ const Login = ({ history }) => {
                         <Form.Control.Feedback type="invalid">{fieldErrors.password}</Form.Control.Feedback>
                       </Form.Group>
 
+                      <div className="text-end mb-3">
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="p-0 fs-7"
+                          onClick={() => setForgotPasswordOpen(true)}
+                        >
+                          Password dimenticata?
+                        </Button>
+                      </div>
+
                       <Button type="submit" className="w-100" disabled={isBusy}>
                         {loading ? (
                           <span className="d-inline-flex align-items-center">
@@ -366,6 +391,12 @@ const Login = ({ history }) => {
           </Row>
         </Container>
       </div>
+
+      <ForgotPasswordModal
+        show={forgotPasswordOpen}
+        onHide={() => setForgotPasswordOpen(false)}
+        defaultEmail={email}
+      />
     </div>
   );
 };
