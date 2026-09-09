@@ -1076,6 +1076,15 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 **Modo corretto:**
 - Davanti a un conflitto su un file a voci numerate, la domanda non e' *quale delle due tengo* ma **se sono una lezione o due**: uno stesso episodio con uno stesso errore e' **una nota sola**, anche quando due rami l'hanno scritta due volte in parallelo; due lezioni davvero distinte diventano #N e #N+1, e la seconda **rimanda alla prima invece di ripeterne il contesto**.
 - **Il numero libero si legge sul ramo di destinazione, non sul proprio** — `git show origin/main:archivio-documenti/note-operative-ai.md | grep -n '^## [0-9]' | tail -3` — ed e' il **piu' alto piu' uno**, non il conteggio delle note (il file non e' in ordine numerico). ⚠️ Questo non basta a evitare la collisione: due rami partiti dallo stesso `main` leggono lo stesso "piu' alto" e scelgono lo stesso numero. Con piu' di una pull request di documenti aperta, **il numero va verificato anche contro gli altri rami aperti**: `git log --oneline origin/main..origin/<altro-ramo> -- archivio-documenti/note-operative-ai.md`.
+  ⚠️ **Correzione del 9/9/2026 (CRMA-54): «gli altri rami aperti» vuol dire TUTTI i rami remoti, non solo quelli con una pull request.** Questa riga diceva «con piu' di una pull request aperta», e non basta: quel giorno la catena era `main` → PR #19 (`cronista/crma-36-…`, note #70-#72) → `cronista/crma-51-…` (note #73-#79), e **il secondo ramo non aveva ancora nessuna PR**. Chi si fosse fermato alle PR avrebbe letto «72» e scelto #73, che era gia' preso. Il comando che non sbaglia guarda tutti i rami in una volta, e costa un secondo:
+  ```
+  git fetch origin
+  for b in $(git branch -r --format='%(refname:short)' | grep -v HEAD); do
+    git show "$b:archivio-documenti/note-operative-ai.md" 2>/dev/null \
+      | grep -oE '^## [0-9]+\.' | grep -oE '[0-9]+' | sort -n | tail -1 \
+      | sed "s|^|$b |"
+  done | sort -k2 -rn | head -3
+  ```
 - **Prima di unire, la prova costa un comando e non tocca l'albero di lavoro:** `git merge-tree --write-tree <ramo-a> <ramo-b>` restituisce l'albero del risultato, e `git show <albero>:archivio-documenti/note-operative-ai.md | grep -c '^## 70\.'` dice se i capitoli 70 sono uno o due. Funziona anche a catena, incapsulando il risultato in un commit di prova con `git commit-tree`: cosi' si verifica l'unione **in sequenza** di tre rami senza fare un solo `checkout`. E' l'unico modo praticabile quando l'albero di lavoro e' occupato da un altro compito, come succede di continuo su Paperclip, dove tutti gli agent condividono la stessa cartella.
 - **La correzione si fa sui rami, prima dell'unione.** Dopo, i due capitoli 70 sono su `main` e ogni citazione «nota #70» resta ambigua per sempre: un numero e' un'identita', non una posizione, e non si rinumera.
 - **Com'e' finita, per chi cerca il precedente:** le due #70 erano un episodio solo con un errore solo, quindi sono diventate **una nota sola** — la **#70** qui sopra, che tiene il caso e la conseguenza sui nomi; il ramo della PR #20 e' stato alleggerito della sua copia. Questa #71 e' nata dopo, ed e' un'altra lezione: non i due sistemi con lo stesso nome, ma il meccanismo che fa collidere due numeri.
@@ -1192,3 +1201,26 @@ npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
 - Si confronta l'uscita con il `migration.sql` committato **togliendo i commenti** (`grep -v '^--'`) e **ordinando le righe**: l'ordine dei blocchi `AlterTable` fra tabelle indipendenti non conta. Identici = migrazione fedele allo schema, provata in **tutte e due** le direzioni con un comando solo. Diversi = il posto esatto dove guardare.
 - ⚠️ `--from-schema-datamodel` (i due schemi) **non e'** `--from-schema-datasource` (schema contro database vero, quello della #16): si somigliano e fanno cose diverse.
 - ⚠️ Questo confronto **non** prova che la migrazione si applichi davvero su un database esistente: quello resta da fare dove un database c'e' (note **#15** e **#16**).
+
+## 80. Una bozza da depositare puo' essere gia' stata depositata da un altro run: si cerca il suo CONTENUTO sui rami, non il suo numero
+
+**Contesto:** 9/9/2026, CRMA-54. Il compito chiedeva, fra le altre cose, di depositare in coda a questo file «la bozza di nota operativa consegnata nel commento di chiusura di CRMA-49», con un numero «che non sia gia' usato da un'altra nota» — e avvertiva che una collisione era gia' successa una volta (e' la nota **#71**).
+
+**Errore:** trattarlo come un problema di **numero**, che e' quello che l'avvertimento suggeriva, e cercare la bozza dove il compito diceva che stava. Due cose non tornavano, e nessuna delle due dava errore:
+
+1. **Su CRMA-49 non c'era nessun commento di chiusura** (`GET /api/issues/<id>/comments` → `0`). La bozza stava sul commento di chiusura di **CRMA-42**, il compito *padre*, quello che l'aveva prodotta leggendo il codice. Concludere «non c'e', la scrivo io» avrebbe generato una seconda versione della stessa lezione.
+2. **La bozza era gia' depositata da un altro run**, come nota **#74**, sul ramo `cronista/crma-51-nota-paragrafo-che-fa-il-conto`, che non aveva ancora una pull request. Depositarla di nuovo avrebbe messo **la stessa lezione sotto due numeri diversi** — e questo git non lo segnala mai: due numeri diversi non fanno conflitto testuale, e la prova della **#71** (`git show <albero>:… | grep -c '^## 70\.'`) conta i numeri, non il contenuto. Sarebbe passata l'unione senza un rumore, ed e' il caso peggiore dei due: un numero doppio si vede a occhio, una lezione doppia no.
+
+**Modo corretto:**
+- **Prima di depositare una bozza, cercarne il contenuto su tutti i rami remoti, non solo il numero libero.** Con i titoli in mano si vedono tutte e due le cose in un colpo:
+  ```
+  git fetch origin
+  for b in $(git branch -r --format='%(refname:short)' | grep -v HEAD); do
+    git show "$b:archivio-documenti/note-operative-ai.md" 2>/dev/null \
+      | grep -E '^## [0-9]+\.' | sed "s|^|$b |"
+  done | sort -u
+  ```
+  Il titolo porta la lezione, quindi l'elenco dei titoli basta a riconoscere un doppione senza aprire niente.
+- **La provenienza scritta nel compito e' una pista, non un fatto** (e' la **#56** applicata alle issue invece che ai documenti): se il compito indicato non ha commenti, la bozza si cerca **sui compiti vicini** — il padre, i fratelli, quelli chiusi dall'ultimo giro — prima di dichiararla mancante.
+- **Quando la catena delle note vive su rami non ancora uniti, la nota nuova si scrive in cima a quella catena, non su `main`.** Appendere a `main` lascia il file con un salto visibile (qui sarebbe stato #69 → #80) e produce un conflitto garantito in coda al file, perche' tutte le note si aggiungono nello stesso punto. Costa un `git worktree` sulla punta della catena, ed e' la **#71** applicata *prima* dell'unione invece che dopo.
+- **Il risultato di questo giro, per chi cerca il precedente:** la bozza di CRMA-42 **non** e' stata ridepositata — vive come **#74** e basta. Questa #80 e' l'altra lezione, quella che il giro ha prodotto davvero.
