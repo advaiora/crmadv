@@ -64,3 +64,4 @@
 | 2026-08-25 15:00 | Controllo finale skill Paperclip e lista operativa fase 0 | 2h 41m | 18,6 | 0,12 | nessuno | — |
 | 2026-08-26 11:46 | Pacchetto azienda Paperclip + riscrittura lista fase 0 | 20h 29m | 19,2 | 0,02 | nessuno | — |
 | 2026-08-26 13:06 | Pacchetto Paperclip: verifica sull'export vero e correzione dei campi agent | 47 min | 13,7 | 0,29 | nessuno | — |
+| 2026-09-09 09:17 | Unione dei nove rami della release di settembre (passo zero A1) | 28 min | 11,4 | 0,41 | revisore×1 | -2,9 |
