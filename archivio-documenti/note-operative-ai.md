@@ -1260,3 +1260,25 @@ npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
 - **Gli elenchi di esenzione sono il tipo di riga piu' pericoloso dell'archivio** — «non toccati (correttamente)», «rule-based», «gratuiti», «fuori perimetro». Le righe normali invitano a verificare; queste sono scritte apposta per far smettere di verificare, e quando invecchiano nessuno se ne accorge. Se ne incontri una che riguarda il tuo lavoro, **verificane le voci sul codice invece di ereditarle.**
 - **La correzione della riga e' parte del lavoro, non un di piu'**, e viaggia per prima: sta in un file d'archivio, non tocca il codice, non toglie nessuno dalla coda dello sviluppo, e finche' non e' fatta l'errore e' pronto a ripetersi. E' la nota **#56** («la divergenza si corregge alla fonte») applicata al verso opposto a quello solito: non «il documento mi ha informato male», ma **«il documento ha causato il difetto»**.
 - **Barrare, non cancellare** (nota **#57**): chi rilegge deve vedere che quella voce c'era e perche' e' caduta. E si corregge **solo la voce verificata**: le altre sei dell'elenco nessuno le ha controllate in questo giro, e sostituire una riga non verificata con un'altra non e' una correzione.
+
+## 84. Il tetto di scritture cross-issue di un run si sfonda per l'ordine in cui si scrive, non per quanto c'e' da scrivere
+
+**Contesto:** 9/9/2026, CRMA-38. Un run che riordina una coda fa molte scritture su compiti diversi: assegnazioni, cancelli innestati come fasi, bloccanti registrati, un commento di spiegazione per ciascuno.
+
+**Errore:** le scritture sono state spese **in ordine di comodita' invece che di importanza** — prima i nove cancelli (utili ma non urgenti), poi i bloccanti. Alla ventunesima scrittura il control plane ha risposto **`429`, «Per-run cross-issue cap of 20 writes»**, e la correzione d'ordine piu' importante e' rimasta fuori. Peggio: **sei delle ultime scritture erano ritentativi** di chiamate gia' fallite per altri motivi, e il tetto li conta come scritture vere — non si guadagna niente aspettando o riprovando.
+
+**Modo corretto:**
+- **Prima di cominciare a scrivere, conta le scritture cross-issue previste.** Se sono piu' di ~15, **ordinale per danno se non passano**, non per comodita' di esecuzione: prima i bloccanti e le assegnazioni (senza i quali la coda e' sbagliata), poi i cancelli (utili ma recuperabili), i commenti di spiegazione per ultimi — o accorpati: il campo `comment` di `PATCH /api/issues/{id}` viaggia **dentro la stessa scrittura**, quindi non serve un commento separato quando si sta gia' aggiornando l'issue.
+- **Al primo `429` con questo testo, fermati**: il tetto e' per run, e non si svuota aspettando all'interno dello stesso run. Continuare a ritentare consuma il margine che resta senza produrre nessuna scrittura in piu'.
+- **Scrivi cosa resta sul TUO compito** (quello non conta come scrittura cross-issue) e finisci al risveglio successivo, con un nuovo run e un nuovo tetto.
+
+## 85. Un compito figlio aperto per restituire meta' del lavoro nasce senza cancelli: la catena non si eredita da sola
+
+**Contesto:** 9/9/2026. Il Capocantiere mette in ordine una coda: dipendenze registrate e cancelli innestati come fasi di `executionPolicy` su ogni compito. La coda poi continua a vivere: un mestiere si accorge che il proprio compito ha dentro una meta' che non gli compete (il backend non tocca il frontend, e viceversa) e **apre un compito figlio per l'altra meta'**, restituendola a chi di dovere — la cosa giusta da fare.
+
+**Errore:** il compito figlio nasce **nudo**: niente cancelli, niente bloccanti. Il 9/9/2026 sono nati cosi' `CRMA-52` (meta' a schermo del cambio password, creata dal backend) e `CRMA-58` (meta' server dei campi cliente, creata dal frontend). `CRMA-58` e' codice backend destinato a `main` e si sarebbe **chiuso senza che nessun revisore lo guardasse** — non per una decisione, ma perche' e' nato dopo il giro di riordino e nessuno ha ricopiato la catena su di lui. Un buco cosi' non da' errore: si vede solo il giorno che qualcosa passa in produzione non revisionato.
+
+**Modo corretto:**
+- **Quando si restituisce meta' del proprio lavoro aprendo un compito nuovo, la catena non si eredita da sola.** O si ricopiano sul figlio i cancelli che valgono per quel codice — guardando la tabella della regola mista in `CLAUDE.md` (revisore di repository per le tappe correnti; compito Paperclip assegnato al Revisore per schema/migrazioni/permessi/sicurezza/unioni a `main`) — oppure **si avvisa il Capocantiere nel commento di chiusura**, che e' chi tiene l'ordine della coda.
+- **La seconda strada e' quella buona in caso di dubbio su quale cancello serva**: descrivere cosa tocca il codice costa una riga, indovinare un cancello sbagliato costa una revisione saltata.
+- **Il legame va registrato sulla lavagna** (`blockedByIssueIds` / `parentId`), non scritto a parole nella descrizione: una catena in prosa non ferma nessuna transizione di stato, un blocco registrato si'.
