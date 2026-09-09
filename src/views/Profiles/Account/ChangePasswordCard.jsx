@@ -83,7 +83,7 @@ const ChangePasswordCard = () => {
       setSuccessMessage(
         result?.otherSessionsRevoked
           ? 'Password aggiornata. Gli altri accessi con la password vecchia sono stati chiusi; questa sessione resta attiva.'
-          : 'Password aggiornata.',
+          : 'Password aggiornata, ma gli altri accessi con la password vecchia potrebbero essere ancora attivi.',
       );
     } catch (requestError) {
       setErrorCode(requestError?.code || '');

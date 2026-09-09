@@ -79,6 +79,20 @@ describe('Cambia password', () => {
     expect(screen.getByLabelText('Password nuova')).toHaveValue('');
   });
 
+  it('se il server non conferma la chiusura degli altri accessi, avverte invece di tacere', async () => {
+    // Ramo oggi irraggiungibile (la rotta scrive sempre `true`), ma va tenuto
+    // sotto test perche' e' il caso che il rilievo del Guardiano ha chiesto di
+    // far parlare: se un domani tornasse `false`, l'utente non deve leggere un
+    // "Password aggiornata." che gli fa credere chiuse sessioni rimaste aperte.
+    apiPost.mockResolvedValue({ changed: true, otherSessionsRevoked: false, token: 'token-nuovo' });
+
+    render(<ChangePasswordCard />);
+    compila();
+    invia();
+
+    expect(await screen.findByText(/potrebbero essere ancora attivi/i)).toBeInTheDocument();
+  });
+
   it('non chiama il server se le due password nuove non coincidono', () => {
     render(<ChangePasswordCard />);
     compila({ conferma: 'altracosa' });
