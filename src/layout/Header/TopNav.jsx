@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import SimpleBar from 'simplebar-react';
 import { AlignLeft, Bell, Globe, LogOut, Settings } from 'react-feather';
 import { Button, Container, Dropdown, Nav, Navbar } from 'react-bootstrap';
 import { connect } from 'react-redux';
 import { Link, useHistory, useLocation } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify';
+import { ToastContainer } from 'react-toastify';
 import HkBadge from '../../components/@hk-badge/@hk-badge';
 import { toggleCollapsedNav } from '../../redux/action/Theme';
 import { ThemeSwitcher } from '../../utils/theme-provider/theme-switcher';
@@ -16,124 +16,10 @@ import { readUserAvatar, USER_PROFILE_PREFS_CHANGED_EVENT } from '../../lib/user
 import { PROFILE_UPDATED_EVENT } from '../../lib/profileEvents';
 import { CommandPaletteTrigger } from '../../components/command-palette/CommandPalette';
 import { AiChatTrigger } from '../../views/Agency/chat/AiChatWidget';
-import { listMessagingUsers } from '../../modules/messaging/api/messagingApi';
 import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from '../../modules/messaging/ui/constants';
+import { MESSAGING_NOTIFICATIONS_CONTAINER_ID, useMessagingUnreadPoll } from './useMessagingUnreadPoll';
+import { buildInitials, formatActivityTime, prettifyAction, resolveMobilePageTitle } from './topNavFormatters';
 import 'react-toastify/dist/ReactToastify.css';
-
-const ACTION_LABELS = {
-    'me.view': 'Profilo e permessi visualizzati',
-    'quotes.email.send': 'Email preventivo inviata',
-    'quotes.email.resend': 'Email preventivo reinviata',
-    'quotes.create': 'Preventivo creato',
-    'quotes.update': 'Preventivo aggiornato',
-    'quotes.delete': 'Preventivo eliminato',
-    'clients.create': 'Cliente creato',
-    'clients.update': 'Cliente aggiornato',
-    'clients.delete': 'Cliente eliminato',
-    'vault.create': 'Credenziale creata',
-    'vault.edit': 'Credenziale aggiornata',
-    'vault.delete': 'Credenziale eliminata',
-    'vault.reveal': 'Credenziale visualizzata',
-    'vault.reveal_denied': 'Visualizzazione credenziale negata',
-    'roles.assign': 'Ruolo assegnato',
-    'roles.update': 'Ruolo aggiornato',
-    'roles.create': 'Ruolo creato',
-    'roles.delete': 'Ruolo eliminato',
-    'modules.enable': 'Modulo attivato',
-    'modules.disable': 'Modulo disattivato',
-    'branding.update': 'Branding workspace aggiornato',
-};
-
-const MESSAGING_POLL_INTERVAL_MS = 2000;
-const MESSAGING_NOTIFICATIONS_CONTAINER_ID = 'workspace-messaging-notifications';
-
-const normalizeUnreadCount = (value) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
-};
-
-const truncateText = (value, maxLength = 80) => {
-    if (!value || typeof value !== 'string') {
-        return '';
-    }
-
-    const normalized = value.trim();
-    if (normalized.length <= maxLength) {
-        return normalized;
-    }
-
-    return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
-};
-
-const prettifyAction = (action) => {
-    if (!action || typeof action !== 'string') {
-        return 'Attivita registrata';
-    }
-
-    return ACTION_LABELS[action] || action.replaceAll('.', ' ');
-};
-
-const formatActivityTime = (isoDate) => {
-    if (!isoDate) {
-        return '';
-    }
-
-    const parsedDate = new Date(isoDate);
-    if (Number.isNaN(parsedDate.getTime())) {
-        return '';
-    }
-
-    return parsedDate.toLocaleString('it-IT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-};
-
-const buildInitials = (value) => {
-    if (!value || typeof value !== 'string') {
-        return 'U';
-    }
-
-    const words = value
-        .trim()
-        .split(' ')
-        .filter(Boolean);
-
-    if (words.length === 0) {
-        return 'U';
-    }
-
-    if (words.length === 1) {
-        return words[0].slice(0, 2).toUpperCase();
-    }
-
-    return `${words[0][0]}${words[1][0]}`.toUpperCase();
-};
-
-const resolveMobilePageTitle = (pathname) => {
-    if (!pathname || pathname === '/') {
-        return 'Dashboard';
-    }
-
-    if (pathname.startsWith('/dashboard')) return 'Dashboard';
-    if (pathname.startsWith('/agency')) return 'Produzione AI';
-    if (pathname.startsWith('/apps/clients')) return 'Clienti';
-    if (pathname.startsWith('/projects')) return 'Progetti';
-    if (pathname.startsWith('/apps/quotes')) return 'Preventivi';
-    if (pathname.startsWith('/apps/team')) return 'Team';
-    if (pathname.startsWith('/apps/email')) return 'Messaggi';
-    if (pathname.startsWith('/apps/calendar')) return 'Calendario';
-    if (pathname.startsWith('/apps/vault')) return 'Credenziali';
-    if (pathname.startsWith('/apps/web-assets')) return 'Siti in gestione';
-    if (pathname.startsWith('/audit')) return 'Audit';
-    if (pathname.startsWith('/pages/profile')) return 'Profilo';
-    if (pathname.startsWith('/settings')) return 'Impostazioni';
-
-    return 'CRM';
-};
 
 const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const history = useHistory();
@@ -143,10 +29,6 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const [loadingNavbarData, setLoadingNavbarData] = useState(false);
     const [navbarDataError, setNavbarDataError] = useState('');
     const [userAvatarUrl, setUserAvatarUrl] = useState('');
-    const [messagingUnreadCount, setMessagingUnreadCount] = useState(0);
-    const [messagingPollingBlocked, setMessagingPollingBlocked] = useState(false);
-    const unreadByUserRef = useRef(new Map());
-    const hasMessagingBaselineRef = useRef(false);
 
     const loadNavbarData = useCallback(async () => {
         setLoadingNavbarData(true);
@@ -189,10 +71,7 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
         logout();
         setNavbarData(null);
         setNavbarDataError('');
-        setMessagingUnreadCount(0);
-        setMessagingPollingBlocked(false);
-        unreadByUserRef.current = new Map();
-        hasMessagingBaselineRef.current = false;
+        resetMessagingUnread();
         history.push('/login');
     };
 
@@ -220,75 +99,12 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
     const avatarUserId = user?.id || session?.userId || '';
     const mobilePageTitle = useMemo(() => resolveMobilePageTitle(location.pathname), [location.pathname]);
 
-    const pollMessagingUnread = useCallback(async () => {
-        if (!session?.accessToken || !canViewMessaging || messagingPollingBlocked) {
-            return;
-        }
-
-        try {
-            const result = await listMessagingUsers({ limit: 80 });
-            const contacts = Array.isArray(result?.items) ? result.items : [];
-
-            const nextUnreadByUser = new Map();
-            let nextUnreadCount = 0;
-
-            contacts.forEach((contact) => {
-                const unreadCount = normalizeUnreadCount(contact?.unreadCount);
-                nextUnreadCount += unreadCount;
-                nextUnreadByUser.set(contact.userId, {
-                    ...contact,
-                    unreadCount,
-                });
-            });
-
-            if (hasMessagingBaselineRef.current && !onMessagingPage) {
-                contacts.forEach((contact) => {
-                    const previousUnreadCount = normalizeUnreadCount(
-                        unreadByUserRef.current.get(contact.userId)?.unreadCount,
-                    );
-                    const currentUnreadCount = normalizeUnreadCount(contact?.unreadCount);
-                    const unreadDelta = currentUnreadCount - previousUnreadCount;
-
-                    if (unreadDelta <= 0) {
-                        return;
-                    }
-
-                    const senderName = contact?.name || contact?.email || 'utente';
-                    const preview = truncateText(contact?.lastMessagePreview, 72);
-                    const toastMessage = unreadDelta > 1
-                        ? `${senderName} ti ha inviato ${unreadDelta} nuovi messaggi.`
-                        : `Nuovo messaggio da ${senderName}${preview ? `: ${preview}` : ''}`;
-
-                    toast.info(toastMessage, {
-                        containerId: MESSAGING_NOTIFICATIONS_CONTAINER_ID,
-                        autoClose: 5000,
-                        onClick: () => history.push('/apps/email'),
-                    });
-                });
-            }
-
-            unreadByUserRef.current = nextUnreadByUser;
-            hasMessagingBaselineRef.current = true;
-            setMessagingUnreadCount(nextUnreadCount);
-        } catch (error) {
-            if (Number(error?.status) === 401) {
-                return;
-            }
-
-            if (Number(error?.status) === 403 || Number(error?.status) === 404) {
-                setMessagingPollingBlocked(true);
-                setMessagingUnreadCount(0);
-                unreadByUserRef.current = new Map();
-                hasMessagingBaselineRef.current = false;
-            }
-        }
-    }, [
-        canViewMessaging,
-        history,
-        messagingPollingBlocked,
+    const handleNavigateToMessaging = useCallback(() => history.push('/apps/email'), [history]);
+    const { unreadCount: messagingUnreadCount, resetAll: resetMessagingUnread } = useMessagingUnreadPoll({
+        enabled: Boolean(session?.accessToken) && canViewMessaging,
         onMessagingPage,
-        session?.accessToken,
-    ]);
+        onNavigateToMessaging: handleNavigateToMessaging,
+    });
 
     useEffect(() => {
         if (!avatarUserId) {
@@ -309,58 +125,6 @@ const TopNav = ({ navCollapsed, toggleCollapsedNav }) => {
             window.removeEventListener('storage', syncAvatar);
         };
     }, [avatarUserId]);
-
-    useEffect(() => {
-        if (!session?.accessToken || !canViewMessaging || messagingPollingBlocked) {
-            setMessagingUnreadCount(0);
-            unreadByUserRef.current = new Map();
-            hasMessagingBaselineRef.current = false;
-            return undefined;
-        }
-
-        let timeoutId;
-        let cancelled = false;
-
-        const runPollingCycle = async () => {
-            if (cancelled) {
-                return;
-            }
-
-            await pollMessagingUnread();
-
-            if (cancelled) {
-                return;
-            }
-
-            timeoutId = window.setTimeout(runPollingCycle, MESSAGING_POLL_INTERVAL_MS);
-        };
-
-        void runPollingCycle();
-
-        return () => {
-            cancelled = true;
-            if (timeoutId) {
-                window.clearTimeout(timeoutId);
-            }
-        };
-    }, [canViewMessaging, messagingPollingBlocked, pollMessagingUnread, session?.accessToken]);
-
-    useEffect(() => {
-        if (typeof document === 'undefined') {
-            return undefined;
-        }
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                void pollMessagingUnread();
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [pollMessagingUnread]);
 
     return (
         <>
