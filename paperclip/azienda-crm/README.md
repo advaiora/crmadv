@@ -6,7 +6,7 @@
 ## In una riga
 
 Questo pacchetto contiene **l'azienda di agent al completo**: dieci mestieri, le loro istruzioni,
-le quattro basi di conoscenza e il progetto su cui lavoreranno. **Nasce tutto spento.**
+le cinque basi di conoscenza e il progetto su cui lavoreranno. **Nasce tutto spento.**
 
 ## Cosa c'è dentro
 
@@ -14,7 +14,7 @@ le quattro basi di conoscenza e il progetto su cui lavoreranno. **Nasce tutto sp
 |---|---|
 | `COMPANY.md` | Chi comanda (voi due), il principio che regge l'azienda, le sei regole non negoziabili |
 | `agents/` | **Dieci cartelle, un mestiere ciascuna.** Dentro ognuna, `AGENTS.md`: l'intestazione è la scheda dell'agent, il testo sotto sono le sue istruzioni permanenti |
-| `skills/` | Le **quattro basi di conoscenza** già scritte, per intero (vendorizzate: niente da scaricare) |
+| `skills/` | Le **cinque basi di conoscenza** già scritte, per intero (vendorizzate: niente da scaricare). Quattro sono di mestiere; `crm-note-operative` ce l'hanno **tutti e dieci** |
 | `projects/sviluppo-crm/` | Il progetto sotto cui nasceranno i compiti veri |
 | `.paperclip.yaml` | La configurazione tecnica |
 | `ISTRUZIONI-PER-AGENT.md` | Cosa deve fare l'agent che riceve questo pacchetto, in che ordine, e **dove fermarsi** |

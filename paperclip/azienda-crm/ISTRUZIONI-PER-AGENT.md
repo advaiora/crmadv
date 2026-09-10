@@ -6,7 +6,7 @@
 
 ## Il mandato, in una frase
 
-**Crea in Paperclip i dieci agent descritti in `agents/`, installa le quattro skill di `skills/`,
+**Crea in Paperclip i dieci agent descritti in `agents/`, installa le cinque skill di `skills/`,
 crea il progetto di `projects/`, e non accendere niente.**
 
 In azienda è già installata la skill **`paperclip-create-agent`**: è fatta esattamente per questo
@@ -78,9 +78,10 @@ curl -sS "$PAPERCLIP_API_URL/llms/agent-icons.txt" -H "Authorization: Bearer $PA
 **Quelli sono lo schema autorevole. Il mio è una traduzione.** Se i due divergono, vince il suo:
 prendi i **valori** dal pacchetto e mettili nei **campi** che lui dichiara.
 
-## Passo 2 — Installa le quattro skill
+## Passo 2 — Installa le cinque skill
 
-In `skills/` ci sono quattro cartelle, ognuna con `SKILL.md` e una cartella `references/`.
+In `skills/` ci sono cinque cartelle, ognuna con `SKILL.md` e una cartella `references/`.
+⚠️ `crm-note-operative` va attaccata a **tutti e dieci** gli agent, non a un mestiere solo.
 **Sono vendorizzate**, cioè il contenuto è lì per intero: non vanno scaricate da nessuna parte, e
 non hanno una sorgente GitHub a cui puntare.
 
@@ -170,7 +171,7 @@ Scrivi un commento sul compito con:
 ## Come si capisce che il lavoro è riuscito
 
 Nell'organigramma ci sono **dieci agent** (o dieci assunzioni in attesa di firma), tutti con il
-risveglio spento, il Capocantiere in cima e gli altri nove che rispondono a lui. Le quattro skill
-sono nella libreria. Il progetto "Sviluppo CRM" esiste.
+risveglio spento, il Capocantiere in cima e gli altri nove che rispondono a lui. Le cinque skill
+sono nella libreria, e `crm-note-operative` risulta attaccata a tutti e dieci gli agent. Il progetto "Sviluppo CRM" esiste.
 
 **Se una sola di queste cose non è vera, il lavoro non è riuscito a metà: è da riferire.**
