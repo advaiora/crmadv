@@ -1,8 +1,222 @@
 #!/bin/sh
-# Rigenera la mappa progetto (archivio-documenti/mappa/, generata, non committata).
+# ===========================================================================
+# Hook pre-commit del progetto. Git ne esegue UNO SOLO: qui dentro stanno
+# due controlli con severita' OPPOSTE, ed e' voluto.
+#
+#   PARTE 1 - rigenerazione della mappa: NON blocca mai (solo un avviso).
+#   PARTE 2 - cintura di sicurezza sui segreti: BLOCCA il commit (exit 1).
+#
+# Tenerle separate serve a non farle scivolare l'una nell'altra: una mappa
+# non rigenerata e' un fastidio, una password committata e' un incidente.
+# Attivazione (una volta per clone):  git config core.hooksPath .githooks
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# PARTE 1 - Mappa progetto (archivio-documenti/mappa/, generata, non committata).
 # Forma leggera decisa il 4/8/2026 (registro in archivio-documenti/team-agenti.md):
 # sub-secondo, NON blocca mai il commit — tiene la mappa fresca anche se una
-# sessione dimentica `npm run mappa`. Attivazione: git config core.hooksPath .githooks
+# sessione dimentica `npm run mappa`.
+# ---------------------------------------------------------------------------
 if ! node scripts/agenti/mappa.mjs >/dev/null 2>&1; then
   echo "[avviso] mappa non rigenerata (node scripts/agenti/mappa.mjs fallito): rigenerala a mano" >&2
+fi
+
+# ---------------------------------------------------------------------------
+# PARTE 2 - Cintura di sicurezza: segreti in stage. QUESTA BLOCCA (exit 1).
+#
+# Perche' esiste: il 10/2/2026 il file `.env` e' stato committato con dentro la
+# password del superuser PostgreSQL e nessuno se n'e' accorto per sette mesi
+# (compito CRMA-67). Il `.gitignore` da solo non basta: `git add -f` lo scavalca.
+#
+# Perche' e' scritto in Node e non in grep/awk: in questo contenitore `grep` e'
+# ugrep (rifiuta le retro-referenze POSIX `\1`) e `awk` e' mawk, mentre su Git
+# Bash per Windows sono altri programmi ancora. Node c'e' su entrambe le
+# postazioni, e' gia' un requisito del progetto (lo usa anche la PARTE 1) e le
+# sue espressioni regolari si comportano allo stesso modo ovunque.
+#
+# VIA D'USCITA, dichiarata anche nel messaggio d'errore:  git commit --no-verify
+# ---------------------------------------------------------------------------
+CONTROLLO_SEGRETI=$(cat <<'JS'
+const { execFileSync } = require('node:child_process');
+
+const git = (...args) =>
+  execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+
+// --- Che cosa NON deve mai entrare in un commit --------------------------
+// I nomi di file di ambiente. Qualunque profondita': conta solo il nome.
+const AMBIENTE_AMMESSI = new Set([
+  '.env.example', '.env.sample', '.env.template', '.env.dist',
+]);
+const eFileDiAmbiente = (nome) => nome === '.env' || nome.startsWith('.env.');
+
+// I contenuti. Ogni regola dice come si chiama, cosi' il messaggio e' leggibile.
+const REGOLE = [
+  {
+    nome: 'stringa di connessione con credenziali',
+    re: /\b(postgresql|postgres|mysql|mariadb|mongodb\+srv|mongodb|rediss|redis|amqps|amqp):\/\/([^:/@\s"'`]+):([^@\s"'`]+)@/gi,
+    credenziali: true,
+  },
+  { nome: 'chiave API Anthropic',        re: /\bsk-ant-[A-Za-z0-9_-]{16,}/g },
+  { nome: 'chiave API OpenAI',           re: /\bsk-proj-[A-Za-z0-9_-]{16,}/g },
+  { nome: 'chiave di accesso AWS',       re: /\bAKIA[0-9A-Z]{16}\b/g },
+  { nome: 'token Slack',                 re: /\bxox[baprs]-[0-9A-Za-z-]{10,}/g },
+  { nome: 'chiave service_role',         re: /service_role[^A-Za-z0-9]{0,12}ey[A-Za-z0-9_.-]{20,}/gi },
+  { nome: 'chiave privata',              re: /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g },
+];
+
+// --- Le esclusioni, scritte qui perche' il prossimo le trovi ---------------
+// (1) PERCORSI che per mestiere contengono segreti finti. Nella storia del
+//     progetto ci sono gia': `sk-ant-vecchia` e `sk-ant-nuova` nei test del
+//     frontend, `sk-ant-api03-${...}` in provider-api-key-env.test.ts.
+//     ⚠️ Ci sta dentro anche questo hook: il file elenca per forza i pattern
+//     che cerca, quindi senza l'esclusione si bloccherebbe da solo appena
+//     qualcuno lo modifica.
+const PERCORSI_ESCLUSI = [
+  /(^|\/)__tests__\//,
+  /(^|\/)__mocks__\//,
+  /\.(test|spec)\.[cm]?[jt]sx?$/,
+  /(^|\/)\.githooks\/pre-commit$/,
+];
+
+// (2) PASSWORD che sono segnaposto, non segreti. Nella storia esistono gia':
+//     `postgres:postgres` (utente uguale a password, in auth-login.smoke.ts),
+//     `test-user:test-pass` (runtime-env.unit.test.ts), `user:pass` nel
+//     messaggio d'errore di runtime-env.ts, `postgres:LA-TUA-PASSWORD` in
+//     installazione-e-avvio.md.
+//     ⚠️ Ampliare questa lista con parsimonia: ogni voce e' un buco.
+const PASSWORD_SEGNAPOSTO = new Set([
+  'password', 'pass', 'passwd', 'secret', 'test-pass', 'testpass',
+  'changeme', 'change-me', 'example', 'esempio', 'placeholder',
+  'mypassword', 'yourpassword', 'tuapassword',
+]);
+
+function eSegnaposto(utente, password) {
+  if (utente.toLowerCase() === password.toLowerCase()) return true;   // postgres:postgres
+  if (PASSWORD_SEGNAPOSTO.has(password.toLowerCase())) return true;   // user:pass
+  if (/^[A-Z0-9]+([-_][A-Z0-9]+)+$/.test(password)) return true;      // LA-TUA-PASSWORD
+  if (/^[$<{]/.test(password) || /[}>]$/.test(password)) return true; // ${DB_PASS}, <password>
+  if (/^[*x.]+$/i.test(password)) return true;                        // ****, xxxx
+  return false;
+}
+
+const escluso = (percorso) => PERCORSI_ESCLUSI.some((re) => re.test(percorso));
+
+// --- Raccolta dei riscontri ------------------------------------------------
+const riscontri = [];
+
+// (a) I nomi dei file in stage.
+const inStage = git('diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z')
+  .split('\0')
+  .filter(Boolean);
+for (const percorso of inStage) {
+  const nome = percorso.split('/').pop();
+  if (eFileDiAmbiente(nome) && !AMBIENTE_AMMESSI.has(nome)) {
+    riscontri.push({ percorso, riga: null, motivo: 'file di ambiente (non va mai committato)', estratto: '' });
+  }
+}
+
+// (b) Il contenuto del DIFF IN STAGE: conta cio' che si sta per committare,
+//     non cio' che c'e' nell'albero. Solo le righe aggiunte (`+`).
+const conStoria = (() => {
+  try { git('rev-parse', '--verify', '--quiet', 'HEAD'); return true; } catch { return false; }
+})();
+const base = conStoria ? 'HEAD' : '4b825dc642cb6eb9a060e54bf8d69288fbee4904'; // albero vuoto
+
+const diff = git(
+  'diff', '--cached', '--unified=0', '--no-color', '--no-ext-diff',
+  '--src-prefix=a/', '--dst-prefix=b/', base,
+).split('\n');
+
+let file = '';
+let numeroRiga = 0;
+let dentroHunk = false;
+
+for (const linea of diff) {
+  if (linea.startsWith('diff --git ')) { dentroHunk = false; file = ''; continue; }
+  if (!dentroHunk && linea.startsWith('+++ ')) {
+    let percorso = linea.slice(4);
+    if (percorso === '/dev/null') { file = ''; continue; }
+    if (percorso.startsWith('"')) { try { percorso = JSON.parse(percorso); } catch { /* percorso esotico: lo teniamo com'e' */ } }
+    file = percorso.replace(/^b\//, '');
+    continue;
+  }
+  if (linea.startsWith('@@')) {
+    const m = /^@@ -\S+ \+(\d+)/.exec(linea);
+    numeroRiga = m ? Number(m[1]) : 0;
+    dentroHunk = true;
+    continue;
+  }
+  if (!dentroHunk || !linea.startsWith('+') || !file) continue;
+
+  const contenuto = linea.slice(1);
+  const numero = numeroRiga;
+  numeroRiga += 1;
+  if (escluso(file)) continue;
+
+  for (const regola of REGOLE) {
+    regola.re.lastIndex = 0;
+    let m;
+    while ((m = regola.re.exec(contenuto)) !== null) {
+      if (regola.credenziali) {
+        const [, schema, utente, password] = m;
+        if (eSegnaposto(utente, password)) continue;
+        riscontri.push({ percorso: file, riga: numero, motivo: regola.nome, estratto: `${schema}://${utente}:***@` });
+      } else {
+        const trovato = m[0];
+        const estratto = trovato.length > 14 ? `${trovato.slice(0, 10)}... (${trovato.length} caratteri)` : trovato;
+        riscontri.push({ percorso: file, riga: numero, motivo: regola.nome, estratto });
+      }
+    }
+  }
+}
+
+if (riscontri.length === 0) process.exit(0);
+
+// --- Il messaggio: quale file, quale riga, cosa fare -----------------------
+// ⚠️ Solo ASCII da qui in giu': questo testo lo legge anche il terminale di Git
+// Bash su Windows, che sui caratteri accentati e sui simboli tipografici
+// restituisce caratteri illeggibili (stessa famiglia della nota operativa #13).
+const etichetta = (r) => (r.riga === null ? r.percorso : `${r.percorso}:${r.riga}`);
+const larghezza = Math.min(56, Math.max(...riscontri.map((r) => etichetta(r).length)));
+
+console.error('');
+console.error('  [COMMIT RIFIUTATO] fra i file in stage c\'e\' un segreto.');
+console.error('');
+for (const r of riscontri.slice(0, 20)) {
+  console.error(`    ${etichetta(r).padEnd(larghezza)}  ${r.motivo}${r.estratto ? `  [${r.estratto}]` : ''}`);
+}
+if (riscontri.length > 20) console.error(`    ... e altri ${riscontri.length - 20} riscontri.`);
+console.error('');
+console.error('  Cosa fare:');
+console.error('    1. togli il file dallo stage:   git restore --staged <file>');
+console.error('       (se e\' un file di ambiente: tienilo fuori da git, i valori');
+console.error('        di esempio vanno in .env.example senza quelli veri)');
+console.error('    2. se il valore vero e\' gia\' finito da qualche parte, consideralo');
+console.error('       compromesso e ruotalo: toglierlo dal commit non basta.');
+console.error('    3. se e\' un FALSO POSITIVO, il commit si forza cosi\':');
+console.error('');
+console.error('           git commit --no-verify');
+console.error('');
+console.error('       e poi segnalalo, cosi\' la regola viene corretta:');
+console.error('       .githooks/pre-commit, elenco delle esclusioni.');
+console.error('');
+process.exit(1);
+JS
+)
+
+node -e "$CONTROLLO_SEGRETI"
+esito_segreti=$?
+
+if [ "$esito_segreti" -eq 1 ]; then
+  exit 1
+fi
+
+# Uscita inattesa (node assente, errore di sintassi nel controllo, ...): si
+# rifiuta lo stesso. Un controllo di sicurezza che si arrende in silenzio e'
+# peggio che non averlo — e la via d'uscita resta `git commit --no-verify`.
+if [ "$esito_segreti" -ne 0 ]; then
+  echo "[BLOCCO] il controllo sui segreti non ha potuto girare (node e' uscito con $esito_segreti)." >&2
+  echo "         Commit rifiutato per prudenza: aggiusta .githooks/pre-commit," >&2
+  echo "         oppure, se sei sicuro, usa  git commit --no-verify" >&2
+  exit 1
 fi

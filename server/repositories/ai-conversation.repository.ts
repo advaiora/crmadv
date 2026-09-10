@@ -57,6 +57,16 @@ export type ConversationAttachmentDraftInput = {
   binaryData?: Buffer | null;
 };
 
+/**
+ * Gli stessi byte, ri-tipati per Prisma. Dalla 6.19 un campo `Bytes` si dichiara
+ * `Uint8Array<ArrayBuffer>`, mentre il `Buffer` che arriva da @fastify/multipart
+ * e' un `Uint8Array<ArrayBufferLike>`: a runtime sono la stessa cosa, per
+ * TypeScript no. La vista qui sotto NON copia i byte — li affaccia sullo stesso
+ * blocco di memoria — quindi un allegato da 20 MB non viene duplicato.
+ */
+const bytesPerPrisma = (byte: Uint8Array): Uint8Array<ArrayBuffer> =>
+  new Uint8Array(byte.buffer as ArrayBuffer, byte.byteOffset, byte.byteLength);
+
 const ATTACHMENT_SELECT = {
   id: true,
   kind: true,
@@ -343,7 +353,9 @@ export const aiConversationRepository = {
         contentChars: input.content.length,
         // I byte, se presenti, nascono insieme all'allegato (stessa scrittura): cosi'
         // non esiste mai una bozza "file" senza il suo binario.
-        binary: input.binaryData ? { create: { data: input.binaryData } } : undefined,
+        binary: input.binaryData
+          ? { create: { data: bytesPerPrisma(input.binaryData) } }
+          : undefined,
       },
       select: ATTACHMENT_SELECT,
     });
