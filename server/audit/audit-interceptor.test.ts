@@ -134,6 +134,86 @@ test('una scrittura in blocco porta con sé quante righe ha toccato', () => {
   assert.equal(built?.entry.affectedCount, 42);
 });
 
+test('una scrittura in blocco che non ha toccato NESSUNA riga non si registra', () => {
+  // Il difetto che questa prova chiude: senza il controllo, il polling dei
+  // Messaggi su una conversazione gia' letta faceva comparire nel registro un
+  // `workspace_message.update` indistinguibile da un aggiornamento vero, ogni
+  // volta. Il registro dichiarava un cambiamento che non era avvenuto.
+  requestContext.start();
+  requestContext.setWorkspaceId(WORKSPACE);
+
+  for (const operation of ['updateMany', 'deleteMany', 'createMany']) {
+    assert.equal(
+      buildPendingAuditEntry({
+        model: 'WorkspaceMessage',
+        operation,
+        args: { where: { workspaceId: WORKSPACE } },
+        result: { count: 0 },
+        actorUserId: USER,
+      }),
+      null,
+      `${operation} a zero righe non deve produrre una registrazione`,
+    );
+  }
+});
+
+test('una scrittura in blocco che ha toccato una riga sola si registra', () => {
+  // Il confine dell'esclusione qui sopra: si scarta lo zero, non l'uno.
+  requestContext.start();
+  requestContext.setWorkspaceId(WORKSPACE);
+
+  const built = buildPendingAuditEntry({
+    model: 'WorkspaceMessage',
+    operation: 'updateMany',
+    args: { where: { workspaceId: WORKSPACE } },
+    result: { count: 1 },
+    actorUserId: USER,
+  });
+
+  assert.equal(built?.entry.action, 'workspace_message.update');
+  assert.equal(built?.entry.affectedCount, 1);
+});
+
+test('le varianti *AndReturn contano le righe restituite, e a elenco vuoto non registrano', () => {
+  requestContext.start();
+  requestContext.setWorkspaceId(WORKSPACE);
+
+  const due = buildPendingAuditEntry({
+    model: 'Client',
+    operation: 'createManyAndReturn',
+    args: { data: [{ workspaceId: WORKSPACE }, { workspaceId: WORKSPACE }] },
+    result: [{ id: 'c-1' }, { id: 'c-2' }],
+    actorUserId: USER,
+  });
+  assert.equal(due?.entry.affectedCount, 2);
+
+  const nessuna = buildPendingAuditEntry({
+    model: 'Client',
+    operation: 'updateManyAndReturn',
+    args: { where: { workspaceId: WORKSPACE } },
+    result: [],
+    actorUserId: USER,
+  });
+  assert.equal(nessuna, null);
+});
+
+test('un risultato di forma inattesa non fa perdere la scrittura', () => {
+  // Ripiego voluto: meglio una riga con conteggio impreciso che una scrittura
+  // che sparisce dal registro perche' il risultato non aveva la forma prevista.
+  requestContext.start();
+  requestContext.setWorkspaceId(WORKSPACE);
+
+  const built = buildPendingAuditEntry({
+    model: 'Client',
+    operation: 'updateMany',
+    args: { where: { workspaceId: WORKSPACE } },
+    result: undefined,
+    actorUserId: USER,
+  });
+
+  assert.equal(built?.entry.affectedCount, 1);
+});
+
 test('senza workspace non si registra niente', () => {
   requestContext.start();
   // Nessun workspace nel contesto e nessuno nella riga: la registrazione non
@@ -203,7 +283,9 @@ test("un'annotazione a mano su un altro bersaglio non scarta niente", () => {
   assert.equal(entries[0]?.entityId, 'c-7');
 });
 
-test('due scritture sulla stessa riga e con lo stesso verbo fanno una registrazione sola', () => {
+test('tre scritture sulla stessa riga fanno una registrazione sola, e di UNA riga', () => {
+  // Il conteggio dice quante RIGHE sono cambiate, non quante volte le si e'
+  // scritte: qui la riga e' una, aggiornata tre volte nella stessa richiesta.
   requestContext.start();
 
   for (let index = 0; index < 3; index += 1) {
@@ -220,7 +302,74 @@ test('due scritture sulla stessa riga e con lo stesso verbo fanno una registrazi
 
   const { entries } = requestContext.drainPendingAuditEntries();
   assert.equal(entries.length, 1);
-  assert.equal(entries[0]?.affectedCount, 3);
+  assert.equal(entries[0]?.affectedCount, 1);
+});
+
+test('due scritture in blocco sulla stessa chiave sommano le righe toccate', () => {
+  // Il caso opposto al precedente: due `updateMany` toccano insiemi di righe che
+  // si aggiungono davvero, quindi li' sommare e' giusto.
+  requestContext.start();
+  requestContext.setWorkspaceId(WORKSPACE);
+
+  for (const count of [3, 4]) {
+    const built = buildPendingAuditEntry({
+      model: 'Client',
+      operation: 'updateMany',
+      args: { where: { workspaceId: WORKSPACE } },
+      result: { count },
+      actorUserId: USER,
+    });
+    assert.ok(built);
+    requestContext.addPendingAuditEntry(built.key, built.entry);
+  }
+
+  const { entries } = requestContext.drainPendingAuditEntries();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.affectedCount, 7);
+});
+
+test("un'annotazione a mano senza id scarta le automatiche di tutto il suo tipo", () => {
+  // Serve alle annotazioni che riassumono piu' righe insieme e non possono
+  // nominarle una per una — «ha assegnato i membri del reparto» copre le righe
+  // di DepartmentMember che quella richiesta ha scritto.
+  requestContext.start();
+
+  for (const id of ['dm-1', 'dm-2']) {
+    const built = buildPendingAuditEntry({
+      model: 'DepartmentMember',
+      operation: 'create',
+      args: { data: { workspaceId: WORKSPACE } },
+      result: { id, workspaceId: WORKSPACE },
+      actorUserId: USER,
+    });
+    assert.ok(built);
+    requestContext.addPendingAuditEntry(built.key, built.entry);
+  }
+
+  requestContext.markManualAudit('department_member', undefined);
+
+  const { entries } = requestContext.drainPendingAuditEntries();
+  assert.deepEqual(entries, []);
+});
+
+test("lo scarto per tipo non tracima su un tipo diverso", () => {
+  requestContext.start();
+
+  const built = buildPendingAuditEntry({
+    model: 'Department',
+    operation: 'update',
+    args: { where: { id: 'd-1' } },
+    result: { id: 'd-1', workspaceId: WORKSPACE },
+    actorUserId: USER,
+  });
+  assert.ok(built);
+  requestContext.addPendingAuditEntry(built.key, built.entry);
+
+  requestContext.markManualAudit('department_member', undefined);
+
+  const { entries } = requestContext.drainPendingAuditEntries();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.entityType, 'department');
 });
 
 test('oltre il tetto per richiesta si conta invece di accumulare', () => {
@@ -235,6 +384,7 @@ test('oltre il tetto per richiesta si conta invece di accumulare', () => {
       actorUserId: USER,
       operation: 'update',
       affectedCount: 1,
+      bulk: false,
     });
   }
 
@@ -253,6 +403,7 @@ test('svuotare due volte non riscrive le stesse registrazioni', () => {
     actorUserId: USER,
     operation: 'create',
     affectedCount: 1,
+    bulk: false,
   });
 
   assert.equal(requestContext.drainPendingAuditEntries().entries.length, 1);

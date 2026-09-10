@@ -391,6 +391,8 @@ export const createApp = (options: FastifyServerOptions = {}): FastifyInstance =
 
     await audit.log({
       event: "debug.whoami",
+      entityType: 'workspace',
+      entityId: workspace.id,
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: {

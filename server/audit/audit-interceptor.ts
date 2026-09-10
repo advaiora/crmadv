@@ -26,6 +26,9 @@
 //    annotato lo stesso bersaglio con `audit.log`, quella automatica viene
 //    scartata. «Ha inviato il preventivo al cliente» dice molto più di «una riga
 //    è cambiata», e non vogliamo due righe per lo stesso fatto.
+//    ⚠️ Lo scarto si aggancia a `entityType`: un'annotazione a mano che non lo
+//    porta non scarta niente. È il motivo per cui `audit.log` va sempre chiamata
+//    con `entityType`/`targetType` — vedi il commento in server/audit/audit.ts.
 //
 // 3. È UN ELENCO DI ESCLUSIONI, NON DI INCLUSIONI. Di norma si traccia; si
 //    elencano i modelli da NON tracciare. Il contrario (elenco di inclusioni)
@@ -60,6 +63,25 @@ const OPERATION_VERB: Record<string, 'create' | 'update' | 'delete'> = {
   deleteMany: 'delete',
 };
 
+// Le operazioni che toccano un insieme di righe invece che una sola. Servono
+// distinte in due punti: per sapere quante righe ha toccato la scrittura, e per
+// riconoscere quella che non ne ha toccata nessuna.
+const BULK_OPERATIONS = new Set([
+  'createMany',
+  'createManyAndReturn',
+  'updateMany',
+  'updateManyAndReturn',
+  'deleteMany',
+]);
+
+// ⚠️ QUESTO ELENCO NON È IL PERIMETRO INTERO. L'estensione vede solo ciò che
+// passa dai metodi di modello di Prisma: le scritture in SQL grezzo
+// (`$executeRaw`, `$executeRawUnsafe`) NON passano di qui e non finiscono nel
+// registro, per quanto il modello non sia escluso. Oggi riguarda
+// server/modules/agency-os/agency.repository.ts:354 e :404 (impostazioni di
+// Produzione AI) — fuori dal perimetro di questa release, ma chi scriverà una
+// `$executeRaw` domani non è coperto per costruzione e deve annotare a mano.
+//
 // ⚠️ I modelli qui sotto NON vengono tracciati, e ognuno ha il suo motivo.
 // Aggiungerne uno è una decisione: si toglie qualcosa dal registro. Toglierne
 // uno invece è gratis e va nella direzione giusta.
@@ -141,13 +163,24 @@ export const resolveWorkspaceId = (args: unknown, result: unknown): string | nul
 export const resolveEntityId = (args: unknown, result: unknown): string | null =>
   readString(result, 'id') ?? readString((args as { where?: unknown } | null)?.where, 'id');
 
-const resolveAffectedCount = (operation: string, result: unknown): number => {
-  if (operation === 'createMany' || operation === 'updateMany' || operation === 'deleteMany') {
-    const count = (result as { count?: unknown } | null)?.count;
-    return typeof count === 'number' ? count : 1;
+export const isBulkOperation = (operation: string) => BULK_OPERATIONS.has(operation);
+
+export const resolveAffectedCount = (operation: string, result: unknown): number => {
+  if (!isBulkOperation(operation)) {
+    return 1;
   }
 
-  return 1;
+  // `createManyAndReturn` e `updateManyAndReturn` restituiscono le righe scritte,
+  // non un conteggio: lì il numero è la lunghezza dell'elenco.
+  if (Array.isArray(result)) {
+    return result.length;
+  }
+
+  const count = (result as { count?: unknown } | null)?.count;
+
+  // Se il risultato non ha la forma attesa si ripiega su 1: meglio una riga di
+  // registro con un conteggio impreciso che perdere del tutto la scrittura.
+  return typeof count === 'number' ? count : 1;
 };
 
 /**
@@ -182,6 +215,17 @@ export const buildPendingAuditEntry = ({
     return null;
   }
 
+  const affectedCount = resolveAffectedCount(operation, result);
+  if (isBulkOperation(operation) && affectedCount === 0) {
+    // Una scrittura in blocco che non ha toccato nessuna riga NON è un
+    // cambiamento. Registrarla comunque farebbe dire al registro una cosa falsa:
+    // in tabella comparirebbe `workspace_message.update`, indistinguibile da un
+    // aggiornamento vero (il conteggio non arriva nemmeno a chi legge, perché
+    // audit-flush lo mette nei metadati solo se maggiore di 1). È il caso che
+    // scatta a ogni giro di polling dei Messaggi su una conversazione già letta.
+    return null;
+  }
+
   const verb = OPERATION_VERB[operation];
   const entityType = resolveEntityType(model);
   const entityId = resolveEntityId(args, result);
@@ -195,7 +239,8 @@ export const buildPendingAuditEntry = ({
       workspaceId,
       actorUserId,
       operation,
-      affectedCount: resolveAffectedCount(operation, result),
+      affectedCount,
+      bulk: isBulkOperation(operation),
     },
   };
 };

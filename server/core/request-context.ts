@@ -30,6 +30,10 @@ export type PendingAuditEntry = {
   actorUserId: string | null;
   operation: string;
   affectedCount: number;
+  // Vero se l'operazione tocca un insieme di righe (`updateMany` e sorelle) e non
+  // una riga sola. Serve a decidere se due scritture con la stessa chiave nella
+  // stessa richiesta vanno sommate: vedi addPendingAuditEntry.
+  bulk: boolean;
 };
 
 export type RequestStore = {
@@ -93,7 +97,14 @@ export const requestContext = {
 
   // Segna che per questo bersaglio esiste già un'annotazione scritta a mano:
   // l'intercettore non ne aggiungerà una automatica.
-  markManualAudit(entityType: string, entityId: string | null | undefined): void {
+  //
+  // Senza `entityId` il segno vale per TUTTO il tipo, limitatamente a questa
+  // richiesta. Non è una scorciatoia: un'annotazione come «ha assegnato i membri
+  // del reparto» copre le righe che quella richiesta ha scritto su
+  // `DepartmentMember` senza poterle nominare una per una, e senza il segno per
+  // tipo l'automatica comparirebbe accanto a lei come doppione. Il raggio d'azione
+  // è una singola richiesta HTTP, quindi non può scartare il lavoro di nessun altro.
+  markManualAudit(entityType: string | undefined, entityId: string | null | undefined): void {
     const store = storage.getStore();
     if (store && entityType) {
       store.manualTargets.add(`${entityType}:${entityId ?? ''}`);
@@ -108,7 +119,14 @@ export const requestContext = {
 
     const existing = store.pendingEntries.get(key);
     if (existing) {
-      existing.affectedCount += entry.affectedCount;
+      // Sommare ha senso solo fra scritture in blocco: due `updateMany` nella
+      // stessa richiesta toccano insiemi di righe che si aggiungono. Due `update`
+      // sulla STESSA riga (è la stessa chiave: stesso tipo, stesso id, stesso
+      // verbo) restano una riga sola — sommare direbbe «due righe toccate»,
+      // mentre la riga era una e l'hanno scritta due volte.
+      if (entry.bulk) {
+        existing.affectedCount += entry.affectedCount;
+      }
       return;
     }
 
@@ -132,7 +150,12 @@ export const requestContext = {
     }
 
     const entries = [...store.pendingEntries.values()].filter(
-      (entry) => !store.manualTargets.has(`${entry.entityType}:${entry.entityId ?? ''}`),
+      (entry) =>
+        // Il bersaglio preciso è già annotato a mano…
+        !store.manualTargets.has(`${entry.entityType}:${entry.entityId ?? ''}`)
+        // …oppure lo è tutto il tipo, per un'annotazione che non poteva nominare
+        // le singole righe (vedi markManualAudit).
+        && !store.manualTargets.has(`${entry.entityType}:`),
     );
     const dropped = store.droppedEntries;
 
