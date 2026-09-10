@@ -5,14 +5,26 @@
 > stata fatta davvero**, su un database usa-e-getta, e i numeri che leggi sono misurati.
 >
 > Compito CRMA-70. Scritto il 9/9/2026 dal Guardiano.
+>
+> **Aggiornato il 10/9/2026** con le risposte di Jacopo (§2.3). La più importante cambia
+> il senso di tutto il documento: il progetto Supabase è sul **piano gratuito**, che non
+> fa backup di nessun tipo. Quindi quello proposto qui non è *un secondo* backup — è
+> **l'unico**, e oggi al suo posto non c'è niente.
 
 ---
 
 ## 1. La cosa da sapere per prima
 
-**Il database di produzione del CRM non ha nessun backup che io sia riuscito a trovare.**
-Il CRM è online e funzionante — l'ho verificato mentre scrivevo — e i dati veri stanno
-tutti in un posto solo.
+**Il database di produzione del CRM non ha nessun backup.** Non «nessuno che io sia
+riuscito a trovare»: dal 10/9/2026 è una cosa accertata, non un sospetto — il progetto
+Supabase è sul piano gratuito, e il piano gratuito non fa backup (§2.3 e §3). Il CRM è
+online e funzionante, e i dati veri stanno tutti in un posto solo.
+
+**Cosa significa in pratica, senza girarci intorno:** se domani il database di produzione
+si perde — per un guasto, per una cancellazione sbagliata, per un accesso finito nelle
+mani sbagliate — **non c'è niente da cui ripartire**. Non un file, non uno snapshot, non
+un pannello da cui premere «ripristina». Si ricomincia dal database vuoto che le 67
+migrazioni sanno ricostruire: la forma del CRM tornerebbe, i dati dell'agenzia no.
 
 C'è una cosa peggiore della mancanza in sé, ed è che **un documento del progetto dà già
 per scontato che il backup esista**. In `recap-A1-release-settembre.md` (riga 118), a
@@ -21,8 +33,13 @@ proposito di una cancellazione per errore, si legge:
 > «l'unico rimedio è un backup del database — cioè una richiesta a un tecnico»
 
 Quel rimedio oggi non c'è. Chi leggesse quella riga durante un guaio concluderebbe che
-c'è una strada da tentare, e perderebbe tempo prezioso a cercarla. **Quella riga va
-corretta**, che questa proposta venga approvata o no.
+c'è una strada da tentare, e perderebbe tempo prezioso a cercarla.
+
+✅ **Corretta.** Compito CRMA-72, commit `ce45bbf` sul ramo
+`cronista/crma-72-recap-backup-cestino`: adesso quella riga dice la verità («oggi non
+esiste un backup del database di produzione»). ⚠️ Il commit è **su un ramo, non ancora
+unito a `main`**: finché l'unione non avviene, la versione del recap che si legge su
+`main` promette ancora il backup inesistente.
 
 ---
 
@@ -44,7 +61,12 @@ buona questa proposta.
 | Il database ha **69 tabelle**, 261 indici, 152 vincoli di chiave esterna, e si ricostruisce da zero applicando le 67 migrazioni tracciate | Applicate tutte in ordine su un database vuoto, senza un solo errore (capitolo 4) |
 | Il database usa l'estensione **pgvector**, e questa è una dipendenza del ripristino | La migrazione `20260713074114_project_source_chunks` fa `CREATE EXTENSION IF NOT EXISTS vector`; la colonna `ProjectSourceChunk.embedding` è di tipo `vector(1536)` |
 
-### 2.2 NON accertato — mi servono accessi che non ho
+### 2.2 Quello che il 9/9 non avevo potuto accertare — e cosa mi serviva
+
+> **Da leggere insieme al §2.3**, che contiene le risposte arrivate il 10/9/2026. Questa
+> sezione resta qui perché dice *perché* quelle domande erano necessarie, e cosa serve
+> chiedere di nuovo il giorno in cui qualcosa cambia (un cambio di piano, un cambio di
+> macchina).
 
 Questi tre punti non sono opinioni: sono buchi veri, e due di essi possono ribaltare la
 proposta. Li elenco nominando esattamente cosa mi serve, come chiede il compito.
@@ -74,13 +96,51 @@ proposta. Li elenco nominando esattamente cosa mi serve, come chiede il compito.
    online, che stanno nel file `.env` dentro `/srv/crmadv` sulla VPS.
    👉 *Mi serve saperlo confermato*, perché è da lì che il backup dovrà pescarle.
 
+### 2.3 Le risposte di Jacopo — 10/9/2026
+
+Arrivate rispondendo alla scheda di domande su CRMA-70. Due chiudono un buco, una resta
+aperta di proposito.
+
+| Domanda | Risposta | Cosa cambia |
+|---|---|---|
+| Piano Supabase e backup automatici | **Piano gratuito — nessun backup** | 🔴 Il caso peggiore fra quelli previsti. Non stiamo aggiungendo una seconda rete di sicurezza a una che c'è già: **stiamo mettendo la prima**, e oggi al suo posto non c'è niente |
+| Cron di backup già attivo sulla VPS | **Non verificabile adesso** — si procede assumendo che non ci sia, e si controlla prima di attivare | Non cambia il piano. Aggiunge **un passo obbligatorio** all'esecuzione: il comando del §2.2 punto 2 va eseguito *prima* di installare il cron nuovo, per non ritrovarsi due backup che si pestano i piedi |
+| Dove va la copia fuori sede | **Archivio a oggetti** (Backblaze B2 o Hostinger) | Scelta fatta: era l'opzione raccomandata al §5.2. Comporta aprire un servizio e un metodo di pagamento — pochi centesimi al mese con questi volumi |
+| Approvazione della proposta | **«Aspetta — prima voglio vedere le risposte alle altre domande»** | Le altre risposte sono queste tre, e sono tutte qui. L'approvazione va richiesta di nuovo, con questo documento aggiornato davanti |
+
+**Perché la prima risposta è quella grave.** Il 9/9 la mancanza di backup era un fatto
+sul *nostro* lato: nessuno script, nessun documento. Restava però aperta la possibilità
+che Supabase ci stesse coprendo le spalle senza che noi lo sapessimo. Quella possibilità
+adesso è chiusa: **non ci copre nessuno.** Il CRM è in produzione, con dati di clienti
+veri, e non esiste da nessuna parte una copia da cui ripartire.
+
 ---
 
-## 3. Perché non basta aspettarsi che ci pensi Supabase
+## 3. Perché il piano gratuito non ci copre — e perché non basterebbe nemmeno se pagassimo
 
-Anche nel caso migliore — siamo su un piano a pagamento e i backup giornalieri sono
-attivi — **quei backup da soli non bastano**, per tre motivi che falliscono in modi
-diversi:
+**Prima parte: il piano gratuito non fa backup.** Non è una nostra deduzione, è scritto
+nella documentazione di Supabase, che al piano gratuito dice testualmente di arrangiarsi:
+
+> «We recommend that free tier plan projects regularly export their data using the
+> Supabase CLI `db dump` command and maintain off-site backups.»
+> — *Supabase Docs, «Database Backups»* (letto il 10/9/2026)
+
+E, sempre lì: «*Database backups are not available for download for Free Plan projects*».
+I backup giornalieri partono dal piano Pro (7 giorni), Team (14), Enterprise (fino a 30).
+**Quindi la proposta di questo documento è esattamente ciò che il fornitore stesso
+raccomanda di fare al posto suo.**
+
+⚠️ **Un rischio in più che il piano gratuito si porta dietro**, e che non riguarda i
+backup ma va detto qui perché nasce dalla stessa risposta: la documentazione avverte che
+«*We may pause applications on the Free Plan that exhibit low activity in a 7-day
+period*». Un progetto sospeso si riattiva dal pannello, quindi non è una perdita di dati
+— ma è un CRM di produzione che può smettere di rispondere senza che nessuno l'abbia
+deciso. È un motivo in più per valutare il passaggio a un piano a pagamento, oltre ai
+backup.
+
+**Seconda parte: nemmeno passando a Pro il problema sarebbe chiuso.** Se domani il
+progetto passasse a un piano con i backup giornalieri, **quei backup da soli non
+basterebbero comunque**, per tre motivi che falliscono in modi diversi:
 
 - **Proteggono dal guasto della macchina, non dall'errore nostro.** Se qualcuno cancella
   per sbaglio i clienti di un workspace e se ne accorge dopo dieci giorni, un backup
@@ -92,8 +152,12 @@ diversi:
   facendolo, e farlo su produzione è fuori discussione. Un dump nostro invece si prova
   quando si vuole, ed è ciò che ho fatto al capitolo 4.
 
-**Proposta: tutti e due.** I backup del provider come rete di sicurezza sull'infrastruttura,
-e un dump nostro come copia che possediamo, sappiamo leggere e abbiamo già ripristinato.
+**Conclusione, aggiornata al piano reale.** Il dump nostro serve **in ogni caso**: oggi
+perché è l'unica copia che esisterebbe, domani — se si passasse a un piano a pagamento —
+perché copre i tre buchi qui sopra che i backup del provider non coprono. Il passaggio di
+piano e il dump non sono alternative fra cui scegliere: **il dump va fatto comunque**, e
+il piano a pagamento è una decisione separata, che riguarda anche la sospensione per
+inattività.
 
 ---
 
@@ -192,8 +256,15 @@ Serve un terzo posto. In ordine di quanto sono convinto:
    pulita (è uno spazio che le persone usano a mano, quindi qualcuno può cancellare per
    sbaglio), ma non costa niente in più e non richiede aprire un servizio nuovo.
 
-👉 **Questa è una scelta che spetta a Jacopo**, perché comporta aprire un servizio e
-un metodo di pagamento. Non la decido io.
+✅ **Scelta fatta da Jacopo il 10/9/2026: l'archivio a oggetti** (opzione 1). Comporta
+aprire il servizio e un metodo di pagamento — passo che spetta a lui, io non ho né posso
+avere quelle credenziali.
+
+⚠️ **Con il piano gratuito questa copia pesa il doppio di quanto pesasse ieri.** Quando
+si pensava che Supabase tenesse comunque i suoi backup, la copia fuori sede era la terza
+di tre. Adesso le copie totali sono **due** — la VPS e l'archivio a oggetti — e nascono
+tutte e due dallo stesso comando. Se quel comando smette di girare, non resta niente:
+è la ragione per cui la sorveglianza del §5.4 non è un accessorio.
 
 ### 5.3 Le credenziali — il capitolo che mi riguarda più da vicino
 
@@ -304,20 +375,43 @@ e non manderà email finché non gli si rimette accanto la **`ENCRYPTION_KEY` gi
 
 ---
 
-## 7. Cosa serve per andare avanti
+## 7. Cosa serve per andare avanti — aggiornato al 10/9/2026
 
-**Da Jacopo, tre risposte:**
+Le tre domande del 9/9 hanno avuto risposta (§2.3). Resta questo.
 
-1. **Su che piano è il progetto Supabase, e i backup automatici sono attivi?** (Settings →
-   Database → Backups). È la risposta che decide se stiamo mettendo la prima rete di
-   sicurezza o la seconda.
-2. **C'è già un cron sulla VPS?** Il comando da eseguire è nel §2.2, punto 2.
-3. **La copia fuori sede: archivio a oggetti a pagamento (centesimi al mese) o Google
-   Drive aziendale?** (§5.2)
+**① L'approvazione, che oggi manca.** Alla domanda «approvi la proposta?» la risposta è
+stata «aspetta, prima voglio vedere le risposte alle altre domande». Adesso quelle
+risposte ci sono e stanno nel §2.3. **La proposta è ferma qui**: nessuno ha installato
+niente, e nessuno lo farà senza un sì esplicito.
 
-**Poi, se approvi, l'esecuzione è:** lo script di backup + il cron sulla VPS + il
-guardiano del silenzio + la copia fuori sede. Serve però qualcuno **con accesso SSH alla
-VPS**: io da qui non ce l'ho, e questa parte non posso farla al posto suo.
+**② L'esecuzione, che richiede un accesso che io non ho.** Se approvata, l'esecuzione è
+in cinque passi, in quest'ordine:
 
-**Indipendentemente dall'approvazione**, una cosa va fatta comunque: **correggere la riga
-118 di `recap-A1-release-settembre.md`**, che promette un backup che non esiste (§1).
+1. **Controllare che sulla VPS non ci sia già un cron di backup** — è il passo che la
+   risposta «non riesco a controllarlo adesso» rende obbligatorio. Comando nel §2.2,
+   punto 2. Serve a non ritrovarsi due backup che si sovrascrivono a vicenda.
+2. **Aprire l'archivio a oggetti** (Backblaze B2 o Hostinger) e generare le chiavi di
+   accesso — solo scrittura, con i file resi non cancellabili per N giorni (§5.2).
+3. **Installare lo script di backup e il `.pgpass`** sulla VPS, con i permessi del §5.3.
+4. **Installare il cron delle 03:30** e la copia verso l'archivio a oggetti (§5.1, §5.2).
+5. **Accendere la sorveglianza** — il guardiano del silenzio del §5.4, che è ciò che
+   distingue un backup da un backup che ha smesso di girare senza dirlo a nessuno.
+
+👉 **I passi 1-4 richiedono l'accesso SSH alla VPS e le credenziali del fornitore di
+archiviazione. Io non ho né l'uno né le altre, e non devo averle.** Questa parte la fa
+Jacopo, o chi ha quegli accessi. Io posso preparare lo script e il testo del cron perché
+vengano incollati, e posso costruire la sorveglianza dal lato Paperclip.
+
+**③ Una decisione separata, da non confondere con questa.** Il piano gratuito espone
+anche alla sospensione per inattività (§3). Se il CRM è in produzione con clienti veri,
+vale la pena valutare il passaggio a un piano a pagamento — ma è una decisione di costo
+che **non sostituisce** il backup di questo documento e non va usata per rimandarlo.
+
+### Cose già chiuse, che non aspettano più niente
+
+- ✅ **La riga del recap che prometteva un backup inesistente** è stata corretta —
+  CRMA-72, commit `ce45bbf`. ⚠️ Ancora su un ramo, non su `main` (§1).
+- ✅ **La prova di ripristino** è stata fatta e misurata (§4), e la procedura è scritta
+  (§6). Non era subordinata a nessuna approvazione, ed è la parte del compito che vale
+  di più: se domani qualcuno dovesse ripristinare, troverebbe dei comandi già provati
+  invece di una pagina bianca.
