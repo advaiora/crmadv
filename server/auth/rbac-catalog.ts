@@ -105,6 +105,37 @@ export const DASHBOARD_PERMISSIONS = {
   view: 'dashboard.view',
 } as const;
 
+// Cestino (CRMA-29). Le chiavi restano in inglese come tutte le vicine
+// (regola ②-bis); a schermo il modulo si chiama «Cestino».
+//
+// ⚠️ `purge` NON e' un sinonimo di `<modulo>.delete`, ed e' il motivo per cui
+// esiste come voce sua: dal Cestino in avanti, `clients.delete` significa
+// "sposta nel cestino" — reversibile — mentre `trash.purge` e' l'unica azione
+// che distrugge davvero, su qualunque entita' e senza ripensamenti.
+export const TRASH_MODULE_KEY = 'trash';
+
+export const TRASH_PERMISSIONS = {
+  view: 'trash.view',
+  restore: 'trash.restore',
+  purge: 'trash.purge',
+} as const;
+
+export type TrashPermissionKey = (typeof TRASH_PERMISSIONS)[keyof typeof TRASH_PERMISSIONS];
+
+// I cinque ruoli di sistema, passati uno per uno come vuole la regola ①-bis.
+// Il criterio non e' "chi merita il cestino" ma "chi poteva gia' distruggere":
+//   Superadmin  view + restore + purge   (da 'all')
+//   Admin       view + restore + purge   (da 'all_except', vedi la nota li' sotto)
+//   Manager     nessuno   — nel perimetro non puo' cancellare niente: ha
+//                           clients.create/edit ma non clients.delete, e sui
+//                           messaggi e sul team non ha nessuna cancellazione.
+//                           Un cestino su cui non finisce mai niente di suo
+//                           sarebbe una voce di menu vuota.
+//   Operativo   nessuno   — stessa ragione, con ancora meno permessi.
+//   Viewer      nessuno   — e' in sola lettura per definizione.
+// I ruoli PERSONALIZZATI non li tocca il bootstrap: ci pensa la migrazione dati
+// 20260910_cestino_soft_delete, che da' il Cestino a chi ha gia' un '*.delete'.
+
 export type TeamPermissionKey =
   (typeof TEAM_PERMISSIONS)[keyof typeof TEAM_PERMISSIONS];
 export type DashboardPermissionKey =
@@ -143,6 +174,7 @@ export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
   { key: 'audit', name: 'Audit', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
+  { key: TRASH_MODULE_KEY, name: 'Cestino', isCore: true, description: 'Le cose cancellate: si riportano indietro, o si eliminano per davvero' },
   // isCore come Moduli, Branding e Audit: e' configurazione di sistema, non una
   // funzione di business che ha senso accendere e spegnere. Un workspace col
   // server di posta "spento" da Gestione Moduli non saprebbe piu' come mandare
@@ -172,6 +204,9 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'modules.manage', moduleKey: 'modules', description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding.manage', moduleKey: 'branding', description: 'Modificare logo, colori e nome del workspace' },
   { key: 'audit.view', moduleKey: 'audit', description: 'Consultare il registro di chi ha fatto cosa e quando' },
+  { key: TRASH_PERMISSIONS.view, moduleKey: TRASH_MODULE_KEY, description: 'Vedere il Cestino e cosa contiene' },
+  { key: TRASH_PERMISSIONS.restore, moduleKey: TRASH_MODULE_KEY, description: 'Riportare indietro dal Cestino quello che era stato cancellato' },
+  { key: TRASH_PERMISSIONS.purge, moduleKey: TRASH_MODULE_KEY, description: 'Eliminare PER DAVVERO dal Cestino: non si torna piu indietro' },
   // ⚠️ Chi ha questo permesso decide da quale casella parte la posta del CRM —
   // inviti compresi. Non e' "vedere una configurazione": e' poter dirottare le
   // email del workspace su un server proprio. La descrizione lo dice, o si
@@ -350,6 +385,13 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
         // Stessa logica di 'modules.manage' qui sopra: configurazione di workspace.
         AI_PRODUCTION_PERMISSIONS.manageSettings,
         AI_PRODUCTION_PERMISSIONS.manageBudget,
+        // ⚠️ trash.purge NON e' escluso, ed e' una scelta, non una dimenticanza.
+        // Regola ①-bis: chi esercitava gia' quel potere non deve perderlo. Oggi
+        // l'Admin ha 'clients.delete' e quella cancellazione e' definitiva; dal
+        // Cestino in avanti diventa reversibile, e senza trash.purge l'Admin si
+        // ritroverebbe con MENO potere distruttivo di prima. Se un domani si
+        // vuole che la distruzione definitiva resti al solo Superadmin, e' una
+        // decisione da prendere apposta: si aggiunge TRASH_PERMISSIONS.purge qui.
       ],
     },
   },

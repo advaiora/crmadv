@@ -340,7 +340,17 @@ model Membership {
   workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // --- Cestino (CRMA-29) ---
+  // ⚠️ La coppia (workspaceId, userId) resta unica anche da cestinata: chi
+  // reinvita una persona rimossa deve RIPRISTINARE la membership esistente, non
+  // crearne una seconda — o l'inserimento sbatte sul vincolo.
+  // `deletedByUserId` non ha una relation di proposito: e' un'etichetta per la
+  // pagina Cestino, e chi ha cancellato puo' a sua volta non esserci piu'.
+  deletedAt       DateTime?
+  deletedByUserId String?
+
   @@unique([workspaceId, userId])
+  @@index([workspaceId, deletedAt])
   @@index([workspaceId])
   @@index([userId])
 }
@@ -386,7 +396,16 @@ model Client {
   vaultItems      VaultItem[]
   aiConversations AiConversation[]
 
+  // --- Cestino (CRMA-29) ---
+  // Cestinare un cliente non tocca cio' che gli sta attaccato: nessuna cascata
+  // parte, quindi il ripristino lo riporta completo per costruzione.
+  // `deletedByUserId` non ha una relation di proposito: e' un'etichetta per la
+  // pagina Cestino, e chi ha cancellato puo' a sua volta non esserci piu'.
+  deletedAt       DateTime?
+  deletedByUserId String?
+
   @@index([workspaceId, name])
+  @@index([workspaceId, deletedAt])
   @@index([workspaceId, email])
   @@index([workspaceId, phone])
   @@index([workspaceId, updatedAt])
@@ -1412,7 +1431,16 @@ model Role {
   rolePermissions RolePermission[]
   userRoles       UserRole[]
 
+  // --- Cestino (CRMA-29) ---
+  // Solo i ruoli PERSONALIZZATI si cestinano: quelli di sistema no, il bootstrap
+  // li ricrea a ogni login. ⚠️ Il nome resta occupato finche' e' nel cestino.
+  // `deletedByUserId` non ha una relation di proposito: e' un'etichetta per la
+  // pagina Cestino, e chi ha cancellato puo' a sua volta non esserci piu'.
+  deletedAt       DateTime?
+  deletedByUserId String?
+
   @@unique([workspaceId, name])
+  @@index([workspaceId, deletedAt])
   @@index([workspaceId])
 }
 
@@ -1763,7 +1791,16 @@ model WorkspaceMessage {
   senderUser      User      @relation("WorkspaceMessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
   recipientUser   User      @relation("WorkspaceMessageRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
 
+  // --- Cestino (CRMA-29) ---
+  // Un messaggio cestinato sparisce dalla conversazione e dai non-letti, ma
+  // resta leggibile dal Cestino di chi lo ha cancellato.
+  // `deletedByUserId` non ha una relation di proposito: e' un'etichetta per la
+  // pagina Cestino, e chi ha cancellato puo' a sua volta non esserci piu'.
+  deletedAt       DateTime?
+  deletedByUserId String?
+
   @@index([workspaceId, senderUserId, recipientUserId, createdAt(sort: Desc)])
+  @@index([workspaceId, deletedAt])
   @@index([workspaceId, recipientUserId, readAt, createdAt(sort: Desc)])
   @@index([workspaceId, createdAt(sort: Desc)])
 }
