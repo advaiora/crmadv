@@ -60,6 +60,15 @@ const REGOLE = [
   { nome: 'chiave API OpenAI',           re: /\bsk-proj-[A-Za-z0-9_-]{16,}/g },
   { nome: 'chiave di accesso AWS',       re: /\bAKIA[0-9A-Z]{16}\b/g },
   { nome: 'token Slack',                 re: /\bxox[baprs]-[0-9A-Za-z-]{10,}/g },
+  // I due prefissi che piu' spesso finiscono per sbaglio dentro un commit
+  // (misurati come "passano" durante la revisione di CRMA-83, compito CRMA-85).
+  // `gh[pousr]_` copre l'intera famiglia dei token GitHub, non solo `ghp_`:
+  // sono la stessa cosa con una lettera diversa (personal, oauth, user, server,
+  // refresh) e costano zero righe in piu'.
+  { nome: 'token GitHub',                re: /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g },
+  // Le chiavi Google sono lunghe esattamente 39 caratteri: `AIza` + 35. Il
+  // conteggio esatto e' voluto, evita di segnalare parole che iniziano per AIza.
+  { nome: 'chiave API Google',           re: /\bAIza[0-9A-Za-z_-]{35}/g },
   { nome: 'chiave service_role',         re: /service_role[^A-Za-z0-9]{0,12}ey[A-Za-z0-9_.-]{20,}/gi },
   { nome: 'chiave privata',              re: /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g },
 ];
@@ -71,6 +80,12 @@ const REGOLE = [
 //     ⚠️ Ci sta dentro anche questo hook: il file elenca per forza i pattern
 //     che cerca, quindi senza l'esclusione si bloccherebbe da solo appena
 //     qualcuno lo modifica.
+//     ⚠️ Il prezzo di questa esclusione, misurato e accettato (CRMA-85): in
+//     questo repository il posto piu' comodo dove nascondere un segreto vero
+//     e' un file che finisce per `.test.ts`. Non si chiude qui — le fixture
+//     `sk-ant-vecchia` e `test-user:test-pass` esistono davvero e bloccherebbero
+//     il lavoro ogni giorno. Si chiude lato server, con GitHub Push Protection,
+//     che questa esclusione non ce l'ha. E' l'argomento piu' forte a suo favore.
 const PERCORSI_ESCLUSI = [
   /(^|\/)__tests__\//,
   /(^|\/)__mocks__\//,
@@ -90,10 +105,42 @@ const PASSWORD_SEGNAPOSTO = new Set([
   'mypassword', 'yourpassword', 'tuapassword',
 ]);
 
+// (2-bis) Le PAROLE che rendono segnaposto una password tutta maiuscola.
+//     ⚠️ Perche' serve una lista e non basta la forma. Fino al 10/9/2026 la
+//     regola diceva «tutta maiuscole con separatori => segnaposto», e la
+//     giustificava con `postgres:LA-TUA-PASSWORD` di installazione-e-avvio.md.
+//     Ma la forma non guarda le parole: `admin:A1B2-C3D4@prod.host` ha la
+//     stessa forma ed e' una password vera — misurato come "passa" nella
+//     revisione di CRMA-83 (compito CRMA-85). Diversi gestori di password
+//     generano esattamente cosi'. Ora almeno UNO dei pezzi separati da `-`/`_`
+//     deve essere una di queste parole: `LA-TUA-PASSWORD` passa, `A1B2-C3D4` no.
+//     ⚠️ Ogni voce e' un buco: aggiungerne una vale come ampliare la lista qui
+//     sopra. Fuori di proposito gli articoli e i possessivi corti (`LA`, `IL`,
+//     `MY`): non servono — `LA-TUA-PASSWORD` combacia gia' su `TUA` e su
+//     `PASSWORD` — e due lettere sono anche la lunghezza di un pezzo casuale.
+const PAROLE_SEGNAPOSTO = new Set([
+  'tua', 'tuo', 'tue', 'tuoi', 'mia', 'mio', 'your', 'yours',
+  'change', 'changeme', 'example', 'esempio', 'sample', 'placeholder',
+  'segnaposto', 'password', 'pass', 'passwd', 'secret', 'segreto',
+  'qui', 'here', 'todo', 'dummy', 'fake', 'test', 'xxx', 'inserisci',
+]);
+
+// Un tetto di lunghezza in piu', per il caso che resta: una password vera,
+// lunga e casuale, che per sfortuna contenga un pezzo tipo `SECRET`. 64 e'
+// largo abbastanza da non dare fastidio ai segnaposto lunghi della
+// documentazione (`INSERISCI-QUI-LA-TUA-PASSWORD-DEL-DATABASE` sono 42).
+const LUNGHEZZA_MASSIMA_SEGNAPOSTO = 64;
+
+function eSegnapostoMaiuscolo(password) {
+  if (!/^[A-Z0-9]+([-_][A-Z0-9]+)+$/.test(password)) return false;
+  if (password.length > LUNGHEZZA_MASSIMA_SEGNAPOSTO) return false;
+  return password.toLowerCase().split(/[-_]/).some((p) => PAROLE_SEGNAPOSTO.has(p));
+}
+
 function eSegnaposto(utente, password) {
   if (utente.toLowerCase() === password.toLowerCase()) return true;   // postgres:postgres
   if (PASSWORD_SEGNAPOSTO.has(password.toLowerCase())) return true;   // user:pass
-  if (/^[A-Z0-9]+([-_][A-Z0-9]+)+$/.test(password)) return true;      // LA-TUA-PASSWORD
+  if (eSegnapostoMaiuscolo(password)) return true;                    // LA-TUA-PASSWORD
   if (/^[$<{]/.test(password) || /[}>]$/.test(password)) return true; // ${DB_PASS}, <password>
   if (/^[*x.]+$/i.test(password)) return true;                        // ****, xxxx
   return false;
@@ -203,6 +250,18 @@ console.error('');
 process.exit(1);
 JS
 )
+
+# Rientro a vuoto (CRMA-85): lo script qui sopra e' costruito con `cat`. Se
+# `cat` non e' raggiungibile ma `node` si', la variabile resta VUOTA, `node -e ""`
+# esce 0 e il commit passerebbe senza alcun controllo, in silenzio. Stessa
+# severita' del blocco piu' sotto: un controllo che non gira e' un controllo
+# rifiutato, non un controllo superato.
+if [ -z "$CONTROLLO_SEGRETI" ]; then
+  echo "[BLOCCO] il controllo sui segreti e' risultato vuoto (cat non disponibile?)." >&2
+  echo "         Commit rifiutato per prudenza: aggiusta .githooks/pre-commit," >&2
+  echo "         oppure, se sei sicuro, usa  git commit --no-verify" >&2
+  exit 1
+fi
 
 node -e "$CONTROLLO_SEGRETI"
 esito_segreti=$?
