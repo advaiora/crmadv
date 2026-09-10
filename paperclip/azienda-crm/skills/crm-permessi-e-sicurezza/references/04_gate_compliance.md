@@ -224,7 +224,7 @@ Two things follow from it, and the second is the one that gets missed:
    it takes everything else away from you — including things you are perfectly able to see.
 
 ✅ **The Reviewer's brief has been aligned to it — 25/8/2026.** It was written when there was no
-Guardian and kept everything: `.claude/agents/revisore.md` listed the permission chain as its error #1
+Guardian and kept everything: `.claude/agents/revisore-repo.md` listed the permission chain as its error #1
 and security as its point #6. Both have been removed from the Reviewer **at the source**, and the file
 now carries the split explicitly, under *«Permessi e sicurezza sono del guardiano»*.
 
@@ -289,17 +289,17 @@ Tier 1 = the code or a written project rule · Tier 2 = generated artefact · Ti
 | Commit messages in Italian saying what changes for the CRM's user | same §7.3 | 1 | HIGH |
 | The brake on a permission blocking a tool | same §3.5, third brake | 1 | HIGH |
 | Over-size files are deliberate and must not be split on initiative; the list lives in the roadmap | `crmadv/CLAUDE.md`, section «Dimensione dei file» | 1 | HIGH |
-| The Reviewer's seven areas, in its own order of severity | `crmadv/.claude/agents/revisore.md` | 1 | HIGH |
+| The Reviewer's seven areas, in its own order of severity | `crmadv/.claude/agents/revisore-repo.md` | 1 | HIGH |
 | **The division of labour in PART 4** — *«Il guardiano controlla permessi e sicurezza… Il revisore controlla il resto»* | plan §1.2, steps 5-6 (verbatim) | 1 | **HIGH** |
 | The Reviewer's card lists six areas and security is **not** one of them, so on Paperclip security sits with the Guardian | plan §2.2, Reviewer card | 1 | HIGH |
 | You run at step 5, before the Reviewer at step 6 | plan §1.2 | 1 | HIGH |
 | The per-area assignment of the table (which of the two owns each row) | the plan's sentence applied to `revisore.md`'s own list | 3 | HIGH — the principle is quoted; only the row-by-row placement is ours |
-| **`revisore.md` aligned to the split on 25/8/2026**: permission chain and security removed from the Reviewer, error numbering left intact (#6 emptied, not removed), and the division transcribed **from this table** | `crmadv/.claude/agents/revisore.md`, section *«Permessi e sicurezza sono del guardiano»* | 1 | HIGH |
+| **`revisore.md` aligned to the split on 25/8/2026**: permission chain and security removed from the Reviewer, error numbering left intact (#6 emptied, not removed), and the division transcribed **from this table** | `crmadv/.claude/agents/revisore-repo.md`, section *«Permessi e sicurezza sono del guardiano»* | 1 | HIGH |
 
 **VERIFY-ON-FIELD**
 
 - **The Reviewer's remaining areas** are a moving target in one respect: `metodo-revisione` will be
-  **generated** from `.claude/agents/revisore.md`, and what that file says is what the Reviewer will
+  **generated** from `.claude/agents/revisore-repo.md`, and what that file says is what the Reviewer will
   carry. The split itself is settled → [F04:BOUNDARY_WITH_REVIEWER]; what is not yet settled is how
   the generator will divide that file between `metodo-*` and `crm-*` material. It changes nothing on
   your side of the line.

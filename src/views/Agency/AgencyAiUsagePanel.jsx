@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Badge, Card, Col, Form, Row, Spinner, Table } from "react-bootstrap";
 import { getAgencyAiUsage } from "../../modules/agency-os/data/agencyDataAdapter";
-import { toAiFunctionLabel } from "../../modules/agency-os/ai/aiFunctionLabels";
+import {
+  COMPETITOR_SEARCH_FUNCTION_NAME,
+  toAiFunctionLabel,
+} from "../../modules/agency-os/ai/aiFunctionLabels";
 
 // Rendiconto consumi AI del workspace (V4 — cost control): totali, dettaglio per
 // dipendente, per funzione e per progetto, ultime chiamate, con filtri periodo/
@@ -301,7 +304,15 @@ const AgencyAiUsagePanel = () => {
                   <tbody>
                     {usage.perFunction.map((row) => (
                       <tr key={row.functionName}>
-                        <td className="fw-semibold small">{toAiFunctionLabel(row.functionName)}</td>
+                        <td className="fw-semibold small">
+                          {toAiFunctionLabel(row.functionName)}
+                          {row.functionName === COMPETITOR_SEARCH_FUNCTION_NAME && (
+                            <div className="small text-muted fw-normal mt-1">
+                              Costo stimato sui soli token: non include la ricerca sul web, quindi
+                              è una sottostima.
+                            </div>
+                          )}
+                        </td>
                         <td className="text-end">{formatNum(row.calls)}</td>
                         <td className="text-end">{formatUsd(row.costUsd)}</td>
                         <td className="text-end">{formatNum(row.inputTokens)}</td>

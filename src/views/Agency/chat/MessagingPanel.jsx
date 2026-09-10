@@ -6,7 +6,7 @@ import {
   markMessagingConversationRead,
   sendMessagingMessage,
 } from "../../../modules/messaging/api/messagingApi";
-import { formatListDate, formatTime } from "./chatShared";
+import { formatListDate, formatTime, newestUnreadIncomingAt } from "./chatShared";
 import { IconBack, IconSearch } from "./chatIcons";
 import { subscribeMessaging, subscribeStatus } from "../../../realtime/realtimeClient";
 
@@ -137,6 +137,15 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
 
   const bottomRef = React.useRef(null);
   const peerId = peer?.userId || "";
+
+  // Fin dove e' gia' stato chiesto "segna come letto" sulla conversazione aperta
+  // (istante del messaggio in arrivo piu' recente per cui la richiesta e' partita).
+  // Senza questo segnaposto la richiesta partiva a OGNI caricamento, compresi i
+  // controlli automatici silenziosi ogni 1,5 secondi: il server registra un evento
+  // `messages.read` per ogni chiamata, anche quando non ha aggiornato niente, e il
+  // Registro attivita' si riempiva di righe "ha guardato" a conversazione ferma.
+  // Vive in un ref, non nello stato: cambiarlo non deve far ridisegnare niente.
+  const readMarkerRef = React.useRef(0);
   const [realtimeConnected, setRealtimeConnected] = React.useState(false);
 
   // A tutto schermo le due colonne stanno insieme; nel popup si mostra una cosa
@@ -177,11 +186,28 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
     }
     try {
       const result = await listMessagingConversation(userId, { limit: 120 });
-      setMessages(Array.isArray(result?.items) ? result.items : []);
-      try {
-        await markMessagingConversationRead(userId);
-      } catch (_error) {
-        // Segnare "letto" e' un di piu': se fallisce, la conversazione resta leggibile.
+      const items = Array.isArray(result?.items) ? result.items : [];
+      setMessages(items);
+
+      // Si segna come letto solo quando e' arrivato qualcosa di nuovo da leggere:
+      // aprire la conversazione con messaggi non letti passa di qui, e cosi' un
+      // messaggio che arriva mentre e' aperta; il controllo automatico a vuoto no.
+      // La marcatura resta (serve ai non letti), sparisce il rumore nel registro.
+      const unreadAt = newestUnreadIncomingAt(items);
+      if (unreadAt > readMarkerRef.current) {
+        const previousMarker = readMarkerRef.current;
+        // Spostato PRIMA della chiamata: due caricamenti sovrapposti (poller +
+        // segnale del tempo reale) vedrebbero gli stessi non letti e la ripeterebbero.
+        readMarkerRef.current = unreadAt;
+        try {
+          await markMessagingConversationRead(userId);
+        } catch (_error) {
+          // Segnare "letto" e' un di piu': se fallisce, la conversazione resta
+          // leggibile e il segnaposto torna indietro, cosi' il giro dopo riprova.
+          if (readMarkerRef.current === unreadAt) {
+            readMarkerRef.current = previousMarker;
+          }
+        }
       }
     } catch (error) {
       if (!silent) {
@@ -200,6 +226,10 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
   }, [loadContacts]);
 
   React.useEffect(() => {
+    // Il segnaposto dei "gia' segnati come letti" e' della conversazione aperta:
+    // cambiando persona riparte da zero, altrimenti i non letti dell'altra
+    // resterebbero non segnati perche' piu' vecchi del segnaposto precedente.
+    readMarkerRef.current = 0;
     if (!peerId) {
       setMessages([]);
       return;

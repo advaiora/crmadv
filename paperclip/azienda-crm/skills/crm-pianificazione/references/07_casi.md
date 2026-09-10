@@ -42,6 +42,11 @@ sends invitations" and starts meaning "who can take over any account in the work
 included.
 **Lesson.** Some couplings are not about order of work but about **when a risk becomes real**. Read
 the plan for those, and do not "optimise" them into their own milestone → [R04:HARD_CONSTRAINTS].
+**Outcome, 9/9/2026.** The product decision behind the constraint — block private-network addresses
+with a switch that allows them when they are legitimate — landed on `main` (`server/modules/mail/mail.net-guard.ts`,
+merges `46e8d4f`/`4699268`) *before* password recovery was even built, so the constraint was
+satisfied early rather than raced against. See
+`archivio-documenti/decisioni-cliente-e-menu-2026-08-07.md` §7.7 point 7, now ✅ CHIUSO.
 
 ### ✅ P3 — A wrong technical key was caught while it still cost nothing
 
@@ -220,7 +225,7 @@ prevent.
   `archivio-documenti/decisioni-cliente-e-menu-2026-08-07.md` §7.5 points 1-2 — Tier 1 / **HIGH**.
 - **P2 — the «Prova connessione» decision closes inside milestone ②, "non prima, non dopo"; the
   `mail.manage` escalation**: same document §7.5 point 2 and §7.7 point 7 (raised by the reviewer
-  on 18/8/2026) — Tier 1 / **HIGH** (verbatim).
+  on 18/8/2026, closed 9/9/2026) — Tier 1 / **HIGH** (verbatim).
 - **P3 / N1 — `posta` → `mail`, the termination check, «Server di posta: non accessibile» to a
   Superadmin, and the cost window closing when a migration enters git**: `crmadv/CLAUDE.md`, rule
   ②-bis (18/8/2026) — Tier 1 / **HIGH** (verbatim).

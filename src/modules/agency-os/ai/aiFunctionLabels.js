@@ -12,7 +12,13 @@ const AI_FUNCTION_LABELS = {
   "web.generateProject": "Struttura sito/landing",
   "web.generateBlock": "Blocco sito",
   "ads.generateAsset": "Copy campagna ADV",
+  "competitors.search": "Ricerca competitor online",
 };
+
+// Unica funzione il cui costo mostrato e' una sottostima (copre solo i token,
+// non la ricerca web: D2 di CRMA-49). La UI la usa per agganciare la nota
+// solo a questa riga, non a un avviso a tutta pagina.
+export const COMPETITOR_SEARCH_FUNCTION_NAME = "competitors.search";
 
 // Le stesse funzioni in ordine, per chi deve mostrarle in elenco (il testo
 // d'aiuto del campo "Modelli per funzione"): cosi' l'elenco non e' una terza

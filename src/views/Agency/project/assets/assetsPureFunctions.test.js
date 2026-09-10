@@ -228,4 +228,25 @@ describe('esito della ricerca competitor', () => {
       message: 'Quota esaurita.',
     })).toBe('Quota esaurita.');
   });
+
+  it('col budget AI esaurito mostra il motivo vero del server, non "non configurata"', () => {
+    const result = {
+      providerStatus: 'budget_exceeded',
+      realSearch: false,
+      budgetExceeded: true,
+      budgetMessage: 'Budget AI giornaliero superato: spesi $12 su un limite di $10.',
+      suggestions: [],
+    };
+
+    expect(getFriendlyCompetitorSearchMessage(result)).toBe('Budget AI giornaliero superato: spesi $12 su un limite di $10.');
+    expect(getCompetitorSearchAlertTitle(result)).toBe('Budget AI giornaliero superato.');
+    expect(getCompetitorSearchAlertVariant(result)).toBe('warning');
+  });
+
+  it('sul budget esaurito senza budgetMessage usa comunque un testo che non parla di configurazione', () => {
+    const result = { providerStatus: 'budget_exceeded', realSearch: false };
+
+    expect(getFriendlyCompetitorSearchMessage(result)).not.toMatch(/non configurata/);
+    expect(getFriendlyCompetitorSearchMessage(result)).toMatch(/Budget AI giornaliero/);
+  });
 });

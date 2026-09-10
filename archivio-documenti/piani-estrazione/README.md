@@ -1,6 +1,6 @@
 # Piani di estrazione dei file .jsx grossi
 
-Qui stanno i **piani preparati in anticipo** per spezzare i file grossi del frontend, uno per file. Li produce l'agent *esploratore*; la sessione principale li scrive qui perché gli agent non possono scrivere file, e senza questo passaggio il piano morirebbe con la sessione che l'ha chiesto.
+Qui stanno i **piani preparati in anticipo** per spezzare i file grossi del frontend, uno per file. Li produce l'agent *`esploratore-repo`* (il subagent di repository, non l'agente Esploratore di Paperclip); la sessione principale li scrive qui perché gli agent non possono scrivere file, e senza questo passaggio il piano morirebbe con la sessione che l'ha chiesto.
 
 ## A cosa servono
 
@@ -18,7 +18,7 @@ Un piano **non è un ordine**. È il risultato di una lettura statica del codice
 
 ## Metodo del giro (promemoria)
 
-Sta in `CLAUDE.md`, sezione «Frontend `.jsx` — regole di manutenzione». In breve: `npm run mappa` → si estrae in un giro solo, **committando per estrazione** → verifica in anteprima → **revisore una volta sola, a giro completo** → commit di chiusura → `npm run consumi:compito`.
+Sta in `CLAUDE.md`, sezione «Frontend `.jsx` — regole di manutenzione». In breve: `npm run mappa` → si estrae in un giro solo, **committando per estrazione** → verifica in anteprima → **Revisore Repo una volta sola, a giro completo** → commit di chiusura → `npm run consumi:compito`.
 
 ## Quando un piano si butta
 
