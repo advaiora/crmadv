@@ -1444,3 +1444,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Modo corretto:**
 - Quando il vero bloccante e' un'azione umana fuori dal grafo delle issue (qui: un click «Merge» su GitHub), non collegare o scollegare `blockedByIssueIds` a issue-agente che sono gia' chiuse: si svuota l'elenco (`blockedByIssueIds: []`) e si lascia che sia **solo** `unblockDescriptor` a dire chi sblocca e come — quel campo non alimenta il recupero automatico.
 - Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `blockedBy` risulti vuoto pur restando `status: "blocked"` — segno che il recupero automatico non ha piu' un bloccante "risolvibile" da cui ripartire da solo.
+
+---
+
+## 99. `unblockDescriptor.owner` accetta solo l'agente stesso: un umano o un altro agente vanno nominati altrove, non nel descrittore
+
+**Contesto:** un agente blocca un'issue e prova a impostare `unblockDescriptor.owner` puntandolo a un umano o a un altro agente (es. il CEO), per segnalare esplicitamente chi deve sbloccare.
+
+**Errore:** l'API `PATCH /api/issues/{id}` rifiuta owner diversi da se stessi con `"Agents may only name themselves as an unblock owner"`. Se l'agente si ferma li' senza un fallback, il `PATCH` fallisce del tutto e `unblockDescriptor` resta `null` con `blockedBy: []` — uno stato indistinguibile da "nessuno mi blocca" (vedi nota #98 sul campo che alimenta il recupero automatico), e l'harness rimette il compito in `todo` perdendo il run senza che nessuno sappia chi doveva sbloccarlo.
+
+**Modo corretto:**
+- Impostare sempre `unblockDescriptor.owner = {agentId: <se stesso>}`, con `action` che descrive cosa controllare al risveglio (non chi altro deve agire: quel campo non lo accetta).
+- Nominare il vero sbloccante umano o altro agente in un commento leggibile sull'issue, e/o tramite un'interazione `ask_user_questions` / `request_confirmation` con `resolverPolicy: human_only` — mai tramite il descrittore, che accetta solo se stessi.
+- Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `unblockDescriptor` non sia `null` — se lo e', il `PATCH` con owner esterno e' fallito silenziosamente e va rifatto puntando a se stessi.
