@@ -1370,3 +1370,15 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - **Il ramo piu' completo si verifica per contenuto, non per numero piu' alto.** `crma-60` arrivava a #85 con `git merge-base --is-ancestor` che conferma essere discendente lineare di `crma-36`, `crma-51`, `crma-54`: le loro note erano gia' tutte dentro. Il controllo che ha trovato la #80 mancante e' stato lo stesso della nota #82/#90 (il piu' alto per ramo, letto su **tutti** i rami, non solo quelli con PR).
 - **Le note con lo stesso numero ma testo diverso non si scartano: si rinumerano in coda**, verificando prima se sono davvero la stessa lezione (si accorpano, come gia' successo alla prima collisione #70/#70 nella nota #71) o lezioni distinte (restano entrambe, con numeri diversi) — qui erano distinte tutte e tre, e sono diventate #89 (`crma-72`) e #90 (`crma-84`; `crma-82` scartato come stesura piu' corta e superata dello stesso contenuto di `crma-84`).
 - **Il principio che generalizza:** un compito `done` senza una pull request unita a `main` e' lavoro che non esiste per chiunque legga `main` — vale per il codice quanto per questi stessi file di note operative, che pure parlano di com'e' fatto il repository.
+
+---
+
+## 92. `$?` dopo una pipe (`git commit … | head`) racconta l'uscita di `head`, non quella del comando che conta
+
+**Contesto:** revisione di sicurezza della PR #28 (CRMA-85), al banco: verificare che l'hook `pre-commit` rifiuti davvero un commit con un segreto in stage, in un clone usa-e-getta.
+
+**Errore:** letto l'esito lanciando `git commit … | head -8` e leggendo `$?` subito dopo. `$?` e' l'uscita dell'**ultimo** comando della pipe, cioe' `head` — che e' quasi sempre 0 — non quella di `git commit`. Il commit rifiutato dall'hook sembrava riuscito. Stessa famiglia della nota #39 (il dato vero sta altrove rispetto a dove lo si legge).
+
+**Modo corretto:**
+- Non fidarsi del codice d'uscita quando c'e' una pipe di mezzo. La prova che un commit e' stato rifiutato e' che **il file e' ancora in stage**: si legge con `git status --short` dopo il tentativo (`A file.md` = commit non avvenuto).
+- In alternativa, non mettere `git commit` in pipe: catturare l'uscita in una variabile (`git commit …; esito=$?`) e solo dopo filtrare l'output per la lettura umana.
