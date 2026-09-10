@@ -23,9 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
-# .env file
-.env
-.env
+# File di ambiente: nessuno va committato (.env, .env.local, .env.production, ...).
+# Unica eccezione: .env.example, che e' tracciato e contiene solo valori di esempio.
+.env*
+!.env.example
 
 # PDF rigenerato dal resoconto HTML (vedi archivio-documenti/resoconto-avanzamento.html)
 archivio-documenti/resoconto-avanzamento.pdf
