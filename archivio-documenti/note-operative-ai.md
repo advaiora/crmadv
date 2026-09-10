@@ -1050,4 +1050,4 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 
 **Modo corretto:**
 - Le quattro regole che chiudono questi tre punti (chi revisiona, quando un `blockedBy` e' legittimo, come si misura il fermo, perche' nessun compito esce da `backlog` senza assegnatario) sono scritte per esteso in `CLAUDE.md`, sezione **«Regole della bacheca: chi revisiona, cosa blocca, cosa e' fermo (dal 10/9/2026)»**, subito dopo «Team di agent». Si leggono li': questa nota rimanda, non ricopia.
-- Le stesse regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del capocantiere (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e `R05:REVIEWER_TRIGGERS`): se una copia diverge dalle altre, vince il repository.
+- Le stesse regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del capocantiere (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e `R05:REVIEWER_TRIGGERS` — fuori da questo repository, nel pacchetto azienda di Paperclip): se una copia diverge dalle altre, vince il repository.

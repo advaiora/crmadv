@@ -128,7 +128,10 @@ provvedimento per la sola release di settembre, anche se è la release ad averle
 sicurezza/unioni a `main`) **non era applicata**: fino al 10/9 ogni punto della release portava
 quattro cancelli di revisione, cioè tre run in più a punto e una contraddizione silenziosa con la
 regola scritta. R1 la raffina — non la sostituisce — dicendo che i cancelli si ricavano da inneschi
-osservabili:
+osservabili. **Guardiano, Revisore di Paperclip, Collaudatore e Collaudatore AI sono agenti
+Paperclip** — non i tre subagent di repository (esploratore/revisore/architetto) descritti sopra —
+e si assegnano come cancello sul compito, non si chiamano dentro la sessione: l'elenco completo del
+team e come si assegna un cancello stanno in `archivio-documenti/team-agenti.md`.
 
 | Cancello | Si mette se e solo se il lavoro tocca... |
 |---|---|
@@ -136,6 +139,10 @@ osservabili:
 | **Revisore** di Paperclip | `prisma/schema.prisma` o una migrazione · `server/auth/rbac-catalog.ts` · sicurezza · unione a `main` |
 | **Collaudatore** | un comportamento visibile a schermo o una risposta d'API che cambia |
 | **Collaudatore AI** | prompt, generazioni AI, o il motore delle funzioni AI |
+
+Sui **permessi e ruoli** gli inneschi di Guardiano e Revisore scattano insieme, non in alternativa:
+il Guardiano copre la sicurezza della scelta (chi deve poter fare cosa), il Revisore copre
+`rbac-catalog.ts` come file che tocca schema/permessi.
 
 Tre corollari, che sono la parte che chiude le ambiguità:
 1. **Se non scatta nessun innesco, il compito non ha cancelli** — e non è un compito senza
@@ -163,10 +170,10 @@ in `todo`, e spostarli di colonna non poteva avere nessun effetto — il fermo s
 nella colonna. Il criterio meccanico da passare a ogni giro, riportato così com'è:
 
 ```
-attività più vecchia di 2 ore senza run attivo   → si rilancia con un commento
-blocked senza bloccanti                          → si rimette in todo
-fuori da backlog senza assegnatario              → si assegna
-tutti i bloccanti chiusi ma il compito è fermo    → si rilancia
+attività più vecchia di 2 ore senza run attivo  → si rilancia con un commento
+blocked senza bloccanti                         → si rimette in todo
+fuori da backlog senza assegnatario             → si assegna
+tutti i bloccanti chiusi ma il compito è fermo   → si rilancia
 ```
 
 **Un risveglio differito non si ritenta da solo:** se `claimedAt` e `runId` restano nulli, quella
@@ -178,9 +185,10 @@ segreto trapelato è rimasto fermo quindici ore, perché nessuno lo vedeva.
 
 **Le stesse quattro regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del
 capocantiere** (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e
-`R05:REVIEWER_TRIGGERS`). Il repository è la copia che legge chi sviluppa: **se le tre dovessero
-divergere, vince il repository**, e le altre due si correggono di conseguenza. Una regola, tre
-lettori, mai tre varianti.
+`R05:REVIEWER_TRIGGERS` — **fuori da questo repository**, nel pacchetto azienda di Paperclip, non
+in una cartella clonabile da qui). Il repository è la copia che legge chi sviluppa: **se le tre
+dovessero divergere, vince il repository**, e le altre due si correggono di conseguenza. Una
+regola, tre lettori, mai tre varianti.
 
 ## Regole di scrittura degli handoff
 
