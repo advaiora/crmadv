@@ -1042,8 +1042,6 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
 
----
-
 ## 86. Il titolo di un commit descrive un'intenzione, non un'azione: cosi' un segreto trapelato e' sembrato chiuso per sette mesi
 
 **Contesto:** commit `8a30469`, 19/2/2026, titolo «Rimuovi .env dalla cronologia». La password del superuser PostgreSQL era finita nel commit `569d192` del 10/2/2026 dentro il file `.env`.
@@ -1053,9 +1051,7 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 **Modo corretto:**
 - Togliere davvero un file dalla storia e' `git filter-repo` (o equivalente) **piu' un force-push**, non un semplice `git rm` + commit. Un commit che si limita a cancellare il file in punta lascia il blob in ogni versione precedente e in ogni clone gia' fatto.
 - Un messaggio di commit descrive **cosa il commit fa**, non cosa si voleva ottenere: «Rimuovi .env dalla cronologia» avrebbe dovuto essere «Rimuovi .env (la cronologia resta invariata)», o non essere scritto affatto in quei termini.
-- **Stato residuo, dichiarato invece di lasciato implicito:** su decisione di Jacopo del 10/9/2026 la storia **non** viene riscritta (47 rami aperti e ogni clone da rifare erano un prezzo sproporzionato per un segreto di sviluppo) — quindi quella password resta leggibile nella storia di `origin/main` a tempo indefinito. L'unica difesa reale e' che non sia piu' valida: rotazione della password ancora da fare al 10/9/2026 — data da aggiungere qui quando avviene.
-
----
+- **Stato residuo, dichiarato invece di lasciato implicito:** su decisione di Jacopo del 10/9/2026 la storia **non** viene riscritta (una cinquantina di rami aperti a quella data, e ogni clone da rifare, erano un prezzo sproporzionato per un segreto di sviluppo) — quindi quella password resta leggibile nella storia di `origin/main` a tempo indefinito. L'unica difesa reale e' che non sia piu' valida: rotazione della password ancora da fare al 10/9/2026 — data da aggiungere qui quando avviene.
 
 ## 87. La descrizione di un compito Paperclip si copia nel risveglio di ogni agente che lo tocca: un segreto scritto li' si propaga da solo
 
