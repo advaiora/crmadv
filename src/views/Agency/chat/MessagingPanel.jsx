@@ -1,14 +1,10 @@
 import React from "react";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
-import {
-  listMessagingConversation,
-  listMessagingUsers,
-  markMessagingConversationRead,
-  sendMessagingMessage,
-} from "../../../modules/messaging/api/messagingApi";
-import { formatListDate, formatTime, newestUnreadIncomingAt } from "./chatShared";
+import { listMessagingUsers, sendMessagingMessage } from "../../../modules/messaging/api/messagingApi";
+import { formatListDate, formatTime } from "./chatShared";
 import { IconBack, IconSearch } from "./chatIcons";
 import { subscribeMessaging, subscribeStatus } from "../../../realtime/realtimeClient";
+import { useMessagingConversation } from "./useMessagingConversation";
 
 // Il mondo MESSAGGISTICA dentro il popup delle chat (spec 4-ter §1).
 //
@@ -20,16 +16,17 @@ import { subscribeMessaging, subscribeStatus } from "../../../realtime/realtimeC
 // Riusa il layer API gia' in casa (src/modules/messaging/api/messagingApi.js), lo
 // stesso della pagina Messaggi: qui non si duplica logica di server, si cambia solo
 // dove la si guarda.
+//
+// Il ciclo di vita della conversazione APERTA (caricamento, storico oltre i 120
+// messaggi piu' recenti, poller, tempo reale, scroll) vive in useMessagingConversation:
+// questo file era sopra le 500 righe e quella parte e' un mondo a se'.
 
-// Stessi ritmi della pagina Messaggi: i contatti cambiano piano, la conversazione
-// aperta e' quella che si guarda mentre l'altro scrive. Questi valori sono la RETE DI
-// SICUREZZA: quando il tempo reale (websocket) e' connesso il polling rallenta ai
-// valori "SLOW" (l'aggiornamento istantaneo arriva dal websocket); se il websocket
-// cade, si torna ai ritmi rapidi.
+// Stessi ritmi della pagina Messaggi: i contatti cambiano piano. Questi valori sono
+// la RETE DI SICUREZZA: quando il tempo reale (websocket) e' connesso il polling
+// rallenta ai valori "SLOW" (l'aggiornamento istantaneo arriva dal websocket); se il
+// websocket cade, si torna ai ritmi rapidi.
 const CONTACTS_POLL_INTERVAL_MS = 2500;
-const CONVERSATION_POLL_INTERVAL_MS = 1500;
 const CONTACTS_POLL_SLOW_MS = 20000;
-const CONVERSATION_POLL_SLOW_MS = 12000;
 
 const getErrorMessage = (error, fallback) => {
   const status = Number(error?.status);
@@ -129,24 +126,24 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
   // Il contatto INTERO (non solo l'id) sta nel padre: la ricerca filtra l'elenco e con
   // il solo id il nome dell'intestazione sparirebbe appena il peer esce dai risultati.
   const setPeer = onPeerChange;
-  const [messages, setMessages] = React.useState([]);
-  const [messagesLoading, setMessagesLoading] = React.useState(false);
-  const [messagesError, setMessagesError] = React.useState("");
   const [composerText, setComposerText] = React.useState("");
   const [sending, setSending] = React.useState(false);
 
-  const bottomRef = React.useRef(null);
   const peerId = peer?.userId || "";
-
-  // Fin dove e' gia' stato chiesto "segna come letto" sulla conversazione aperta
-  // (istante del messaggio in arrivo piu' recente per cui la richiesta e' partita).
-  // Senza questo segnaposto la richiesta partiva a OGNI caricamento, compresi i
-  // controlli automatici silenziosi ogni 1,5 secondi: il server registra un evento
-  // `messages.read` per ogni chiamata, anche quando non ha aggiornato niente, e il
-  // Registro attivita' si riempiva di righe "ha guardato" a conversazione ferma.
-  // Vive in un ref, non nello stato: cambiarlo non deve far ridisegnare niente.
-  const readMarkerRef = React.useRef(0);
   const [realtimeConnected, setRealtimeConnected] = React.useState(false);
+
+  const {
+    messages,
+    messagesLoading,
+    messagesError,
+    setMessagesError,
+    hasMoreOlder,
+    loadingOlder,
+    loadConversation,
+    loadOlderMessages,
+    bottomRef,
+    messagesContainerRef,
+  } = useMessagingConversation(peerId, realtimeConnected);
 
   // A tutto schermo le due colonne stanno insieme; nel popup si mostra una cosa
   // alla volta, come su un telefono.
@@ -176,90 +173,26 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
     [searchQuery],
   );
 
-  const loadConversation = React.useCallback(async (userId, { silent = false } = {}) => {
-    if (!userId) {
-      return;
-    }
-    if (!silent) {
-      setMessagesLoading(true);
-      setMessagesError("");
-    }
-    try {
-      const result = await listMessagingConversation(userId, { limit: 120 });
-      const items = Array.isArray(result?.items) ? result.items : [];
-      setMessages(items);
-
-      // Si segna come letto solo quando e' arrivato qualcosa di nuovo da leggere:
-      // aprire la conversazione con messaggi non letti passa di qui, e cosi' un
-      // messaggio che arriva mentre e' aperta; il controllo automatico a vuoto no.
-      // La marcatura resta (serve ai non letti), sparisce il rumore nel registro.
-      const unreadAt = newestUnreadIncomingAt(items);
-      if (unreadAt > readMarkerRef.current) {
-        const previousMarker = readMarkerRef.current;
-        // Spostato PRIMA della chiamata: due caricamenti sovrapposti (poller +
-        // segnale del tempo reale) vedrebbero gli stessi non letti e la ripeterebbero.
-        readMarkerRef.current = unreadAt;
-        try {
-          await markMessagingConversationRead(userId);
-        } catch (_error) {
-          // Segnare "letto" e' un di piu': se fallisce, la conversazione resta
-          // leggibile e il segnaposto torna indietro, cosi' il giro dopo riprova.
-          if (readMarkerRef.current === unreadAt) {
-            readMarkerRef.current = previousMarker;
-          }
-        }
-      }
-    } catch (error) {
-      if (!silent) {
-        setMessages([]);
-        setMessagesError(getErrorMessage(error, "Impossibile caricare la conversazione."));
-      }
-    } finally {
-      if (!silent) {
-        setMessagesLoading(false);
-      }
-    }
-  }, []);
-
   React.useEffect(() => {
     void loadContacts();
   }, [loadContacts]);
 
-  React.useEffect(() => {
-    // Il segnaposto dei "gia' segnati come letti" e' della conversazione aperta:
-    // cambiando persona riparte da zero, altrimenti i non letti dell'altra
-    // resterebbero non segnati perche' piu' vecchi del segnaposto precedente.
-    readMarkerRef.current = 0;
-    if (!peerId) {
-      setMessages([]);
-      return;
-    }
-    void loadConversation(peerId);
-  }, [loadConversation, peerId]);
-
-  React.useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   // Tempo reale (Fase 4): sappiamo se il websocket e' connesso (per rallentare il
-  // polling) e ascoltiamo il segnale "nuovo messaggio". Ricevuto il segnale, si
-  // ricarica dall'endpoint autorizzato: l'elenco contatti sempre (badge non letti,
-  // anteprime) e la conversazione aperta solo se e' quella toccata.
+  // polling) e ascoltiamo il segnale "nuovo messaggio" per aggiornare l'elenco
+  // contatti (badge non letti, anteprime). La conversazione aperta ascolta lo
+  // stesso segnale per conto suo, dentro useMessagingConversation.
   React.useEffect(() => subscribeStatus(setRealtimeConnected), []);
 
   React.useEffect(() => {
-    const onMessagingEvent = (event) => {
+    const onMessagingEvent = () => {
       void loadContacts({ silent: true });
-      if (event?.withUserId && event.withUserId === peerId) {
-        void loadConversation(peerId, { silent: true });
-      }
     };
     return subscribeMessaging(onMessagingEvent);
-  }, [loadContacts, loadConversation, peerId]);
+  }, [loadContacts]);
 
-  // Due poller separati, ognuno acceso solo quando la sua colonna e' a video: nel
-  // popup stretto ne gira sempre uno solo. Il componente esiste solo a popup aperto,
-  // quindi a popup chiuso non resta niente acceso.
+  // Poller dei contatti, acceso solo quando la sua colonna e' a video: nel popup
+  // stretto puo' non esserlo. Il componente esiste solo a popup aperto, quindi a
+  // popup chiuso non resta niente acceso.
   React.useEffect(() => {
     if (!showList) {
       return undefined;
@@ -283,30 +216,6 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
       if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [loadContacts, showList, realtimeConnected]);
-
-  React.useEffect(() => {
-    if (!peerId) {
-      return undefined;
-    }
-    let timeoutId;
-    let cancelled = false;
-    const delay = realtimeConnected ? CONVERSATION_POLL_SLOW_MS : CONVERSATION_POLL_INTERVAL_MS;
-
-    const run = async () => {
-      if (cancelled) return;
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
-        await loadConversation(peerId, { silent: true });
-      }
-      if (cancelled) return;
-      timeoutId = window.setTimeout(run, delay);
-    };
-
-    timeoutId = window.setTimeout(run, delay);
-    return () => {
-      cancelled = true;
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, [loadConversation, peerId, realtimeConnected]);
 
   const submitSearch = (event) => {
     event.preventDefault();
@@ -351,7 +260,6 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
           onSubmitSearch={submitSearch}
           onSelect={(contact) => {
             setPeer(contact);
-            setMessages([]);
             setComposerText("");
           }}
         />
@@ -373,7 +281,7 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
 
           {messagesError && <div className="ai-chat-notice is-error">{messagesError}</div>}
 
-          <div className="ai-chat-messages">
+          <div className="ai-chat-messages" ref={messagesContainerRef}>
             <div className="ai-chat-messages-inner">
               {!peerId ? (
                 <div className="ai-chat-empty">Scegli una persona per aprire la conversazione.</div>
@@ -385,6 +293,19 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
                 <div className="ai-chat-empty">Nessun messaggio. Inizia tu la conversazione.</div>
               ) : (
                 <>
+                  {hasMoreOlder && (
+                    <div className="d-flex justify-content-center mb-2">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        onClick={() => void loadOlderMessages()}
+                        disabled={loadingOlder}
+                      >
+                        {loadingOlder ? <Spinner animation="border" size="sm" /> : "Carica messaggi precedenti"}
+                      </Button>
+                    </div>
+                  )}
                   {messages.map((message) => (
                     <MessageBubble key={message.id} message={message} />
                   ))}
