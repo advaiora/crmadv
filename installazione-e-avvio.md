@@ -222,7 +222,12 @@ non si committano.
 
 Da qui passano gli **inviti al Team** e le **notifiche dei preventivi** — e ci passera'
 il **recupero password** quando sara' costruito (non esiste ancora). Leggono tutti la
-stessa configurazione (`server/core/mail.ts`), quindi si configura una volta sola.
+stessa configurazione (`server/core/mail.ts`) e spediscono tutti dallo **stesso punto
+d'uscita** (`server/core/send-mail.ts`), quindi si configura una volta sola.
+
+> **Le sei variabili qui sotto sono tutto quello che serve.** Il giorno in cui arrivano
+> le credenziali della casella `noreply`, si riempiono e si riavvia l'API: non c'e'
+> nessun codice da scrivere e nessun file da toccare.
 
 > ⚠️ **Dal 18/8/2026 queste variabili non sono piu' l'unico posto.** Dentro il CRM
 > esiste la pagina **Profilo → Server di posta** (Superadmin e Admin), che salva gli
@@ -235,11 +240,21 @@ stessa configurazione (`server/core/mail.ts`), quindi si configura una volta sol
 
 - **In locale puoi lasciare `SMTP_HOST` vuoto.** In sviluppo il CRM ripiega su una
   casella finta (Ethereal) che restituisce un link per leggere il messaggio: utile per
-  collaudare, non recapita nulla a nessuno.
+  collaudare, non recapita nulla a nessuno. **Se Ethereal non risponde** (macchina
+  scollegata, proxy) il messaggio viene scritto **nei log dell'API** — destinatario,
+  oggetto e corpo per intero — e il lavoro va avanti lo stesso: cerca le righe che
+  cominciano con `[Posta]`.
+- **In produzione, invece, non si ripiega su niente.** Senza server configurato la
+  posta non parte e nei log compare `[Posta] …: nessun server di posta configurato`,
+  con chi stava spedendo e verso chi. ⚠️ **In nessuno dei due casi il CRM annuncia
+  "email inviata"**: quando l'invito non parte, chi ha invitato si riprende il link
+  d'invito nella risposta e fa entrare la persona a mano.
 - `SMTP_SECURE` va **`false`** sulla porta 587 (la cifratura parte dopo la connessione)
   e `true` sulla 465.
 - `SMTP_PASS` e' la password della casella. Sta **solo** nel `.env`, e non va copiata
   dentro nessun documento di progetto.
+- Il mittente si chiama **`EMAIL_FROM`**, non `MAIL_FROM`: e' il nome con cui e' nata
+  ed e' quello che il codice legge. Se manca, si ripiega su `no-reply@local`.
 - `APP_BASE_URL` e' l'indirizzo a cui risponde il CRM: serve a comporre il link di
   accettazione degli inviti. In sviluppo, se manca, si usa `http://localhost:5173`.
 
