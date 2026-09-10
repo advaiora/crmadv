@@ -31,8 +31,16 @@ export type MailSettings = {
   from: string;
 };
 
-/** Da dove arrivano i parametri usati per spedire. */
-export type MailSettingsSource = 'database' | 'env' | 'ethereal';
+/**
+ * Da dove arrivano i parametri usati per spedire.
+ *
+ * I primi due sono server veri e recapitano davvero. Gli altri due no:
+ * `ethereal` e' una casella finta consultabile via link, `log` non e' nemmeno
+ * quella — scrive il messaggio nei log del server e basta. Chi legge questo
+ * campo deve poter distinguere le due famiglie, perche' dire "inviata" per un
+ * messaggio finito nel log e' esattamente il guasto che il modulo previene.
+ */
+export type MailSettingsSource = 'database' | 'env' | 'ethereal' | 'log';
 
 /**
  * L'esito della ricerca di una configurazione, con i tre casi tenuti distinti.
@@ -271,6 +279,27 @@ const createEtherealTransport = async (): Promise<ResolvedMailTransport | null> 
   }
 };
 
+/**
+ * Il trasporto che non spedisce: raccoglie il messaggio e lo restituisce come
+ * JSON (`jsonTransport` di nodemailer), senza aprire nessuna connessione.
+ *
+ * Esiste perche' in sviluppo, senza server di posta configurato, il lavoro deve
+ * andare avanti lo stesso: l'invito al Team si crea, il messaggio finisce nei
+ * log e chi sta collaudando lo legge li'. E' l'ultima spiaggia del ripiego di
+ * sviluppo, DOPO Ethereal: Ethereal ha bisogno della rete e di un account
+ * generato al volo, quindi su una macchina scollegata — o dietro un proxy — non
+ * si accende. Prima di oggi in quel caso non succedeva niente e il messaggio
+ * spariva senza lasciare traccia.
+ *
+ * ⚠️ In produzione non si usa mai: chi lo riceve vede `source: 'log'` e sa che
+ * il messaggio NON e' partito.
+ */
+const createLogTransport = (): ResolvedMailTransport => ({
+  transport: nodemailer.createTransport({ jsonTransport: true }),
+  from: readEnv('EMAIL_FROM') ?? DEFAULT_MAIL_FROM,
+  source: 'log',
+});
+
 export type EsitoCanaleDiPosta =
   | ({ esito: 'ok' } & ResolvedMailTransport)
   | { esito: 'assente' }
@@ -310,6 +339,11 @@ export const resolveMailTransportDettagliato = async (
     if (ethereal) {
       return { esito: 'ok', ...ethereal };
     }
+
+    // Ethereal non risponde (macchina scollegata, proxy, servizio giu'): si
+    // scende sul trasporto che scrive nei log. In sviluppo si va avanti
+    // sempre, e il messaggio resta leggibile da qualche parte.
+    return { esito: 'ok', ...createLogTransport() };
   }
 
   return { esito: resolved.esito };

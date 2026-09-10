@@ -48,9 +48,9 @@ Prima di toccare qualsiasi cosa, scrivi la **coda**: l'elenco ordinato dei pezzi
 Da dove esce la coda, in quest'ordine di precedenza:
 1. i **prossimi passi dell'handoff più recente** in `archivio-documenti/handoff/`;
 2. l'obiettivo su cui si stava lavorando in questa conversazione;
-3. il piano di un esploratore già chiamato in sessione, se c'è.
+3. il piano di un Esploratore Repo già chiamato in sessione, se c'è.
 
-Applica le regole normali del progetto senza sconti — anzi, con più scrupolo, perché **nessuno sta guardando**: `npm run mappa` prima di chiamare gli assistenti secondari, l'esploratore quando ricorrono le sue condizioni, il **revisore a ogni tappa conclusa** (dove non è stato esplicitamente spento per quella fase), i test della sola cartella toccata durante il lavoro e la suite intera una volta sola in fondo.
+Applica le regole normali del progetto senza sconti — anzi, con più scrupolo, perché **nessuno sta guardando**: `npm run mappa` prima di chiamare gli assistenti secondari, l'**Esploratore Repo** quando ricorrono le sue condizioni, il **Revisore Repo a ogni tappa conclusa** (dove non è stato esplicitamente spento per quella fase), i test della sola cartella toccata durante il lavoro e la suite intera una volta sola in fondo.
 
 ## 3. Il ciclo di lavoro, con il cancello
 
@@ -63,7 +63,7 @@ Per ogni pezzo della coda, **prima di cominciarlo**:
 
 **A pezzo concluso** (deciso da Jacopo il 6/8/2026):
 - **committa e pusha subito sul ramo del lavoro in corso** *(aggiornato il 19/8/2026: prima diceva «su `main`», quando si pushava direttamente sul ramo principale)*. È ciò che rende sicura un'interruzione: se la sessione muore, non si perde niente e il lavoro è visibile anche da fuori. Messaggio di commit nello stile del progetto (italiano, che dice *cosa cambia per chi usa il CRM*, non quali file sono stati toccati).
-- **Mai** `--no-verify`, **mai** force push, **mai** riscrivere la storia. ⚠️ E **mai unire a `main`**: l'unione è una decisione dell'utente, che al rientro trova il ramo pronto e la sceglie lui. Creare il ramo del proprio lavoro invece si può — anzi si deve.
+- **Mai** `--no-verify`, **mai** force push, **mai** riscrivere la storia. ⚠️ E **mai unire a `main`**: dal 10/9/2026 l'unione la *esegue* un agente, ma **solo dopo il consenso dell'utente registrato su una richiesta di conferma** (CLAUDE.md, sezione «L'unione a `main`») — e durante `/vado` l'utente non è al PC, quindi quel consenso non può esistere. Il consenso non si presume mai: al rientro trova il ramo pronto e la pull request aperta, e decide lui. Creare il ramo del proprio lavoro invece si può — anzi si deve.
 - Annota il pezzo nel registro: `npm run consumi:compito -- "<nome del lavoro>"` con `--da`/`--a` per delimitarlo. Non è burocrazia: è quello che rende affidabile il punto 3.2 la prossima volta.
 
 **Se la coda si svuota e avanza tempo** (deciso da Jacopo il 6/8/2026): pesca **solo item piccoli già scritti in roadmap** — le "trovate per strada", il debito tecnico minuto — cioè cose già tracciate, a basso rischio, che non richiedono una sua decisione. **Vietato** iniziare una V nuova, spezzare un file-mostro non assegnato, o toccare schema e permessi per riempire il tempo.

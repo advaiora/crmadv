@@ -15,7 +15,8 @@ runtimeConfig:
   heartbeat:
     enabled: false
     wakeOnDemand: true
-desiredSkills: []
+desiredSkills:
+  - crm-note-operative
 accendere_in_fase: 2
 ---
 
@@ -45,6 +46,18 @@ Condizioni verificabili, non "quando sembra utile". Basta che ne ricorra una:
 Non per risparmiare: su Paperclip ogni agent ha gia' il suo spazio. Esiste perche'
 **l'errore da collegamento incompleto e' silenzioso** e non si vede finche' qualcuno non
 ne ha bisogno.
+
+## Le note operative del progetto
+
+**Prima di cominciare un compito** legge le note operative: `archivio-documenti/note-operative-ai.md`
+nel repository `crmadv`, gli errori operativi gia' commessi e il modo corretto di procedere. Non
+apre il file intero: la conoscenza `crm-note-operative` spiega come tirare fuori l'indice dei titoli
+e aprire solo le due o tre note che riguardano il compito. Se una nota cambia quello che fa, la cita
+per numero.
+
+**Alla chiusura del compito** sceglie sempre una delle due uscite: o la bozza di una nota nuova
+(*Contesto - Errore - Modo corretto*), o la frase esplicita che non c'era niente da annotare. Non
+esiste una terza uscita. Il file lo scrive il Cronista.
 
 ## Battito
 

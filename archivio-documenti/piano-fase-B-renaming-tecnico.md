@@ -1,6 +1,6 @@
 # Piano della fase B del re-naming — i nomi tecnici
 
-> **Cos'è questo documento.** Il piano completo di **B1 (frontend) e B2 (backend/permessi)**, costruito il 17/8/2026 su due ricognizioni indipendenti (un esploratore su `src/**`, uno su `server/**` e `prisma/**`). **Nulla è stato eseguito.** Serve a decidere con i numeri davanti, e a permettere a una sessione futura di partire senza rifare l'indagine.
+> **Cos'è questo documento.** Il piano completo di **B1 (frontend) e B2 (backend/permessi)**, costruito il 17/8/2026 su due ricognizioni indipendenti (un Esploratore Repo su `src/**`, uno su `server/**` e `prisma/**`). **Nulla è stato eseguito.** Serve a decidere con i numeri davanti, e a permettere a una sessione futura di partire senza rifare l'indagine.
 >
 > Le fasi A e A2 (etichette visibili e pagina «Ruoli e permessi») sono **chiuse**. Questa è l'ultima parte del re-naming, e non serve alla UX: serve a chi sviluppa, per non tenere in testa due vocabolari — l'interfaccia dice *Produzione AI* e *Brief*, il codice dice ancora `agency` e `discovery`.
 
@@ -78,7 +78,7 @@ Jacopo (17/8/2026) ha autorizzato a procedere su B2 **a condizione che l'unico n
 ### Lotto 2 — Le chiavi dei permessi *(backend + migrazione, indipendente dagli URL)*
 Migrazione `UPDATE` + `rbac-catalog.ts` **nello stesso commit** (il catalogo e i tre array-ruolo di Manager/Operativo/Viewer), poi i moduli con ridichiarazione locale **uno alla volta**: clients, vault, web-assets+seo, checklists, quotes, calendar, projects, dashboard (⚠️ le 12 citazioni sciolte), messaging, e le rotte di vecchia convenzione in `server/routes/` (roles, modules, branding, departments).
 **Rete di sicurezza:** i test che citano le chiavi come stringa **falliscono rumorosamente** — sono la difesa vera. Da estendere: un test sulle *chiavi* modellato su quello del vocabolario in `rbac-catalog.unit.test.ts`.
-**Revisore obbligatorio** (roadmap, per tutta la fase B), qui almeno tre passaggi: dopo la migrazione, dopo i moduli, prima del commit finale.
+**Revisore Repo obbligatorio** (roadmap, per tutta la fase B), qui almeno tre passaggi: dopo la migrazione, dopo i moduli, prima del commit finale.
 
 ### Lotto 3 — Gli URL ⚠️ *(frontend e backend INSIEME, atomico — non spezzabile)*
 Le **94 rotte** del backend e le **50 chiamate** del frontend cambiano nello stesso commit. Insieme a loro, i punti che *costruiscono* l'indirizzo lato client, che sono **almeno quattro copie**: `RouteList.jsx` (21 rotte), `SidebarMenu.jsx`, `TopNav.jsx:122` (`pathname.startsWith('/agency')`), e `Account/index.jsx:8-24` — la **terza copia dei nomi dei moduli**, che ha già un commento nel file a ricordarlo. Più i `Link to=`/`history.push` sparsi.

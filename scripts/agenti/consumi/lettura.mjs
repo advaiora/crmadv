@@ -93,7 +93,7 @@ export function leggiChiamate(base, dirProgettoCorrente = null) {
       const m = j.message;
       if (!m) continue;
       // Nel transcript principale la chiamata Agent porta il TIPO di agent
-      // (esploratore, revisore, ...) e la sua risposta contiene l'identificativo
+      // (esploratore-repo, revisore-repo, ...) e la sua risposta contiene l'identificativo
       // del subagent: è l'unico punto in cui i due si toccano.
       if (iSub < 0 && Array.isArray(m.content)) {
         for (const b of m.content) {
