@@ -1041,3 +1041,29 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - **Il campanello d'allarme generale:** quando falliscono *quasi tutti* i test, comprese cartelle che il lavoro non ha mai toccato, la causa e' l'ambiente, non il codice. La conferma costa dieci secondi — `git diff --name-only origin/main...HEAD | grep <cartella-che-fallisce>`: se non compare, quel file e' identico a `main` e non puo' essere stato rotto dal lavoro in corso. E' lo stesso ragionamento della nota #37 sui rossi da timeout, applicato a una causa diversa.
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
+
+---
+
+## 86. Il titolo di un commit descrive un'intenzione, non un'azione: cosi' un segreto trapelato e' sembrato chiuso per sette mesi
+
+**Contesto:** commit `8a30469`, 19/2/2026, titolo «Rimuovi .env dalla cronologia». La password del superuser PostgreSQL era finita nel commit `569d192` del 10/2/2026 dentro il file `.env`.
+
+**Errore:** il titolo dice che la cronologia e' stata ripulita. Non lo e': `8a30469` e' una cancellazione normale del file (`.env | 3 ---`, un solo file cambiato), non una riscrittura della storia. Il blob resta raggiungibile con `git show 569d192:.env`, ed e' antenato di `origin/main` (`git merge-base --is-ancestor 569d192 origin/main` risponde vero). Chiunque legga quella riga di log conclude che il problema e' stato chiuso a febbraio — ed e' esattamente per questo che nessuno se n'e' accorto per sette mesi, fino al rilievo del Guardiano in CRMA-67 il 10/9/2026.
+
+**Modo corretto:**
+- Togliere davvero un file dalla storia e' `git filter-repo` (o equivalente) **piu' un force-push**, non un semplice `git rm` + commit. Un commit che si limita a cancellare il file in punta lascia il blob in ogni versione precedente e in ogni clone gia' fatto.
+- Un messaggio di commit descrive **cosa il commit fa**, non cosa si voleva ottenere: «Rimuovi .env dalla cronologia» avrebbe dovuto essere «Rimuovi .env (la cronologia resta invariata)», o non essere scritto affatto in quei termini.
+- **Stato residuo, dichiarato invece di lasciato implicito:** su decisione di Jacopo del 10/9/2026 la storia **non** viene riscritta (47 rami aperti e ogni clone da rifare erano un prezzo sproporzionato per un segreto di sviluppo) — quindi quella password resta leggibile nella storia di `origin/main` a tempo indefinito. L'unica difesa reale e' che non sia piu' valida: rotazione della password ancora da fare al 10/9/2026 — data da aggiungere qui quando avviene.
+
+---
+
+## 87. La descrizione di un compito Paperclip si copia nel risveglio di ogni agente che lo tocca: un segreto scritto li' si propaga da solo
+
+**Contesto:** 10/9/2026, apertura di CRMA-67 (il compito che denuncia la password PostgreSQL trapelata, nota #86). Il Guardiano ha riportato la password **in chiaro** nella descrizione del compito, per documentare il rilievo.
+
+**Errore:** la descrizione di un'issue Paperclip non e' un documento passivo: viene iniettata nel risveglio di ogni agente che lavora su quel compito o sui suoi figli. Un compito che denuncia un segreto trapelato lo aveva cosi' ripropagato su un secondo sistema — misurato il 10/9/2026 sulla VPS: **15 file e 5 agenti distinti** avevano gia' il valore in chiaro nei propri trascritti di sessione e log di run, prima ancora che qualcuno se ne accorgesse.
+
+**Modo corretto:**
+- In un compito di sicurezza il segreto si **maschera subito**, non dopo: si scrive solo cio' che lo identifica — quale credenziale, in che commit, in che file, il comando per verificarlo (`git show <commit>:<file>`) — mai il valore.
+- Chi ha davvero bisogno del valore lo legge dalla fonte (il blob nella storia, il gestore segreti), non dalla bacheca.
+- I trascritti gia' scritti non si possono richiamare: e' una delle ragioni per cui, una volta successo, la rotazione della credenziale conviene comunque, indipendentemente dal fatto che il resto del rilievo sia gia' stato mascherato. (Descrizione e documento di CRMA-67 sono stati mascherati il 10/9/2026.)
