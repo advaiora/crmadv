@@ -1041,3 +1041,13 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - **Il campanello d'allarme generale:** quando falliscono *quasi tutti* i test, comprese cartelle che il lavoro non ha mai toccato, la causa e' l'ambiente, non il codice. La conferma costa dieci secondi — `git diff --name-only origin/main...HEAD | grep <cartella-che-fallisce>`: se non compare, quel file e' identico a `main` e non puo' essere stato rotto dal lavoro in corso. E' lo stesso ragionamento della nota #37 sui rossi da timeout, applicato a una causa diversa.
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
+
+## 70. Tredici compiti fermi otto ore: tre punti dove la regola diceva "valuta" invece di "se X allora Y"
+
+**Contesto:** notte fra il 9 e il 10/9/2026, release di settembre. Tredici compiti della catena sono rimasti fermi otto ore senza che nessuno se ne accorgesse in tempo, e un compito `critical` su un segreto trapelato e' rimasto senza assegnatario per quindici ore.
+
+**Errore:** nessuna delle tre cause era una decisione sbagliata. **Primo:** una catena di dieci compiti legati da `blockedBy` (`28 → 45 → 29 → 46 → 30 → 31 → 32 → 47 → 33 → 34 → 23`), senza una sola diramazione, dove alcuni legami non nominavano nessun motivo tecnico: erano solo un ordine preferito, scambiato per un blocco reale. **Secondo:** nessuno dei tredici compiti era in stato `blocked`, erano gia' tutti in `todo`: spostarli di colonna non poteva avere nessun effetto, perche' il fermo stava nel grafo dei bloccanti, non nella colonna. **Terzo:** il compito `critical` sul segreto trapelato non aveva nessun assegnatario, quindi nessuno lo vedeva.
+
+**Modo corretto:**
+- Le quattro regole che chiudono questi tre punti (chi revisiona, quando un `blockedBy` e' legittimo, come si misura il fermo, perche' nessun compito esce da `backlog` senza assegnatario) sono scritte per esteso in `CLAUDE.md`, sezione **«Regole della bacheca: chi revisiona, cosa blocca, cosa e' fermo (dal 10/9/2026)»**, subito dopo «Team di agent». Si leggono li': questa nota rimanda, non ricopia.
+- Le stesse regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del capocantiere (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e `R05:REVIEWER_TRIGGERS`): se una copia diverge dalle altre, vince il repository.
