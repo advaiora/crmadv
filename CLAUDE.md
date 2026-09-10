@@ -130,8 +130,11 @@ quattro cancelli di revisione, cioè tre run in più a punto e una contraddizion
 regola scritta. R1 la raffina — non la sostituisce — dicendo che i cancelli si ricavano da inneschi
 osservabili. **Guardiano, Revisore di Paperclip, Collaudatore e Collaudatore AI sono agenti
 Paperclip** — non i tre subagent di repository (esploratore/revisore/architetto) descritti sopra —
-e si assegnano come cancello sul compito, non si chiamano dentro la sessione: l'elenco completo del
-team e come si assegna un cancello stanno in `archivio-documenti/team-agenti.md`.
+e si assegnano come cancello sul compito, non si chiamano dentro la sessione. **L'elenco completo
+del team Paperclip e il gesto per assegnare un cancello vivono fuori da questo repository**, nel
+pacchetto azienda di Paperclip — non in una cartella clonabile da qui, e non in
+`archivio-documenti/team-agenti.md`: quel file descrive un team diverso, i tre subagent di
+repository (esploratore/revisore/architetto) appena esclusi sopra.
 
 | Cancello | Si mette se e solo se il lavoro tocca... |
 |---|---|

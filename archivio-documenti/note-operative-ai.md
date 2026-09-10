@@ -1373,7 +1373,7 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 92. `$?` dopo una pipe (`git commit … | head`) racconta l'uscita di `head`, non quella del comando che conta
+## 93. `$?` dopo una pipe (`git commit … | head`) racconta l'uscita di `head`, non quella del comando che conta
 
 **Contesto:** revisione di sicurezza della PR #28 (CRMA-85), al banco: verificare che l'hook `pre-commit` rifiuti davvero un commit con un segreto in stage, in un clone usa-e-getta.
 
