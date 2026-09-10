@@ -1421,6 +1421,8 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Non insistere col `PATCH`/`checkout`: e' la stessa famiglia della nota gia' nota per le issue di un altro run (si commenta, non si patcha). L'evidenza si lascia in un commento sull'issue bloccata, con il riferimento verificabile (qui: il commit gia' su `origin`), e si segnala nel commento del compito che la sta aspettando (qui: CRMA-90) che lo stato-macchina non riflette il lavoro reale.
 - Non c'e' un endpoint per "liberare" un checkout andato storto dall'esterno: si aspetta che scada da solo o che un `checkout` successivo (anche dello stesso agente, run nuovo) lo sblocchi.
 
+---
+
 ## 97. Un bloccante risolto rimette il compito in coda da solo: non vuol dire che il vero anello mancante sia sparito
 
 **Contesto:** 10/9/2026, risveglio su CRMA-90 con motivo `issue_blockers_resolved`. Il compito era `blocked` con due bloccanti nominati (CRMA-105 e CRMA-107); entrambi sono diventati `done` nel frattempo. Il risveglio ha trovato lo stato gia' `in_progress` — nessun agente lo aveva cambiato, ne' con un `PATCH` ne' con un commento: il runtime sposta da solo un'issue `blocked` quando `blockedBy` si svuota di bloccanti aperti.
@@ -1430,3 +1432,15 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Modo corretto:**
 - A un risveglio `issue_blockers_resolved`, non agire sul nuovo `status` da solo: rileggere il testo dei bloccanti appena chiusi (commenti, interazioni collegate) per capire se la loro chiusura *include* l'azione che serviva o solo un passo verso di essa.
 - Se l'azione che manca e' ancora dovuta — qui, l'unione a `main`, riservata a Jacopo o Claudio anche a consenso gia' dato (nota gia' scritta nella regola di CLAUDE.md sulle unioni) — il compito torna `blocked`, con il nuovo anello nominato per esteso nel commento: non basta lasciarlo `in_progress` per inerzia del campo di stato, ne' richiuderlo `blocked` senza dire cosa manca stavolta.
+
+---
+
+## 98. Rimettere `blocked` con lo stesso `blockedByIssueIds` gia' `done` riavvia lo stesso ciclo del recupero automatico
+
+**Contesto:** 10/9/2026, giro successivo alla nota #97 sullo stesso compito CRMA-90. Confermato che l'unico anello mancante resta l'unione umana della PR #29 (`GET /repos/advaiora/crmadv/pulls/29` -> `state: open, merged: false`): bisognava rimettere il compito `blocked`.
+
+**Errore:** il `PATCH` piu' ovvio e' rimettere `status: "blocked"` lasciando `blockedByIssueIds` invariato (qui: CRMA-105 e CRMA-107, entrambe gia' `done`). Ma e' proprio quel campo, non lo stato scritto a mano, che il runtime guarda per decidere il recupero automatico descritto nella nota #97: con due bloccanti collegati gia' risolti, la prossima volta che una qualunque delle due issue viene ritoccata (o anche senza, a seconda di quando gira il controllo) il compito torna da solo `in_progress`, e il ciclo si ripete da capo — non perche' qualcosa sia cambiato, ma perche' il campo che decide il recupero non descriveva piu' il vero bloccante.
+
+**Modo corretto:**
+- Quando il vero bloccante e' un'azione umana fuori dal grafo delle issue (qui: un click «Merge» su GitHub), non collegare o scollegare `blockedByIssueIds` a issue-agente che sono gia' chiuse: si svuota l'elenco (`blockedByIssueIds: []`) e si lascia che sia **solo** `unblockDescriptor` a dire chi sblocca e come — quel campo non alimenta il recupero automatico.
+- Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `blockedBy` risulti vuoto pur restando `status: "blocked"` — segno che il recupero automatico non ha piu' un bloccante "risolvibile" da cui ripartire da solo.
