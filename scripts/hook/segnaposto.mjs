@@ -97,11 +97,49 @@ export function eSegnapostoMaiuscolo(password) {
   return pezzi.some((p) => PAROLE_SEGNAPOSTO.has(p));
 }
 
+// Le forme di INTERPOLAZIONE che valgono per segnaposto: un delimitatore che apre, un
+// delimitatore che chiude, e in mezzo il nome. Ognuna deve combaciare con TUTTA la
+// password (`^…$`), non con il suo primo carattere.
+//
+// ⚠️ PERCHE' SI CHIEDE LA CHIUSURA, e non basta l'apertura (compito CRMA-108). Fino al
+//    10/9/2026 la riga era `/^[$<{]/.test(password) || /[}>]$/.test(password)`: guardava
+//    SOLO il primo carattere, oppure SOLO l'ultimo, e non chiedeva mai che il segnaposto
+//    fosse chiuso. Quindi qualunque cosa cominciasse per `$`, `<` o `{` era un segnaposto,
+//    e qualunque cosa finisse per `}` o `>` pure. Misurato al cancello di sicurezza di
+//    CRMA-85, con l'hook di `origin/main` (34daabf) installato in un clone usa-e-getta:
+//      admin:$uperSegreta2026   PASSAVA      <- una password vera che comincia per `$`
+//      admin:{Xk7Qw2Zz41Plm     PASSAVA
+//      admin:Xk7Qw2Zz41Plm>     PASSAVA
+//      admin:Xk7Qw2Zz41Plm      rifiutata    <- la stessa, senza il metacarattere
+//    L'ultima riga e' la misura del difetto: era il carattere in piu' a disattivare la
+//    cintura. Il `$` iniziale e' fra i caratteri che i generatori di password mettono piu'
+//    spesso, quindi non serviva nessuno che lo sfruttasse: bastava che capitasse, e
+//    l'incidente di CRMA-67 (la password del superuser rimasta sette mesi nella storia di
+//    git) sarebbe ripassato dalla porta aperta apposta per fermarlo.
+//
+// ⚠️ Il `$` DA SOLO non e' un segnaposto, ed e' una scelta: `$DB_PASS` senza graffe viene
+//    RIFIUTATO. Motivo: `$` seguito da lettere e' esattamente la forma di una password
+//    vera che comincia per `$`, e non c'e' modo di distinguere `$DB_PASS` da
+//    `$uperSegreta2026` guardando la password. Nel repository non esiste nessuna stringa
+//    di connessione che usi quella forma — verificato passando la regola delle credenziali
+//    su tutti i file tracciati. Chi un giorno ne avesse bisogno per un motore di modelli
+//    aggiunga qui la forma, con l'esempio accanto, invece di riaprire il primo carattere.
+//    Stesso discorso per la graffa singola `{NOME}`: non c'e' e non e' ammessa; le due
+//    forme vive sono `${…}` e `{{…}}`.
+export const SEGNAPOSTI_DELIMITATI = [
+  /^\$\{[^{}]+\}$/,   // ${DB_PASS}       - variabile d'ambiente non espansa
+  /^\{\{[^{}]+\}\}$/, // {{PASSWORD}}     - segnaposto di un motore di modelli
+  /^<[^<>]+>$/,       // <password>       - segnaposto della documentazione
+];
+
+export const eSegnapostoDelimitato = (password) =>
+  SEGNAPOSTI_DELIMITATI.some((forma) => forma.test(password));
+
 export function eSegnaposto(utente, password) {
   if (utente.toLowerCase() === password.toLowerCase()) return true;   // postgres:postgres
   if (PASSWORD_SEGNAPOSTO.has(password.toLowerCase())) return true;   // user:pass
   if (eSegnapostoMaiuscolo(password)) return true;                    // LA-TUA-PASSWORD
-  if (/^[$<{]/.test(password) || /[}>]$/.test(password)) return true; // ${DB_PASS}, <password>
+  if (eSegnapostoDelimitato(password)) return true;                   // ${DB_PASS}, <password>
   if (/^[*x.]+$/i.test(password)) return true;                        // ****, xxxx
   return false;
 }

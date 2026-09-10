@@ -24,7 +24,9 @@ import {
   LUNGHEZZA_MASSIMA_SEGNAPOSTO,
   PAROLE_SEGNAPOSTO,
   PASSWORD_SEGNAPOSTO,
+  SEGNAPOSTI_DELIMITATI,
   eSegnaposto,
+  eSegnapostoDelimitato,
   eSegnapostoMaiuscolo,
   sembraCasuale,
 } from './segnaposto.mjs';
@@ -65,6 +67,17 @@ const CASI = [
   ['user', 'pass', true, 'messaggio d\'errore di runtime-env.ts'],
   ['root', '****', true, 'password oscurata'],
   ['root', 'xxxx', true, 'password oscurata'],
+
+  // --- I quattro misurati in CRMA-108, con l'hook di `origin/main` (34daabf) installato
+  //     in un clone usa-e-getta. I primi tre PASSAVANO: la vecchia regola guardava solo il
+  //     primo carattere (o solo l'ultimo) e non chiedeva mai che il segnaposto fosse
+  //     chiuso. Il quarto e' il controllo — la stessa password senza il metacarattere era
+  //     gia' rifiutata prima, ed e' la prova che era il carattere in piu' a disattivare la
+  //     cintura, non la password a sembrare finta.
+  ['admin', '$uperSegreta2026', false, 'CRMA-108: apre e non chiude'],
+  ['admin', '{Xk7Qw2Zz41Plm', false, 'CRMA-108: apre e non chiude'],
+  ['admin', 'Xk7Qw2Zz41Plm>', false, 'CRMA-108: chiude e non apre'],
+  ['admin', 'Xk7Qw2Zz41Plm', false, 'CRMA-108: il controllo, gia\' rifiutata prima'],
 
   // --- Il costo dichiarato della stretta di CRMA-91: un segnaposto con un suffisso che
   //     sembra casuale adesso viene RIFIUTATO. Nel repository non esiste (verificato
@@ -121,6 +134,63 @@ test('le due liste non contengono le parole ritirate in CRMA-85', () => {
     for (const voce of insieme) {
       assert.equal(voce, voce.toLowerCase(), `\`${voce}\` non e' minuscola: non combacerebbe mai`);
     }
+  }
+});
+
+// ⚠️ La proprieta' che chiude CRMA-108, scritta sulla CLASSE e non sui tre esempi
+//    misurati — stessa ragione per cui (P3) piu' sotto e' scritta sul corpus e non sui
+//    quattro casi del rilievo di CRMA-91. Un segnaposto delimitato deve APRIRE e CHIUDERE,
+//    e deve essere TUTTO il valore: un metacarattere in testa o in coda a una password
+//    vera non la trasforma in un segnaposto.
+const NOMI = ['DB_PASS', 'PASSWORD', 'password', 'metti-qui', 'DATABASE_URL_PASSWORD'];
+const SEGRETI_VERI = ['Xk7Qw2Zz41Plm', 'uperSegreta2026', 'hunter2XYZ9'];
+
+test('(P5) i segnaposto delimitati aprono, chiudono, e sono tutto il valore (CRMA-108)', () => {
+  for (const nome of NOMI) {
+    // Le tre forme chiuse: sono segnaposto, e devono restare accettate.
+    for (const chiuso of [`\${${nome}}`, `{{${nome}}}`, `<${nome}>`]) {
+      assert.equal(eSegnapostoDelimitato(chiuso), true, `${chiuso} e' un segnaposto chiuso`);
+      assert.equal(eSegnaposto('root', chiuso), true, `${chiuso} doveva passare`);
+    }
+
+    // Le stesse forme MONCHE: aperte e mai chiuse, o chiuse e mai aperte. Sono il difetto.
+    for (const monco of [
+      `\${${nome}`, `{{${nome}`, `<${nome}`, `$${nome}`, `{${nome}`,
+      `${nome}}`, `${nome}}}`, `${nome}>`, `\${${nome}}}`, `x\${${nome}}`, `\${${nome}}x`,
+      // La graffa singola chiusa: forma non ammessa, dichiarata nel commento di
+      // `SEGNAPOSTI_DELIMITATI`. Le due vive sono `${…}` e `{{…}}`.
+      `{${nome}}`,
+    ]) {
+      assert.equal(eSegnapostoDelimitato(monco), false, `${monco} non e' chiuso per intero`);
+    }
+  }
+
+  // Il cuore della misura di CRMA-108: una password vera resta un segreto anche con un
+  // metacarattere appiccicato in testa o in coda. Prima ne bastava uno per disattivare
+  // l'intera cintura.
+  for (const segreto of SEGRETI_VERI) {
+    assert.equal(eSegnaposto('admin', segreto), false, `${segreto} e' un segreto`);
+    for (const apre of ['$', '<', '{', '${', '{{']) {
+      assert.equal(
+        eSegnaposto('admin', apre + segreto), false,
+        `${apre}${segreto}: un'apertura senza chiusura non e' un segnaposto`,
+      );
+    }
+    for (const chiude of ['}', '>', '}}']) {
+      assert.equal(
+        eSegnaposto('admin', segreto + chiude), false,
+        `${segreto}${chiude}: una chiusura senza apertura non e' un segnaposto`,
+      );
+    }
+  }
+});
+
+test('le forme delimitate sono ancorate ai due capi: nessuna puo\' combaciare a meta\'', () => {
+  // Un `^…$` mancante rimetterebbe in piedi il difetto in silenzio, perche' i casi
+  // nominati continuerebbero a passare. Qui si guarda la forma, non il suo effetto.
+  for (const forma of SEGNAPOSTI_DELIMITATI) {
+    assert.ok(forma.source.startsWith('^'), `${forma} non e' ancorata all'inizio`);
+    assert.ok(forma.source.endsWith('$'), `${forma} non e' ancorata alla fine`);
   }
 });
 
