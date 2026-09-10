@@ -42,12 +42,19 @@ CONTROLLO_SEGRETI="scripts/hook/controllo-segreti.mjs"
 # Rientro a vuoto (CRMA-85, riscritto in CRMA-93 per la nuova forma): prima il
 # controllo era una variabile riempita da `cat`, e se `cat` mancava la variabile
 # restava vuota, `node -e ""` usciva 0 e il commit passava SENZA alcun controllo,
-# in silenzio. Adesso il rischio equivalente e' il file assente (clone parziale,
-# `git checkout` di un commit che non ce l'ha, cartella rinominata): `node` uscirebbe
-# 1 e il commit verrebbe rifiutato lo stesso, ma senza dire perche'. Il controllo
-# qui sotto serve al messaggio, non alla sicurezza.
-if [ ! -f "$CONTROLLO_SEGRETI" ]; then
-  echo "[BLOCCO] manca $CONTROLLO_SEGRETI: il controllo sui segreti non c'e'." >&2
+# in silenzio. Dopo l'estrazione i modi di rientrare a vuoto sono DUE, e vanno
+# tenuti distinti perche' si comportano in modo opposto:
+#   - file ASSENTE (clone parziale, `git checkout` di un commit che non ce l'ha,
+#     cartella rinominata): `node` uscirebbe 1 e il commit verrebbe rifiutato lo
+#     stesso, ma senza dire perche'. Qui la guardia serve al messaggio;
+#   - file PRESENTE ma VUOTO, zero byte (checkout interrotto, disco pieno, merge
+#     andato male): `node file-vuoto.mjs` esce 0, ed e' esattamente il rientro a
+#     vuoto silenzioso di prima in una forma nuova. Qui la guardia serve alla
+#     SICUREZZA, non al messaggio.
+# Percio' `-s` (esiste E non e' vuoto) e non `-f` (esiste e basta): misurato su
+# commit veri in CRMA-93, con `-f` un segreto vero passava a modulo vuoto.
+if [ ! -s "$CONTROLLO_SEGRETI" ]; then
+  echo "[BLOCCO] $CONTROLLO_SEGRETI manca o e' vuoto: il controllo sui segreti non c'e'." >&2
   echo "         Commit rifiutato per prudenza: ripristina il file," >&2
   echo "         oppure, se sei sicuro, usa  git commit --no-verify" >&2
   exit 1
