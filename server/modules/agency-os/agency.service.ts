@@ -61,6 +61,14 @@ import {
   resolveCompetitorSearchProvider,
   type CompetitorSearchEngineProvider,
 } from './competitor-search-model.js';
+import {
+  addCompetitorSearchUsage,
+  COMPETITOR_SEARCH_FUNCTION_NAME,
+  EMPTY_COMPETITOR_SEARCH_USAGE,
+  readCompetitorSearchUsage,
+  type CompetitorSearchUsage,
+} from './competitor-search-usage.js';
+import { computeAgencyAiCostUsd, resolveAgencyAiRates } from './ai-cost-rates.js';
 import { CHAT_PERMISSIONS } from '../../auth/rbac-catalog.js';
 import { departmentRepository } from '../../repositories/department.repository.js';
 import { teamRepository } from '../team/team.repository.js';
@@ -2368,30 +2376,13 @@ const getAgencyChatModelOptions = async (workspaceId?: string) => {
   };
 };
 
-const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputTokens: number) => {
-  const normalizedModel = model.toLowerCase();
-  const rates = normalizedModel.includes('gpt-4o-mini')
-    ? { inputPerMillion: 0.15, outputPerMillion: 0.6 }
-    : normalizedModel.includes('gpt-4o')
-      ? { inputPerMillion: 5, outputPerMillion: 15 }
-      : normalizedModel.includes('gpt-5')
-        ? { inputPerMillion: 1.25, outputPerMillion: 10 }
-        // Modelli Claude/Anthropic (prezzi per 1M token, input/output).
-        : normalizedModel.includes('claude-haiku') || normalizedModel.includes('haiku')
-          ? { inputPerMillion: 1, outputPerMillion: 5 }
-          : normalizedModel.includes('claude-sonnet') || normalizedModel.includes('sonnet')
-            ? { inputPerMillion: 3, outputPerMillion: 15 }
-            : normalizedModel.includes('claude-opus') || normalizedModel.includes('opus')
-              ? { inputPerMillion: 5, outputPerMillion: 25 }
-              : normalizedModel.includes('claude-fable') || normalizedModel.includes('fable')
-                ? { inputPerMillion: 10, outputPerMillion: 50 }
-                : normalizedModel.includes('claude')
-                  ? { inputPerMillion: 5, outputPerMillion: 25 }
-                  : { inputPerMillion: 2, outputPerMillion: 8 };
-  const cost = ((inputTokens / 1_000_000) * rates.inputPerMillion)
-    + ((outputTokens / 1_000_000) * rates.outputPerMillion);
-  return Number(cost.toFixed(6));
-};
+// Le tariffe stanno in `ai-cost-rates.ts`. Sono state spostate li' perche' da
+// li' si puo' sapere anche SE il modello e' stato riconosciuto: il ripiego
+// `{ 2, 8 }` prezzava in silenzio qualunque modello sconosciuto. Il calcolo per
+// gli altri modelli non cambia (stesso ordine di verifica, stessi prezzi).
+const estimateAgencyAiCostUsd = (model: string, inputTokens: number, outputTokens: number) => (
+  computeAgencyAiCostUsd(model, inputTokens, outputTokens)
+);
 
 // Stima di costo dei pulsanti AI (V4 — cost control). I pulsanti a funzione
 // predefinita che passano dal motore AI e vengono loggati in AiUsageLog. Per
@@ -2410,6 +2401,20 @@ const AGENCY_AI_ESTIMATABLE_FUNCTIONS: AgencyAiEstimatableFunction[] = [
   { functionName: 'web.generateProject', label: 'Struttura sito/landing', seedInputTokens: 3000, seedOutputTokens: 1500 },
   { functionName: 'web.generateBlock', label: 'Blocco sito', seedInputTokens: 1500, seedOutputTokens: 600 },
   { functionName: 'ads.generateAsset', label: 'Copy campagna ADV', seedInputTokens: 1500, seedOutputTokens: 500 },
+  // Ricerca competitor (CRMA-55). Aggiunta qui per ereditare il percorso
+  // seed → storico delle altre cinque: sotto i 4 usi reali la stima e' il seed,
+  // da li' in poi la banda p25-p75 dei token davvero consumati.
+  //
+  // ⚠️ Due avvertenze su questo numero:
+  // 1. Il seed NON e' misurato. Andava preso su due chiamate reali, ma in questo
+  //    ambiente non c'e' nessuna chiave provider configurata, quindi si ripiega
+  //    sui valori di `discovery.generateBrief`. E' un numero debole: chi passa
+  //    di qui con una chiave attiva lo sostituisca con la misura vera.
+  // 2. Il costo del `web_search` NON e' compreso (decisione D2, opzione A). La
+  //    ricerca web si paga a chiamata, oltre ai token, e quel prezzo unitario
+  //    non e' osservabile da nessuna risposta di provider: il costo registrato
+  //    e' quello dei soli token, quindi per difetto.
+  { functionName: COMPETITOR_SEARCH_FUNCTION_NAME, label: 'Ricerca competitor online', seedInputTokens: 4000, seedOutputTokens: 2000 },
 ];
 
 // Numero minimo di usi reali oltre il quale la stima passa dallo "seed" allo
@@ -3910,11 +3915,63 @@ const buildCompetitorSearchResult = (input: {
   };
 };
 
+// Riga di consumo della ricerca competitor nel rendiconto «Consumi & costi AI»
+// (CRMA-55). Prima di questo, la ricerca competitor era l'unica funzione a
+// pagamento del CRM che non lasciava traccia: costava e non compariva da
+// nessuna parte.
+//
+// Best-effort come le altre due scritture di AiUsageLog (motore JSON e motore
+// testo): un errore di scrittura del log non deve mai rompere una ricerca gia'
+// pagata. Per lo stesso motivo non lancia mai.
+const logCompetitorSearchUsage = async (input: {
+  workspaceId: string;
+  projectId: string | null;
+  model: string;
+  usage: CompetitorSearchUsage;
+  durationMs: number;
+}) => {
+  // Il ripiego di prezzo non deve restare muto (CRMA-55): se il modello della
+  // ricerca competitor non e' in tabella, il costo registrato e' inventato e va
+  // detto. Si usa `console.warn` e non `logAgencyServiceEvent` apposta: quello
+  // tace in produzione, ed e' proprio in produzione che un costo sbagliato
+  // conta.
+  const rates = resolveAgencyAiRates(input.model);
+  if (!rates.matched) {
+    console.warn(
+      `[AgencyService] Ricerca competitor: nessuna tariffa nota per il modello "${input.model}". `
+      + `Il costo e' calcolato con la tariffa di ripiego (${rates.inputPerMillion}$/${rates.outputPerMillion}$ per 1M token) `
+      + 'ed e\' quindi una supposizione. Aggiungere il modello in ai-cost-rates.ts.',
+    );
+  }
+
+  try {
+    await aiUsageRepository.create({
+      workspaceId: input.workspaceId,
+      // Utente che ha avviato la ricerca (dal contesto di richiesta), come le
+      // altre due scritture: senza, la riga non entra nei totali per utente.
+      userId: requestContext.getUserId(),
+      projectId: input.projectId,
+      functionName: COMPETITOR_SEARCH_FUNCTION_NAME,
+      model: input.model,
+      // Token VERI letti da `usage`, non stimati dai caratteri: qui la risposta
+      // del provider li porta con se'.
+      inputTokens: input.usage.inputTokens,
+      outputTokens: input.usage.outputTokens,
+      costUsd: computeAgencyAiCostUsd(input.model, input.usage.inputTokens, input.usage.outputTokens),
+      durationMs: input.durationMs,
+      status: 'success',
+    });
+  } catch {
+    // ignora: il log costi e' accessorio rispetto al risultato della ricerca
+  }
+};
+
 const runAgencyOpenAiCompetitorSearch = async (input: {
   workspaceId: string;
   project: AgencyProjectPayload;
   runtimeConfig: Awaited<ReturnType<typeof resolveAgencyRuntimeConfig>>;
 }) => {
+  const startedAt = Date.now();
   const context = buildCompetitorSearchContext(input.project);
   const model = resolveCompetitorSearchModel({
     provider: 'openai_web_search',
@@ -3965,6 +4022,24 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
     }
 
     const payload = await response.json();
+    // I token veri della chiamata, letti prima del parse: il payload dopo
+    // serve solo per il testo, e `usage` andrebbe perso insieme al resto.
+    const usage = readCompetitorSearchUsage(payload);
+
+    // La riga si scrive PRIMA del parse, e non e' un dettaglio d'ordine: la
+    // chiamata al provider e' gia' riuscita e gia' pagata (`response.ok`, token
+    // letti sopra), a poter fallire e' solo l'interpretazione a valle. Siccome
+    // `assertWithinAiBudget` misura la spesa sommando AiUsageLog, una spesa non
+    // loggata non entrerebbe nel budget: una sequenza di risposte pagate e non
+    // interpretabili scavalcherebbe il fusibile senza mai toccarlo.
+    await logCompetitorSearchUsage({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      model,
+      usage,
+      durationMs: Date.now() - startedAt,
+    });
+
     const parsed = competitorSearchResponseSchema.parse(
       parseJsonObjectFromText(extractOpenAiResponseText(payload)),
     );
@@ -3994,6 +4069,7 @@ const runAgencyAnthropicCompetitorSearch = async (input: {
   project: AgencyProjectPayload;
   runtimeConfig: Awaited<ReturnType<typeof resolveAgencyRuntimeConfig>>;
 }) => {
+  const startedAt = Date.now();
   const context = buildCompetitorSearchContext(input.project);
   const model = resolveCompetitorSearchModel({
     provider: 'anthropic_web_search',
@@ -4024,6 +4100,12 @@ const runAgencyAnthropicCompetitorSearch = async (input: {
     ];
 
     let payload: unknown = null;
+    // ⚠️ I token si SOMMANO giro per giro, non si leggono dall'ultimo payload.
+    // `payload` viene riassegnato a ogni continuazione (fino a 4 giri in tutto)
+    // e ogni giro e' una richiesta fatturata: leggere solo l'ultimo
+    // sottostimerebbe il consumo fino a quattro volte, senza che niente lo
+    // segnali.
+    let usage: CompetitorSearchUsage = { ...EMPTY_COMPETITOR_SEARCH_USAGE };
     for (let attempt = 0; attempt <= ANTHROPIC_SEARCH_MAX_CONTINUATIONS; attempt += 1) {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -4054,6 +4136,7 @@ const runAgencyAnthropicCompetitorSearch = async (input: {
       }
 
       payload = await response.json();
+      usage = addCompetitorSearchUsage(usage, payload);
       const stopReason = isRecord(payload) ? payload.stop_reason : null;
       if (stopReason !== 'pause_turn') {
         break;
@@ -4066,6 +4149,19 @@ const runAgencyAnthropicCompetitorSearch = async (input: {
         content: isRecord(payload) && Array.isArray(payload.content) ? payload.content : [],
       });
     }
+
+    // Come nel ramo OpenAI: la riga si scrive prima del parse, perche' i giri
+    // sono gia' stati pagati e `usage` e' completo all'uscita del ciclo. Una
+    // spesa non loggata non entra nel budget (`assertWithinAiBudget` somma
+    // AiUsageLog), quindi non deve dipendere dal fatto che la risposta sia
+    // interpretabile.
+    await logCompetitorSearchUsage({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      model,
+      usage,
+      durationMs: Date.now() - startedAt,
+    });
 
     // Prima il blocco tool_use (JSON valido per costruzione), poi il testo come
     // ripiego: se il modello ha risposto a parole nonostante lo strumento, si
@@ -8130,6 +8226,11 @@ export const agencyService = {
       }
 
       try {
+        // Cost control (CRMA-55): il fusibile scatta PRIMA della chiamata al
+        // provider. Sta qui e non dentro i due motori perche' cosi' nessuno dei
+        // due rami puo' spendere scavalcandolo. Il dry-run non arriva fin qui
+        // (esce sopra), quindi non consuma budget: e' il comportamento voluto.
+        await assertWithinAiBudget(input.workspaceId);
         const runSearch = resolved.provider === 'anthropic_web_search'
           ? runAgencyAnthropicCompetitorSearch
           : runAgencyOpenAiCompetitorSearch;
@@ -8139,6 +8240,29 @@ export const agencyService = {
           runtimeConfig,
         });
       } catch (error) {
+        // Il budget esaurito NON e' un errore di provider. Senza questo ramo il
+        // `catch` generico qui sotto lo tratterebbe come 'configured_error' e
+        // l'utente leggerebbe «la chiamata al provider non e riuscita» invece
+        // del motivo vero. Si risponde 200 con un flag nel corpo, come fa la
+        // chat: chi chiama questa rotta si aspetta un oggetto, non un 4xx.
+        if (error instanceof AiBudgetExceededError) {
+          return {
+            provider,
+            providerStatus: 'budget_exceeded',
+            realSearch: false,
+            budgetExceeded: true,
+            budgetMessage: error.message,
+            suggestions: [],
+            queryContext: {
+              websiteUrl: project.sources.websiteUrl,
+              projectName: project.name,
+              projectType: project.projectType?.key ?? null,
+              clientName: project.clientName,
+              manualNotesAvailable: project.sources.manualNotes.length > 0,
+            },
+            message: error.message,
+          };
+        }
         const detail = error instanceof Error ? error.message : 'Errore sconosciuto';
         const isTimeout = (error instanceof Error && (
           error.name === 'AbortError' || detail.toLowerCase().includes('aborted')
@@ -8453,10 +8577,28 @@ export const agencyService = {
 
     const estimates = await Promise.all(
       AGENCY_AI_ESTIMATABLE_FUNCTIONS.map(async (fn) => {
-        const model = resolveAgencyProviderModel(
-          status.provider,
-          runtimeConfig.ai.functionModels[fn.functionName] || status.model,
-        );
+        // La ricerca competitor sceglie il modello con un meccanismo SUO
+        // (`runtimeConfig.competitorSearch.model`), non con `functionModels`
+        // come le altre cinque. Senza questo ramo la stima uscirebbe calcolata
+        // su un modello diverso da quello davvero usato, quindi con la tariffa
+        // sbagliata. Stessa risoluzione della scheda stato e delle due funzioni
+        // di ricerca.
+        const model = fn.functionName === COMPETITOR_SEARCH_FUNCTION_NAME
+          ? resolveCompetitorSearchModel({
+            provider: resolveCompetitorSearchProvider({
+              enabled: runtimeConfig.competitorSearch.enabled,
+              provider: runtimeConfig.competitorSearch.provider,
+              openAiKeyConfigured: runtimeConfig.ai.apiKeyConfigured,
+              anthropicKeyConfigured: runtimeConfig.ai.anthropicApiKeyConfigured,
+            }).provider ?? undefined,
+            envModel: process.env.AGENCY_COMPETITOR_SEARCH_MODEL,
+            searchModel: runtimeConfig.competitorSearch.model,
+            configuredModel: runtimeConfig.ai.model,
+          })
+          : resolveAgencyProviderModel(
+            status.provider,
+            runtimeConfig.ai.functionModels[fn.functionName] || status.model,
+          );
         const samples = await aiUsageRepository.recentSuccessSamples(
           workspaceId,
           fn.functionName,

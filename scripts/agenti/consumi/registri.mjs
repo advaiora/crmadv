@@ -31,7 +31,7 @@ export function scriviRegistro(dati, adesso) {
 }
 
 // Registro per compito: serve a rispondere alla domanda "conviene chiamare
-// l'esploratore?" confrontando lavori SIMILI fra loro (i giri di spezzatura dei
+// l'esploratore-repo?" confrontando lavori SIMILI fra loro (i giri di spezzatura dei
 // file, per esempio), non periodi diversi: le sessioni variano troppo per tipo
 // di lavoro perche' un confronto a periodo dica qualcosa. Dopo otto-dieci righe
 // il quadro si legge da solo.
@@ -80,7 +80,7 @@ export function scriviCompito(nome, dati, chiamate, da, a) {
         '> `--da "2026-07-31T07:40Z" --a "2026-07-31T08:26Z"` si annota un lavoro già concluso.\n' +
         '>\n' +
         '> **A cosa serve:** confrontare lavori SIMILI fra loro — per esempio i giri di spezzatura\n' +
-        "> dei file-mostro — per capire se chiamare l'esploratore conviene. Non serve un periodo\n" +
+        "> dei file-mostro — per capire se chiamare l'esploratore-repo conviene. Non serve un periodo\n" +
         '> "senza agenti": le sessioni variano troppo per tipo di lavoro, la differenza sparirebbe\n' +
         '> nel rumore. Si confronta a parità di compito.\n' +
         '>\n' +
@@ -88,7 +88,7 @@ export function scriviCompito(nome, dati, chiamate, da, a) {
         '> Le ore sono quelle del computer. Consumo e risparmio sono misurati sullo **stesso pezzo di\n' +
         '> tempo**: il risparmio di un agent chiamato a fine compito risulta quindi piccolo o negativo,\n' +
         '> perché le riletture che avrebbe evitato cadono nel compito dopo. Vale soprattutto per il\n' +
-        '> revisore, che per contratto si chiama in chiusura — e che comunque non si tiene per far\n' +
+        '> revisore-repo, che per contratto si chiama in chiusura — e che comunque non si tiene per far\n' +
         '> risparmiare token, ma per trovare errori.\n' +
         '>\n' +
         '> La **velocità** (unità/min = consumo/durata) risponde alle domande di capacità della finestra\n' +

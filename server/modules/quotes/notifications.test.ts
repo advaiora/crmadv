@@ -1,21 +1,33 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { Transporter } from 'nodemailer';
 import { Prisma } from '@prisma/client';
 import {
   buildQuoteNotificationsService,
   renderQuoteNotificationTemplate,
 } from './notifications.js';
+import type { SendMailFn } from '../../core/send-mail.js';
 
-const createTransportStub = (calls: Array<Record<string, unknown>>) =>
-  ({
-    sendMail: async (payload: Record<string, unknown>) => {
-      calls.push(payload);
-      return {
-        messageId: 'provider-message-id',
-      };
-    },
-  }) as unknown as Transporter;
+/**
+ * Sta al posto del punto d'uscita della posta (`core/send-mail.ts`) e raccoglie
+ * quello che sarebbe partito: destinatario, oggetto, corpo e allegati gia'
+ * preparati. Prima qui si sostituiva il trasporto di nodemailer; adesso il
+ * trasporto non lo vede piu' nessuno fuori da `core/mail.ts`.
+ */
+const createSendMailStub = (calls: Array<Record<string, unknown>>): SendMailFn =>
+  async (input) => {
+    const attachments = input.preparaAllegati ? await input.preparaAllegati() : undefined;
+    calls.push({
+      ...input.messaggio,
+      ...(attachments ? { attachments } : {}),
+    });
+    return {
+      esito: 'inviata',
+      source: 'env',
+      recapitata: true,
+      providerMessageId: 'provider-message-id',
+      previewUrl: null,
+    };
+  };
 
 test('renderQuoteNotificationTemplate replaces all placeholders', () => {
   const rendered = renderQuoteNotificationTemplate(
@@ -54,12 +66,7 @@ test('notifyQuoteEvent skips delivery when client email is missing', async () =>
     }),
     findBrandingByWorkspaceId: async () => null,
     renderQuotePdfFn: async () => Buffer.from('pdf'),
-    resolveTransport: async () => ({
-      esito: 'ok' as const,
-      transport: createTransportStub(sentEmails),
-      from: 'no-reply@test.local',
-      source: 'env' as const,
-    }),
+    sendMailFn: createSendMailStub(sentEmails),
   });
 
   const result = await service.notifyQuoteEvent({
@@ -125,12 +132,7 @@ test('notifyQuoteEvent sends templated email and PDF attachment for SENT', async
       updatedAt: new Date(),
     }),
     renderQuotePdfFn: async () => Buffer.from('%PDF-1.4 test-pdf'),
-    resolveTransport: async () => ({
-      esito: 'ok' as const,
-      transport: createTransportStub(sentEmails),
-      from: 'no-reply@test.local',
-      source: 'env' as const,
-    }),
+    sendMailFn: createSendMailStub(sentEmails),
   });
 
   const result = await service.notifyQuoteEvent({
@@ -198,7 +200,7 @@ test('notifiche preventivi: configurazione illeggibile non si confonde con "non 
     }) as never,
     findBrandingByWorkspaceId: (async () => null) as never,
     renderQuotePdfFn: async () => Buffer.from('pdf'),
-    resolveTransport: async () => ({ esito: 'illeggibile' as const }),
+    sendMailFn: async () => ({ esito: 'illeggibile' as const }),
   });
 
   const result = await service.notifyQuoteEvent({

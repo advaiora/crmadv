@@ -86,9 +86,9 @@ export function stampaQuadro(dati, chiamate, opzioni) {
   if (agenti.quanti === 0) {
     console.log('  Nessun agent usato finora in questo progetto: niente da confrontare.');
   } else {
-    // Il team di progetto (esploratore, revisore, architetto) va tenuto distinto
+    // Il team di progetto (esploratore-repo, revisore-repo, architetto-repo) va tenuto distinto
     // dagli agent che Claude Code porta di suo, nei nomi E nei conti: la domanda
-    // "teniamo l'esploratore e il revisore?" si decide sul nostro team.
+    // "teniamo l'esploratore-repo e il revisore-repo?" si decide sul nostro team.
     const elenca = (dentro) =>
       agenti.perTipo
         .filter((t) => TEAM_DI_PROGETTO.includes(t.tipo) === dentro)

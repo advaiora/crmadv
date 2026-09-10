@@ -6,6 +6,7 @@ import { Alert, Button, Card, Col, Container, Form, Row, Spinner } from "react-b
 import { Link } from "react-router-dom";
 import { apiPost, ApiRequestError } from "../../../../utils/apiClient";
 import { useSession } from "../../../../hooks/useSession";
+import { useGoogleSignInAvailability } from "../../../../hooks/useGoogleSignInAvailability";
 import { authenticateWithGoogle, GoogleAuthError } from "../../../../utils/googleAuthClient";
 import { requestGoogleIdToken } from "../../../../utils/googleIdentity";
 import { getClientRuntimeConfig } from "../../../../utils/runtimeConfig";
@@ -70,6 +71,7 @@ const Login = ({ history }) => {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const { apiBaseUrl, googleClientId, googleRedirectUri, googleDebugRawResponse } = getClientRuntimeConfig();
+  const googleSignInAvailable = useGoogleSignInAvailability();
   const isBusy = loading || googleLoading;
   const resolvePostAuthPath = (onboardingRequired) => (
     onboardingRequired ? "/pages/workspace-branding?onboarding=1" : "/dashboard"
@@ -273,23 +275,27 @@ const Login = ({ history }) => {
                     )}
 
                     <Form onSubmit={handleSubmit}>
-                      <Button type="button" variant="outline-primary" className="w-100 mb-3" onClick={handleGoogleLogin} disabled={isBusy}>
-                        {googleLoading ? (
-                          <span className="d-inline-flex align-items-center">
-                            <Spinner animation="border" size="sm" className="me-2" />
-                            Accesso Google...
-                          </span>
-                        ) : (
-                          <span className="d-inline-flex align-items-center justify-content-center gap-2">
-                            <FontAwesomeIcon icon={faGoogle} />
-                            <span>Continua con Google</span>
-                          </span>
-                        )}
-                      </Button>
+                      {googleSignInAvailable && (
+                        <>
+                          <Button type="button" variant="outline-primary" className="w-100 mb-3" onClick={handleGoogleLogin} disabled={isBusy}>
+                            {googleLoading ? (
+                              <span className="d-inline-flex align-items-center">
+                                <Spinner animation="border" size="sm" className="me-2" />
+                                Accesso Google...
+                              </span>
+                            ) : (
+                              <span className="d-inline-flex align-items-center justify-content-center gap-2">
+                                <FontAwesomeIcon icon={faGoogle} />
+                                <span>Continua con Google</span>
+                              </span>
+                            )}
+                          </Button>
 
-                      <div className="title-sm title-wth-divider divider-center my-3">
-                        <span>Oppure</span>
-                      </div>
+                          <div className="title-sm title-wth-divider divider-center my-3">
+                            <span>Oppure</span>
+                          </div>
+                        </>
+                      )}
 
                       <Form.Group className="mb-3">
                         <Form.Label>Email</Form.Label>

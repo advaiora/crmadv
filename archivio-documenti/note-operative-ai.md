@@ -810,7 +810,7 @@ Cosi' si distingue in un secondo il proprio danno dalla deriva altrui — e in q
 
 **Modo corretto:**
 - Una contraddizione fra un'istruzione di sessione e `CLAUDE.md` e' **un conflitto da segnalare**, esattamente come quelli fra Jacopo e Claudio: si dice cosa dice l'una, cosa dice l'altra, e si aspetta. Non e' una decisione da prendere per conto proprio, **e va sollevata prima di cominciare il lavoro**, non nel riepilogo finale.
-- Il campanello: se stai per **saltare un passo del metodo** (revisore, esploratore, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
+- Il campanello: se stai per **saltare un passo del metodo** (Revisore Repo, Esploratore Repo, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
 - Prima di dire *"c'e' una regola che me lo vieta"*, **guarda dove sta davvero**: `.claude/settings.json` e `settings.local.json` del progetto, gli stessi due sotto `~/.claude/`, un eventuale `CLAUDE.md` utente. Se non e' in nessuno di quelli, e' il prompt di sessione dell'applicazione: **non e' modificabile ne' da te ne' da un file del repository**, e va detto cosi' — altrimenti Jacopo cerca di togliere una regola che non esiste da nessuna parte.
 
 ---
@@ -1383,3 +1383,127 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - **Regola pratica per chi apre un compito destinato al magazzino:** la descrizione porta sempre in fondo la riga `**Uscita dal magazzino:** <cosa deve essere vero perche' riparta> — <chi lo verifica>`. Senza quella riga il compito non entra in `backlog`: e' quella riga che permette, mesi dopo, di controllare se lo scopo e' gia' stato raggiunto per un'altra via, invece di scoprirlo per caso come il 10/9/2026.
 - **Caso specifico da ricordare, e verificato ancora valido il 10/9/2026:** i compiti Paperclip hanno un campo che dovrebbe scegliere per ciascuno se usare l'albero condiviso o uno isolato (`executionWorkspacePreference`), ma quel campo **non si scrive via API** — la `PATCH` risponde `200` e il valore resta vuoto, cioe' resta l'albero condiviso di default (verificato su CRMA-56). E' un'impostazione da dashboard: finche' nessuno la imposta da li', il vincolo dell'albero condiviso resta vero per davvero — non si toglie ritentando la stessa scrittura via API, si nomina e si chiede a chi ha accesso alla dashboard.
 - Le due regole corrispondenti (R5 e R6) sono scritte per esteso in `CLAUDE.md`, sezione «Regole della bacheca», subito dopo R1-R4: questa nota rimanda, non ricopia.
+
+---
+
+## 93. `$?` dopo una pipe (`git commit … | head`) racconta l'uscita di `head`, non quella del comando che conta
+
+**Contesto:** revisione di sicurezza della PR #28 (CRMA-85), al banco: verificare che l'hook `pre-commit` rifiuti davvero un commit con un segreto in stage, in un clone usa-e-getta.
+
+**Errore:** letto l'esito lanciando `git commit … | head -8` e leggendo `$?` subito dopo. `$?` e' l'uscita dell'**ultimo** comando della pipe, cioe' `head` — che e' quasi sempre 0 — non quella di `git commit`. Il commit rifiutato dall'hook sembrava riuscito. Stessa famiglia della nota #39 (il dato vero sta altrove rispetto a dove lo si legge).
+
+**Modo corretto:**
+- Non fidarsi del codice d'uscita quando c'e' una pipe di mezzo. La prova che un commit e' stato rifiutato e' che **il file e' ancora in stage**: si legge con `git status --short` dopo il tentativo (`A file.md` = commit non avvenuto).
+- In alternativa, non mettere `git commit` in pipe: catturare l'uscita in una variabile (`git commit …; esito=$?`) e solo dopo filtrare l'output per la lettura umana.
+
+---
+
+## 94. Un file che esiste in due copie tracciate si modifica su una sola, e il revisore lo trova solo diffando le due copie
+
+**Contesto:** revisione della PR #29 (CRMA-107). La skill `crm-pianificazione` vive in due copie nel repository — `paperclip/skills/crm-pianificazione/` e `paperclip/azienda-crm/skills/crm-pianificazione/` — debito gia' scritto in roadmap (CRMA-60, «la skill esiste in due copie che divergono»). La PR doveva solo aggiornare due frasi datate in `04_ordine-e-dipendenze.md` e `07_casi.md`.
+
+**Errore:** la modifica e' stata scritta su `paperclip/skills/crm-pianificazione/references/` e basta. Su `origin/main` le due copie erano identiche byte per byte (`git diff --quiet <ramoA>:file <ramoB>:file` non dava output); dopo la modifica divergevano di 2 e 6 righe. Niente nel diff della PR lo segnalava — il file toccato compariva come modificato, quello gemello semplicemente non compariva, ed e' proprio l'assenza a passare inosservata in una revisione che guarda cosa e' cambiato.
+
+**Modo corretto:**
+- Prima di chiudere una modifica a un file di cui si sa (o si sospetta, vedi CRMA-60) che esiste altrove come copia, cercarlo: `find . -path "*<nome-file>*"` o `grep -rl` sul nome della cartella.
+- Se le copie esistono, verificare con un diff mirato che restino identiche **dopo** la modifica, non fidarsi del fatto che "il contenuto e' lo stesso, l'ho scritto uguale a mano": `diff copiaA copiaB` deve dare output vuoto.
+- Finche' le due copie di `crm-pianificazione` non sono state fuse in una sola (CRMA-60), ogni PR che tocca `references/` in una delle due deve toccare anche l'altra, con lo stesso diff.
+
+---
+
+## 95. Due PR aperte insieme possono scegliere lo stesso numero di nota senza che nessuna delle due lo sappia
+
+**Contesto:** revisione della PR #29 (CRMA-90, CRMA-106). Il commit che aggiungeva la nota #92 su questo ramo e' arrivato **due ore dopo** un commit che aggiungeva una nota #92 diversa su un altro ramo aperto (`cronista/crma-94-r5-r6-bacheca`, PR #30). Nessuno dei due rami poteva vederlo: ognuno calcola "il piu' alto piu' uno" (nota #82) sul proprio `git log`, che a quel momento non conteneva l'altro ramo.
+
+**Errore:** il controllo di unicita' descritto dalla nota #82 ("si rifa' alla consegna, non alla scrittura") basta a evitare collisioni con `main`, ma non con **rami fratelli aperti nello stesso momento** — quelli non compaiono in nessun `git log` locale finche' non vengono spinti e non li si va a cercare esplicitamente. La PR #29 dichiarava "nessun duplicato di numero verificato": vero sul proprio ramo, falso appena si guarda anche l'altro.
+
+**Modo corretto:**
+- Il controllo di unicita' alla consegna (nota #82) su un file di note condiviso non basta farlo sul proprio ramo: va esteso a **tutti i rami `cronista/` aperti** (`git branch -r | grep cronista/`), confrontando l'ultimo numero di ciascuno con il proprio.
+- Chi trova la collisione rinumera **il ramo con il commit piu' recente** (per data di commit, non per numero di PR): il ramo piu' vecchio ha "prenotato" il numero per primo.
+- La rinumerazione e' legittima solo finche' la nota non e' ancora su `main` — dopo l'unione vale la nota #71/#91 ("un numero non si rinumera mai"). Prima dell'unione, su un ramo ancora aperto, e' l'unico momento in cui rinumerare e' corretto.
+
+---
+
+## 96. Il blocco del checkout su un'issue non guarda l'agente, guarda il run — anche se l'agente e' lo stesso
+
+**Contesto:** 10/9/2026, risveglio su CRMA-90 (CRMA-107 assegnata a me, stato `in_progress`). Il lavoro tecnico era gia' fatto e su `origin` (commit `824b32c`, le due copie della skill `crm-pianificazione` coincidevano): restava solo marcare il compito `done`.
+
+**Errore:** sia il `PATCH` di stato sia il `POST .../checkout` sono stati rifiutati con «Issue checkout conflict», perche' `checkoutRunId` (`aa743d80-...`) non coincideva col run corrente (`324db172-...`) — pur essendo lo stesso agente assegnatario in entrambi i casi. Il blocco non e' "un altro agente ci sta lavorando", e' "un run precedente non ha rilasciato correttamente l'issue": puo' capitare anche a se stessi, fra un risveglio e il successivo.
+
+**Modo corretto:**
+- Non insistere col `PATCH`/`checkout`: e' la stessa famiglia della nota gia' nota per le issue di un altro run (si commenta, non si patcha). L'evidenza si lascia in un commento sull'issue bloccata, con il riferimento verificabile (qui: il commit gia' su `origin`), e si segnala nel commento del compito che la sta aspettando (qui: CRMA-90) che lo stato-macchina non riflette il lavoro reale.
+- Non c'e' un endpoint per "liberare" un checkout andato storto dall'esterno: si aspetta che scada da solo o che un `checkout` successivo (anche dello stesso agente, run nuovo) lo sblocchi.
+
+---
+
+## 97. Un bloccante risolto rimette il compito in coda da solo: non vuol dire che il vero anello mancante sia sparito
+
+**Contesto:** 10/9/2026, risveglio su CRMA-90 con motivo `issue_blockers_resolved`. Il compito era `blocked` con due bloccanti nominati (CRMA-105 e CRMA-107); entrambi sono diventati `done` nel frattempo. Il risveglio ha trovato lo stato gia' `in_progress` — nessun agente lo aveva cambiato, ne' con un `PATCH` ne' con un commento: il runtime sposta da solo un'issue `blocked` quando `blockedBy` si svuota di bloccanti aperti.
+
+**Errore:** leggere `in_progress` come "il lavoro puo' ripartire" senza rileggere *perche'* era `blocked`. Qui il bloccante vero non era ne' CRMA-105 ne' CRMA-107 in se': era l'unione della PR #29 a `main`, un'azione che nessun agente esegue da solo (regola del progetto, vale anche col consenso di Jacopo gia' arrivato). CRMA-105 aveva il compito di *chiedere* quel consenso, non di *eseguire* l'unione: chiuderla come `done` ha tolto un bloccante dal campo, ma l'anello che contava — chi preme il bottone «Merge» — e' rimasto esattamente dove era prima. Fidarsi del solo campo `status` avrebbe fatto sembrare il compito "da continuare" mentre l'unica cosa che manca e' identica a un'ora prima.
+
+**Modo corretto:**
+- A un risveglio `issue_blockers_resolved`, non agire sul nuovo `status` da solo: rileggere il testo dei bloccanti appena chiusi (commenti, interazioni collegate) per capire se la loro chiusura *include* l'azione che serviva o solo un passo verso di essa.
+- Se l'azione che manca e' ancora dovuta — qui, l'unione a `main`, riservata a Jacopo o Claudio anche a consenso gia' dato (nota gia' scritta nella regola di CLAUDE.md sulle unioni) — il compito torna `blocked`, con il nuovo anello nominato per esteso nel commento: non basta lasciarlo `in_progress` per inerzia del campo di stato, ne' richiuderlo `blocked` senza dire cosa manca stavolta.
+
+---
+
+## 98. Rimettere `blocked` con lo stesso `blockedByIssueIds` gia' `done` riavvia lo stesso ciclo del recupero automatico
+
+**Contesto:** 10/9/2026, giro successivo alla nota #97 sullo stesso compito CRMA-90. Confermato che l'unico anello mancante resta l'unione umana della PR #29 (`GET /repos/advaiora/crmadv/pulls/29` -> `state: open, merged: false`): bisognava rimettere il compito `blocked`.
+
+**Errore:** il `PATCH` piu' ovvio e' rimettere `status: "blocked"` lasciando `blockedByIssueIds` invariato (qui: CRMA-105 e CRMA-107, entrambe gia' `done`). Ma e' proprio quel campo, non lo stato scritto a mano, che il runtime guarda per decidere il recupero automatico descritto nella nota #97: con due bloccanti collegati gia' risolti, la prossima volta che una qualunque delle due issue viene ritoccata (o anche senza, a seconda di quando gira il controllo) il compito torna da solo `in_progress`, e il ciclo si ripete da capo — non perche' qualcosa sia cambiato, ma perche' il campo che decide il recupero non descriveva piu' il vero bloccante.
+
+**Modo corretto:**
+- Quando il vero bloccante e' un'azione umana fuori dal grafo delle issue (qui: un click «Merge» su GitHub), non collegare o scollegare `blockedByIssueIds` a issue-agente che sono gia' chiuse: si svuota l'elenco (`blockedByIssueIds: []`) e si lascia che sia **solo** `unblockDescriptor` a dire chi sblocca e come — quel campo non alimenta il recupero automatico.
+- Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `blockedBy` risulti vuoto pur restando `status: "blocked"` — segno che il recupero automatico non ha piu' un bloccante "risolvibile" da cui ripartire da solo.
+
+---
+
+## 99. Una regola scritta senza la sua procedura non protegge nulla, produce solo una coda
+
+**Contesto:** 10/9/2026, sezione «L'unione a `main`» di `CLAUDE.md`. Il testo diceva «il consenso resta obbligatorio, sempre e senza eccezioni» su un'operazione — l'unione di una pull request pronta — che con la release in corso si presentava anche diciotto volte in una giornata. Alle 14:01 dello stesso giorno, rispondendo alla richiesta `crma-23-coda-unioni`, Jacopo ha dovuto correggere la regola a caldo, scegliendo due corsie (consenso singolo solo per schema, migrazioni, permessi o sicurezza; il Capocantiere unisce da solo tutto il resto a cancelli superati) perché la fila di conferme era già più lenta della produzione di pull request.
+
+**Errore:** scrivere «sempre e senza eccezioni» pensando alla sicurezza del principio, senza calcolare il volume a cui quel principio si sarebbe applicato. Una regola che tratta un refuso di documentazione e una migrazione di schema con lo stesso passaggio umano non è più severa: è indifferente al rischio, e l'unico effetto misurabile è stato diciotto pull request ferme, alcune con la conferma già scaduta prima che qualcuno la leggesse.
+
+**Modo corretto:**
+- Quando una regola introduce un passaggio umano obbligatorio su un'azione che può ripetersi molte volte al giorno, il testo che la scrive deve includere **da subito** un criterio meccanico per distinguere dove il passaggio serve davvero da dove è solo un tappo — non aspettare che il volume lo dimostri da sé.
+- Il criterio va ancorato a qualcosa di verificabile senza giudizio (qui: quali file tocca la pull request), sullo stesso modello degli inneschi di R1 per i cancelli di revisione — non al «rischio percepito», che ogni agente stima in modo diverso.
+- Vale anche al contrario: se la regola prevede un riscadenzamento automatico di un passaggio umano (qui: una conferma scaduta si riemette da sola, senza richiedere il permesso di richiedere), va scritto per iscritto la prima volta — altrimenti ogni conferma scaduta genera una nuova domanda invece di una nuova richiesta, ed è la stessa cosa che si voleva evitare.
+
+---
+
+## 100. Un divieto senza la sua procedura e' un divieto che blocca tutto, anche quando la barriera vera non esiste
+
+**Contesto:** all'inizio di settembre 2026 il progetto arriva a venti pull request aperte, quattordici delle quali verso `main`, ferme su una convinzione condivisa: gli agenti non potevano unire a `main` senza l'approvazione di Jacopo o Claudio, e nessuno sapeva come si chiedesse quell'approvazione in modo che contasse. Il 10/9/2026 CLAUDE.md sostituisce la vecchia regola con una vera procedura (sezione "L'unione a `main`", PR #40): la esegue il Capocantiere (il CEO se il ramo e' suo), il consenso lo da' una persona accettando una richiesta di conferma sul compito.
+
+**Errore:** la regola precedente diceva solo "nessun merge su `main` senza approvazione", senza dire ne' come si chiede ne' chi la esegue. Davanti a un divieto fatto cosi', l'unica mossa sicura e' fermarsi — e infatti ci si e' fermati, per quattordici pull request. L'errore era doppio, perche' la barriera era creduta tecnica e non lo era affatto: il token ha `push`, `main` non ha branch protection, e un'unione via API era gia' stata fatta il 9/9/2026 (vedi nota #66). Non mancava la possibilita' di unire: mancava una procedura che dicesse come farlo restando dentro la regola.
+
+**Modo corretto:**
+- I sei passi e i quattro divieti della procedura stanno in CLAUDE.md, sezione "L'unione a `main`": pull request aperta, cancelli del compito chiusi, `mergeable_state` `clean`, richiesta di conferma con `request_confirmation` (numero e titolo della PR, ramo, file toccati, sha di testa, cancelli superati, effetto per chi usa il CRM), unione solo dopo l'accettazione e solo se la testa non si e' mossa, metodo `squash` verificato con `git fetch` (nota #66). Si legge li' e si segue: non si riscrive a memoria qui.
+- La lezione che vale oltre questo caso: **una regola che vieta qualcosa senza dire come si ottiene il permesso e' una regola che blocca**, non una regola che protegge. Quando se ne trova una, la si segnala a chi puo' scriverne la procedura, invece di aggirarla o di restarne paralizzati.
+- Prima di dedurre che una barriera sia tecnica (un token senza il permesso, una protezione sul ramo), verificarlo — vedi nota #66: spesso il token puo' gia' tutto quello che serve, ed e' solo il consenso a mancare.
+
+## 101. Un rebase interattivo in un albero condiviso puo' essere continuato da un altro run mentre lo si sta ancora risolvendo
+
+**Contesto:** 10/9/2026, chiusura di CRMA-90. Il ramo `cronista/crma-110-nota-unione-main` era fermo in un rebase interattivo (`onto ad06d7d`, il commit appena unito da CRMA-90) con un conflitto su `note-operative-ai.md`, lasciato aperto da un turno precedente della stessa sessione. Mentre preparavo la risoluzione — tenere le note #89-#98 gia' su `origin/main` e rinumerare la mia nota incoming da #89 a #99 — lo strumento di scrittura ha rifiutato una prima modifica con «File has been modified since read», e alla rilettura il file mostrava contenuti diversi in rapida successione: prima senza le note #89-#98, poi di nuovo completo. Il `git reflog` ha confermato: il rebase era stato portato a termine (`rebase (finish)`) da un'esecuzione concorrente sullo stesso albero, non dal mio comando.
+
+**Errore che si rischiava:** fidarsi dell'ultima lettura del file per decidere la mossa successiva, in un momento in cui un secondo run stava scrivendo sullo stesso `.git` (stesso indice, stesso `rebase-merge/`) — l'albero condiviso vale anche per lo stato interno di git, non solo per i file di testo. Il primo tentativo di risoluzione (mio o dell'altro run, non distinguibile dai soli comandi locali) aveva prodotto un commit che *cancellava* le note #89-#98 dal ramo, invece di limitarsi a rinumerare la nota in arrivo: sarebbe finito su `main` come regressione silenziosa se non fosse stato riletto prima del push.
+
+**Modo corretto:**
+- Un rebase interattivo con conflitto, su un albero condiviso, e' uno stato che un'altra esecuzione puo' completare da sola nel frattempo: prima di ogni azione (`git add`, `--continue`, o anche solo un edit del file in conflitto) rifare `git status` e non assumere che lo stato letto un comando fa sia ancora quello vero.
+- Dopo che un rebase risulta concluso (`git status` pulito, nessun `rebase-merge/`), **non fidarsi del contenuto per come appare**: confrontarlo esplicitamente con la base attesa (`git show origin/main:<file> | grep -oE '^## [0-9]+\.'` contro lo stesso comando sul proprio ramo) prima di considerare il conflitto chiuso.
+- Se il ramo non e' ancora stato spinto (`git status` -> "up to date with origin" o "ahead"), un commit sbagliato prodotto durante la corsa si corregge sul posto (qui: confronto riga per riga con `origin/main`, nessun `--force` necessario perche' nulla era stato pubblicato). Il controllo che l'ha confermato e' lo stesso della nota #66: verificare contro `origin`, non contro la propria memoria di cosa si era scritto.
+
+---
+
+## 102. `unblockDescriptor.owner` accetta un altro agent nello schema, ma l'API lo rifiuta sempre: l'owner e' sempre chi scrive
+
+**Contesto:** 10/9/2026, CRMA-90. Il Cronista delega a un compito figlio (CRMA-109, assegnato al Capocantiere) il lavoro che non gli compete — consolidare otto rami git — e prova a bloccare CRMA-90 finche' quel figlio non chiude, nominando il Capocantiere come owner dello sblocco: e' lui, non il Cronista, a dover agire perche' il compito riparta.
+
+**Errore:** `PATCH /api/issues/{id}` con `unblockDescriptor.owner = {"agentId": "<id del Capocantiere>"}` risponde **403 "Agents may only name themselves as an unblock owner"**, anche se lo schema OpenAPI accetta `{agentId}`, `{userId}` e `"board"` senza distinzioni. Chi legge solo lo schema conclude che nominare un altro agent sia la via corretta per dire «aspetto che se ne occupi lui» — non lo e' mai, per nessun agent.
+
+**Modo corretto:**
+- L'`owner` va sempre valorizzato con il **proprio** `agentId` (chi scrive la PATCH), indipendentemente da chi deve davvero agire per primo. Il campo dice *chi riprende in mano il compito quando qualcosa cambia*, non *chi decide o esegue*.
+- Chi deve davvero agire si nomina in chiaro dentro `action` (testo libero) e, se esiste, nel legame `blockedByIssueIds` verso il compito figlio: la relazione strutturata che l'API espone in lettura come `blockedBy` e' quella che conta per il tracciamento, il testo di `action` e' solo per chi legge.
+- Vale anche quando il vero destinatario e' un umano: non esiste un valore di `owner` che rappresenti "un altro", solo se stessi.

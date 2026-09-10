@@ -26,6 +26,7 @@ import { subscribeConversation } from "../../../realtime/realtimeClient";
 import { MESSAGING_MODULE_KEY, MESSAGING_PERMISSIONS } from "../../../modules/messaging/ui/constants";
 import ChatBubble from "./chatBubble";
 import MessagingPanel from "./MessagingPanel";
+import MessagingLoadError from "./MessagingLoadError";
 import ChatParticipantsPanel from "./ChatParticipantsPanel";
 import ChatOnboarding from "./ChatOnboarding";
 import { AttachEntityPanel, AttachmentChips } from "./chatAttachments";
@@ -351,6 +352,9 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   const [messagingPeer, setMessagingPeer] = React.useState(null);
   const [access, setAccess] = React.useState(null);
   const [accessLoaded, setAccessLoaded] = React.useState(false);
+  // La lettura del profilo non e' riuscita: NON sappiamo se i Messaggi ci sono.
+  // E' diverso da "l'utente non li ha", e va detto invece di ripiegare su altro.
+  const [accessError, setAccessError] = React.useState(false);
 
   const [projects, setProjects] = React.useState([]);
   const [projectsLoaded, setProjectsLoaded] = React.useState(false);
@@ -478,10 +482,15 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
         const result = await fetchWorkspaceAccess();
         if (!cancelled) {
           setAccess(result);
+          setAccessError(false);
         }
       } catch (_err) {
-        // Senza risposta si resta sulla sola Chat AI: meglio un mondo in meno che un
-        // tab che porta a una schermata di errore.
+        // Senza risposta NON si ripiega sulla Chat AI: chi stava sui Messaggi si
+        // vedrebbe comparire un'altra area — e la Produzione AI al lancio e'
+        // nascosta. Si dice che non si sono caricati e si offre di riprovare.
+        if (!cancelled) {
+          setAccessError(true);
+        }
       } finally {
         if (!cancelled) {
           setAccessLoaded(true);
@@ -569,11 +578,13 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
 
   // Se i Messaggi non sono disponibili (modulo spento, permesso tolto) si torna alla
   // Chat AI: senza, si resterebbe su un mondo vuoto e senza tab per uscirne.
+  // ⚠️ Solo quando lo si SA: se la lettura del profilo e' fallita non si cambia mondo
+  // — si resta sui Messaggi e si mostra l'errore (vedi MessagingLoadError).
   React.useEffect(() => {
-    if (accessLoaded && !canUseMessaging && mode === "messaging") {
+    if (accessLoaded && !accessError && !canUseMessaging && mode === "messaging") {
       setMode("ai");
     }
-  }, [accessLoaded, canUseMessaging, mode]);
+  }, [accessLoaded, accessError, canUseMessaging, mode]);
 
   // Esc per chiudere e blocco dello scroll del corpo sono cose dell'overlay: la
   // casella e' una pagina come le altre, non deve rubare Esc ne' bloccare lo scroll.
@@ -1047,12 +1058,21 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
       {accessLoaded && canUseMessaging && <ModeTabs mode={mode} onMode={setMode} />}
 
       {isMessaging ? (
-        <MessagingPanel
-          expanded={expandedView}
-          canSend={canSendMessages}
-          peer={messagingPeer}
-          onPeerChange={setMessagingPeer}
-        />
+        accessError ? (
+          <MessagingLoadError
+            onRetry={() => {
+              setAccessError(false);
+              setAccessLoaded(false);
+            }}
+          />
+        ) : (
+          <MessagingPanel
+            expanded={expandedView}
+            canSend={canSendMessages}
+            peer={messagingPeer}
+            onPeerChange={setMessagingPeer}
+          />
+        )
       ) : (
         <>
         {/* Elemento in sospeso (voce "Allega a una chat…"): l'utente sceglie dove
