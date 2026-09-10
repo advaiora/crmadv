@@ -1508,3 +1508,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Chi deve davvero agire si nomina in chiaro dentro `action` (testo libero) e, se esiste, nel legame `blockedByIssueIds` verso il compito figlio: la relazione strutturata che l'API espone in lettura come `blockedBy` e' quella che conta per il tracciamento, il testo di `action` e' solo per chi legge.
 - Vale anche quando il vero destinatario e' un umano: non esiste un valore di `owner` che rappresenti "un altro", solo se stessi. Verso un umano il canale e' un commento leggibile sull'issue e/o un'interazione `ask_user_questions` / `request_confirmation` con `resolverPolicy: human_only` — mai il descrittore.
 - **Verifica (aggiunta il 10/9/2026, CRMA-118):** la `PATCH` con `owner` esterno non si limita a ignorare quel campo, fallisce **per intero** — anche gli altri campi passati nella stessa chiamata (es. `status`) restano non applicati. Dopo ogni `PATCH` che tocca `unblockDescriptor`, rileggere l'issue e controllare che il campo non sia tornato `null`: se lo e', la scrittura e' fallita in silenzio e va rifatta con l'owner giusto.
+
+---
+
+## 103. Un commento nel codice che cita un numero di riga in un altro file invecchia al primo refactor — e su un albero condiviso puo' nascere gia' sbagliato
+
+**Contesto:** 10/9/2026, CRMA-123. Un commento sopra `SYSTEM_MODULE_CATALOG` in `server/auth/rbac-catalog.ts` rimandava a `SidebarMenu.jsx:342 e :349` per due voci di menu. Il compito CRMA-32 (riordino del menu) ha spostato quelle voci a `:309` e `:318`, e il commento e' finito stale. Prima revisione della correzione: i numeri erano stati aggiornati a `309`/`318` — ma quei numeri venivano dal lavoro **non committato** di CRMA-32 nell'albero di lavoro condiviso, non da `main` (`git log --oneline origin/main..<ramo-CRMA-32>` era vuoto). Se la correzione fosse arrivata su `main` per prima, sarebbe atterrata gia' sbagliata: lo stesso difetto che doveva togliere, solo spostato.
+
+**Errore:** citare un numero di riga di un altro file dentro un commento persistente e' una scommessa doppia — invecchia al primo refactor di quel file (il difetto originale), e se il numero si legge da un albero condiviso puo' anche non essere mai stato vero su `main` (il difetto scoperto in revisione, vedi anche [[numeri-di-riga-letti-dall-albero-condiviso]]).
+
+**Modo corretto:**
+- In un commento che deve restare valido nel tempo, riferirsi a un'altra posizione nel codice **per nome** (l'etichetta della voce, il nome della chiave, il nome della funzione), mai per numero di riga: il nome sopravvive al refactor, la riga no.
+- Se davvero serve un riferimento verificabile a un file diverso, verificarlo con `git show origin/main:<file> | grep -n <termine>` prima di scriverlo — mai leggere la riga dall'albero di lavoro condiviso quando l'altro file e' oggetto del lavoro non committato di un altro compito.
+- Quando un blocco di commento a cui si rimanda (qui: l'ipotesi di accorciamento etichette, introdotta da "🔸 Da riguardare quando...") viene tolto perche' superato, controllare che nessun'altra riga dello stesso commento vi punti ancora con un "qui sotto" o simile.

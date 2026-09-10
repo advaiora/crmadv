@@ -131,14 +131,15 @@ export type SystemRoleDefinition = {
 // inglese: allineare non vuol dire tradurre tutto.
 export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   // ⚠️ Queste due voci sono ACCORCIATE rispetto al menu, che dice "Branding Workspace" e
-  // "Gestione Moduli" (SidebarMenu.jsx:309 e :318, e cosi' si chiamano anche le due
-  // pagine). Qui il contesto lo da' gia' la colonna dei moduli, quindi ripetere
-  // "Gestione" e "Workspace" sarebbe rumore. Non e' un disallineamento sfuggito: e' la
-  // stessa scelta fatta per "Impostazioni Pipeline" -> "Impostazioni" sotto un genitore
-  // che dice gia' Pipeline. Col riordino del gruppo "Impostazioni" (CRMA-32,
-  // 10/9/2026) le etichette del menu sono rimaste per esteso ("Server di posta",
-  // "Branding Workspace", "Gestione Moduli"): l'accorciamento ipotizzato qui sotto non
-  // e' avvenuto, e le due copie restano intenzionalmente diverse.
+  // "Gestione Moduli" (le voci "Branding Workspace" e "Gestione Moduli" in
+  // SidebarMenu.jsx, e cosi' si chiamano anche le due pagine). Qui il contesto lo da'
+  // gia' la colonna dei moduli, quindi ripetere "Gestione" e "Workspace" sarebbe
+  // rumore. Non e' un disallineamento sfuggito: e' la stessa scelta fatta per
+  // "Impostazioni Pipeline" -> "Impostazioni" sotto un genitore che dice gia' Pipeline.
+  // Col riordino del gruppo "Impostazioni" (CRMA-32, 10/9/2026) le etichette del menu
+  // sono rimaste per esteso ("Server di posta", "Branding Workspace", "Gestione
+  // Moduli"): l'accorciamento ipotizzato in passato per questo modulo non e' avvenuto,
+  // e le due copie restano intenzionalmente diverse.
   // "Branding" resta comunque inglese perche' e' il termine del mestiere.
   { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
