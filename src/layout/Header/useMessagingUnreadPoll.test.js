@@ -7,6 +7,7 @@ import { useMessagingUnreadPoll } from "./useMessagingUnreadPoll";
 
 vi.mock("../../modules/messaging/api/messagingApi", () => ({
   listMessagingUsers: vi.fn(),
+  MESSAGING_CONTACTS_LIMIT: 100,
 }));
 
 vi.mock("react-toastify", () => ({

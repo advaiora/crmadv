@@ -1,5 +1,11 @@
 import { apiGet, apiPost } from '../../../utils/apiClient';
 
+// Tetto vero della lista contatti: il server lo accetta fino a qui
+// (MAX_CONTACTS_LIMIT in server/modules/messaging/service.ts). Oltre, la
+// ricerca testuale (gia' presente nel selettore) e' la via — non ha senso
+// alzarlo ulteriormente senza una paginazione vera della lista.
+export const MESSAGING_CONTACTS_LIMIT = 100;
+
 const withQuery = (path, params = {}) => {
   const searchParams = new URLSearchParams();
 

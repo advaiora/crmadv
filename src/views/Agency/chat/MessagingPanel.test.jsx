@@ -16,6 +16,7 @@ vi.mock("../../../modules/messaging/api/messagingApi", () => ({
   listMessagingConversation: vi.fn(),
   markMessagingConversationRead: vi.fn(),
   sendMessagingMessage: vi.fn(),
+  MESSAGING_CONTACTS_LIMIT: 100,
 }));
 
 // Il tempo reale si finge per due motivi: non aprire websocket nei test, e avere in

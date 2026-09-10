@@ -1,6 +1,10 @@
 import React from "react";
 import { Badge, Button, Form, Spinner } from "react-bootstrap";
-import { listMessagingUsers, sendMessagingMessage } from "../../../modules/messaging/api/messagingApi";
+import {
+  listMessagingUsers,
+  MESSAGING_CONTACTS_LIMIT,
+  sendMessagingMessage,
+} from "../../../modules/messaging/api/messagingApi";
 import { formatListDate, formatTime } from "./chatShared";
 import { IconBack, IconSearch } from "./chatIcons";
 import { subscribeMessaging, subscribeStatus } from "../../../realtime/realtimeClient";
@@ -157,7 +161,7 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
         setContactsError("");
       }
       try {
-        const result = await listMessagingUsers({ q: searchQuery || undefined, limit: 80 });
+        const result = await listMessagingUsers({ q: searchQuery || undefined, limit: MESSAGING_CONTACTS_LIMIT });
         setContacts(Array.isArray(result?.items) ? result.items : []);
       } catch (error) {
         if (!silent) {

@@ -1,6 +1,6 @@
 import React from "react";
 import { toast } from "react-toastify";
-import { listMessagingUsers } from "../../modules/messaging/api/messagingApi";
+import { listMessagingUsers, MESSAGING_CONTACTS_LIMIT } from "../../modules/messaging/api/messagingApi";
 import { subscribeMessaging, subscribeStatus } from "../../realtime/realtimeClient";
 
 // Estratto da TopNav.jsx (che sforava le 500 righe): qui vive il conteggio dei
@@ -76,7 +76,7 @@ export function useMessagingUnreadPoll({ enabled, onMessagingPage, onNavigateToM
     const sequence = ++pollSequenceRef.current;
 
     try {
-      const result = await listMessagingUsers({ limit: 80 });
+      const result = await listMessagingUsers({ limit: MESSAGING_CONTACTS_LIMIT });
       if (sequence !== pollSequenceRef.current) {
         // Una richiesta piu' recente e' gia' partita mentre questa era in volo:
         // questa risposta e' superata, non si scrive stato con dati vecchi.
