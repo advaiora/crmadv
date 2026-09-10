@@ -1282,3 +1282,36 @@ npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
 - **Quando si restituisce meta' del proprio lavoro aprendo un compito nuovo, la catena non si eredita da sola.** O si ricopiano sul figlio i cancelli che valgono per quel codice — guardando la tabella della regola mista in `CLAUDE.md` (revisore di repository per le tappe correnti; compito Paperclip assegnato al Revisore per schema/migrazioni/permessi/sicurezza/unioni a `main`) — oppure **si avvisa il Capocantiere nel commento di chiusura**, che e' chi tiene l'ordine della coda.
 - **La seconda strada e' quella buona in caso di dubbio su quale cancello serva**: descrivere cosa tocca il codice costa una riga, indovinare un cancello sbagliato costa una revisione saltata.
 - **Il legame va registrato sulla lavagna** (`blockedByIssueIds` / `parentId`), non scritto a parole nella descrizione: una catena in prosa non ferma nessuna transizione di stato, un blocco registrato si'.
+
+## 86. Il titolo di un commit descrive un'intenzione, non un'azione: cosi' un segreto trapelato e' sembrato chiuso per sette mesi
+
+**Contesto:** commit `8a30469`, 19/2/2026, titolo «Rimuovi .env dalla cronologia». La password del superuser PostgreSQL era finita nel commit `569d192` del 10/2/2026 dentro il file `.env`.
+
+**Errore:** il titolo dice che la cronologia e' stata ripulita. Non lo e': `8a30469` e' una cancellazione normale del file (`.env | 3 ---`, un solo file cambiato), non una riscrittura della storia. Il blob resta raggiungibile con `git show 569d192:.env`, ed e' antenato di `origin/main` (`git merge-base --is-ancestor 569d192 origin/main` risponde vero). Chiunque legga quella riga di log conclude che il problema e' stato chiuso a febbraio — ed e' esattamente per questo che nessuno se n'e' accorto per sette mesi, fino al rilievo del Guardiano in CRMA-67 il 10/9/2026.
+
+**Modo corretto:**
+- Togliere davvero un file dalla storia e' `git filter-repo` (o equivalente) **piu' un force-push**, non un semplice `git rm` + commit. Un commit che si limita a cancellare il file in punta lascia il blob in ogni versione precedente e in ogni clone gia' fatto.
+- Un messaggio di commit descrive **cosa il commit fa**, non cosa si voleva ottenere: «Rimuovi .env dalla cronologia» avrebbe dovuto essere «Rimuovi .env (la cronologia resta invariata)», o non essere scritto affatto in quei termini.
+- **Stato residuo, dichiarato invece di lasciato implicito:** su decisione di Jacopo del 10/9/2026 la storia **non** viene riscritta (una cinquantina di rami aperti a quella data, e ogni clone da rifare, erano un prezzo sproporzionato per un segreto di sviluppo) — quindi quella password resta leggibile nella storia di `origin/main` a tempo indefinito. L'unica difesa reale e' che non sia piu' valida: rotazione della password ancora da fare al 10/9/2026 — data da aggiungere qui quando avviene.
+
+## 87. La descrizione di un compito Paperclip si copia nel risveglio di ogni agente che lo tocca: un segreto scritto li' si propaga da solo
+
+**Contesto:** 10/9/2026, apertura di CRMA-67 (il compito che denuncia la password PostgreSQL trapelata, nota #86). Il Guardiano ha riportato la password **in chiaro** nella descrizione del compito, per documentare il rilievo.
+
+**Errore:** la descrizione di un'issue Paperclip non e' un documento passivo: viene iniettata nel risveglio di ogni agente che lavora su quel compito o sui suoi figli. Un compito che denuncia un segreto trapelato lo aveva cosi' ripropagato su un secondo sistema — misurato il 10/9/2026 sulla VPS: **15 file e 5 agenti distinti** avevano gia' il valore in chiaro nei propri trascritti di sessione e log di run, prima ancora che qualcuno se ne accorgesse.
+
+**Modo corretto:**
+- In un compito di sicurezza il segreto si **maschera subito**, non dopo: si scrive solo cio' che lo identifica — quale credenziale, in che commit, in che file, il comando per verificarlo (`git show <commit>:<file>`) — mai il valore.
+- Chi ha davvero bisogno del valore lo legge dalla fonte (il blob nella storia, il gestore segreti), non dalla bacheca.
+- I trascritti gia' scritti non si possono richiamare: e' una delle ragioni per cui, una volta successo, la rotazione della credenziale conviene comunque, indipendentemente dal fatto che il resto del rilievo sia gia' stato mascherato. (Descrizione e documento di CRMA-67 sono stati mascherati il 10/9/2026.)
+
+## 88. `node -e "…"` fra virgolette doppie: la shell mangia tutto cio' che sta fra apici rovesci, PRIMA che node lo veda, e non lo dice
+
+**Contesto:** 10/9/2026, apertura di CRMA-86: il testo passato all'API era un markdown con riferimenti tecnici fra backtick (`` `8a30469` ``, `` `.env` ``, `` `git filter-repo` ``), costruito con `node -e "..."` a virgolette doppie invece che con un file intermedio.
+
+**Errore:** quando il comando e' `node -e "testo con \`qualcosa\` dentro"`, la shell (bash) esegue **prima** tutto cio' che sta fra i backtick, come farebbe con qualsiasi altra sostituzione di comando, e solo il suo output — spesso vuoto o un errore silenzioso — arriva a node. Non e' un problema di virgolette che si chiudono in anticipo (quello darebbe un errore di sintassi evidente): qui la POST **riesce**, risponde `ok`, e il corpo arriva all'API con quei pezzi cancellati. Il guasto non si vede finche' qualcuno non rilegge il contenuto pubblicato. E' la variante di scrittura del problema descritto per la lettura alla nota #61: la' mancava lo strumento (`python3`), qui lo strumento c'e' ma lo si invoca nel modo che lo rompe.
+
+**Modo corretto:**
+- Il testo con backtick non passa mai per la riga di comando dentro un `node -e "..."` a doppi apici. Si scrive prima il markdown con lo strumento di scrittura file (nessuna interpretazione di shell), poi lo si legge da un file: `node -e '...'` ad **apici singoli** (la shell non fa sostituzioni dentro apici singoli) leggendo il percorso da `process.argv`, oppure uno script `.mjs` vero e proprio.
+- Controllo che non costa nulla: prima di spedire, contare i backtick nel file JSON gia' costruito — se il numero non torna, qualcosa e' stato eseguito invece che copiato.
+- **Una risposta `ok` non prova che il contenuto sia integro**: dopo una POST con testo tecnico (nomi di file, hash di commit, comandi), rileggerla dall'API e confrontarla con l'originale, non fidarsi del solo codice di stato.

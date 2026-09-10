@@ -26,9 +26,12 @@ import { userRepository } from '../../repositories/user.repository.js';
 // 2. LE SESSIONI GIA' APERTE RESTANO VALIDE. Il JWT e' senza stato e dura 7 giorni
 //    (`server/auth/jwt.ts`); non c'e' tabella sessioni, ne' denylist, ne' `tokenVersion`.
 //    Cambiare la password NON caccia fuori nessuno. E' una decisione presa, non una
-//    dimenticanza: revocare richiede una colonna nuova su `User` (`passwordChangedAt`)
-//    e quindi una migrazione, che questo lavoro non porta. Va detto a schermo, e il
-//    seguito e' un compito a se'.
+//    dimenticanza: revocare richiede una colonna su `User` (`passwordChangedAt`) su
+//    cui appoggiarsi. ⚠️ Dal 9/9/2026 (CRMA-24) quella colonna ESISTE, ma e' ancora
+//    vuota per tutti: nessuno la scrive e nessuno la legge. Finche' il compito del
+//    recupero password non la collega — scriverla qui al cambio, confrontarla con
+//    l'`iat` del token in `server/auth/jwt.ts` — il comportamento resta questo, e
+//    va detto a schermo.
 // 3. NON SI TOCCA `vaultPasswordHash`. E' un'altra password (le Credenziali).
 //    Nota pero' la conseguenza, gia' vera oggi: chi non ha impostato una password
 //    di cassaforte propria la sblocca con quella dell'account, quindi cambiare

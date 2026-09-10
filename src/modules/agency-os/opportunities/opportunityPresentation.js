@@ -20,6 +20,12 @@ const TYPE_ORDER = {
 // va aggiunta una seconda copia. In particolare gli stati sono quelli veri
 // dell'enum ProjectOpportunityStatus (open, proposed, won, lost, suggested):
 // il default e' "open", quindi sbagliarli si vede subito su ogni riga.
+//
+// Il re-export serve a chi importa da questo modulo; qui dentro serve anche
+// l'import vero, perche' un "export ... from" non introduce il nome nello
+// scope locale (usato piu' sotto in groupAgencyOpportunities).
+import { toReadableLabel as formatOpportunityLabel } from "../labels/agencyStatusLabels";
+
 export { toReadableLabel as formatOpportunityLabel } from "../labels/agencyStatusLabels";
 
 export const sortAgencyOpportunities = (items) => {

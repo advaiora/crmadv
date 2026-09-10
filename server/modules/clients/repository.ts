@@ -29,6 +29,26 @@ type CreateClientInput = {
   phone: string | null;
   vatNumber: string | null;
   taxCode: string | null;
+  // I quattro campi di fatturazione e contatto sono arrivati dopo (CRMA-24) e
+  // sono OPZIONALI qui apposta: la migrazione e i due elenchi di questo file
+  // viaggiano da soli, senza obbligare `service.ts` a nominarli prima che
+  // esistano a schermo. Chi non li passa scrive `null`, che e' il valore giusto.
+  //
+  // ⚠️ LA CATENA SI FERMA QUI, ED E' VOLUTO — ma va chiuso, o i campi non
+  // arrivano mai a chi usa il CRM. `service.ts` ha i propri elenchi espliciti,
+  // e nessuno di questi quattro nomi ci compare ancora. Chi collega la maschera
+  // (punto 5 della release) deve toccare, in `server/modules/clients/service.ts`:
+  //   - `mapClient` (~riga 653): la risposta dell'API. Senza questo il valore si
+  //     legge dal database e si butta via un livello dopo — stesso sintomo del
+  //     campo dimenticato nel `select`, un piano piu' in alto.
+  //   - la lettura del payload di creazione (~riga 774) e della patch (~riga 814):
+  //     senza queste il campo non si puo' nemmeno scrivere dall'API.
+  //   - `CSV_HEADER_COLUMNS` (~riga 38) e `toExportCsvRow` (~riga 602): l'export.
+  //   - il registro attivita' (~righe 1123 e 1208): quali campi risultano cambiati.
+  pecEmail?: string | null;
+  sdiCode?: string | null;
+  website?: string | null;
+  contactPerson?: string | null;
   street: string | null;
   city: string | null;
   zip: string | null;
@@ -41,7 +61,18 @@ type CreateClientInput = {
 
 type UpdateClientInput = Partial<CreateClientInput>;
 
-const clientSelect = {
+/**
+ * Le colonne che escono da questo repository — una volta sola, perche' le
+ * quattro query che le chiedono devono restituire la stessa cosa.
+ *
+ * ⚠️ Quando si aggiunge un campo a `Client` va aggiunto anche qui, o si ottiene
+ * un campo che si salva e non si rilegge: nessun errore, nessun test rosso, e
+ * il guasto si vede solo ricaricando la maschera. Il test
+ * «ogni colonna del modello Client e' chiesta al database» in `repository.test.ts`
+ * esiste apposta per non lasciarlo scoprire a chi usa il CRM. Modello imitato:
+ * `server/modules/mail/mail.repository.ts` (`CAMPI_LETTI`).
+ */
+export const clientSelect = {
   id: true,
   workspaceId: true,
   type: true,
@@ -50,6 +81,10 @@ const clientSelect = {
   phone: true,
   vatNumber: true,
   taxCode: true,
+  pecEmail: true,
+  sdiCode: true,
+  website: true,
+  contactPerson: true,
   street: true,
   city: true,
   zip: true,
@@ -139,6 +174,42 @@ const buildSearchWhere = (query: string): Prisma.ClientWhereInput => ({
       },
     },
   ],
+});
+
+/**
+ * Le colonne che questo repository SCRIVE quando crea un cliente.
+ *
+ * E' una funzione a se' — invece di un oggetto scritto dentro `create()` —
+ * perche' cosi' si puo' provare senza database che nomini davvero tutti i campi
+ * scrivibili del modello. La rilettura ha `clientSelect` a proteggerla; senza
+ * questo, la scrittura non aveva niente.
+ *
+ * ⚠️ Un campo dimenticato qui e' l'altra meta' dello stesso guasto: si compila
+ * a schermo, non arriva al database, e la maschera ricaricata lo mostra vuoto.
+ */
+export const buildCreateData = (
+  workspaceId: string,
+  input: CreateClientInput,
+): Prisma.ClientUncheckedCreateInput => ({
+  workspaceId,
+  type: input.type,
+  name: input.name,
+  email: input.email,
+  phone: input.phone,
+  vatNumber: input.vatNumber,
+  taxCode: input.taxCode,
+  pecEmail: input.pecEmail ?? null,
+  sdiCode: input.sdiCode ?? null,
+  website: input.website ?? null,
+  contactPerson: input.contactPerson ?? null,
+  street: input.street,
+  city: input.city,
+  zip: input.zip,
+  province: input.province,
+  country: input.country,
+  notes: input.notes,
+  tags: input.tags,
+  customFields: input.customFields ?? {},
 });
 
 export const clientsRepository = {
@@ -246,23 +317,7 @@ export const clientsRepository = {
 
   create(workspaceId: string, input: CreateClientInput) {
     return prisma.client.create({
-      data: {
-        workspaceId,
-        type: input.type,
-        name: input.name,
-        email: input.email,
-        phone: input.phone,
-        vatNumber: input.vatNumber,
-        taxCode: input.taxCode,
-        street: input.street,
-        city: input.city,
-        zip: input.zip,
-        province: input.province,
-        country: input.country,
-        notes: input.notes,
-        tags: input.tags,
-        customFields: input.customFields ?? {},
-      },
+      data: buildCreateData(workspaceId, input),
       select: clientSelect,
     });
   },
