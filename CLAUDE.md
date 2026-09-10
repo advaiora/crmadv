@@ -37,11 +37,24 @@ Sul progetto lavorano **due assistenti, in due ambienti diversi, con mestieri di
 4. La **fonte di verità del prodotto** è `archivio-documenti/02-brief-operativo-definitivo-bibbia.md` (la "bibbia"); la roadmap di sviluppo è `archivio-documenti/03-roadmap-confronto-e-build.md`.
 5. **Se l'utente si allontana dal PC** e vuole che il lavoro prosegua senza di lui, lancia `/vado` (`/vado 2h`, `/vado tutto`). Il lavoro avanza **a pezzi committabili** — il tempo non taglia un pezzo, decide solo se cominciarne un altro — con commit e push a ogni pezzo chiuso. Ciò che richiede una sua decisione non viene deciso: viene **parcheggiato con le opzioni già istruite** e presentato al rientro in `archivio-documenti/rapporto-al-rientro.md`. Non è un handoff e non tocca la cartella degli handoff: sono due cose diverse (l'handoff chiude una sessione, il rapporto al rientro riprende una conversazione ancora aperta).
 
-## L'unione a `main`: la esegue un agente, il consenso lo dà una persona (dal 10/9/2026)
+## L'unione a `main`: due corsie, e chi preme il pulsante (dal 10/9/2026)
 
 **Cosa cambia, in una riga: la regola precedente era «nessun merge su `main` senza approvazione», e non diceva come si ottiene l'approvazione — così ogni agente si fermava e il pulsante lo premeva a mano Jacopo o Claudio su GitHub.** Il 10/9/2026 le pull request aperte erano venti. La sicurezza non era data dal fatto che gli agenti non potessero unire (possono: il token ha `push`, `main` non ha branch protection, ed è già successo il 9/9), ma dal fatto che non sapessero come chiedere. Adesso lo sanno, e il consenso è un passaggio formale che lascia una traccia.
 
-**Il consenso resta obbligatorio, sempre e senza eccezioni. Cambia solo chi preme il pulsante.**
+**Lo stesso giorno, alle 14:01, la regola è stata corretta una seconda volta.** Con diciotto pull request in coda, un consenso per ciascuna — anche per un refuso o una nota — era diventato di per sé il collo di bottiglia (ce n'erano già di scadute prima che qualcuno le leggesse). Rispondendo alla richiesta `crma-23-coda-unioni`, Jacopo ha scelto **due corsie** invece di una fila unica: il consenso dove il rischio è vero, i cancelli da soli dove non lo è. **Il consenso non è stato abolito: si applica dove serve.** Quello che segue sostituisce la frase «il consenso resta obbligatorio, sempre e senza eccezioni», che era vera fino a quel momento e non lo è più.
+
+### Le due corsie, e come si sceglie fra loro
+
+Il criterio è **meccanico**, come gli inneschi di R1 qui sotto: si guardano i file toccati dalla pull request (`git diff --name-only` contro la base), non il rischio percepito o il giudizio di chi ha scritto il ramo.
+
+| | |
+|---|---|
+| **Corsia A — serve il consenso singolo di Jacopo o Claudio** | la pull request tocca almeno uno fra: `prisma/schema.prisma`, una migrazione (`prisma/migrations/**`), `server/auth/rbac-catalog.ts`, autenticazione o sessioni, segreti o `.env`, permessi e ruoli |
+| **Corsia B — il Capocantiere unisce senza chiedere** | nessuno dei punti sopra è toccato: documenti, note operative, roadmap, etichette e testi a schermo, correzioni di interfaccia, strumenti di sviluppo |
+
+**Corsia B non è "senza controllo": è "a cancelli superati, senza un secondo passaggio umano".** I cancelli del compito (passo 2 dei sei passi qui sotto) restano obbligatori in entrambe le corsie — quello che cambia è solo il passo 4. Nel dubbio su quale corsia tocchi una pull request, si tratta come corsia A: chiedere un consenso di troppo costa un passaggio in più, ometterlo su un rischio vero costa una migrazione applicata due volte o un permesso che nessuno ha visto arrivare.
+
+**Il cancello Revisore su «unione a `main`» (tabella R1 qui sotto) non è quello che questa sezione descrive, e il consenso di corsia A non lo sostituisce.** Sono due controlli diversi, che possono coesistere sullo stesso compito: il cancello Revisore è una revisione dell'agente Paperclip fatta *prima* che la pull request arrivi a questo punto; il consenso di corsia A è la decisione finale di Jacopo o Claudio *su quella pull request specifica*. Un compito con il cancello Revisore superato entra comunque in corsia A se tocca uno dei punti della tabella sopra.
 
 ### Chi può unire
 
@@ -49,29 +62,33 @@ Sul progetto lavorano **due assistenti, in due ambienti diversi, con mestieri di
 |---|---|
 | **Esegue l'unione** | **Capocantiere** (`4c8f15c8-070f-41bf-95f3-3c5c9004959e`). Se il ramo da unire è suo, la esegue il **CEO** (`acdb80ad-1600-4ab6-94b3-ca75fe6b9833`) |
 | **Non uniscono mai** | tutti gli altri: sviluppatori, Cronista, Guardiano, Revisore, Collaudatori, Esploratore. Portano il lavoro fino alla pull request e si fermano lì |
-| **Dà il consenso** | **solo Jacopo o Claudio**, rispondendo alla richiesta di conferma sul compito |
+| **Dà il consenso, in corsia A** | **solo Jacopo o Claudio**, rispondendo alla richiesta di conferma sul compito |
 
-La ragione della separazione è una sola e non è negoziabile: **chi ha scritto il ramo non lo unisce.** È lo stesso principio per cui un cancello non può avere come revisore l'assegnatario del compito.
+La ragione della separazione fra chi scrive e chi unisce è una sola e non è negoziabile, in entrambe le corsie: **chi ha scritto il ramo non lo unisce.** È lo stesso principio per cui un cancello non può avere come revisore l'assegnatario del compito.
 
 ### I sei passi, in ordine, senza scorciatoie
 
 1. **La pull request verso `main` esiste** ed è aperta. Un ramo senza pull request non si unisce, mai — nemmeno con un `git push` diretto su `main`.
-2. **I cancelli del compito sono chiusi.** Se il compito prevedeva Guardiano, Revisore, Collaudatore o Collaudatore AI, quelli devono risultare superati. Se non ne prevedeva nessuno, il commento di chiusura deve dichiarare la revisione del revisore di repository.
-3. **`mergeable_state` è `clean`.** Se è `dirty`, `blocked` o `behind`, prima si sistema il ramo. Non si chiede il consenso su una pull request che non è unibile: significherebbe far decidere l'utente su qualcosa che poi cambia.
-4. **Si chiede il consenso con una richiesta di conferma sul compito** (`POST /api/issues/{issueId}/interactions`, `kind: request_confirmation`, `continuationPolicy: wake_assignee`), con `idempotencyKey` `confirmation:{issueId}:merge:{numeroPR}:{shaTesta}`. La richiesta deve contenere, per esteso: **numero e titolo della pull request**, **nome del ramo**, **elenco dei file toccati**, **le sette cifre iniziali dello sha della testa**, **quali cancelli sono stati superati e da chi**, e **una riga che dica cosa cambia per chi usa il CRM**. Una richiesta che non contiene queste sei cose non è una richiesta di consenso: è un disturbo.
-5. **Si unisce solo dopo l'accettazione, e solo se la testa non si è mossa.** Prima di eseguire si rilegge `head.sha` dalla pull request: se è diverso da quello scritto nella conferma, **la conferma è decaduta** e ne serve una nuova. Il consenso vale per quel codice lì, non per quel ramo in generale.
-6. **Il metodo è `squash`, e la prova non è la risposta dell'API.** `PUT /repos/advaiora/crmadv/pulls/{n}/merge` con `{"merge_method":"squash"}`; poi `git fetch origin` e si verifica che il commit sia davvero antenato di `origin/main` (nota operativa #66). Infine si scrive l'esito nel compito.
+2. **I cancelli del compito sono chiusi.** Se il compito prevedeva Guardiano, Revisore, Collaudatore o Collaudatore AI, quelli devono risultare superati. Se non ne prevedeva nessuno, il commento di chiusura deve dichiarare la revisione del revisore di repository. Vale in entrambe le corsie.
+3. **`mergeable_state` è `clean`.** Se è `dirty`, `blocked` o `behind`, prima si sistema il ramo. In corsia A non si chiede il consenso su una pull request che non è unibile: significherebbe far decidere l'utente su qualcosa che poi cambia. In corsia B non si unisce comunque una pull request non pulita.
+4. **Solo in corsia A: si chiede il consenso con una richiesta di conferma sul compito** (`POST /api/issues/{issueId}/interactions`, `kind: request_confirmation`, `continuationPolicy: wake_assignee`), con `idempotencyKey` `confirmation:{issueId}:merge:{numeroPR}:{shaTesta}`. La richiesta deve contenere, per esteso: **numero e titolo della pull request**, **nome del ramo**, **elenco dei file toccati**, **le sette cifre iniziali dello sha della testa**, **quali cancelli sono stati superati e da chi**, e **una riga che dica cosa cambia per chi usa il CRM**. Una richiesta che non contiene queste sei cose non è una richiesta di consenso: è un disturbo. **In corsia B questo passo non esiste**: dal passo 3 si va direttamente al passo 5.
+5. **In corsia A si unisce solo dopo l'accettazione, e solo se la testa non si è mossa.** Prima di eseguire si rilegge `head.sha` dalla pull request: se è diverso da quello scritto nella conferma, **la conferma è decaduta** e ne serve una nuova (vedi sotto: non si chiede il permesso di richiederla). Il consenso vale per quel codice lì, non per quel ramo in generale. In corsia B si rilegge comunque `head.sha` subito prima di unire, per la stessa ragione: si unisce il codice che si è appena verificato, non quello di qualche minuto prima.
+6. **Il metodo è `squash`, e la prova non è la risposta dell'API.** `PUT /repos/advaiora/crmadv/pulls/{n}/merge` con `{"merge_method":"squash"}`; poi `git fetch origin` e si verifica che il commit sia davvero antenato di `origin/main` (nota operativa #66). Infine si scrive l'esito nel compito, con la corsia usata.
+
+### Quando una conferma di corsia A scade, si riemette da sola
+
+**È già la terza risposta alla stessa domanda, non serve chiederla una quarta volta.** Se la richiesta di conferma scade prima che Jacopo o Claudio la leggano — come già successo alla PR #34 — il Capocantiere la **riemette da solo**, con lo sha aggiornato (se nel frattempo si è mosso) e senza chiedere il permesso di richiedere di nuovo: il permesso è stato dato il 10/9/2026 rispondendo a `crma-23-coda-unioni`. La nuova richiesta segue comunque il passo 4: numero e titolo della PR, ramo, file toccati, sha, cancelli, e cosa cambia per chi usa il CRM.
 
 ### I quattro divieti che rendono la regola impenetrabile
 
-- **Mai unire senza il passo 4.** Un'approvazione arrivata in chat, in un commento generico, a voce o «già data l'altra volta per un ramo simile» **non conta**. Conta solo un'accettazione registrata su quella richiesta di conferma. Se hai un dubbio su cosa valga come consenso, allora non ce l'hai.
-- **Mai un consenso cumulativo.** Una conferma vale **una pull request**. Non esistono «unisci tutte quelle pronte», né deleghe permanenti.
-- **Mai durante `/vado`.** Se l'utente non è al PC non può dare il consenso, e il consenso non si presume: il ramo lo trova pronto al rientro. Resta com'era scritto in `.claude/commands/vado.md`.
-- **Mai `--force`, mai riscrivere la storia, mai unire una pull request altrui senza che il suo compito sia chiuso.**
+- **Mai unire in corsia A senza il passo 4.** Un'approvazione arrivata in chat, in un commento generico, a voce o «già data l'altra volta per un ramo simile» **non conta**. Conta solo un'accettazione registrata su quella richiesta di conferma. Se hai un dubbio su cosa valga come consenso, allora non ce l'hai — e se hai un dubbio su quale corsia tocchi, tratta la pull request come corsia A.
+- **Mai un consenso cumulativo.** Una conferma vale **una pull request**. Non esistono «unisci tutte quelle pronte», né deleghe permanenti — la corsia B copre già il caso dove il consenso singolo era solo un tappo, non serve derogare al resto.
+- **Mai durante `/vado`, in nessuna delle due corsie.** Se l'utente non è al PC non può dare il consenso in corsia A, e non c'è nessuno che possa accorgersi di un cancello superato per errore in corsia B: il ramo lo trova pronto al rientro, qualunque sia la corsia. Resta com'era scritto in `.claude/commands/vado.md`.
+- **Mai `--force`, mai riscrivere la storia, mai unire una pull request altrui senza che il suo compito sia chiuso.** Vale in entrambe le corsie.
 
 ### Se il consenso è negato
 
-Non si insiste e non si riformula la stessa richiesta sperando in un sì. Il motivo del rifiuto si scrive nel compito, il ramo resta aperto, e se serve una modifica si apre il lavoro corrispondente. Un rifiuto è una decisione, non un ostacolo da aggirare.
+Vale per la corsia A, l'unica dove il consenso esiste. Non si insiste e non si riformula la stessa richiesta sperando in un sì. Il motivo del rifiuto si scrive nel compito, il ramo resta aperto, e se serve una modifica si apre il lavoro corrispondente. Un rifiuto è una decisione, non un ostacolo da aggirare.
 
 ## Regola sui conflitti tra le due persone (IMPORTANTE)
 
