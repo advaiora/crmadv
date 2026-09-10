@@ -1447,13 +1447,13 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 99. `unblockDescriptor.owner` accetta solo l'agente stesso: un umano o un altro agente vanno nominati altrove, non nel descrittore
+## 100. Un divieto senza la sua procedura e' un divieto che blocca tutto, anche quando la barriera vera non esiste
 
-**Contesto:** un agente blocca un'issue e prova a impostare `unblockDescriptor.owner` puntandolo a un umano o a un altro agente (es. il CEO), per segnalare esplicitamente chi deve sbloccare.
+**Contesto:** all'inizio di settembre 2026 il progetto arriva a venti pull request aperte, quattordici delle quali verso `main`, ferme su una convinzione condivisa: gli agenti non potevano unire a `main` senza l'approvazione di Jacopo o Claudio, e nessuno sapeva come si chiedesse quell'approvazione in modo che contasse. Il 10/9/2026 CLAUDE.md sostituisce la vecchia regola con una vera procedura (sezione "L'unione a `main`", PR #40): la esegue il Capocantiere (il CEO se il ramo e' suo), il consenso lo da' una persona accettando una richiesta di conferma sul compito.
 
-**Errore:** l'API `PATCH /api/issues/{id}` rifiuta owner diversi da se stessi con `"Agents may only name themselves as an unblock owner"`. Se l'agente si ferma li' senza un fallback, il `PATCH` fallisce del tutto e `unblockDescriptor` resta `null` con `blockedBy: []` — uno stato indistinguibile da "nessuno mi blocca" (vedi nota #98 sul campo che alimenta il recupero automatico), e l'harness rimette il compito in `todo` perdendo il run senza che nessuno sappia chi doveva sbloccarlo.
+**Errore:** la regola precedente diceva solo "nessun merge su `main` senza approvazione", senza dire ne' come si chiede ne' chi la esegue. Davanti a un divieto fatto cosi', l'unica mossa sicura e' fermarsi — e infatti ci si e' fermati, per quattordici pull request. L'errore era doppio, perche' la barriera era creduta tecnica e non lo era affatto: il token ha `push`, `main` non ha branch protection, e un'unione via API era gia' stata fatta il 9/9/2026 (vedi nota #66). Non mancava la possibilita' di unire: mancava una procedura che dicesse come farlo restando dentro la regola.
 
 **Modo corretto:**
-- Impostare sempre `unblockDescriptor.owner = {agentId: <se stesso>}`, con `action` che descrive cosa controllare al risveglio (non chi altro deve agire: quel campo non lo accetta).
-- Nominare il vero sbloccante umano o altro agente in un commento leggibile sull'issue, e/o tramite un'interazione `ask_user_questions` / `request_confirmation` con `resolverPolicy: human_only` — mai tramite il descrittore, che accetta solo se stessi.
-- Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `unblockDescriptor` non sia `null` — se lo e', il `PATCH` con owner esterno e' fallito silenziosamente e va rifatto puntando a se stessi.
+- I sei passi e i quattro divieti della procedura stanno in CLAUDE.md, sezione "L'unione a `main`": pull request aperta, cancelli del compito chiusi, `mergeable_state` `clean`, richiesta di conferma con `request_confirmation` (numero e titolo della PR, ramo, file toccati, sha di testa, cancelli superati, effetto per chi usa il CRM), unione solo dopo l'accettazione e solo se la testa non si e' mossa, metodo `squash` verificato con `git fetch` (nota #66). Si legge li' e si segue: non si riscrive a memoria qui.
+- La lezione che vale oltre questo caso: **una regola che vieta qualcosa senza dire come si ottiene il permesso e' una regola che blocca**, non una regola che protegge. Quando se ne trova una, la si segnala a chi puo' scriverne la procedura, invece di aggirarla o di restarne paralizzati.
+- Prima di dedurre che una barriera sia tecnica (un token senza il permesso, una protezione sul ramo), verificarlo — vedi nota #66: spesso il token puo' gia' tutto quello che serve, ed e' solo il consenso a mancare.
