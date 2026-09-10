@@ -202,8 +202,12 @@ Nella notte fra il 9 e il 10/9/2026, durante la release di settembre, tredici co
 sono rimasti fermi otto ore senza che nessuno se ne accorgesse in tempo, e un compito `critical` su
 un segreto trapelato è rimasto senza assegnatario per quindici ore. Nessuna delle tre cause era una
 decisione sbagliata: erano tre punti in cui la regola in vigore diceva *"valuta"* invece di *"se X
-allora Y"*. Le quattro regole che seguono chiudono quei tre punti, in modo verificabile invece che
-lasciato al giudizio del momento. Valgono per **tutto il progetto**, da qui in avanti — non sono un
+allora Y"*. R1-R4 chiudono quei tre punti, in modo verificabile invece che lasciato al giudizio del
+momento. R5 e R6 nascono da un secondo episodio, lo stesso giorno: passando in rassegna la bacheca
+dopo l'incidente, Jacopo ha trovato compiti fermi per motivi mai verificati — un sospetto scambiato
+per un fatto, un vincolo letto su un documento invece che sul sistema. Sei regole, due episodi
+distinti, un solo principio comune: quello che comanda una decisione sulla bacheca dev'essere
+verificato, non presunto. Valgono per **tutto il progetto**, da qui in avanti — non sono un
 provvedimento per la sola release di settembre, anche se è la release ad averle fatte nascere.
 
 **R1 — Chi revisiona si ricava dal lavoro, non si sceglie.** La «regola mista» scritta qui sopra
@@ -269,12 +273,54 @@ revisione non è lenta, non è mai iniziata (nell'incidente: otto ore).
 assegnatario, a prescindere dalla priorità scritta sopra: è così che un compito `critical` su un
 segreto trapelato è rimasto fermo quindici ore, perché nessuno lo vedeva.
 
-**Le stesse quattro regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del
-capocantiere** (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e
+**R5 — Un sospetto non parcheggia un compito: apre una domanda (dal 10/9/2026).** Il 10/9/2026
+Jacopo ha trovato in `backlog` quattro compiti che non ci dovevano stare: tre il cui scopo era
+**già raggiunto** (le chiavi AI c'erano già, l'account Superadmin esisteva già, i dati erano già
+migrati) e uno parcheggiato perché **si sospettava** servisse un accesso a hPanel — accesso che
+Jacopo aveva. Nessuno dei quattro sarebbe riemerso da solo: in `backlog` un compito non risulta
+mai in ritardo, quindi nessuno lo controlla. **La regola, in una riga: se il motivo per cui si
+starebbe parcheggiando un compito è una cosa non verificata, non si parcheggia — si chiede.** Due
+obblighi che la rendono verificabile:
+1. **Ogni compito che entra in `backlog` porta in fondo alla descrizione la riga**
+   `**Uscita dal magazzino:** <cosa deve essere vero perché riparta> — <chi lo verifica>`. Senza
+   quella riga, il compito non entra in backlog: è quella riga che permette, mesi dopo, di capire
+   se lo scopo è già stato raggiunto per un'altra via.
+2. **Il parcheggio si fonda su un fatto verificato, mai su un sospetto.** Il motivo va scritto al
+   passato e con la prova («verificato il 10/9: `GOOGLE_CLIENT_ID` assente dal `.env` di
+   produzione»), non al condizionale.
+
+**R6 — Un vincolo d'ambiente si verifica oggi, non si eredita (dal 10/9/2026).** Nella stessa
+ricognizione della bacheca del 10/9/2026, tre compiti pronti sono rimasti in magazzino perché
+«l'albero di lavoro è uno solo e condiviso, metterne in coda più di tre-quattro li fa scontrare
+sugli stessi file». Quella frase descriveva una condizione reale al momento in cui fu scritta, ma è
+stata poi **ripetuta come motivo di parcheggio senza ricontrollarla** — trattandola come una
+proprietà permanente del sistema invece che come uno stato da verificare a ogni volta. **Un vincolo
+d'ambiente — l'albero di lavoro, i dev server, le porte, il database, i permessi della macchina —
+vale solo se è stato verificato *in quella sessione*, con la prova**: prima di parcheggiare
+qualcosa per contesa di risorse, si guarda com'è fatto il sistema adesso, non cosa diceva un
+documento. In pratica: nessun compito va in `backlog` per contesa di risorse. Se la contesa è
+reale (verificata, non presunta), il compito resta in coda con la **priorità** più bassa (che è il
+modo giusto di dire «prima quello, poi questo», R2), oppure si nomina il vincolo e si chiede la
+decisione a chi di dovere. Il magazzino non è il posto dove si mettono i lavori che aspettano una
+risorsa: è il posto dove si perdono. ⚠️ **Il caso concreto che ha fatto da innesco, e resta valido
+oggi:** i compiti hanno un campo che dovrebbe scegliere, per ogni singolo compito, se lavorare
+sull'albero condiviso o su uno isolato (`executionWorkspacePreference`) — cioè la scelta *non*
+dovrebbe più essere un destino fisso dell'intero progetto. Ma quel campo, scritto via API, **non si
+applica**: la richiesta risponde "riuscita" e il valore resta vuoto, cioè resta l'albero condiviso
+di default (verificato il 10/9/2026 su CRMA-56). È un'impostazione che si cambia **solo dalla
+dashboard di Paperclip**: finché non viene impostata da lì, il vincolo dell'albero condiviso **è
+ancora vero** — non si toglie da solo, e non si toglie ritentando la stessa scrittura via API. Chi
+lo trova ancora attivo non deve dedurne che sia falso: deve nominarlo e chiedere l'impostazione da
+dashboard, invece di parcheggiare il compito in silenzio.
+
+**R1-R6 vivono anche nelle istruzioni permanenti del CEO**; R1-R4 vivono inoltre nella conoscenza
+del capocantiere (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e
 `R05:REVIEWER_TRIGGERS` — **fuori da questo repository**, nel pacchetto azienda di Paperclip, non
-in una cartella clonabile da qui). Il repository è la copia che legge chi sviluppa: **se le tre
-dovessero divergere, vince il repository**, e le altre due si correggono di conseguenza. Una
-regola, tre lettori, mai tre varianti.
+in una cartella clonabile da qui; quelle sigle `R0x:` identificano voci di quella conoscenza e non
+corrispondono numero per numero alle `R1`-`R6` di questa sezione). Se R5 e R6 non sono ancora
+arrivate anche lì, vanno riportate nello stesso modo in cui lo furono R1-R4. Il repository è la
+copia che legge chi sviluppa: **se le copie dovessero divergere, vince il repository**, e le altre
+si correggono di conseguenza. Una regola, più lettori, mai varianti in contraddizione.
 
 ## Regole di scrittura degli handoff
 
