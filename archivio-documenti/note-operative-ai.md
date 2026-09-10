@@ -941,6 +941,7 @@ Due cose rendono la diagnosi piu' lenta di quanto dovrebbe:
 
 **Modo corretto:**
 - **Prima di concludere che il token e' sbagliato, controllare che ci sia:** `env | grep -E 'GH_TOKEN|GITHUB_TOKEN'`. Uscita vuota vuol dire **token assente**, che e' un problema diverso e si risolve altrove.
+- ⚠️ **Guardare QUALE delle due, non solo se ce n'e' una** *(aggiunto il 9/9/2026, CRMA-24)*: `env | grep -c` risponde `1` sia con l'una sia con l'altra, ed e' proprio il controllo che ha fatto credere a un run di avere `GITHUB_TOKEN` mentre aveva solo `GH_TOKEN`. La forma che risponde davvero e' `env | grep -oE '^(GH_TOKEN|GITHUB_TOKEN)='`. **Cambia da run a run** — misurato: il run di CRMA-24 aveva `GH_TOKEN` e non `GITHUB_TOKEN`, quello di CRMA-51 l'esatto contrario. Nei comandi si usa quindi la stessa forma del credential helper, `TOK="${GH_TOKEN:-$GITHUB_TOKEN}"`, mai il nome secco di una delle due → nota **#66**.
 - **Il segreto di solito esiste gia' a livello azienda**, e quello che manca e' solo il collegamento a questo agent. Si guardano nell'ordine: `GET /api/companies/$PAPERCLIP_COMPANY_ID/secrets/catalog` (qui elenca `GITHUB_TOKEN_CRMADV`) e `GET /api/agents/me/secrets` (qui tornava `[]`).
 - **La via per sbloccarsi e' una proposta, non un messaggio in chat:** `POST /api/agents/me/secret-proposals` con `{"kind":"binding","secretId":"<dal catalogo>","configPath":"env.GITHUB_TOKEN","justification":"..."}`. Resta `pending` finche' un umano approva.
 - **Intanto il lavoro non si perde: si committa lo stesso.** Un ramo locale sopravvive al run. ⚠️ Ma se si e' lavorato in un `git worktree` creato dentro `PAPERCLIP_RUN_SCRATCH_DIR`, quella cartella viene **cancellata da Paperclip alla fine del run**: prima di chiudere si fa `git worktree remove`, cosi' il riferimento del ramo resta nel `.git` condiviso e nessun worktree fantasma lo tiene occupato. Verifica: `git log --oneline -1 <ramo>` dal repository principale.
@@ -957,7 +958,12 @@ Il sintomo ingannevole e' proprio la coerenza apparente dei numeri: un commento,
 - **Lo stato di un compito non e' l'elenco dei suoi commenti.** Al risveglio si guardano **entrambi** gli elenchi, e quello delle interazioni per primo se il compito era bloccato su una decisione:
   `curl -s -H "Authorization: Bearer $PAPERCLIP_API_KEY" "$PB/api/issues/$PAPERCLIP_TASK_ID/interactions"` — leggendo `status`, `resolvedAt` e `response`.
 - **Il confronto che conta e' `resolvedAt` contro la fine del run precedente**, non l'autore del commento: qui `resolvedAt 2026-09-08T14:22:54Z` contro un run chiuso alle `14:19:11` diceva chiaramente che qualcosa era arrivato dopo.
-- **`reason: issue_commented` non e' affidabile per capire cosa e' cambiato:** riporta un motivo, non l'autore ne' l'oggetto. Non usarlo per decidere dove guardare — guarda gli oggetti.
+- **`reason: issue_commented` non e' affidabile per capire cosa e' cambiato:** riporta un motivo, non l'autore ne' l'oggetto. Non usarlo per decidere dove guardare — guarda gli oggetti. ⚠️ **Un `issue_commented` che non corrisponde a nessun commento nuovo e' un indizio forte**: quasi sempre il risveglio viene da un'**interazione risolta**.
+
+**Il seguito, perche' la stessa nota e' stata applicata a meta'** *(aggiunto il 9/9/2026, CRMA-24)*. Un run sapeva che le conferme non compaiono nel thread — questa nota — e ha comunque cercato **solo fra i commenti**: il commento piu' recente era il proprio, quindi «nessuno ha ancora risposto», e ha aperto una **seconda** conferma che chiedeva la stessa identica cosa. Un heartbeat intero speso ad aspettare un permesso **gia' concesso 21 minuti prima**. Le due cose da aggiungere al modo corretto qui sopra:
+
+- **Prima dei commenti, non insieme ai commenti.** Su un compito che ha una conferma in sospeso, `GET /api/issues/{id}/interactions` si legge **per primo**, guardando `status`, `resolvedByUserId` e `resolvedAt`.
+- **Il testo che e' stato accettato E' il mandato.** Se la conferma diceva «se accetti, lo faccio io», allora tocca a te: riproporre la domanda non e' prudenza, e' un giro a vuoto. ⚠️ Unica eccezione nota, ed e' un'altra cosa: una conferma che riguarda un **segreto** non collega niente → nota **#65**.
 
 ## 65. Una richiesta di conferma ACCETTATA non approva la proposta di segreto: sono due oggetti diversi, e il blocco resta
 
@@ -986,10 +992,11 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 
 **Contesto:** 9/9/2026, compito CRMA-22. Da un run Paperclip, chiudere il giro su `advaiora/crmadv`: guardare lo stato di una pull request e unirla a `main` dopo l'approvazione arrivata nel thread.
 
-**Errore:** partire da `gh pr view` / `gh pr merge`, che e' il gesto naturale. Risposta: `/bin/bash: line 1: gh: command not found` (`command -v gh` vuoto, niente in `/usr/bin` ne' in `/usr/local/bin`). E' la stessa famiglia della nota #61 su `python3`: su questa macchina ci sono `git`, `node` e `curl`, non gli strumenti da postazione di lavoro. Il tempo si perde due volte se, non trovando `gh`, si conclude che la pull request va aperta o unita a mano dall'interfaccia web e si chiude il compito chiedendo a un umano di premere il pulsante: **il token che serve e' lo stesso del push** (`$GITHUB_TOKEN`, vedi nota #63) e basta e avanza.
+**Errore:** partire da `gh pr view` / `gh pr merge`, che e' il gesto naturale. Risposta: `/bin/bash: line 1: gh: command not found` (`command -v gh` vuoto, niente in `/usr/bin` ne' in `/usr/local/bin`). E' la stessa famiglia della nota #61 su `python3`: su questa macchina ci sono `git`, `node` e `curl`, non gli strumenti da postazione di lavoro. Il tempo si perde due volte se, non trovando `gh`, si conclude che la pull request va aperta o unita a mano dall'interfaccia web e si chiude il compito chiedendo a un umano di premere il pulsante: **il token che serve e' lo stesso del push** (vedi nota #63 — attenzione al nome della variabile, il punto qui sotto) e basta e avanza.
 
 **Modo corretto:**
-- **Tutto il ciclo passa dall'API REST**, con `Authorization: Bearer $GITHUB_TOKEN` e `Accept: application/vnd.github+json` su `https://api.github.com/repos/advaiora/crmadv`:
+- ⚠️ **Il nome della variabile non e' garantito** *(correzione del 9/9/2026, CRMA-24: prima questa nota diceva secco `$GITHUB_TOKEN`, e cosi' com'era mandava fuori strada)*. In alcuni run e' impostata `GH_TOKEN`, in altri `GITHUB_TOKEN`, mai per forza quella che ti aspetti. Con il nome sbagliato `curl` manda un `Bearer ` **vuoto** e GitHub risponde `Bad credentials` — messaggio che manda a cercare un token scaduto, pista vuota e per giunta smentita dal `git push` andato a buon fine trenta secondi prima (il push non se ne accorge perche' passa dal credential helper, che le prova entrambe). Si parte sempre da `TOK="${GH_TOKEN:-$GITHUB_TOKEN}"` e si usa `Bearer $TOK`. Come si verifica quale c'e': nota **#63**.
+- **Tutto il ciclo passa dall'API REST**, con `Authorization: Bearer $TOK` e `Accept: application/vnd.github+json` su `https://api.github.com/repos/advaiora/crmadv`:
   - aprire: `POST .../pulls` con `{"title":...,"head":"<ramo>","base":"main","body":...}`
   - leggere: `GET .../pulls/<n>` — i campi che decidono sono `mergeable` e `mergeable_state` (`"clean"` = si puo' unire)
   - unire: `PUT .../pulls/<n>/merge` con `{"merge_method":"squash","commit_title":"...","commit_message":"..."}`
@@ -1042,6 +1049,261 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 
 **Da non confondere con i rossi VERI di questo contenitore, che restano rossi anche facendo tutto giusto:** manca il file `.env` (escluso dal repository), quindi `test:integration` cade 9 volte su 12 con `ENOENT ... /.env` e tre prove di `team-invite` cadono con *«public base URL is not configured»*. Quelle non si aggiustano da qui: il `.env` lo mette Jacopo o Claudio sulla macchina.
 
+## 70. «Il Revisore» non basta: gli stessi ruoli esistono in due squadre, e dal 9/9/2026 quelli di repository finiscono in `-repo`
+
+**Contesto:** 9/9/2026, CRMA-23. Nei commenti sull'unione dei nove rami della release avevo scritto piu' volte «il Revisore ha esaminato...». Jacopo e' andato a controllare in dashboard la scheda dell'agente Revisore di Paperclip, l'ha trovata a **zero attivita'**, e ha ragionevolmente concluso che le revisioni dichiarate non fossero mai avvenute.
+
+**Errore:** i tre ruoli esploratore, revisore e architetto esistono **in due sistemi diversi con lo stesso nome** — i subagent di repository (`.claude/agents/`, imposti da `CLAUDE.md`) e le schede agente di Paperclip. Le revisioni c'erano state davvero, ma con i subagent di repository, che **girano dentro la sessione e non compaiono mai in dashboard**. Scrivendo «il Revisore» senza specificare quale, avevo prodotto una dichiarazione che l'unica verifica disponibile all'utente smentiva. Il danno non e' formale: mette l'utente nella posizione di dover scegliere se credermi.
+
+**Modo corretto:**
+- **I nomi adesso distinguono da soli, e questo viene prima di ogni regola di stile.** Su richiesta di Jacopo, lo stesso 9/9/2026, i subagent di repository sono stati rinominati **`esploratore-repo`, `revisore-repo`, `architetto-repo`** (a schermo: Esploratore Repo, Revisore Repo, Architetto Repo); le schede agente di Paperclip restano **senza suffisso** — «agente Revisore di Paperclip», «agente Esploratore», Guardiano, Capo del personale. La prima risposta era stata la sola regola di stile «di' sempre quale dei due»: e' diventata una differenza nei nomi perche' un nome e' piu' difficile da dimenticare di una buona intenzione.
+- **«Il Revisore» e basta non e' piu' una citazione valida.** In un documento scritto prima del 9/9/2026 e' quasi sempre il subagent di repository, ma va verificato, non dato per scontato.
+- **La prova che un subagent di repository ha lavorato sta nei registri di sessione della VPS**, non in dashboard. Due posti, e servono entrambi:
+  - **quante volte e' stato chiamato**, dal transcript della sessione madre:
+    `grep -rhoo '"subagent_type":"[a-z-]*"' ~/.claude/projects/<slug>/ | sort | uniq -c`
+  - **cosa gli era stato chiesto**, dal file di fianco al registro del subagent: `~/.claude/projects/<slug>/<sessione>/subagents/agent-*.meta.json` contiene `agentType` e `description` gia' pronti da citare. Per CRMA-23 quel file dice `{"agentType":"revisore","description":"Revisione unione nove rami"}` — una riga che chiude la discussione, mentre il conteggio da solo non dice di che lavoro si trattasse.
+- ⚠️ **Il conteggio va fatto ricorsivo** (`grep -r`), **e la classe di caratteri deve comprendere il trattino** (`[a-z-]`, altrimenti dal 9/9/2026 il suffisso `-repo` taglia fuori proprio i nomi che si stanno cercando): la cartella dello slug ha il layout a cartelle-per-sessione descritto nella **nota #36**, e fermarsi ai `.jsonl` di primo livello e' esattamente l'errore che li' aveva falsato la quota subagent a 0.
+- **Quando l'utente contesta l'attivita' di un agente, non rispondere a memoria**: quei file sono verificabili in dieci secondi e la risposta cambia natura.
+- **Quale dei due si usa e quando** — revisione dentro la sessione contro compito Paperclip — sta in `CLAUDE.md`, sezione *«Team di agent»*, nella tabella della regola mista.
+- **Il principio generale**, che vale oltre questo caso: quando dichiaro un lavoro fatto da qualcun altro, devo chiedermi *dove andrebbe a controllare l'utente* — e se la' non si vede niente, dirlo io per primo invece di lasciarglielo scoprire.
+
+## 71. Due rami che aggiungono una nota numerata danno un conflitto git, e la risoluzione ovvia («tengo tutte e due») e' quella sbagliata
+
+**Contesto:** 9/9/2026, CRMA-41. Tre pull request di soli documenti aperte insieme. Due di esse — PR #19 (`cronista/crma-36-nota-70-due-revisori`) e PR #20 (`ceo/crma-23-rinomina-agenti-repo`) — aggiungevano ognuna una nota **numerata #70** in coda a questo file: due note **diverse**, non due copie, che raccontavano lo stesso episodio del 9/9 ma prescrivevano cose diverse su come si chiamano gli agent.
+
+**Errore:** trattarlo come un normale conflitto di testo. Git il guasto lo segnala, perche' le due aggiunte cadevano nello stesso punto — misurato: `git merge-tree --write-tree 1db9e23 674668d` → *CONFLICT (content) in archivio-documenti/note-operative-ai.md*. Ma **la risoluzione naturale di un conflitto fatto di due aggiunte e' «le tengo tutte e due»**, e li' produce un documento con due capitoli 70 che si contraddicono. E il segnale non e' garantito: se le due aggiunte fossero cadute in **punti diversi** del file — basta che una delle due non sia in coda — git le avrebbe unite **in silenzio**, perche' confronta righe, non numeri.
+
+**Modo corretto:**
+- Davanti a un conflitto su un file a voci numerate, la domanda non e' *quale delle due tengo* ma **se sono una lezione o due**: uno stesso episodio con uno stesso errore e' **una nota sola**, anche quando due rami l'hanno scritta due volte in parallelo; due lezioni davvero distinte diventano #N e #N+1, e la seconda **rimanda alla prima invece di ripeterne il contesto**.
+- **Il numero libero si legge sul ramo di destinazione, non sul proprio** — `git show origin/main:archivio-documenti/note-operative-ai.md | grep -n '^## [0-9]' | tail -3` — ed e' il **piu' alto piu' uno**, non il conteggio delle note (il file non e' in ordine numerico). ⚠️ Questo non basta a evitare la collisione: due rami partiti dallo stesso `main` leggono lo stesso "piu' alto" e scelgono lo stesso numero. Con piu' di una pull request di documenti aperta, **il numero va verificato anche contro gli altri rami aperti**: `git log --oneline origin/main..origin/<altro-ramo> -- archivio-documenti/note-operative-ai.md`.
+  ⚠️ **Correzione del 9/9/2026 (CRMA-54 e CRMA-57): «gli altri rami aperti» vuol dire TUTTI i rami, remoti E locali — non solo quelli con una pull request.** Questa riga diceva «con piu' di una pull request di documenti aperta», e quel giorno le due letture comode hanno sbagliato tutte e due, per motivi diversi:
+  - **Le pull request non bastano** (CRMA-54): la catena era `main` → PR #19 (`cronista/crma-36-…`, note #70-#72) → `cronista/crma-51-…` (note #73-#79), e **il secondo ramo non aveva ancora nessuna PR**. Chi si fosse fermato alle PR avrebbe letto «72» e scelto #73, che era gia' preso.
+  - **Nemmeno `origin/*` basta** (CRMA-57): su Paperclip gli agent condividono **un solo albero di lavoro**, e i rami degli altri restano **locali** finche' qualcuno non li pubblica. Nello stesso giro il piu' alto risultava **#69** su `origin/main` e **#73** sui rami remoti, mentre il ramo **locale** `cronista/crma-51` era gia' arrivato alla **#79** — pubblicato solo qualche minuto dopo. Due letture, due numeri, **entrambi gia' presi**.
+
+  Il comando che non sbaglia guarda **`git branch -a`**, non `-r`, e costa un secondo:
+  ```
+  git fetch origin
+  for b in $(git branch -a --format='%(refname:short)' | grep -v HEAD); do
+    git show "$b:archivio-documenti/note-operative-ai.md" 2>/dev/null \
+      | grep -oE '^## [0-9]+\.' | grep -oE '[0-9]+' | sort -n | tail -1 \
+      | sed "s|^|$b |"
+  done | sort -k2 -rn | head -5
+  ```
+  ⚠️ **E il risultato scade.** Vale nell'istante in cui lo esegui, non per tutto il compito: va rifatto **come ultimo gesto prima di consegnare**, ed e' la nota **#82**. Infine, quando la nota nuova va in coda a un ramo che ne ha gia' aggiunte, **si parte da quel ramo invece che da `main`**: il conflitto non nasce proprio, e il CEO unisce una catena sola.
+- **Prima di unire, la prova costa un comando e non tocca l'albero di lavoro:** `git merge-tree --write-tree <ramo-a> <ramo-b>` restituisce l'albero del risultato, e `git show <albero>:archivio-documenti/note-operative-ai.md | grep -c '^## 70\.'` dice se i capitoli 70 sono uno o due. Funziona anche a catena, incapsulando il risultato in un commit di prova con `git commit-tree`: cosi' si verifica l'unione **in sequenza** di tre rami senza fare un solo `checkout`. E' l'unico modo praticabile quando l'albero di lavoro e' occupato da un altro compito, come succede di continuo su Paperclip, dove tutti gli agent condividono la stessa cartella.
+- **La correzione si fa sui rami, prima dell'unione.** Dopo, i due capitoli 70 sono su `main` e ogni citazione «nota #70» resta ambigua per sempre: un numero e' un'identita', non una posizione, e non si rinumera.
+- **Com'e' finita, per chi cerca il precedente:** le due #70 erano un episodio solo con un errore solo, quindi sono diventate **una nota sola** — la **#70** qui sopra, che tiene il caso e la conseguenza sui nomi; il ramo della PR #20 e' stato alleggerito della sua copia. Questa #71 e' nata dopo, ed e' un'altra lezione: non i due sistemi con lo stesso nome, ma il meccanismo che fa collidere due numeri.
+
+## 72. Tre rami di documenti puliti uno per uno non sono puliti in sequenza: la prova va fatta a catena
+
+**Contesto:** 9/9/2026, CRMA-41. Tre pull request di soli documenti aperte insieme, che toccano gli stessi due file (`CLAUDE.md` e `archivio-documenti/team-agenti.md`): PR #19 (le note #70 e #71), PR #20 (la rinomina dei subagent in `-repo`) e PR #21 (la regola mista estesa a tutta la squadra). Prima di mandarle al cancello, verifica che si unissero pulite.
+
+**Errore:** provarle **una alla volta contro `origin/main`**. Tutte e tre risultavano pulite, e il comando usciva `0` per tutte e tre: `git merge-tree --write-tree origin/main <ramo>`. Il risultato tranquillizza ed **e' falso** — la prova a una alla volta confronta ogni ramo con `main`, e **non confronta mai i rami fra loro**. Rifatta a catena, l'unione va in conflitto in **tutti e sei gli ordini possibili**: `CONFLICT (content) in CLAUDE.md` e `in archivio-documenti/team-agenti.md`, sempre fra PR #20 e PR #21, mai per colpa di PR #19. Cambia solo *dove* si rompe — al **passo 2** nei due ordini in cui #20 e #21 sono consecutive, al **passo 3** negli altri quattro — e questo e' proprio il motivo per cui vanno provati tutti: fermarsi al primo ordine che si prova fa sembrare il guasto legato all'ordine, quando non lo e'.
+
+Il conflitto non e' semantico ma **di adiacenza**, ed e' questa la parte che inganna: PR #21 **inserisce una sezione nuova** subito prima del paragrafo «Mappa del progetto», e PR #20 **riscrive quel paragrafo** (`esploratore`/`revisore` diventano `Esploratore Repo`/`Revisore Repo`). Le due modifiche non si contraddicono per niente, ma cadono attaccate, e git le vede come la stessa regione. ⚠️ La risoluzione naturale — «tengo tutte e due» — lascia il paragrafo «Mappa del progetto» **due volte**, una col nome vecchio e una col nome nuovo.
+
+**Modo corretto:**
+- **Con piu' di una pull request di documenti aperta, la prova si fa a catena, non una alla volta.** Non tocca l'albero di lavoro, quindi si puo' fare anche mentre un altro compito lo occupa:
+  ```
+  cur=$(git rev-parse origin/main)
+  for b in origin/<ramo-a> origin/<ramo-b> origin/<ramo-c>; do
+    out=$(git merge-tree --write-tree "$cur" "$b") \
+      || { echo "CONFLITTO su $b"; echo "$out" | grep CONFLICT; break; }
+    cur=$(git commit-tree $(echo "$out" | head -1) -p "$cur" -p "$(git rev-parse $b)" -m prova)
+  done
+  ```
+  I commit di prova restano penzolanti e spariscono da soli: non creano rami e non sporcano niente.
+- **Vanno provati tutti gli ordini**, non uno solo: e' l'unico modo per distinguere «queste due PR si toccano comunque» da «si toccano solo se le unisco in quest'ordine». Sei prove per tre rami costano un secondo.
+- **In un conflitto di adiacenza si tiene la sezione nuova di un ramo *e* la riscrittura del paragrafo dell'altro** — mai le due copie del paragrafo. La verifica che chiude: `git show <albero>:CLAUDE.md | grep -c '^\*\*Mappa del progetto'` deve dire `1`.
+- **Quando si sa che un altro ramo aperto sta riscrivendo un paragrafo, la sezione nuova si inserisce lontano da li'** — un paragrafo piu' su o piu' giu' basta a non generare il conflitto.
+- Per la tecnica `merge-tree`/`commit-tree` applicata alle **voci numerate** (due rami che scelgono lo stesso numero) vedi la **nota #71**: qui il guasto e' un altro, la posizione e non il numero.
+
+## 73. Un paragrafo che «fa il conto» va riletto contando davvero, quando la lista sotto cambia
+
+**Contesto:** 9/9/2026, PR #21 (`ceo/crma-23-regola-mista-tutto-il-team`), tabella della regola mista in `CLAUDE.md`. Due commit di fila: il primo (`0d07889`) scrive una tabella di **8 righe**; il secondo (`4e96c1c`) aggiunge la riga mancante «Scrittura del codice» **in seconda posizione** e, nello stesso commit, scrive il paragrafo che dimostra la copertura — *«Il conto delle tredici schede, cosi' nessuno resta scoperto»*.
+
+**Errore:** il conto e' stato scritto contando **come se la riga nuova fosse stata aggiunta in fondo**. Ne sono usciti tre numeri sbagliati in una frase sola — *«nove righe coprono nove mestieri, l'**ottava** ne copre due, la **decima** scheda e' il CEO»*, mentre le nove righe coprono **dieci** mestieri, quella doppia e' la **seconda** e il CEO e' l'**undicesima** — e una somma che faceva **12** sotto un titolo che ne dichiarava **13**. Il paragrafo esisteva per un solo scopo, dimostrare che nessun mestiere resta scoperto, e nel dimostrarlo si smentiva. Nessun controllo automatico puo' accorgersene: e' prosa, non codice. L'ha trovato la revisione (CRMA-43), corretto in `7c8d081`.
+
+**Modo corretto:**
+- Quando un commit **inserisce** un elemento in una lista che un testo vicino conta o indicizza per posizione («la terza riga», «le ultime due», «la decima»), rileggere quel testo **contando gli elementi uno per uno sul file finale** — non sul ricordo di com'era la lista prima.
+- **I due segnali che obbligano al ricontrollo**, entrambi visibili nel proprio diff: l'inserimento **non e' in coda**, e nel testo attorno compaiono **numeri ordinali** o un totale. Con tutti e due presenti il ricontrollo non e' facoltativo.
+- **Se il paragrafo dichiara un totale, farlo tornare a mano prima di committare** (qui: 10 mestieri + 1 CEO + 2 agenti in pausa = 13). E' l'unico modo in cui quel tipo di frase puo' essere verificata, e costa dieci secondi contro un rilievo bloccante in revisione.
+- Vale per ogni documento del progetto che tiene un conto dichiarato, non solo per questa tabella: `CLAUDE.md` ne ha piu' d'uno («i cinque ruoli di sistema», «i tre destini possibili di un file fuori norma»).
+
+## 74. Censire «le N cose di tipo X» in un repository: la catena degli import si calcola, non si legge a occhio
+
+**Contesto:** 9/9/2026, CRMA-42. Censire i cinque innesti AI dentro `server/**` — cioe' tutti i file che arrivano al motore AI anche per catena di import indiretta — partendo da un elenco gia' scritto in un documento del 19/8.
+
+**Errore:** ricostruire la catena **a occhio**, leggendo le righe `import` a mano e ragionando su quali file «probabilmente» arrivino al motore. Costa molti giri di `grep`, produce una lista **incompleta**, e soprattutto non e' ricalcolabile domani: fra un mese e' di nuovo un documento invecchiato, che e' esattamente quello che la nota **#56** dice di non produrre. Nel caso concreto avrebbe mancato `server/app.ts:38` — e il difetto era nello strumento improvvisato, non nel repository: il primo script leggeva gli import solo fra **apici singoli**, e quella riga usa le **virgolette doppie**. Un file «non trovato» che invece c'era, e nessun errore da nessuna parte.
+
+**Modo corretto:**
+- Calcolare la **chiusura transitiva del grafo degli import, in tutti e due i versi** (chi importa X, e cosa importa X) con venti righe di `node -e`. Su `server/**` costa meno di un secondo e da' numeri piccoli e verificabili — qui **13** e **29**.
+- ⚠️ Nel regexp degli import **accettare entrambi gli apici** (`['"]`) e risolvere le estensioni `.js` → `.ts`: sono i due punti in cui uno script fatto in fretta perde file in silenzio, senza sbagliare — semplicemente non li trova.
+- La differenza che conta non e' la velocita': e' che una lista **calcolata** si rifa' quando il codice cambia, mentre una lista **letta** invecchia dal giorno dopo. Se il censimento serve piu' di una volta, si scrive lo script.
+
+## 75. I numeri di `costs/*` di Paperclip non sono una spesa: si guarda `billingType` e `model` prima di citarli
+
+**Contesto:** 9/9/2026, CRMA-40. Misurare quanto e' costato ogni mestiere leggendo `GET /api/companies/{id}/costs/by-agent` e `/costs/by-agent-model`.
+
+**Errore (visto prima di scriverlo nel referto):** `costCents` vale **0 per ogni agente**, e `costs/summary` riporta `spendCents: 0`. Preso alla lettera il referto avrebbe detto «la squadra e' costata zero» — falso. Gli agent girano su abbonamento (`billingType: "subscription_included"` sul 100% delle righe): consumano la finestra del piano, che Paperclip **non converte in euro**. Stessa trappola sul modello: `costs/by-agent-model` torna `model: "unknown"` su tutte le righe, quindi la ripartizione fra Opus e Fable **non esiste**, non e' solo difficile. E un terzo inganno nello stesso endpoint: il costo si registra **a run concluso**, percio' gli agent con run falliti in avvio o ancora in corso **non compaiono affatto** — e «non compare in tabella» somiglia moltissimo a «ha consumato zero». Il 9/9 erano 23 run su 103 senza consumo attribuito, e tre mestieri interi assenti dalla tabella pur avendo risvegli.
+
+**Modo corretto:**
+- Prima di citare un numero di `costs/*`, guardare `billingType`. Se e' `subscription_included`, **l'unica valuta comparabile sono i token** (`outputTokens`, `inputTokens`, `cachedInputTokens`): si scrive «token», non «costo», e non si traduce in euro.
+- Se `model` e' `unknown`, la ripartizione per modello si dichiara **non ricavabile**, invece di stimarla.
+- Incrociare sempre `costs/by-agent` con `heartbeat-runs`: le righe mancanti in `costs` sono agent con run non conclusi, **non** agent inattivi.
+- **Corollario su `npm run consumi`:** eseguito dentro il contenitore Paperclip legge `~/.claude/projects` **del contenitore**, cioe' i soli run Paperclip di questa macchina — non lo storico della postazione Windows. Il 9/9 diceva «4 chiamate in tutto» mentre il registro compiti ne contava 66. Lo storico vero sta in `archivio-documenti/consumi/registro-compiti.md`, e il perimetro va dichiarato ogni volta che si cita il monitor (stesso errore di perimetro della nota **#38**).
+- Vale la regola generale della **#39**: prima di fidarsi di un numero si guarda **com'e' fatta la riga**, non solo cosa contiene. Qui nessun endpoint dava errore — davano numeri plausibili che volevano dire un'altra cosa.
+
+## 76. I test del backend NON girano con Vitest: `npx vitest run server/...` da' un rosso finto che sembra un file di test mancante
+
+**Contesto:** 9/9/2026, CRMA-24. Verificare un test appena scritto sotto `server/`, con in testa che «nel progetto i test si lanciano con vitest» — vero, ma **solo per il frontend**.
+
+**Errore:** lanciato `npx vitest run server/modules/clients/repository.test.ts`. Risposta: `No test files found, exiting with code 1`. Sembra che il file non esista o sia scritto male, e si va a cercare il difetto in un file che sta benissimo. In realta' l'`include` di Vitest e' `src/**/*.{test,spec}.{js,jsx,ts,tsx}` (`vite.config.js:68`): **`server/` e' fuori perimetro per costruzione**, e un percorso fuori dall'`include` non produce un errore, produce «nessun file».
+
+**Modo corretto:**
+- La regola mnemonica e' **`src/` → Vitest, `server/` → `node --test`**. Il backend ha un runner suo.
+- Un file solo: `node --test --import tsx "server/modules/clients/repository.test.ts"`. Tutto: `npm run test:unit`, oppure `npm run test:backend` che aggiunge script e smoke (`package.json`).
+- ⚠️ In questo contenitore va anteposto `NODE_ENV=test`, altrimenti si ricade nei rossi finti della nota **#69**.
+- Come si distingue il guasto: quando il rosso e' **`No test files found`** non e' la nota #69 (rossi finti da `NODE_ENV`) ne' la **#51** (la suite lenta in contesa) — e' il **runner sbagliato**, e si riconosce dal fatto che il conteggio dei test e' zero invece che rosso.
+
+## 77. Su un ramo che aspetta di essere unito, prima di dichiararlo finito si guarda se sono cambiate le REGOLE, non solo se il codice va ancora in merge
+
+**Contesto:** 9/9/2026, CRMA-24. Lavoro di schema consegnato e pull request aperta; mentre il ramo aspettava, su `main` e' arrivata una regola nuova — quale revisore deve passare su schema e migrazioni (commit `1198512`, `CLAUDE.md`).
+
+**Errore:** dare per finito un lavoro gia' consegnato e limitarsi a rispondere al commento che ti sveglia. La consegna era corretta **secondo le regole del momento in cui e' stata fatta**, ma per un ramo aperto il momento che conta e' **l'unione**, non la consegna. Senza guardare cosa si era mosso su `main`, il lavoro di schema si sarebbe chiuso **saltando un cancello di revisione diventato obbligatorio nel frattempo** — senza accorgersene e senza che niente desse errore.
+
+**Modo corretto:**
+- Prima di dichiarare finito un ramo in attesa: `git diff $(git merge-base origin/main HEAD) origin/main -- CLAUDE.md`. Costa un comando.
+- ⚠️ **Il caso che sembra piu' innocuo e' proprio quello da guardare.** Un `main` che si e' mosso **solo su `CLAUDE.md`** non da' conflitti e non tocca un solo file di codice: `git merge-tree` dice «pulito» ed e' vero. Ma e' l'unico caso in cui il cambiamento riguarda **come si lavora** — cioe' esattamente la cosa che il diff del codice non puo' mostrare.
+- Si applica anche ai documenti che spostano un cancello o un mestiere: `archivio-documenti/team-agenti.md` insieme a `CLAUDE.md`.
+
+## 78. Un comando da cinque minuti non si incanala in `tail`: si salva l'uscita intera su file, e poi si filtra
+
+**Contesto:** 9/9/2026, revisione di CRMA-24. Serviva sapere se `npx tsc --noEmit` segnalasse errori **nei file del commit**, distinguendoli dalla baseline del progetto.
+
+**Errore:** lanciato `npx tsc --noEmit 2>&1 | tail -30`. Sono tornate le ultime 30 righe: abbastanza per vedere *che* ci sono errori, inutili per contarli e per sapere in quali file stanno. Il resto lo aveva **gia' buttato via `tail`**, quindi e' servita **una seconda esecuzione da cinque minuti** per riavere cio' che la prima aveva prodotto e scartato. Effetto secondario che inganna due volte: `| tail` **maschera il codice di uscita** del comando a monte — l'esito riportato era `exit 0` con 233 errori sotto.
+
+**Modo corretto:**
+- Quando il comando costa minuti, **si redirige l'uscita intera su file** — `npx tsc --noEmit > "$PAPERCLIP_RUN_SCRATCH_DIR/tsc-full.txt" 2>&1` — e si filtra il file quante volte serve: conteggio, elenco dei file, ricerca mirata, senza rilanciare niente. **Il filtro si sceglie dopo aver visto i dati, non prima.**
+- Vale per `tsc --noEmit` (che la nota **#52** dice gia' di non lanciare due volte nello stesso comando), per le suite di test e per ogni build.
+- Se il codice di uscita serve, leggerlo **prima** della pipe (`${PIPESTATUS[0]}`) o non incanalare affatto: con `| tail` il codice che arriva e' quello di `tail`, cioe' sempre `0`.
+
+## 79. Verificare una migrazione contro lo schema SENZA database: `migrate diff` fra due schemi, non fra schema e datasource
+
+**Contesto:** 9/9/2026, CRMA-35. Revisionare una migrazione dentro il contenitore degli agent Paperclip, dove `DATABASE_URL` non esiste (`npx prisma migrate status` → `P1012, Environment variable not found`).
+
+**Errore:** dare per scontato che, senza database, il controllo *«ogni campo dello schema e' nel `.sql`, e ogni istruzione del `.sql` e' nello schema»* si possa fare solo **leggendo i due file e confrontandoli a occhio**. Su cinque colonne funziona; su una migrazione vera con rinomine, indici e default e' il punto in cui la revisione smette di essere una prova e diventa un'impressione. La nota **#16** copre come *generare* una migrazione, e la sua ricetta usa `--from-schema-datasource`, che **il database ce l'ha come premessa**: a chi deve solo verificare non serve.
+
+**Modo corretto:** `prisma migrate diff` sa lavorare fra **due schemi** senza toccare nessun database, e le due versioni dello schema si tirano fuori da git:
+
+```
+git show origin/main:prisma/schema.prisma   > vecchio.prisma
+git show origin/<ramo>:prisma/schema.prisma > nuovo.prisma
+npx prisma migrate diff --from-schema-datamodel vecchio.prisma \
+                        --to-schema-datamodel nuovo.prisma --script
+```
+
+- Si confronta l'uscita con il `migration.sql` committato **togliendo i commenti** (`grep -v '^--'`) e **ordinando le righe**: l'ordine dei blocchi `AlterTable` fra tabelle indipendenti non conta. Identici = migrazione fedele allo schema, provata in **tutte e due** le direzioni con un comando solo. Diversi = il posto esatto dove guardare.
+- ⚠️ `--from-schema-datamodel` (i due schemi) **non e'** `--from-schema-datasource` (schema contro database vero, quello della #16): si somigliano e fanno cose diverse.
+- ⚠️ Questo confronto **non** prova che la migrazione si applichi davvero su un database esistente: quello resta da fare dove un database c'e' (note **#15** e **#16**).
+
+## 80. Correggendo un rilievo di «prova falsa» la prova nuova si arrotonda verso l'alto: si copia dalla fonte, non si riformula a memoria
+
+**Contesto:** 9/9/2026, CRMA-48 / CRMA-50 (ricontrollo della PR #21). Una revisione aveva bocciato una clausola di `CLAUDE.md` perche' motivata con un fatto falso; la correzione doveva sostituire la motivazione sbagliata con quella vera, documentata da una nota operativa.
+
+**Errore:** riscrivendo, la prova e' stata **arrotondata verso l'alto**. «Una sessione del 7/8 ha chiuso l'handoff con *verifica a schermo non fatta*» e' diventato «il 7 e l'8/8 hanno chiuso **due** handoff». Il secondo handoff non esiste: l'8/8 quella sessione il muro l'aveva **aggirato**, verificando il dato a database (nota **#50**). Nessuno se ne accorge leggendo, perche' la frase gonfiata e' piu' convincente di quella vera; se ne accorge solo chi va a cercare i file. **E' l'errore piu' insidioso proprio nelle correzioni**, perche' li' la fretta e' di far sparire il rilievo, e una prova al plurale sembra chiuderlo meglio di una al singolare.
+
+**Modo corretto:**
+- Quando si corregge un rilievo di *prova falsa*, la frase nuova si scrive **copiando dalla fonte**, non riformulandola a memoria: e' la memoria di com'era il fatto, non il fatto, a produrre il plurale.
+- Ogni numero che compare — quanti handoff, quante sessioni, quante volte — si **conta con un comando prima di scriverlo**. Qui bastano due comandi, e in due secondi dicono che il caso e' uno solo:
+
+```
+git log --all -i -S "verifica a schermo non fatta"
+git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti/handoff/ | sort -u
+```
+
+- ⚠️ **`-S` distingue maiuscole e minuscole**: senza `-i` la ricerca in minuscolo **non trova** l'handoff, perche' la riga comincia con `**Verifica a schermo non fatta:**` — e un «nessun risultato» viene letto come «non c'e'», che e' l'errore opposto e altrettanto falso.
+- ⚠️ **I commit che tornano non sono i casi**: quel primo comando ne restituisce **quattro**, e contarli rida' un numero gonfiato. Si aggiunge `--name-only` e si guarda **il file**: due commit sono l'aggiunta (`24105a7`) e la cancellazione (`a9e8626`, la cartella tiene solo le ultime 3 versioni) dello **stesso** handoff; gli altri due sono la clausola di `CLAUDE.md` sotto revisione e la nota #50 che cita la frase. L'handoff e' **uno solo** — `archivio-documenti/handoff/handoff-2026-08-07-1730.md:58`.
+- Il secondo comando elenca gli handoff **mai esistiti**, cancellati compresi: 61 file, 12 nella prima decade di agosto, **nessuno datato 08-08**. E' la prova che regge il negativo, e nessun `grep` sull'albero di lavoro puo' darla, perche' li' gli handoff vecchi non ci sono piu'.
+- **Se il conto esatto non riesce, si scrive al singolare il caso che si e' verificato** e si lascia perdere il plurale: una prova piccola e vera regge, una grande e gonfiata fa ripartire il giro di revisione che si stava chiudendo.
+- Parente stretta della **#73** (un paragrafo che «fa il conto» va riletto contando davvero): li' il numero si sfalsa perche' la lista sotto e' cambiata, qui perche' la prova viene ricordata invece che riletta. Stesso rimedio: contare sul file, non a memoria.
+
+## 81. Una bozza da depositare puo' essere gia' stata depositata da un altro run: si cerca il suo CONTENUTO sui rami, non il suo numero
+
+**Contesto:** 9/9/2026, CRMA-54. Il compito chiedeva, fra le altre cose, di depositare in coda a questo file «la bozza di nota operativa consegnata nel commento di chiusura di CRMA-49», con un numero «che non sia gia' usato da un'altra nota» — e avvertiva che una collisione era gia' successa una volta (e' la nota **#71**).
+
+**Errore:** trattarlo come un problema di **numero**, che e' quello che l'avvertimento suggeriva, e cercare la bozza dove il compito diceva che stava. Due cose non tornavano, e nessuna delle due dava errore:
+
+1. **Su CRMA-49 non c'era nessun commento di chiusura** (`GET /api/issues/<id>/comments` → `0`). La bozza stava sul commento di chiusura di **CRMA-42**, il compito *padre*, quello che l'aveva prodotta leggendo il codice. Concludere «non c'e', la scrivo io» avrebbe generato una seconda versione della stessa lezione.
+2. ~~**La bozza era gia' depositata da un altro run**, come nota **#74**, sul ramo `cronista/crma-51-nota-paragrafo-che-fa-il-conto`, che non aveva ancora una pull request.~~ *(corretto il 9/9/2026 — vedi il punto in fondo: era un'identificazione sbagliata, non una duplicazione vera.)* Depositarla di nuovo avrebbe messo **la stessa lezione sotto due numeri diversi** — e questo git non lo segnala mai: due numeri diversi non fanno conflitto testuale, e la prova della **#71** (`git show <albero>:… | grep -c '^## 70\.'`) conta i numeri, non il contenuto. Sarebbe passata l'unione senza un rumore, ed e' il caso peggiore dei due: un numero doppio si vede a occhio, una lezione doppia no.
+
+**Modo corretto:**
+- **Prima di depositare una bozza, cercarne il contenuto su tutti i rami remoti, non solo il numero libero.** Con i titoli in mano si vedono tutte e due le cose in un colpo:
+  ```
+  git fetch origin
+  for b in $(git branch -r --format='%(refname:short)' | grep -v HEAD); do
+    git show "$b:archivio-documenti/note-operative-ai.md" 2>/dev/null \
+      | grep -E '^## [0-9]+\.' | sed "s|^|$b |"
+  done | sort -u
+  ```
+  Il titolo porta la lezione, quindi l'elenco dei titoli basta a riconoscere un doppione senza aprire niente.
+- **La provenienza scritta nel compito e' una pista, non un fatto** (e' la **#56** applicata alle issue invece che ai documenti): se il compito indicato non ha commenti, la bozza si cerca **sui compiti vicini** — il padre, i fratelli, quelli chiusi dall'ultimo giro — prima di dichiararla mancante.
+- **Quando la catena delle note vive su rami non ancora uniti, la nota nuova si scrive in cima a quella catena, non su `main`.** Appendere a `main` lascia il file con un salto visibile (qui sarebbe stato #69 → #81) e produce un conflitto garantito in coda al file, perche' tutte le note si aggiungono nello stesso punto. Costa un `git worktree` sulla punta della catena, ed e' la **#71** applicata *prima* dell'unione invece che dopo.
+- ~~**Il risultato di questo giro, per chi cerca il precedente:** la bozza di CRMA-42 **non** e' stata ridepositata — vive come **#74** e basta.~~ *(corretto il 9/9/2026, vedi sotto)* Questa #81 e' l'altra lezione, quella che il giro ha prodotto davvero.
+- ⚠️ **Questa nota e' nata #80 ed e' diventata #81 il 9/9/2026, prima di qualsiasi unione.** Il numero #80 era stato scelto sul ramo `cronista/crma-57-nota-prova-piu-grande` **tre minuti prima**, per una lezione diversa, e la revisione l'ha intercettato. Non contraddice la regola «un numero non si rinumera» (**#71**): quella regola protegge le **citazioni**, e una nota mai arrivata su `main` non e' ancora citata da nessuno. La finestra in cui rinumerare costa zero e' esattamente questa, e si chiude con l'unione — il perche' sta nella **#82**.
+- 🔴 **Correzione del 9/9/2026 (revisione CRMA-54): il punto 2 sopra identificava la bozza sbagliata.** La nota **#74** (`cronista/crma-51-nota-paragrafo-che-fa-il-conto`) e' la lezione sulla **catena di import** consegnata nel *primo* commento di chiusura di CRMA-42 (quello del 9/9/2026 alle 13:30) — «censire "le N cose di tipo X"... la catena degli import si calcola, non si legge a occhio». La bozza che il compito CRMA-54 chiedeva di depositare era un'**altra**, consegnata nel commento **successivo** su CRMA-49 (14:01:23): «Un buco nel codice puo' avere una frase che lo autorizza», sulla riga 320 della roadmap. **Non era mai stata depositata da nessun run.** La prova: sweep del contenuto (non del numero) su ogni ramo remoto piu' `main` — zero occorrenze delle frasi chiave («frase che lo autorizza», «elenchi di esenzione») ovunque. E' ora depositata come nota **#83**, in coda a questo file. L'errore qui sopra e' stato lasciato barrato invece che cancellato (nota **#57**): la conclusione «gia' fatto» era plausibile — due bozze diverse nate dallo stesso compito padre, con lo stesso titolo di provenienza («commento di chiusura di CRMA-42/CRMA-49») — ed e' proprio per questo che vale la pena lasciarla leggibile.
+
+## 82. Un controllo di unicita' vale solo nell'istante in cui lo esegui: su un albero condiviso si rifa' alla consegna, non alla scrittura
+
+**Contesto:** 9/9/2026, CRMA-54 e CRMA-57. Due run in parallelo, stesso albero di lavoro condiviso, **stesso commit di partenza** (`109d46f`, note fino alla #79). Tutti e due dovevano aggiungere una nota in coda a questo file; tutti e due **hanno eseguito il controllo del numero libero** prescritto dalla **#71**; tutti e due hanno letto «79» e scelto **#80**. I due depositi distano **tre minuti e venti**: `c1d5d80` alle 13:44:00 e `44d7267` alle 13:47:20.
+
+**Errore:** trattare il controllo di unicita' come una **proprieta' del numero** invece che come una **fotografia con una data di scadenza**. Il controllo non era sbagliato: era vero alle 13:44 e falso alle 13:47, e nessuno dei due run poteva vedere l'altro, perche' al momento della lettura il ramo dell'altro **non esisteva ancora**. Aggravante specifica di questo file: la collisione **non produce conflitto git** — due `## 80.` in punti diversi si fondono in silenzio. Misurato: `git merge-tree --write-tree 44d7267 origin/cronista/crma-57-nota-prova-piu-grande` esce con l'albero `b776b12`, e li' dentro `grep -cE '^## 80\.'` risponde **2**; l'unico conflitto che git segnala su quell'unione e' un altro, testuale, sul paragrafo della #71.
+
+**Modo corretto:**
+- **Il controllo del numero si rifa' come ultimo gesto prima di consegnare**, dopo `git fetch origin`, non quando si scrive la nota. Fra la scrittura e la consegna passano minuti, e in quei minuti su Paperclip pubblicano altri run. Il comando e' quello della **#71** (con `git branch -a`, locali compresi).
+- **Chi revisiona lo rifa' una terza volta**, perche' fra la consegna e la revisione passa altro tempo ancora. La prova che chiude la questione va fatta **contro ogni altro ramo aperto che tocca lo stesso file**, non solo contro `main`:
+  ```
+  git merge-tree --write-tree <mio-ramo> <altro-ramo>
+  git show <albero>:archivio-documenti/note-operative-ai.md | grep -cE '^## <N>\.'
+  ```
+  Se risponde `2`, la collisione c'e' e va sciolta **prima** dell'unione. E' andata cosi' questa volta: la revisione l'ha intercettata, e la nota nata #80 su CRMA-54 e' diventata la **#81**.
+- **Finche' la nota non e' su `main`, rinumerarla costa zero; dopo, non si puo' piu'.** Non e' in contrasto con «un numero non si rinumera» (**#71**): quella regola protegge le citazioni, e una nota non ancora unita non e' citata da nessuno. Quindi la collisione si scioglie **sui rami**, ed e' l'ultimo momento in cui si puo'.
+- **Vale per ogni identificatore scelto leggendo lo stato corrente**, non solo per i numeri delle note: il prossimo numero di migrazione, una chiave nel catalogo RBAC, un numero di versione. La domanda giusta non e' «questo numero e' libero?» ma «**questo numero e' ancora libero adesso che sto per unire?**».
+
+## 83. Un buco nel codice puo' avere una frase che lo autorizza: quando la trovi, correggi anche quella
+
+**Contesto:** 9/9/2026, compito CRMA-49. La ricerca competitor chiama OpenAI/Anthropic con `web_search` attivo — spesa vera, piu' cara di una generazione normale — e non passa dal fusibile del budget giornaliero ne' lascia una riga in `AiUsageLog`. Due giri di copertura (13/7 e 22/7/2026) avevano messo stima e tracciamento su **tutti** i pulsanti AI, e questo l'avevano saltato.
+
+**Errore:** trattarlo come una dimenticanza e pianificare solo la correzione del codice. Non era una dimenticanza: `03-roadmap-confronto-e-build.md` riga 320 elenca «Cerca competitor» fra i pulsanti *«rule-based e gratuiti»* che *«non chiamano il motore AI»*, con la formula **«Non toccati (correttamente)»**. Chi ha fatto il giro l'ha letta e ha smesso di controllare — che e' precisamente cio' che una riga cosi' e' scritta per ottenere. Correggere il codice lasciandola in piedi avrebbe chiuso il buco e lasciato intatta la macchina che lo produce: al giro dopo, stesso salto.
+
+**Modo corretto:**
+- **Davanti a una copertura incompleta — un controllo che manca su un percorso e c'e' su tutti gli altri — la prima domanda non e' "chi se n'e' dimenticato" ma "chi l'ha autorizzato".** Cerca la frase che ha esentato quel percorso: quasi sempre esiste, e sta in un elenco di cose dichiarate fuori portata.
+- **Gli elenchi di esenzione sono il tipo di riga piu' pericoloso dell'archivio** — «non toccati (correttamente)», «rule-based», «gratuiti», «fuori perimetro». Le righe normali invitano a verificare; queste sono scritte apposta per far smettere di verificare, e quando invecchiano nessuno se ne accorge. Se ne incontri una che riguarda il tuo lavoro, **verificane le voci sul codice invece di ereditarle.**
+- **La correzione della riga e' parte del lavoro, non un di piu'**, e viaggia per prima: sta in un file d'archivio, non tocca il codice, non toglie nessuno dalla coda dello sviluppo, e finche' non e' fatta l'errore e' pronto a ripetersi. E' la nota **#56** («la divergenza si corregge alla fonte») applicata al verso opposto a quello solito: non «il documento mi ha informato male», ma **«il documento ha causato il difetto»**.
+- **Barrare, non cancellare** (nota **#57**): chi rilegge deve vedere che quella voce c'era e perche' e' caduta. E si corregge **solo la voce verificata**: le altre sei dell'elenco nessuno le ha controllate in questo giro, e sostituire una riga non verificata con un'altra non e' una correzione.
+
+## 84. Il tetto di scritture cross-issue di un run si sfonda per l'ordine in cui si scrive, non per quanto c'e' da scrivere
+
+**Contesto:** 9/9/2026, CRMA-38. Un run che riordina una coda fa molte scritture su compiti diversi: assegnazioni, cancelli innestati come fasi, bloccanti registrati, un commento di spiegazione per ciascuno.
+
+**Errore:** le scritture sono state spese **in ordine di comodita' invece che di importanza** — prima i nove cancelli (utili ma non urgenti), poi i bloccanti. Alla ventunesima scrittura il control plane ha risposto **`429`, «Per-run cross-issue cap of 20 writes»**, e la correzione d'ordine piu' importante e' rimasta fuori. Peggio: **sei delle ultime scritture erano ritentativi** di chiamate gia' fallite per altri motivi, e il tetto li conta come scritture vere — non si guadagna niente aspettando o riprovando.
+
+**Modo corretto:**
+- **Prima di cominciare a scrivere, conta le scritture cross-issue previste.** Se sono piu' di ~15, **ordinale per danno se non passano**, non per comodita' di esecuzione: prima i bloccanti e le assegnazioni (senza i quali la coda e' sbagliata), poi i cancelli (utili ma recuperabili), i commenti di spiegazione per ultimi — o accorpati: il campo `comment` di `PATCH /api/issues/{id}` viaggia **dentro la stessa scrittura**, quindi non serve un commento separato quando si sta gia' aggiornando l'issue.
+- **Al primo `429` con questo testo, fermati**: il tetto e' per run, e non si svuota aspettando all'interno dello stesso run. Continuare a ritentare consuma il margine che resta senza produrre nessuna scrittura in piu'.
+- **Scrivi cosa resta sul TUO compito** (quello non conta come scrittura cross-issue) e finisci al risveglio successivo, con un nuovo run e un nuovo tetto.
+
+## 85. Un compito figlio aperto per restituire meta' del lavoro nasce senza cancelli: la catena non si eredita da sola
+
+**Contesto:** 9/9/2026. Il Capocantiere mette in ordine una coda: dipendenze registrate e cancelli innestati come fasi di `executionPolicy` su ogni compito. La coda poi continua a vivere: un mestiere si accorge che il proprio compito ha dentro una meta' che non gli compete (il backend non tocca il frontend, e viceversa) e **apre un compito figlio per l'altra meta'**, restituendola a chi di dovere — la cosa giusta da fare.
+
+**Errore:** il compito figlio nasce **nudo**: niente cancelli, niente bloccanti. Il 9/9/2026 sono nati cosi' `CRMA-52` (meta' a schermo del cambio password, creata dal backend) e `CRMA-58` (meta' server dei campi cliente, creata dal frontend). `CRMA-58` e' codice backend destinato a `main` e si sarebbe **chiuso senza che nessun revisore lo guardasse** — non per una decisione, ma perche' e' nato dopo il giro di riordino e nessuno ha ricopiato la catena su di lui. Un buco cosi' non da' errore: si vede solo il giorno che qualcosa passa in produzione non revisionato.
+
+**Modo corretto:**
+- **Quando si restituisce meta' del proprio lavoro aprendo un compito nuovo, la catena non si eredita da sola.** O si ricopiano sul figlio i cancelli che valgono per quel codice — guardando la tabella della regola mista in `CLAUDE.md` (revisore di repository per le tappe correnti; compito Paperclip assegnato al Revisore per schema/migrazioni/permessi/sicurezza/unioni a `main`) — oppure **si avvisa il Capocantiere nel commento di chiusura**, che e' chi tiene l'ordine della coda.
+- **La seconda strada e' quella buona in caso di dubbio su quale cancello serva**: descrivere cosa tocca il codice costa una riga, indovinare un cancello sbagliato costa una revisione saltata.
+- **Il legame va registrato sulla lavagna** (`blockedByIssueIds` / `parentId`), non scritto a parole nella descrizione: una catena in prosa non ferma nessuna transizione di stato, un blocco registrato si'.
+
 ## 86. Il titolo di un commit descrive un'intenzione, non un'azione: cosi' un segreto trapelato e' sembrato chiuso per sette mesi
 
 **Contesto:** commit `8a30469`, 19/2/2026, titolo «Rimuovi .env dalla cronologia». La password del superuser PostgreSQL era finita nel commit `569d192` del 10/2/2026 dentro il file `.env`.
@@ -1074,3 +1336,111 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - Il testo con backtick non passa mai per la riga di comando dentro un `node -e "..."` a doppi apici. Si scrive prima il markdown con lo strumento di scrittura file (nessuna interpretazione di shell), poi lo si legge da un file: `node -e '...'` ad **apici singoli** (la shell non fa sostituzioni dentro apici singoli) leggendo il percorso da `process.argv`, oppure uno script `.mjs` vero e proprio.
 - Controllo che non costa nulla: prima di spedire, contare i backtick nel file JSON gia' costruito — se il numero non torna, qualcosa e' stato eseguito invece che copiato.
 - **Una risposta `ok` non prova che il contenuto sia integro**: dopo una POST con testo tecnico (nomi di file, hash di commit, comandi), rileggerla dall'API e confrontarla con l'originale, non fidarsi del solo codice di stato.
+
+## 89. `git status` all'inizio della sessione mostra il ramo — ma un compito arrivato "gia' preso in carico" non dice se quel ramo e' anche il MIO
+
+**Contesto:** 9/9/2026, compito CRMA-72 (correggere una riga di un documento) arrivato con l'ambiente gia' sull'checkout condiviso, sul ramo `backend/crma-25-cambio-e-recupero-password` — il ramo di un ALTRO lavoro (cambio password), lasciato li' da una sessione precedente con modifiche non committate di un terzo lavoro ancora (refactor del form clienti).
+
+**Errore:** ho editato il documento e committato direttamente su quel ramo, senza controllare prima se fosse il mio. Il commit e' finito impilato sopra lavoro altrui, su un ramo il cui nome non ha niente a che vedere col compito appena chiuso — e in caso di push sarebbe finito in una pull request sbagliata.
+
+**Modo corretto:** prima di committare, **il nome del ramo si confronta col compito**, non si da' per buono solo perche' e' quello attivo. Se non corrisponde (capita spesso nell'albero di lavoro condiviso, vedi `[[workspace-condiviso-un-solo-albero]]` in memoria — piu' compiti/agent sullo stesso checkout), si crea il proprio ramo **da `origin/main`** con `git branch <nome> origin/main`, si sposta li' il lavoro gia' fatto con `git reset --soft HEAD~1` + `git stash push -- <solo-il-file-mio>` (mai uno stash che inghiotte anche le modifiche non committate di altri lavori in corso), si passa al nuovo ramo, si fa `git stash pop` e si committa li'. Il ramo originale si lascia esattamente come lo si e' trovato — verificarlo con `git log --oneline -3` e `git status --short --branch` prima di andarsene.
+
+**Nota (CRMA-90, 10/9/2026):** questa nota era nata numerata **#70** sul ramo `cronista/crma-72-recap-backup-cestino`, mai unito. Collideva con la #70 gia' risolta su un altro ramo (vedi nota **#71**): sono due lezioni distinte sullo stesso episodio del 9/9, quindi diventa una nota propria invece di sparire — rinumerata in coda al consolidamento delle note #70-#85.
+
+## 90. Tredici compiti fermi otto ore: tre punti dove la regola diceva "valuta" invece di "se X allora Y"
+
+**Contesto:** notte fra il 9 e il 10/9/2026, release di settembre. Tredici compiti della catena sono rimasti fermi otto ore senza che nessuno se ne accorgesse in tempo, e un compito `critical` su un segreto trapelato e' rimasto senza assegnatario per quindici ore.
+
+**Errore:** nessuna delle tre cause era una decisione sbagliata. **Primo:** una catena di dieci compiti legati da `blockedBy` (`28 → 45 → 29 → 46 → 30 → 31 → 32 → 47 → 33 → 34 → 23`), senza una sola diramazione, dove alcuni legami non nominavano nessun motivo tecnico: erano solo un ordine preferito, scambiato per un blocco reale. **Secondo:** nessuno dei tredici compiti era in stato `blocked`, erano gia' tutti in `todo`: spostarli di colonna non poteva avere nessun effetto, perche' il fermo stava nel grafo dei bloccanti, non nella colonna. **Terzo:** il compito `critical` sul segreto trapelato non aveva nessun assegnatario, quindi nessuno lo vedeva.
+
+**Modo corretto:**
+- Le quattro regole che chiudono questi tre punti (chi revisiona, quando un `blockedBy` e' legittimo, come si misura il fermo, perche' nessun compito esce da `backlog` senza assegnatario) sono scritte per esteso in `CLAUDE.md`, sezione **«Regole della bacheca: chi revisiona, cosa blocca, cosa e' fermo (dal 10/9/2026)»**, subito dopo «Team di agent». Si leggono li': questa nota rimanda, non ricopia.
+- Le stesse regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del capocantiere (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e `R05:REVIEWER_TRIGGERS` — fuori da questo repository, nel pacchetto azienda di Paperclip): se una copia diverge dalle altre, vince il repository.
+
+**Nota (CRMA-90, 10/9/2026):** recuperata dal ramo `cronista/crma-84-regole-bacheca-nel-repository`, mai unito, insieme alla sezione «Regole della bacheca» che porta in `CLAUDE.md`. Nasceva numerata **#70**, in collisione con la #70 gia' risolta nella coda consolidata (vedi nota **#71**). Il ramo `cronista/crma-82-regole-deterministiche-bacheca` conteneva una prima stesura della stessa sezione e della stessa nota, piu' corta: e' stato scartato perche' `crma-84` la riscrive per intero con i rilievi del revisore gia' applicati (i tre corollari, il caso «permessi e ruoli» dove Guardiano e Revisore scattano insieme, i riferimenti a `knowledge/crm-pianificazione/`).
+
+## 91. Otto rami di sole note, sei senza PR: un lavoro "fatto" che su `main` non risultava mai
+
+**Contesto:** 10/9/2026, CRMA-90 (aperto durante l'unione di CRMA-88). Misurato che `main` arrivava alla nota #69, poi saltava a #86: le note #70-#85 esistevano solo su otto rami `cronista/`, tutti derivati dai compiti CRMA-36, CRMA-51, CRMA-54, CRMA-57, CRMA-60, CRMA-72, CRMA-82, CRMA-84 — **tutti chiusi `done` in bacheca**. Sei di quegli otto non avevano nemmeno una pull request aperta.
+
+**Errore:** chiudere un compito `done` non basta a far arrivare il lavoro su `main` — l'ho gia' scritto per un caso singolo nella nota **#41** (memoria: `figlio-done-non-significa-su-main`), ma qui il guasto si era ripetuto **otto volte di seguito** senza che nessuno lo vedesse in aggregato, perche' ogni compito guardava solo il proprio ramo. Tre modi distinti in cui la coda si e' complicata, non uno: (a) rami **cumulativi** — sei su otto contenevano gia' tutte le note #70-#79, non erano lavori indipendenti; (b) una nota, la **#80**, esisteva su un **solo** ramo (`crma-57`) e su nessun altro, quindi si sarebbe persa scegliendo il ramo "piu' completo" senza controllare; (c) **tre rami diversi** (`crma-72`, `crma-82`, `crma-84`) avevano scelto lo stesso numero **#70** per tre lezioni fra loro diverse, perche' ognuno l'aveva calcolato sul proprio `main` di partenza — la stessa collisione gia' descritta nella nota **#71**, qui non su due rami ma su tre.
+
+**Modo corretto:**
+- **La numerazione non si rinumera mai**, nemmeno in un consolidamento cosi' esteso: lo dice gia' la nota #71 ("un numero e' un'identita', non una posizione"), e vale anche quando il buco `main` 69→86 sembra invitare a chiudere la sequenza. Le note #70-#85 sono arrivate su `main` con i loro numeri originali, riempiendo il buco esattamente li' dove stavano.
+- **Il ramo piu' completo si verifica per contenuto, non per numero piu' alto.** `crma-60` arrivava a #85 con `git merge-base --is-ancestor` che conferma essere discendente lineare di `crma-36`, `crma-51`, `crma-54`: le loro note erano gia' tutte dentro. Il controllo che ha trovato la #80 mancante e' stato lo stesso della nota #82/#90 (il piu' alto per ramo, letto su **tutti** i rami, non solo quelli con PR).
+- **Le note con lo stesso numero ma testo diverso non si scartano: si rinumerano in coda**, verificando prima se sono davvero la stessa lezione (si accorpano, come gia' successo alla prima collisione #70/#70 nella nota #71) o lezioni distinte (restano entrambe, con numeri diversi) — qui erano distinte tutte e tre, e sono diventate #89 (`crma-72`) e #90 (`crma-84`; `crma-82` scartato come stesura piu' corta e superata dello stesso contenuto di `crma-84`).
+- **Il principio che generalizza:** un compito `done` senza una pull request unita a `main` e' lavoro che non esiste per chiunque legga `main` — vale per il codice quanto per questi stessi file di note operative, che pure parlano di com'e' fatto il repository.
+
+---
+
+## 93. `$?` dopo una pipe (`git commit … | head`) racconta l'uscita di `head`, non quella del comando che conta
+
+**Contesto:** revisione di sicurezza della PR #28 (CRMA-85), al banco: verificare che l'hook `pre-commit` rifiuti davvero un commit con un segreto in stage, in un clone usa-e-getta.
+
+**Errore:** letto l'esito lanciando `git commit … | head -8` e leggendo `$?` subito dopo. `$?` e' l'uscita dell'**ultimo** comando della pipe, cioe' `head` — che e' quasi sempre 0 — non quella di `git commit`. Il commit rifiutato dall'hook sembrava riuscito. Stessa famiglia della nota #39 (il dato vero sta altrove rispetto a dove lo si legge).
+
+**Modo corretto:**
+- Non fidarsi del codice d'uscita quando c'e' una pipe di mezzo. La prova che un commit e' stato rifiutato e' che **il file e' ancora in stage**: si legge con `git status --short` dopo il tentativo (`A file.md` = commit non avvenuto).
+- In alternativa, non mettere `git commit` in pipe: catturare l'uscita in una variabile (`git commit …; esito=$?`) e solo dopo filtrare l'output per la lettura umana.
+
+---
+
+## 94. Un file che esiste in due copie tracciate si modifica su una sola, e il revisore lo trova solo diffando le due copie
+
+**Contesto:** revisione della PR #29 (CRMA-107). La skill `crm-pianificazione` vive in due copie nel repository — `paperclip/skills/crm-pianificazione/` e `paperclip/azienda-crm/skills/crm-pianificazione/` — debito gia' scritto in roadmap (CRMA-60, «la skill esiste in due copie che divergono»). La PR doveva solo aggiornare due frasi datate in `04_ordine-e-dipendenze.md` e `07_casi.md`.
+
+**Errore:** la modifica e' stata scritta su `paperclip/skills/crm-pianificazione/references/` e basta. Su `origin/main` le due copie erano identiche byte per byte (`git diff --quiet <ramoA>:file <ramoB>:file` non dava output); dopo la modifica divergevano di 2 e 6 righe. Niente nel diff della PR lo segnalava — il file toccato compariva come modificato, quello gemello semplicemente non compariva, ed e' proprio l'assenza a passare inosservata in una revisione che guarda cosa e' cambiato.
+
+**Modo corretto:**
+- Prima di chiudere una modifica a un file di cui si sa (o si sospetta, vedi CRMA-60) che esiste altrove come copia, cercarlo: `find . -path "*<nome-file>*"` o `grep -rl` sul nome della cartella.
+- Se le copie esistono, verificare con un diff mirato che restino identiche **dopo** la modifica, non fidarsi del fatto che "il contenuto e' lo stesso, l'ho scritto uguale a mano": `diff copiaA copiaB` deve dare output vuoto.
+- Finche' le due copie di `crm-pianificazione` non sono state fuse in una sola (CRMA-60), ogni PR che tocca `references/` in una delle due deve toccare anche l'altra, con lo stesso diff.
+
+---
+
+## 95. Due PR aperte insieme possono scegliere lo stesso numero di nota senza che nessuna delle due lo sappia
+
+**Contesto:** revisione della PR #29 (CRMA-90, CRMA-106). Il commit che aggiungeva la nota #92 su questo ramo e' arrivato **due ore dopo** un commit che aggiungeva una nota #92 diversa su un altro ramo aperto (`cronista/crma-94-r5-r6-bacheca`, PR #30). Nessuno dei due rami poteva vederlo: ognuno calcola "il piu' alto piu' uno" (nota #82) sul proprio `git log`, che a quel momento non conteneva l'altro ramo.
+
+**Errore:** il controllo di unicita' descritto dalla nota #82 ("si rifa' alla consegna, non alla scrittura") basta a evitare collisioni con `main`, ma non con **rami fratelli aperti nello stesso momento** — quelli non compaiono in nessun `git log` locale finche' non vengono spinti e non li si va a cercare esplicitamente. La PR #29 dichiarava "nessun duplicato di numero verificato": vero sul proprio ramo, falso appena si guarda anche l'altro.
+
+**Modo corretto:**
+- Il controllo di unicita' alla consegna (nota #82) su un file di note condiviso non basta farlo sul proprio ramo: va esteso a **tutti i rami `cronista/` aperti** (`git branch -r | grep cronista/`), confrontando l'ultimo numero di ciascuno con il proprio.
+- Chi trova la collisione rinumera **il ramo con il commit piu' recente** (per data di commit, non per numero di PR): il ramo piu' vecchio ha "prenotato" il numero per primo.
+- La rinumerazione e' legittima solo finche' la nota non e' ancora su `main` — dopo l'unione vale la nota #71/#91 ("un numero non si rinumera mai"). Prima dell'unione, su un ramo ancora aperto, e' l'unico momento in cui rinumerare e' corretto.
+
+---
+
+## 96. Il blocco del checkout su un'issue non guarda l'agente, guarda il run — anche se l'agente e' lo stesso
+
+**Contesto:** 10/9/2026, risveglio su CRMA-90 (CRMA-107 assegnata a me, stato `in_progress`). Il lavoro tecnico era gia' fatto e su `origin` (commit `824b32c`, le due copie della skill `crm-pianificazione` coincidevano): restava solo marcare il compito `done`.
+
+**Errore:** sia il `PATCH` di stato sia il `POST .../checkout` sono stati rifiutati con «Issue checkout conflict», perche' `checkoutRunId` (`aa743d80-...`) non coincideva col run corrente (`324db172-...`) — pur essendo lo stesso agente assegnatario in entrambi i casi. Il blocco non e' "un altro agente ci sta lavorando", e' "un run precedente non ha rilasciato correttamente l'issue": puo' capitare anche a se stessi, fra un risveglio e il successivo.
+
+**Modo corretto:**
+- Non insistere col `PATCH`/`checkout`: e' la stessa famiglia della nota gia' nota per le issue di un altro run (si commenta, non si patcha). L'evidenza si lascia in un commento sull'issue bloccata, con il riferimento verificabile (qui: il commit gia' su `origin`), e si segnala nel commento del compito che la sta aspettando (qui: CRMA-90) che lo stato-macchina non riflette il lavoro reale.
+- Non c'e' un endpoint per "liberare" un checkout andato storto dall'esterno: si aspetta che scada da solo o che un `checkout` successivo (anche dello stesso agente, run nuovo) lo sblocchi.
+
+---
+
+## 97. Un bloccante risolto rimette il compito in coda da solo: non vuol dire che il vero anello mancante sia sparito
+
+**Contesto:** 10/9/2026, risveglio su CRMA-90 con motivo `issue_blockers_resolved`. Il compito era `blocked` con due bloccanti nominati (CRMA-105 e CRMA-107); entrambi sono diventati `done` nel frattempo. Il risveglio ha trovato lo stato gia' `in_progress` — nessun agente lo aveva cambiato, ne' con un `PATCH` ne' con un commento: il runtime sposta da solo un'issue `blocked` quando `blockedBy` si svuota di bloccanti aperti.
+
+**Errore:** leggere `in_progress` come "il lavoro puo' ripartire" senza rileggere *perche'* era `blocked`. Qui il bloccante vero non era ne' CRMA-105 ne' CRMA-107 in se': era l'unione della PR #29 a `main`, un'azione che nessun agente esegue da solo (regola del progetto, vale anche col consenso di Jacopo gia' arrivato). CRMA-105 aveva il compito di *chiedere* quel consenso, non di *eseguire* l'unione: chiuderla come `done` ha tolto un bloccante dal campo, ma l'anello che contava — chi preme il bottone «Merge» — e' rimasto esattamente dove era prima. Fidarsi del solo campo `status` avrebbe fatto sembrare il compito "da continuare" mentre l'unica cosa che manca e' identica a un'ora prima.
+
+**Modo corretto:**
+- A un risveglio `issue_blockers_resolved`, non agire sul nuovo `status` da solo: rileggere il testo dei bloccanti appena chiusi (commenti, interazioni collegate) per capire se la loro chiusura *include* l'azione che serviva o solo un passo verso di essa.
+- Se l'azione che manca e' ancora dovuta — qui, l'unione a `main`, riservata a Jacopo o Claudio anche a consenso gia' dato (nota gia' scritta nella regola di CLAUDE.md sulle unioni) — il compito torna `blocked`, con il nuovo anello nominato per esteso nel commento: non basta lasciarlo `in_progress` per inerzia del campo di stato, ne' richiuderlo `blocked` senza dire cosa manca stavolta.
+
+---
+
+## 98. Rimettere `blocked` con lo stesso `blockedByIssueIds` gia' `done` riavvia lo stesso ciclo del recupero automatico
+
+**Contesto:** 10/9/2026, giro successivo alla nota #97 sullo stesso compito CRMA-90. Confermato che l'unico anello mancante resta l'unione umana della PR #29 (`GET /repos/advaiora/crmadv/pulls/29` -> `state: open, merged: false`): bisognava rimettere il compito `blocked`.
+
+**Errore:** il `PATCH` piu' ovvio e' rimettere `status: "blocked"` lasciando `blockedByIssueIds` invariato (qui: CRMA-105 e CRMA-107, entrambe gia' `done`). Ma e' proprio quel campo, non lo stato scritto a mano, che il runtime guarda per decidere il recupero automatico descritto nella nota #97: con due bloccanti collegati gia' risolti, la prossima volta che una qualunque delle due issue viene ritoccata (o anche senza, a seconda di quando gira il controllo) il compito torna da solo `in_progress`, e il ciclo si ripete da capo — non perche' qualcosa sia cambiato, ma perche' il campo che decide il recupero non descriveva piu' il vero bloccante.
+
+**Modo corretto:**
+- Quando il vero bloccante e' un'azione umana fuori dal grafo delle issue (qui: un click «Merge» su GitHub), non collegare o scollegare `blockedByIssueIds` a issue-agente che sono gia' chiuse: si svuota l'elenco (`blockedByIssueIds: []`) e si lascia che sia **solo** `unblockDescriptor` a dire chi sblocca e come — quel campo non alimenta il recupero automatico.
+- Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `blockedBy` risulti vuoto pur restando `status: "blocked"` — segno che il recupero automatico non ha piu' un bloccante "risolvibile" da cui ripartire da solo.

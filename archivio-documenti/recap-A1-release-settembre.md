@@ -115,8 +115,9 @@ ripristino, non c'è un posto dove va a finire la roba buttata. Il cestino è qu
 
 **A cosa serve davvero.** È la rete di sicurezza contro l'errore umano più banale e più frequente: uno
 che cancella il cliente sbagliato, o cancella qualcosa senza sapere cosa ci fosse attaccato. Senza
-cestino, l'unico rimedio è un backup del database — cioè una richiesta a un tecnico, con quello che è
-successo nel frattempo perso comunque.
+cestino, una cancellazione è definitiva: **oggi non esiste un backup del database di produzione**
+da cui recuperare (vedi CRMA-70), quindi non c'è nessun rimedio successivo. Il cestino non è una
+comodità: è l'unica rete di sicurezza contro l'errore umano.
 
 **Come funziona (in gergo si chiama "soft-delete", cancellazione morbida).** Invece di togliere davvero
 la riga dal database, la si **marca come cancellata**. La riga resta lì, ma sparisce dalla vista. Poi

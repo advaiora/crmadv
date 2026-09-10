@@ -149,6 +149,86 @@ I campioni vanno in `archivio-documenti/consumi/calibrazione.json`. Non chiederl
 
 Tutto il resto — com'è composto il team, l'archivio delle alternative scartate, il registro delle decisioni — sta in `archivio-documenti/team-agenti.md`.
 
+## Regole della bacheca: chi revisiona, cosa blocca, cosa è fermo (dal 10/9/2026)
+
+Nella notte fra il 9 e il 10/9/2026, durante la release di settembre, tredici compiti della catena
+sono rimasti fermi otto ore senza che nessuno se ne accorgesse in tempo, e un compito `critical` su
+un segreto trapelato è rimasto senza assegnatario per quindici ore. Nessuna delle tre cause era una
+decisione sbagliata: erano tre punti in cui la regola in vigore diceva *"valuta"* invece di *"se X
+allora Y"*. Le quattro regole che seguono chiudono quei tre punti, in modo verificabile invece che
+lasciato al giudizio del momento. Valgono per **tutto il progetto**, da qui in avanti — non sono un
+provvedimento per la sola release di settembre, anche se è la release ad averle fatte nascere.
+
+**R1 — Chi revisiona si ricava dal lavoro, non si sceglie.** La «regola mista» scritta qui sopra
+(revisore di repository per le tappe ordinarie, agente Revisore di Paperclip per schema/permessi/
+sicurezza/unioni a `main`) **non era applicata**: fino al 10/9 ogni punto della release portava
+quattro cancelli di revisione, cioè tre run in più a punto e una contraddizione silenziosa con la
+regola scritta. R1 la raffina — non la sostituisce — dicendo che i cancelli si ricavano da inneschi
+osservabili. **Guardiano, Revisore di Paperclip, Collaudatore e Collaudatore AI sono agenti
+Paperclip** — non i tre subagent di repository (esploratore/revisore/architetto) descritti sopra —
+e si assegnano come cancello sul compito, non si chiamano dentro la sessione. **L'elenco completo
+del team Paperclip e il gesto per assegnare un cancello vivono fuori da questo repository**, nel
+pacchetto azienda di Paperclip — non in una cartella clonabile da qui, e non in
+`archivio-documenti/team-agenti.md`: quel file descrive un team diverso, i tre subagent di
+repository (esploratore/revisore/architetto) appena esclusi sopra.
+
+| Cancello | Si mette se e solo se il lavoro tocca... |
+|---|---|
+| **Guardiano** (sicurezza) | autenticazione o sessioni · permessi e ruoli · caricamento o servizio di file · dati non fidati dall'esterno · segreti e `.env` · il perimetro di ciò che è raggiungibile (moduli accesi/spenti) |
+| **Revisore** di Paperclip | `prisma/schema.prisma` o una migrazione · `server/auth/rbac-catalog.ts` · sicurezza · unione a `main` |
+| **Collaudatore** | un comportamento visibile a schermo o una risposta d'API che cambia |
+| **Collaudatore AI** | prompt, generazioni AI, o il motore delle funzioni AI |
+
+Sui **permessi e ruoli** gli inneschi di Guardiano e Revisore scattano insieme, non in alternativa:
+il Guardiano copre la sicurezza della scelta (chi deve poter fare cosa), il Revisore copre
+`rbac-catalog.ts` come file che tocca schema/permessi.
+
+Tre corollari, che sono la parte che chiude le ambiguità:
+1. **Se non scatta nessun innesco, il compito non ha cancelli** — e non è un compito senza
+   controllo: la revisione è quella del **revisore di repository** dentro la sessione, e chi chiude
+   **dichiara nel commento di chiusura di averlo chiamato e su quali file**.
+2. **Un cancello non può avere come revisore l'assegnatario del compito**: se coincidono, quel
+   cancello salta e restano gli altri (esempio reale: l'audit di sicurezza lo *fa* il Guardiano,
+   quindi lo revisiona il Revisore).
+3. **La politica di un compito già entrato nella catena non si cambia sotto i piedi di chi sta
+   revisionando**: se è già in `in_review`, si corregge dopo la chiusura, mai durante.
+
+**R2 — Un legame di blocco è tecnico o non esiste.** `blockedBy` significa una sola cosa: senza il
+primo compito, il secondo non è costruibile. Motivi ammessi, da **nominare per esteso nel compito
+bloccato**: stesso file riscritto in profondità (si nomina il file), stessa tabella o stessa
+migrazione (si nomina), un dato o una funzione che il secondo consuma e che non esiste finché il
+primo non è chiuso (si nomina). *«Prima questo poi quello»* non è un motivo: quello è l'**ordine**,
+e si esprime con la **priorità**, non con un blocco. Senza il motivo nominato, il legame va tolto.
+**Tetto duro: nessuna catena più lunga di tre anelli** — quella dell'incidente ne aveva dieci
+(`28 → 45 → 29 → 46 → 30 → 31 → 32 → 47 → 33 → 34 → 23`), senza una sola diramazione: una
+quarantina di run in sequenza, mai due agenti al lavoro insieme.
+
+**R3 — Fermo è chi non ha attività, non chi sta in una colonna.** Lo stato e il grafo dei bloccanti
+sono due cose diverse: nessuno dei tredici compiti dell'incidente era in `blocked`, erano già tutti
+in `todo`, e spostarli di colonna non poteva avere nessun effetto — il fermo stava nel grafo, non
+nella colonna. Il criterio meccanico da passare a ogni giro, riportato così com'è:
+
+```
+attività più vecchia di 2 ore senza run attivo  → si rilancia con un commento
+blocked senza bloccanti                         → si rimette in todo
+fuori da backlog senza assegnatario             → si assegna
+tutti i bloccanti chiusi ma il compito è fermo   → si rilancia
+```
+
+**Un risveglio differito non si ritenta da solo:** se `claimedAt` e `runId` restano nulli, quella
+revisione non è lenta, non è mai iniziata (nell'incidente: otto ore).
+
+**R4 — Un compito senza assegnatario è invisibile.** Nessun compito esce da `backlog` senza
+assegnatario, a prescindere dalla priorità scritta sopra: è così che un compito `critical` su un
+segreto trapelato è rimasto fermo quindici ore, perché nessuno lo vedeva.
+
+**Le stesse quattro regole vivono anche nelle istruzioni permanenti del CEO e nella conoscenza del
+capocantiere** (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e
+`R05:REVIEWER_TRIGGERS` — **fuori da questo repository**, nel pacchetto azienda di Paperclip, non
+in una cartella clonabile da qui). Il repository è la copia che legge chi sviluppa: **se le tre
+dovessero divergere, vince il repository**, e le altre due si correggono di conseguenza. Una
+regola, tre lettori, mai tre varianti.
+
 ## Regole di scrittura degli handoff
 
 - Linguaggio **chiaro e semplice**, niente sigle o nomi "in codice" non spiegati.
