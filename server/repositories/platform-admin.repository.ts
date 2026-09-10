@@ -112,6 +112,19 @@ export const platformAdminRepository = {
     });
   },
 
+  // I workspace di cui una persona è membro, per il Registro attività della
+  // promozione a Super Admin di piattaforma (CRMA-81). Comprende le membership
+  // sospese e quelle ancora da accettare: la domanda a cui la riga risponde è
+  // «di quali workspace questa persona fa parte», e chi amministra un workspace
+  // dove il membro è inattivo ha lo stesso interesse a saperlo.
+  listMemberWorkspaceIds(userId: string) {
+    return prisma.membership.findMany({
+      where: { userId },
+      select: { workspaceId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  },
+
   // Legge le impostazioni AI runtime di tutti i workspace per le chiavi indicate.
   // NON restituisce il segreto in chiaro: per la chiave API espone solo la presenza
   // del ciphertext.

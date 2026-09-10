@@ -202,15 +202,19 @@ export const platformAdminService = {
     return body.userId.trim();
   },
 
+  // `changed` dice se il flag è stato davvero scritto (CRMA-81). Serve a chi
+  // annota il Registro attività: una richiesta su chi è già Super Admin non
+  // cambia niente, e annotarla lo stesso metterebbe a registro un innalzamento
+  // di privilegio che non è avvenuto.
   async promotePlatformAdmin(userId: string) {
     const user = await platformAdminRepository.findUserById(userId);
     if (!user) {
       throw notFound('User not found');
     }
     if (user.isPlatformAdmin) {
-      return user;
+      return { user, changed: false };
     }
-    return platformAdminRepository.setUserPlatformAdmin(userId, true);
+    return { user: await platformAdminRepository.setUserPlatformAdmin(userId, true), changed: true };
   },
 
   async demotePlatformAdmin(userId: string, actorUserId: string) {
@@ -224,7 +228,7 @@ export const platformAdminService = {
       throw notFound('User not found');
     }
     if (!user.isPlatformAdmin) {
-      return user;
+      return { user, changed: false };
     }
 
     const adminCount = await platformAdminRepository.countPlatformAdmins();
@@ -232,7 +236,16 @@ export const platformAdminService = {
       throw badRequest('Deve restare almeno un Super Admin di piattaforma');
     }
 
-    return platformAdminRepository.setUserPlatformAdmin(userId, false);
+    return { user: await platformAdminRepository.setUserPlatformAdmin(userId, false), changed: true };
+  },
+
+  // I workspace in cui va annotato un cambio di Super Admin di piattaforma.
+  // La promozione non ha un workspace bersaglio — sta sopra tutti — quindi la
+  // riga si scrive in ognuno di quelli di cui la persona è membro: è lì che
+  // qualcuno ha motivo di accorgersene. Scelta di Jacopo del 10/9/2026.
+  async listMemberWorkspaceIds(userId: string): Promise<string[]> {
+    const memberships = await platformAdminRepository.listMemberWorkspaceIds(userId);
+    return [...new Set(memberships.map((membership) => membership.workspaceId))];
   },
 
   parseWindowDays(rawDays: unknown): number {
