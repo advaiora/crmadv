@@ -108,6 +108,14 @@ const EXCLUDED_MODELS = new Map<string, string>([
   ['PasswordResetToken', 'materiale di sicurezza a vita breve'],
   ['WorkspaceVaultKey', 'chiavi: annotate a mano dal modulo vault'],
   ['AiConversationAttachmentBinary', 'blob senza workspace: non attribuibile'],
+  // Stesso caso del precedente, per gli allegati ai messaggi (CRMA-30): i byte
+  // stanno in una tabella a parte che NON ha workspaceId, quindi l'intercettore
+  // non saprebbe a chi attribuire la riga. Il fatto e' gia' registrato dove ha
+  // un significato - la rotta di caricamento annota
+  // `messages.attachment.upload` sull'allegato vero, che il workspace ce l'ha.
+  // Senza questa riga ogni caricamento produrrebbe DUE registrazioni: quella
+  // buona e un doppione non attribuibile sul blob.
+  ['WorkspaceMessageAttachmentBinary', 'blob senza workspace: non attribuibile'],
 ]);
 
 // La forma canonica del bersaglio - e la tabella delle eccezioni sui tre tipi
