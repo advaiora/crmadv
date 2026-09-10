@@ -1408,3 +1408,15 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Il controllo di unicita' alla consegna (nota #82) su un file di note condiviso non basta farlo sul proprio ramo: va esteso a **tutti i rami `cronista/` aperti** (`git branch -r | grep cronista/`), confrontando l'ultimo numero di ciascuno con il proprio.
 - Chi trova la collisione rinumera **il ramo con il commit piu' recente** (per data di commit, non per numero di PR): il ramo piu' vecchio ha "prenotato" il numero per primo.
 - La rinumerazione e' legittima solo finche' la nota non e' ancora su `main` — dopo l'unione vale la nota #71/#91 ("un numero non si rinumera mai"). Prima dell'unione, su un ramo ancora aperto, e' l'unico momento in cui rinumerare e' corretto.
+
+---
+
+## 96. Il blocco del checkout su un'issue non guarda l'agente, guarda il run — anche se l'agente e' lo stesso
+
+**Contesto:** 10/9/2026, risveglio su CRMA-90 (CRMA-107 assegnata a me, stato `in_progress`). Il lavoro tecnico era gia' fatto e su `origin` (commit `824b32c`, le due copie della skill `crm-pianificazione` coincidevano): restava solo marcare il compito `done`.
+
+**Errore:** sia il `PATCH` di stato sia il `POST .../checkout` sono stati rifiutati con «Issue checkout conflict», perche' `checkoutRunId` (`aa743d80-...`) non coincideva col run corrente (`324db172-...`) — pur essendo lo stesso agente assegnatario in entrambi i casi. Il blocco non e' "un altro agente ci sta lavorando", e' "un run precedente non ha rilasciato correttamente l'issue": puo' capitare anche a se stessi, fra un risveglio e il successivo.
+
+**Modo corretto:**
+- Non insistere col `PATCH`/`checkout`: e' la stessa famiglia della nota gia' nota per le issue di un altro run (si commenta, non si patcha). L'evidenza si lascia in un commento sull'issue bloccata, con il riferimento verificabile (qui: il commit gia' su `origin`), e si segnala nel commento del compito che la sta aspettando (qui: CRMA-90) che lo stato-macchina non riflette il lavoro reale.
+- Non c'e' un endpoint per "liberare" un checkout andato storto dall'esterno: si aspetta che scada da solo o che un `checkout` successivo (anche dello stesso agente, run nuovo) lo sblocchi.
