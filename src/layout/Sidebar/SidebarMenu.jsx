@@ -329,7 +329,12 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
-            name: "Impostazioni Account",
+            // "Impostazioni Account" prometteva impostazioni modificabili: la
+            // pagina è sola lettura (ruoli, permessi, moduli, attività
+            // recente) — il suo stesso titolo a schermo dice "Account e
+            // Accesso" (Account/index.jsx). La voce di menu ora dice lo
+            // stesso, invece di promettere qualcosa che non c'è (CRMA-31).
+            name: "Account e Accesso",
             path: "/pages/account",
             grp_name: "apps",
           },
