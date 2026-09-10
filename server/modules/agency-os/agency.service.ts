@@ -4025,10 +4025,13 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
     // I token veri della chiamata, letti prima del parse: il payload dopo
     // serve solo per il testo, e `usage` andrebbe perso insieme al resto.
     const usage = readCompetitorSearchUsage(payload);
-    const parsed = competitorSearchResponseSchema.parse(
-      parseJsonObjectFromText(extractOpenAiResponseText(payload)),
-    );
 
+    // La riga si scrive PRIMA del parse, e non e' un dettaglio d'ordine: la
+    // chiamata al provider e' gia' riuscita e gia' pagata (`response.ok`, token
+    // letti sopra), a poter fallire e' solo l'interpretazione a valle. Siccome
+    // `assertWithinAiBudget` misura la spesa sommando AiUsageLog, una spesa non
+    // loggata non entrerebbe nel budget: una sequenza di risposte pagate e non
+    // interpretabili scavalcherebbe il fusibile senza mai toccarlo.
     await logCompetitorSearchUsage({
       workspaceId: input.workspaceId,
       projectId: input.project.id,
@@ -4036,6 +4039,10 @@ const runAgencyOpenAiCompetitorSearch = async (input: {
       usage,
       durationMs: Date.now() - startedAt,
     });
+
+    const parsed = competitorSearchResponseSchema.parse(
+      parseJsonObjectFromText(extractOpenAiResponseText(payload)),
+    );
 
     return buildCompetitorSearchResult({
       provider: 'openai_web_search',
@@ -4143,6 +4150,19 @@ const runAgencyAnthropicCompetitorSearch = async (input: {
       });
     }
 
+    // Come nel ramo OpenAI: la riga si scrive prima del parse, perche' i giri
+    // sono gia' stati pagati e `usage` e' completo all'uscita del ciclo. Una
+    // spesa non loggata non entra nel budget (`assertWithinAiBudget` somma
+    // AiUsageLog), quindi non deve dipendere dal fatto che la risposta sia
+    // interpretabile.
+    await logCompetitorSearchUsage({
+      workspaceId: input.workspaceId,
+      projectId: input.project.id,
+      model,
+      usage,
+      durationMs: Date.now() - startedAt,
+    });
+
     // Prima il blocco tool_use (JSON valido per costruzione), poi il testo come
     // ripiego: se il modello ha risposto a parole nonostante lo strumento, si
     // prova comunque a leggerlo invece di buttare via una ricerca gia' pagata.
@@ -4151,14 +4171,6 @@ const runAgencyAnthropicCompetitorSearch = async (input: {
       ? structured
       : parseJsonObjectFromText(extractAnthropicTextContent(payload));
     const parsed = competitorSearchResponseSchema.parse(rawResult);
-
-    await logCompetitorSearchUsage({
-      workspaceId: input.workspaceId,
-      projectId: input.project.id,
-      model,
-      usage,
-      durationMs: Date.now() - startedAt,
-    });
 
     return buildCompetitorSearchResult({
       provider: 'anthropic_web_search',
