@@ -1,8 +1,9 @@
 # Backup del database di produzione — stato, proposta, procedura di ripristino
 
-> **Stato: PROPOSTA, in attesa di approvazione di Jacopo.** Niente di quanto è descritto
-> qui è stato messo in produzione. La prova di ripristino (capitolo 4) invece **è già
-> stata fatta davvero**, su un database usa-e-getta, e i numeri che leggi sono misurati.
+> **Stato: PIANO APPROVATO da Jacopo il 10/9/2026. Script pronto e provato. Manca
+> l'installazione sulla VPS, che richiede un accesso SSH che l'agente non ha.**
+> ⚠️ Quindi **oggi il backup ancora non gira**: finché il passo del capitolo 8 non è
+> fatto, la produzione resta senza nessuna copia.
 >
 > Compito CRMA-70. Scritto il 9/9/2026 dal Guardiano.
 >
@@ -10,6 +11,11 @@
 > il senso di tutto il documento: il progetto Supabase è sul **piano gratuito**, che non
 > fa backup di nessun tipo. Quindi quello proposto qui non è *un secondo* backup — è
 > **l'unico**, e oggi al suo posto non c'è niente.
+>
+> **Cosa esiste già davvero, e si può toccare:** la prova di ripristino (capitolo 4) è
+> stata fatta su un database usa-e-getta e i numeri che leggi sono misurati; lo script,
+> la configurazione di esempio e la guida di installazione stanno in `scripts/backup/`
+> (capitolo 8), e anche quelli sono stati provati.
 
 ---
 
@@ -379,13 +385,12 @@ e non manderà email finché non gli si rimette accanto la **`ENCRYPTION_KEY` gi
 
 Le tre domande del 9/9 hanno avuto risposta (§2.3). Resta questo.
 
-**① L'approvazione, che oggi manca.** Alla domanda «approvi la proposta?» la risposta è
-stata «aspetta, prima voglio vedere le risposte alle altre domande». Adesso quelle
-risposte ci sono e stanno nel §2.3. **La proposta è ferma qui**: nessuno ha installato
-niente, e nessuno lo farà senza un sì esplicito.
+**① L'approvazione: ✅ arrivata.** Jacopo ha approvato il piano il **10/9/2026 alle 09:18**,
+sulla versione del documento al commit `0f2313e`. Approvazione al piano, non
+all'installazione: mettere in produzione richiede comunque i passi del ② qui sotto.
 
-**② L'esecuzione, che richiede un accesso che io non ho.** Se approvata, l'esecuzione è
-in cinque passi, in quest'ordine:
+**② L'esecuzione, che richiede un accesso che io non ho.** L'esecuzione è in cinque passi,
+in quest'ordine:
 
 1. **Controllare che sulla VPS non ci sia già un cron di backup** — è il passo che la
    risposta «non riesco a controllarlo adesso» rende obbligatorio. Comando nel §2.2,
@@ -399,8 +404,8 @@ in cinque passi, in quest'ordine:
 
 👉 **I passi 1-4 richiedono l'accesso SSH alla VPS e le credenziali del fornitore di
 archiviazione. Io non ho né l'uno né le altre, e non devo averle.** Questa parte la fa
-Jacopo, o chi ha quegli accessi. Io posso preparare lo script e il testo del cron perché
-vengano incollati, e posso costruire la sorveglianza dal lato Paperclip.
+Jacopo, o chi ha quegli accessi. ✅ **Lo script, la configurazione e il testo del cron sono
+pronti da incollare**: capitolo 8.
 
 **③ Una decisione separata, da non confondere con questa.** Il piano gratuito espone
 anche alla sospensione per inattività (§3). Se il CRM è in produzione con clienti veri,
@@ -415,3 +420,45 @@ che **non sostituisce** il backup di questo documento e non va usata per rimanda
   (§6). Non era subordinata a nessuna approvazione, ed è la parte del compito che vale
   di più: se domani qualcuno dovesse ripristinare, troverebbe dei comandi già provati
   invece di una pagina bianca.
+- ✅ **Lo script e la guida di installazione** esistono e sono provati (§8).
+
+---
+
+## 8. Lo script, pronto da incollare — 10/9/2026
+
+Approvato il piano, ho costruito le tre cose che si potevano costruire da qui. Stanno nel
+repository, in **`scripts/backup/`**:
+
+| File | Cos'è |
+|---|---|
+| `backup-crmadv.sh` | Lo script che gira ogni notte. Fa il dump, **lo verifica**, ruota, copia fuori sede, e apre un compito **solo se qualcosa va storto** |
+| `crmadv-backup.env.example` | Il modello della configurazione. La copia riempita resta sulla VPS con `chmod 600`, non torna nel repository |
+| `README.md` | I nove passi di installazione, con i comandi da incollare nell'ordine giusto |
+
+**Cosa ho provato davvero**, il 10/9/2026 su un PostgreSQL 17 usa-e-getta creato con
+`initdb` e cancellato a fine prova — la produzione non è stata toccata:
+
+| Prova | Esito |
+|---|---|
+| Backup completo di un database da 200.000 righe | dump da 4,4 MB in 1 secondo |
+| Il dump prodotto **si ripristina** | 200.000 righe tornate, zero errori |
+| Rotazione con 10 giornalieri presenti | ne restano 7, i più recenti |
+| Database irraggiungibile | uscita 1, motivo nel registro, segnale di guasto, **nessun file monco lasciato in giro** |
+| Dump che crolla di dimensione (il fallimento travestito da successo del §5.4) | bloccato — e **il backup buono del giorno prima non viene sovrascritto** |
+| Secondo guasto entro 20 ore | non apre un secondo compito |
+
+**Tre scelte che vale la pena conoscere prima di leggere il codice:**
+
+- **La chiave di Paperclip non passa dalla riga di comando.** Viene data a `curl` dallo
+  standard input (`curl --config -`): sulla riga di comando chiunque sulla macchina la
+  leggerebbe con un `ps`. Stessa ragione per cui la password del database sta nel
+  `.pgpass` e non nel cron (§5.3).
+- **Le copie settimanali e mensili sono collegamenti fisici, non copie.** Due nomi, un
+  solo file su disco: lo spazio si libera quando cade l'ultimo dei due nomi.
+- **Lo script non può cancellare niente sull'archivio a oggetti**, di proposito: le chiavi
+  sono di sola scrittura e la scadenza dei file la decide una regola del fornitore. Così
+  chi entrasse nella VPS non si porta via anche le copie di fuori.
+
+⚠️ **Quello che da qui non si poteva provare, e va provato là:** la connessione vera a
+Supabase, la copia con `rclone`, l'apertura reale del compito su Paperclip e il cron. Sono
+i passi 1-8 del `README.md`, e li fa chi ha l'accesso SSH.
