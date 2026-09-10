@@ -1382,3 +1382,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Modo corretto:**
 - Non fidarsi del codice d'uscita quando c'e' una pipe di mezzo. La prova che un commit e' stato rifiutato e' che **il file e' ancora in stage**: si legge con `git status --short` dopo il tentativo (`A file.md` = commit non avvenuto).
 - In alternativa, non mettere `git commit` in pipe: catturare l'uscita in una variabile (`git commit …; esito=$?`) e solo dopo filtrare l'output per la lettura umana.
+
+---
+
+## 94. Un file che esiste in due copie tracciate si modifica su una sola, e il revisore lo trova solo diffando le due copie
+
+**Contesto:** revisione della PR #29 (CRMA-107). La skill `crm-pianificazione` vive in due copie nel repository — `paperclip/skills/crm-pianificazione/` e `paperclip/azienda-crm/skills/crm-pianificazione/` — debito gia' scritto in roadmap (CRMA-60, «la skill esiste in due copie che divergono»). La PR doveva solo aggiornare due frasi datate in `04_ordine-e-dipendenze.md` e `07_casi.md`.
+
+**Errore:** la modifica e' stata scritta su `paperclip/skills/crm-pianificazione/references/` e basta. Su `origin/main` le due copie erano identiche byte per byte (`git diff --quiet <ramoA>:file <ramoB>:file` non dava output); dopo la modifica divergevano di 2 e 6 righe. Niente nel diff della PR lo segnalava — il file toccato compariva come modificato, quello gemello semplicemente non compariva, ed e' proprio l'assenza a passare inosservata in una revisione che guarda cosa e' cambiato.
+
+**Modo corretto:**
+- Prima di chiudere una modifica a un file di cui si sa (o si sospetta, vedi CRMA-60) che esiste altrove come copia, cercarlo: `find . -path "*<nome-file>*"` o `grep -rl` sul nome della cartella.
+- Se le copie esistono, verificare con un diff mirato che restino identiche **dopo** la modifica, non fidarsi del fatto che "il contenuto e' lo stesso, l'ho scritto uguale a mano": `diff copiaA copiaB` deve dare output vuoto.
+- Finche' le due copie di `crm-pianificazione` non sono state fuse in una sola (CRMA-60), ogni PR che tocca `references/` in una delle due deve toccare anche l'altra, con lo stesso diff.
