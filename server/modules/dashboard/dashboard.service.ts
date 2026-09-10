@@ -44,13 +44,16 @@ const sortUrgent = (items: DashboardUrgentRecord[]) =>
     return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
   });
 
+// I KPI di un modulo spento non valgono zero: mancano proprio dalla risposta.
+const dashboardKpisSchema = z.object({
+  clientsActive: z.number().int().nonnegative().optional(),
+  projectsActive: z.number().int().nonnegative().optional(),
+  quotesSent30d: z.number().int().nonnegative().optional(),
+  checklistOpenItems: z.number().int().nonnegative().optional(),
+});
+
 const dashboardOverviewSchema = z.object({
-  kpis: z.object({
-    clientsActive: z.number().int().nonnegative(),
-    projectsActive: z.number().int().nonnegative(),
-    quotesSent30d: z.number().int().nonnegative(),
-    checklistOpenItems: z.number().int().nonnegative(),
-  }),
+  kpis: dashboardKpisSchema,
   urgent: z.array(z.object({
     type: z.enum(['blocked_project', 'stale_project', 'unsent_quote', 'overdue_checklist']),
     title: z.string(),
@@ -138,14 +141,26 @@ type HomeContext = {
   enabledModuleKeys: Set<string>;
 };
 
+/**
+ * Un segnale della Dashboard vale solo se chi guarda ha il permesso E il modulo
+ * che lo produce e' acceso: un modulo spento non deve lasciare ne' conteggi ne'
+ * link dietro di se'. E' la stessa protezione gia' usata per la Cassaforte
+ * (`canViewSecuritySummary`), qui estesa a tutti i moduli spegnibili.
+ */
+const allowsModuleSignal = (
+  context: Pick<HomeContext, 'permissionKeys' | 'enabledModuleKeys'>,
+  moduleKey: string,
+  permissionKey: string,
+) => context.enabledModuleKeys.has(moduleKey) && hasPermissionKey(context.permissionKeys, permissionKey);
+
 const buildUrgentForContext = async (
   repository: typeof dashboardRepository,
   context: HomeContext,
 ) => {
   const urgentItems: DashboardUrgentRecord[] = [];
-  const canViewProjects = hasPermissionKey(context.permissionKeys, 'projects.view');
-  const canViewChecklists = hasPermissionKey(context.permissionKeys, 'checklists.view');
-  const canViewQuotes = hasPermissionKey(context.permissionKeys, 'quotes.view');
+  const canViewProjects = allowsModuleSignal(context, 'projects', 'projects.view');
+  const canViewChecklists = allowsModuleSignal(context, 'checklists', 'checklists.view');
+  const canViewQuotes = allowsModuleSignal(context, 'quotes', 'quotes.view');
 
   if (canViewProjects && canViewChecklists) {
     const [blocked, overdue] = await Promise.all([
@@ -274,14 +289,28 @@ export const buildDashboardService = (
 
   return {
     async getOverview(workspaceId: string): Promise<DashboardOverviewDto> {
+      // Come getHome: i moduli accesi si leggono prima, e comandano cosa si conta.
+      const enabledModuleKeys = new Set(await moduleRepositoryApi.listEnabledModules(workspaceId));
+      const clientsEnabled = enabledModuleKeys.has('clients');
+      const projectsEnabled = enabledModuleKeys.has('projects');
+      const quotesEnabled = enabledModuleKeys.has('quotes');
+      const checklistsEnabled = enabledModuleKeys.has('checklists');
+
       const [kpis, pipeline, activity, blockedProjects, staleProjects, unsentQuotes, overdueChecklist] = await Promise.all([
-        dashboardRepositoryApi.getKpis(workspaceId),
-        dashboardRepositoryApi.getPipelineSnapshot(workspaceId),
+        dashboardRepositoryApi.getKpis(workspaceId, {
+          clients: clientsEnabled,
+          projects: projectsEnabled,
+          quotes: quotesEnabled,
+          checklists: checklistsEnabled,
+        }),
+        projectsEnabled ? dashboardRepositoryApi.getPipelineSnapshot(workspaceId) : Promise.resolve([]),
         dashboardRepositoryApi.getRecentActivity(workspaceId),
-        dashboardRepositoryApi.getUrgentBlockedProjects(workspaceId),
-        dashboardRepositoryApi.getUrgentStaleProjects(workspaceId),
-        dashboardRepositoryApi.getUrgentUnsentQuotes(workspaceId),
-        dashboardRepositoryApi.getUrgentOverdueChecklistItems(workspaceId),
+        projectsEnabled ? dashboardRepositoryApi.getUrgentBlockedProjects(workspaceId) : Promise.resolve([]),
+        projectsEnabled ? dashboardRepositoryApi.getUrgentStaleProjects(workspaceId) : Promise.resolve([]),
+        quotesEnabled ? dashboardRepositoryApi.getUrgentUnsentQuotes(workspaceId) : Promise.resolve([]),
+        checklistsEnabled
+          ? dashboardRepositoryApi.getUrgentOverdueChecklistItems(workspaceId)
+          : Promise.resolve([]),
       ]);
 
       const urgent = sortUrgent([
@@ -319,14 +348,29 @@ export const buildDashboardService = (
       };
 
       const widgets: DashboardHomeDto['widgets'] = [];
-      const canSeeKpis = true;
+      // I moduli spegnibili: se il modulo e' spento non si conta e non si mostra
+      // niente di suo, nemmeno a chi ne avrebbe il permesso.
+      const clientsEnabled = context.enabledModuleKeys.has('clients');
+      const projectsEnabled = context.enabledModuleKeys.has('projects');
+      const quotesEnabled = context.enabledModuleKeys.has('quotes');
+      const checklistsEnabled = context.enabledModuleKeys.has('checklists');
+      const kpiScope = {
+        clients: clientsEnabled,
+        projects: projectsEnabled,
+        quotes: quotesEnabled,
+        checklists: checklistsEnabled,
+      };
+      const canSeeKpis = clientsEnabled || projectsEnabled || quotesEnabled || checklistsEnabled;
       const canSeeActivity = true;
-      const canViewProjects = hasPermissionKey(permissionKeys, 'projects.view');
-      const canViewQuotes = hasPermissionKey(permissionKeys, 'quotes.view');
-      const canViewClients = hasPermissionKey(permissionKeys, 'clients.view');
-      const canViewChecklists = hasPermissionKey(permissionKeys, 'checklists.view');
-      const canAssignChecklistItems = hasPermissionKey(permissionKeys, 'checklists.assign');
-      const canViewTeam = hasPermissionKey(permissionKeys, 'team.view');
+      const canViewProjects = allowsModuleSignal(context, 'projects', 'projects.view');
+      const canViewQuotes = allowsModuleSignal(context, 'quotes', 'quotes.view');
+      const canViewClients = allowsModuleSignal(context, 'clients', 'clients.view');
+      const canViewChecklists = allowsModuleSignal(context, 'checklists', 'checklists.view');
+      const canAssignChecklistItems = allowsModuleSignal(context, 'checklists', 'checklists.assign');
+      const canViewTeam = allowsModuleSignal(context, 'team', 'team.view');
+      // Il riquadro "Team Workload" conta voci di memo: e' un segnale dei Memo
+      // Operativi mostrato sotto Team, quindi vuole acceso anche quel modulo.
+      const canViewTeamWorkload = canViewTeam && checklistsEnabled;
       const canViewModules = hasAnyPermissionKey(permissionKeys, ['modules.manage', 'modules.view']);
       const canViewAudit = hasPermissionKey(permissionKeys, 'audit.view');
       const canViewVaultSignals = hasAnyPermissionKey(permissionKeys, ['vault.view_list', 'vault.reveal']);
@@ -345,7 +389,7 @@ export const buildDashboardService = (
           'team.roles_assign',
         ])
       );
-      const canCreateClients = hasPermissionKey(permissionKeys, 'clients.create');
+      const canCreateClients = allowsModuleSignal(context, 'clients', 'clients.create');
 
       let kpisPromise: Promise<Awaited<ReturnType<typeof dashboardRepositoryApi.getKpis>>> | null = null;
       let urgentPromise: Promise<Awaited<ReturnType<typeof buildUrgentForContext>>> | null = null;
@@ -369,7 +413,7 @@ export const buildDashboardService = (
 
       const loadKpis = () => {
         if (!kpisPromise) {
-          kpisPromise = dashboardRepositoryApi.getKpis(context.workspaceId);
+          kpisPromise = dashboardRepositoryApi.getKpis(context.workspaceId, kpiScope);
         }
 
         return kpisPromise;
@@ -556,7 +600,7 @@ export const buildDashboardService = (
           order += 1;
         }
 
-        if (canViewTeam) {
+        if (canViewTeamWorkload) {
           widgets.push(widget(
             'team_workload',
             'team_workload',
@@ -657,7 +701,7 @@ export const buildDashboardService = (
           order += 1;
         }
 
-        if (canViewTeam) {
+        if (canViewTeamWorkload) {
           widgets.push(widget(
             'team_workload',
             'team_workload',
@@ -817,7 +861,7 @@ export const buildDashboardService = (
           loadUrgent(),
           loadKpis(),
           canViewProjects ? loadPipelineSnapshot() : Promise.resolve([]),
-          canViewTeam
+          canViewTeamWorkload
             ? loadTeamWorkload()
             : Promise.resolve({
               openChecklistByUser: [],
