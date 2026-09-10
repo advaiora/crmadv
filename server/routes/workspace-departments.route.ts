@@ -78,6 +78,8 @@ const workspaceDepartmentsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'department.create',
+        entityType: 'department',
+        entityId: department?.id,
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: { departmentId: department?.id, name: department?.name },
@@ -107,6 +109,8 @@ const workspaceDepartmentsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'department.update',
+        entityType: 'department',
+        entityId: department?.id,
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: { departmentId: department?.id, name: department?.name },
@@ -135,6 +139,8 @@ const workspaceDepartmentsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'department.delete',
+        entityType: 'department',
+        entityId: department.id,
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: { departmentId: department.id, name: department.name },
@@ -165,6 +171,7 @@ const workspaceDepartmentsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'department.member_role_set',
+        entityType: 'department_member',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: result,
@@ -194,6 +201,7 @@ const workspaceDepartmentsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'department.members_assign',
+        entityType: 'department_member',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: { departmentId: result.departmentId, changes: result.changes },

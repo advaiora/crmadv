@@ -30,6 +30,10 @@ export const requireAuthIdentity = async (request: FastifyRequest): Promise<Auth
   // Registra l'utente autenticato nel contesto di richiesta: così i livelli
   // profondi (es. log costi AI) sanno chi ha avviato l'azione senza propagazioni.
   requestContext.setUserId(user.id);
+  // Il workspace serve all'intercettore del Registro attività per attribuire una
+  // scrittura quando la riga toccata non porta con sé la propria colonna
+  // workspaceId (accade su update e delete, dove si conosce solo l'id).
+  requestContext.setWorkspaceId(tokenClaims.workspaceId ?? null);
 
   return {
     user,
