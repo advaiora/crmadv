@@ -44,6 +44,30 @@ export const authorLabel = (message) => {
 // Rileva se l'AI e' interpellata via menzione @AI (stessa regola del server).
 export const mentionsAi = (text) => /(^|\s)@ai\b/i.test(text || "");
 
+// --- Messaggistica: quando c'e' davvero qualcosa da segnare come letto ---
+
+// Istante (millisecondi) del messaggio IN ARRIVO piu' recente ancora non letto;
+// 0 se non ce n'e' nessuno. Il server manda per ogni messaggio `isMine` (l'ha
+// scritto chi guarda) e `readAt` (quando e' stato letto, null se mai).
+//
+// Serve a chiedere "segna come letto" SOLO quando c'e' qualcosa da segnare:
+// quella richiesta scrive una riga `messages.read` nel Registro attivita' a ogni
+// chiamata, anche quando non aggiorna niente, e chiamandola a ogni caricamento il
+// registro si riempiva di "ha guardato" al ritmo del controllo automatico.
+export const newestUnreadIncomingAt = (items) => {
+  let newest = 0;
+  for (const message of Array.isArray(items) ? items : []) {
+    if (!message || message.isMine || message.readAt) {
+      continue;
+    }
+    const time = Date.parse(message.createdAt);
+    if (Number.isFinite(time) && time > newest) {
+      newest = time;
+    }
+  }
+  return newest;
+};
+
 // --- Allegati (Fase 3a) ---
 
 export const ENTITY_LABELS = {
