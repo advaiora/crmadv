@@ -1395,3 +1395,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Prima di chiudere una modifica a un file di cui si sa (o si sospetta, vedi CRMA-60) che esiste altrove come copia, cercarlo: `find . -path "*<nome-file>*"` o `grep -rl` sul nome della cartella.
 - Se le copie esistono, verificare con un diff mirato che restino identiche **dopo** la modifica, non fidarsi del fatto che "il contenuto e' lo stesso, l'ho scritto uguale a mano": `diff copiaA copiaB` deve dare output vuoto.
 - Finche' le due copie di `crm-pianificazione` non sono state fuse in una sola (CRMA-60), ogni PR che tocca `references/` in una delle due deve toccare anche l'altra, con lo stesso diff.
+
+---
+
+## 95. Due PR aperte insieme possono scegliere lo stesso numero di nota senza che nessuna delle due lo sappia
+
+**Contesto:** revisione della PR #29 (CRMA-90, CRMA-106). Il commit che aggiungeva la nota #92 su questo ramo e' arrivato **due ore dopo** un commit che aggiungeva una nota #92 diversa su un altro ramo aperto (`cronista/crma-94-r5-r6-bacheca`, PR #30). Nessuno dei due rami poteva vederlo: ognuno calcola "il piu' alto piu' uno" (nota #82) sul proprio `git log`, che a quel momento non conteneva l'altro ramo.
+
+**Errore:** il controllo di unicita' descritto dalla nota #82 ("si rifa' alla consegna, non alla scrittura") basta a evitare collisioni con `main`, ma non con **rami fratelli aperti nello stesso momento** — quelli non compaiono in nessun `git log` locale finche' non vengono spinti e non li si va a cercare esplicitamente. La PR #29 dichiarava "nessun duplicato di numero verificato": vero sul proprio ramo, falso appena si guarda anche l'altro.
+
+**Modo corretto:**
+- Il controllo di unicita' alla consegna (nota #82) su un file di note condiviso non basta farlo sul proprio ramo: va esteso a **tutti i rami `cronista/` aperti** (`git branch -r | grep cronista/`), confrontando l'ultimo numero di ciascuno con il proprio.
+- Chi trova la collisione rinumera **il ramo con il commit piu' recente** (per data di commit, non per numero di PR): il ramo piu' vecchio ha "prenotato" il numero per primo.
+- La rinumerazione e' legittima solo finche' la nota non e' ancora su `main` — dopo l'unione vale la nota #71/#91 ("un numero non si rinumera mai"). Prima dell'unione, su un ramo ancora aperto, e' l'unico momento in cui rinumerare e' corretto.
