@@ -116,28 +116,17 @@ const PASSWORD_SEGNAPOSTO = new Set([
 //     stessa forma ed e' una password vera — misurato come "passa" nella
 //     revisione di CRMA-83 (compito CRMA-85). Diversi gestori di password
 //     generano esattamente cosi'. Ora almeno UNO dei pezzi separati da `-`/`_`
-//     deve essere una di queste parole: `LA-TUA-PASSWORD` passa, `A1B2-C3D4` no.
+//     deve essere una di queste parole — E nessun pezzo deve sembrare casuale
+//     (vedi `sembraCasuale` qui sotto). `LA-TUA-PASSWORD` passa; `A1B2-C3D4` no
+//     perche' non ha parole; `A1B2-C3D4-QUI` no perche' ha un pezzo casuale.
 //     ⚠️ Ogni voce e' un buco: aggiungerne una vale come ampliare la lista qui
 //     sopra. Fuori di proposito gli articoli e i possessivi corti (`LA`, `IL`,
 //     `MY`): non servono — `LA-TUA-PASSWORD` combacia gia' su `TUA` e su
 //     `PASSWORD` — e due lettere sono anche la lunghezza di un pezzo casuale.
-//     Le parole stanno su DUE livelli, perche' non valgono tutte uguale
-//     (distinzione introdotta dalla revisione di sicurezza, compito CRMA-89).
-//
-// (2-bis-A) FORTI: parole che compaiono solo nei segnaposto. Nessuno chiama
-//     `TUA` o `INSERISCI` un pezzo di password vera. Una sola basta.
-const PAROLE_SEGNAPOSTO_FORTI = new Set([
+const PAROLE_SEGNAPOSTO = new Set([
   'tua', 'tuo', 'tue', 'tuoi', 'mia', 'mio', 'your', 'yours',
   'change', 'changeme', 'example', 'esempio', 'sample', 'placeholder',
   'segnaposto', 'qui', 'here', 'todo', 'dummy', 'fake', 'inserisci',
-]);
-
-// (2-bis-B) DEBOLI: parole che NOMINANO un segreto, e che quindi possono
-//     benissimo trovarsi dentro un segreto vero. Servono a `DB-PASSWORD` e
-//     `SECRET-KEY`, ma da sole accettavano anche password vere: misurato in
-//     revisione, `root:PROD-SECRET-2026@10.0.0.5` passava. Ora una parola
-//     debole vale SOLO se nessun pezzo della password sembra casuale.
-const PAROLE_SEGNAPOSTO_DEBOLI = new Set([
   'password', 'pass', 'passwd', 'secret', 'segreto',
 ]);
 
@@ -147,6 +136,20 @@ const PAROLE_SEGNAPOSTO_DEBOLI = new Set([
 //    le password tutte-X cadono gia' in /^[*x.]+$/i qui sotto, i file di test
 //    sono gia' esclusi per percorso, e i segnaposto veri che le contengono
 //    (`TEST-PASSWORD`, `XXX-PASSWORD`) combaciano comunque su `PASSWORD`.
+
+// ⚠️ Qui c'e' stata per mezza giornata una distinzione fra parole FORTI (`tua`,
+//    `inserisci`: bastavano da sole) e DEBOLI (`password`, `secret`: valevano
+//    solo senza pezzi casuali). Ritirata il 10/9/2026 su misura della revisione
+//    CRMA-91: le forti facevano `return true` PRIMA del controllo di casualita',
+//    quindi `root:A1B2-C3D4-QUI`, `root:K9QW2MZZ41PLM3G7-HERE`,
+//    `root:A1B2-C3D4-TODO` e `root:A1B2-C3D4-FAKE` passavano — lo stesso buco
+//    che togliere `xxx` e `test` aveva chiuso per due parole sole, non per la
+//    classe. Sottoporre anche le forti al controllo rende i due livelli identici
+//    nel comportamento: una lista sola e' la stessa cosa, scritta onestamente.
+//    Costo dichiarato: un segnaposto con un suffisso che sembra casuale
+//    (`TUA-PASSWORD-PROD1`) ora viene rifiutato. Nel repository non esiste —
+//    verificato mettendo in stage l'intero albero — e la via d'uscita
+//    `--no-verify` e' scritta nel messaggio d'errore.
 
 // Un pezzo "sembra casuale" se e' lungo almeno 4 e mescola lettere e cifre:
 // `A1B2`, `C3D4`, `K9QW2MZZ41PLM3G7`. La lunghezza minima non e' un dettaglio,
@@ -160,15 +163,20 @@ const sembraCasuale = (pezzo) =>
 // documentazione (`INSERISCI-QUI-LA-TUA-PASSWORD-DEL-DATABASE` sono 42).
 // ⚠️ Da solo e' quasi inerte (rilevato in revisione): morde unicamente sopra i
 //    64 caratteri, mentre le password generate stanno fra 16 e 32. Chiude la
-//    coda lunga, non e' la protezione — quella sono le due liste qui sopra.
+//    coda lunga, non e' la protezione — quella sono la lista e `sembraCasuale`.
 const LUNGHEZZA_MASSIMA_SEGNAPOSTO = 64;
 
+// ⚠️ L'ordine dei due controlli e' la sostanza della regola, non uno stile: un
+//    pezzo che sembra casuale RIFIUTA subito, e nessuna parola della lista puo'
+//    piu' salvarlo. Chi aggiunge un `return true` sopra questa riga riapre il
+//    buco di CRMA-91 — un'uscita anticipata e' un'esenzione, e se la eredita in
+//    silenzio ogni voce della lista.
 function eSegnapostoMaiuscolo(password) {
   if (!/^[A-Z0-9]+([-_][A-Z0-9]+)+$/.test(password)) return false;
   if (password.length > LUNGHEZZA_MASSIMA_SEGNAPOSTO) return false;
   const pezzi = password.toLowerCase().split(/[-_]/);
-  if (pezzi.some((p) => PAROLE_SEGNAPOSTO_FORTI.has(p))) return true;
-  return pezzi.some((p) => PAROLE_SEGNAPOSTO_DEBOLI.has(p)) && !pezzi.some(sembraCasuale);
+  if (pezzi.some(sembraCasuale)) return false;
+  return pezzi.some((p) => PAROLE_SEGNAPOSTO.has(p));
 }
 
 function eSegnaposto(utente, password) {
