@@ -1444,3 +1444,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Modo corretto:**
 - Quando il vero bloccante e' un'azione umana fuori dal grafo delle issue (qui: un click «Merge» su GitHub), non collegare o scollegare `blockedByIssueIds` a issue-agente che sono gia' chiuse: si svuota l'elenco (`blockedByIssueIds: []`) e si lascia che sia **solo** `unblockDescriptor` a dire chi sblocca e come — quel campo non alimenta il recupero automatico.
 - Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `blockedBy` risulti vuoto pur restando `status: "blocked"` — segno che il recupero automatico non ha piu' un bloccante "risolvibile" da cui ripartire da solo.
+
+---
+
+## 99. Una regola scritta senza la sua procedura non protegge nulla, produce solo una coda
+
+**Contesto:** 10/9/2026, sezione «L'unione a `main`» di `CLAUDE.md`. Il testo diceva «il consenso resta obbligatorio, sempre e senza eccezioni» su un'operazione — l'unione di una pull request pronta — che con la release in corso si presentava anche diciotto volte in una giornata. Alle 14:01 dello stesso giorno, rispondendo alla richiesta `crma-23-coda-unioni`, Jacopo ha dovuto correggere la regola a caldo, scegliendo due corsie (consenso singolo solo per schema, migrazioni, permessi o sicurezza; il Capocantiere unisce da solo tutto il resto a cancelli superati) perché la fila di conferme era già più lenta della produzione di pull request.
+
+**Errore:** scrivere «sempre e senza eccezioni» pensando alla sicurezza del principio, senza calcolare il volume a cui quel principio si sarebbe applicato. Una regola che tratta un refuso di documentazione e una migrazione di schema con lo stesso passaggio umano non è più severa: è indifferente al rischio, e l'unico effetto misurabile è stato diciotto pull request ferme, alcune con la conferma già scaduta prima che qualcuno la leggesse.
+
+**Modo corretto:**
+- Quando una regola introduce un passaggio umano obbligatorio su un'azione che può ripetersi molte volte al giorno, il testo che la scrive deve includere **da subito** un criterio meccanico per distinguere dove il passaggio serve davvero da dove è solo un tappo — non aspettare che il volume lo dimostri da sé.
+- Il criterio va ancorato a qualcosa di verificabile senza giudizio (qui: quali file tocca la pull request), sullo stesso modello degli inneschi di R1 per i cancelli di revisione — non al «rischio percepito», che ogni agente stima in modo diverso.
+- Vale anche al contrario: se la regola prevede un riscadenzamento automatico di un passaggio umano (qui: una conferma scaduta si riemette da sola, senza richiedere il permesso di richiedere), va scritto per iscritto la prima volta — altrimenti ogni conferma scaduta genera una nuova domanda invece di una nuova richiesta, ed è la stessa cosa che si voleva evitare.
