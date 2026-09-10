@@ -528,6 +528,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
   const canUseMessaging =
     hasModuleEnabled(access, MESSAGING_MODULE_KEY) && hasPermission(access, MESSAGING_PERMISSIONS.view);
   const canSendMessages = hasPermission(access, MESSAGING_PERMISSIONS.send);
+  const canAttachMessages = hasPermission(access, MESSAGING_PERMISSIONS.attach);
 
   // Modelli del selettore: disponibili (provider con chiave) e raggruppati per provider.
   // `availableModelIds` serve sia a preselezionare sia a non inviare una scelta non piu'
@@ -1069,6 +1070,7 @@ const AiChatWidget = ({ inline = false, initialMode = "ai" }) => {
           <MessagingPanel
             expanded={expandedView}
             canSend={canSendMessages}
+            canAttach={canAttachMessages}
             peer={messagingPeer}
             onPeerChange={setMessagingPeer}
           />
