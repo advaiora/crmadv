@@ -67,9 +67,12 @@ const REGOLE = [
 //     `test-user:test-pass` esistono davvero e bloccherebbero il lavoro ogni giorno. Si
 //     chiude lato server, con GitHub Push Protection, che questa esclusione non ce l'ha.
 //     E' l'argomento piu' forte a suo favore.
-//     ⚠️ `.githooks/pre-commit` resta in lista anche dopo l'estrazione di CRMA-93, quando
-//     ha smesso di contenere i pattern: toglierlo sarebbe una stretta, non un'estrazione,
-//     e questo compito e' dichiarato neutro. E' annotato come rilievo.
+//     ⚠️ `.githooks/pre-commit` NON e' piu' in lista (CRMA-98). C'e' stato fino a CRMA-93
+//     perche' l'hook conteneva i pattern qui sopra e senza esclusione si sarebbe bloccato
+//     da solo appena qualcuno lo apriva. Portati via i pattern, quella ragione e' finita e
+//     l'esclusione era diventata l'unico file del repository dove una password vera passava
+//     senza che nessuno dicesse niente. Costo della rimozione, misurato: zero — albero
+//     intero in stage, 3636 file, commit accettato.
 //     ⚠️ Questo file NON e' escluso, ed e' voluto: misurato in CRMA-93, nessuna delle
 //     regole qui sopra combacia col proprio sorgente (dopo ogni prefisso c'e' una `[` di
 //     classe di caratteri, che nessuna delle classi ammette). Se un domani una regola
@@ -79,7 +82,6 @@ const PERCORSI_ESCLUSI = [
   /(^|\/)__tests__\//,
   /(^|\/)__mocks__\//,
   /\.(test|spec)\.[cm]?[jt]sx?$/,
-  /(^|\/)\.githooks\/pre-commit$/,
 ];
 
 const escluso = (percorso) => PERCORSI_ESCLUSI.some((re) => re.test(percorso));
