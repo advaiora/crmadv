@@ -94,7 +94,12 @@ export const validateAttachment = (input: ValidateAttachmentInput): ValidatedAtt
   const normalizedMimeType = input.mimeType.split(';')[0]?.trim().toLowerCase() ?? '';
   if (!ALLOWED_ATTACHMENT_MIME_TYPES.includes(normalizedMimeType)) {
     throw badRequest(
-      'Tipo di file non ammesso. Si possono allegare documenti (PDF, Word, Excel, PowerPoint, testo, CSV), immagini (PNG, JPEG, GIF, WebP, SVG) e archivi ZIP.',
+      // ⚠️ L'elenco qui dentro deve rispecchiare ALLOWED_ATTACHMENT_MIME_TYPES: SVG NON
+      // va nominato, perche' non e' ammesso (vedi il commento sull'elenco). Prometterlo
+      // qui manderebbe la persona a riprovare con un file che il server rifiutera'
+      // comunque - il rifiuto piu' frustrante e' quello che elenca fra i tipi buoni
+      // proprio quello che hai appena caricato.
+      'Tipo di file non ammesso. Si possono allegare documenti (PDF, Word, Excel, PowerPoint, testo, CSV, Markdown), immagini (PNG, JPEG, GIF, WebP) e archivi ZIP.',
     );
   }
 
