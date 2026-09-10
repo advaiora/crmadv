@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { toggleCollapsedNav } from '../../../redux/action/Theme';
 import { useWorkspaceAccess } from '../../../hooks/useWorkspaceAccess';
+import { initialsFromUser } from '../Profile/profileFormatters';
 
 const formatDateTime = (value) => {
   if (!value) {
@@ -22,17 +23,6 @@ const formatDateTime = (value) => {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-};
-
-const initialsFromUser = (user) => {
-  const displayName = user?.name?.trim();
-  if (displayName) {
-    const parts = displayName.split(/\s+/).filter(Boolean);
-    return parts.slice(0, 2).map((part) => part[0].toUpperCase()).join('');
-  }
-
-  const fallback = user?.email?.trim();
-  return fallback ? fallback.slice(0, 2).toUpperCase() : 'U';
 };
 
 const EditProfile = ({ toggleCollapsedNav }) => {
@@ -145,9 +135,11 @@ const EditProfile = ({ toggleCollapsedNav }) => {
             </Col>
 
             <Col lg={12}>
-              <Alert variant="info" className="mb-0">
-                Le modifiche dirette a nome, email o password non sono ancora esposte in questa UI.
-                Questa pagina mostra solo impostazioni realmente disponibili nel prodotto.
+              <Alert variant="info" className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-0">
+                <span>Nome, email, password e immagine profilo si modificano da «Il Mio Profilo».</span>
+                <Button as={Link} to="/pages/profile" variant="outline-primary" size="sm">
+                  Vai a Il Mio Profilo
+                </Button>
               </Alert>
             </Col>
 
