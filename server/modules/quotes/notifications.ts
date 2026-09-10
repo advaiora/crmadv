@@ -1,4 +1,4 @@
-import { resolveMailTransportDettagliato, type EsitoCanaleDiPosta } from '../../core/mail.js';
+import { sendMail, type SendMailFn } from '../../core/send-mail.js';
 import { brandingRepository } from '../../repositories/branding.repository.js';
 import { quotesRepository } from './repository.js';
 import { renderQuotePdf } from './pdf/quotePdf.js';
@@ -55,7 +55,7 @@ type QuoteNotificationsDependencies = {
   upsertNotificationSettings: typeof quotesRepository.upsertNotificationSettings;
   findBrandingByWorkspaceId: typeof brandingRepository.findByWorkspaceId;
   renderQuotePdfFn: typeof renderQuotePdf;
-  resolveTransport: (workspaceId: string) => Promise<EsitoCanaleDiPosta>;
+  sendMailFn: SendMailFn;
 };
 
 type NotificationEventMetrics = {
@@ -281,14 +281,7 @@ export const buildQuoteNotificationsService = (
     upsertNotificationSettings: overrides.upsertNotificationSettings ?? quotesRepository.upsertNotificationSettings,
     findBrandingByWorkspaceId: overrides.findBrandingByWorkspaceId ?? brandingRepository.findByWorkspaceId,
     renderQuotePdfFn: overrides.renderQuotePdfFn ?? renderQuotePdf,
-    // Niente ripiego di sviluppo qui: una notifica di preventivo non deve
-    // risultare "recapitata" perche' e' finita in una casella finta.
-    // Il workspace serve a usare il server di posta configurato dalla pagina
-    // "Server di posta": senza, si spedirebbe sempre con le variabili
-    // d'ambiente e configurare dall'interfaccia non cambierebbe niente qui.
-    resolveTransport:
-      overrides.resolveTransport
-      ?? ((workspaceId: string) => resolveMailTransportDettagliato({ workspaceId })),
+    sendMailFn: overrides.sendMailFn ?? sendMail,
   };
 
   return {
@@ -317,21 +310,6 @@ export const buildQuoteNotificationsService = (
         return result;
       }
 
-      const mail = await dependencies.resolveTransport(input.workspaceId);
-      if (mail.esito !== 'ok') {
-        // I due guasti restano distinti anche nei contatori: "non configurato"
-        // si risolve configurando, "illeggibile" reinserendo la password dopo
-        // un cambio di chiave di cifratura. Appiattirli manderebbe chi guarda
-        // le metriche a riscrivere parametri che erano gia' giusti.
-        const result = {
-          delivered: false,
-          skippedReason:
-            mail.esito === 'illeggibile' ? 'MAIL_CONFIG_UNREADABLE' : 'MAIL_NOT_CONFIGURED',
-        } satisfies NotifyQuoteEventResult;
-        updateMetricsForResult(input.workspaceId, input.event, result);
-        return result;
-      }
-
       try {
         const branding = await dependencies.findBrandingByWorkspaceId(input.workspaceId);
         const workspaceName = branding?.workspaceName?.trim() || 'Workspace';
@@ -349,28 +327,57 @@ export const buildQuoteNotificationsService = (
         const subject = renderQuoteNotificationTemplate(template.subject, payload);
         const text = renderQuoteNotificationTemplate(template.body, payload);
 
-        const attachments =
-          input.event === 'SENT' && input.quotePdfData
-            ? [await buildPdfAttachment(
-              dependencies,
-              workspaceName,
-              input.workspaceId,
-              input.quotePdfData,
-              branding,
-            )]
-            : undefined;
-
-        const info = await mail.transport.sendMail({
-          from: mail.from,
-          to: recipient,
-          subject,
-          text,
-          ...(attachments ? { attachments } : {}),
+        const quotePdfData = input.quotePdfData;
+        const esito = await dependencies.sendMailFn({
+          workspaceId: input.workspaceId,
+          motivo: `notifica preventivo ${input.event}`,
+          // Niente ripiego di sviluppo qui: una notifica di preventivo parla a
+          // un cliente e non deve mai risultare "recapitata" perche' e' finita
+          // in una casella finta.
+          ripiegoDiSviluppo: false,
+          messaggio: { to: recipient, subject, text },
+          // Il PDF si disegna solo se c'e' davvero un server a cui darlo: e'
+          // una funzione apposta per questo (vedi `preparaAllegati`).
+          ...(input.event === 'SENT' && quotePdfData
+            ? {
+              preparaAllegati: async () => [
+                await buildPdfAttachment(
+                  dependencies,
+                  workspaceName,
+                  input.workspaceId,
+                  quotePdfData,
+                  branding,
+                ),
+              ],
+            }
+            : {}),
         });
+
+        if (esito.esito === 'rifiutata') {
+          // Il server ha risposto no: resta un'eccezione, come prima, perche'
+          // e' un guasto e non una notifica saltata di proposito. I contatori
+          // li aggiorna il `catch` qui sotto — farlo anche qui conterebbe due
+          // volte lo stesso fallimento.
+          throw esito.errore;
+        }
+
+        if (esito.esito !== 'inviata') {
+          // I due guasti restano distinti anche nei contatori: "non configurato"
+          // si risolve configurando, "illeggibile" reinserendo la password dopo
+          // un cambio di chiave di cifratura. Appiattirli manderebbe chi guarda
+          // le metriche a riscrivere parametri che erano gia' giusti.
+          const result = {
+            delivered: false,
+            skippedReason:
+              esito.esito === 'illeggibile' ? 'MAIL_CONFIG_UNREADABLE' : 'MAIL_NOT_CONFIGURED',
+          } satisfies NotifyQuoteEventResult;
+          updateMetricsForResult(input.workspaceId, input.event, result);
+          return result;
+        }
 
         const result = {
           delivered: true,
-          providerMessageId: typeof info.messageId === 'string' ? info.messageId : null,
+          providerMessageId: esito.providerMessageId,
         } satisfies NotifyQuoteEventResult;
         updateMetricsForResult(input.workspaceId, input.event, result);
         return result;
