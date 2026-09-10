@@ -1447,6 +1447,19 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
+## 99. `unblockDescriptor.owner` accetta solo l'agente stesso: un umano o un altro agente vanno nominati altrove, non nel descrittore
+
+**Contesto:** un agente blocca un'issue e prova a impostare `unblockDescriptor.owner` puntandolo a un umano o a un altro agente (es. il CEO), per segnalare esplicitamente chi deve sbloccare.
+
+**Errore:** l'API `PATCH /api/issues/{id}` rifiuta owner diversi da se stessi con `"Agents may only name themselves as an unblock owner"`. Se l'agente si ferma li' senza un fallback, il `PATCH` fallisce del tutto e `unblockDescriptor` resta `null` con `blockedBy: []` — uno stato indistinguibile da "nessuno mi blocca" (vedi nota #98 sul campo che alimenta il recupero automatico), e l'harness rimette il compito in `todo` perdendo il run senza che nessuno sappia chi doveva sbloccarlo.
+
+**Modo corretto:**
+- Impostare sempre `unblockDescriptor.owner = {agentId: <se stesso>}`, con `action` che descrive cosa controllare al risveglio (non chi altro deve agire: quel campo non lo accetta).
+- Nominare il vero sbloccante umano o altro agente in un commento leggibile sull'issue, e/o tramite un'interazione `ask_user_questions` / `request_confirmation` con `resolverPolicy: human_only` — mai tramite il descrittore, che accetta solo se stessi.
+- Verifica: dopo il `PATCH`, rileggere l'issue e controllare che `unblockDescriptor` non sia `null` — se lo e', il `PATCH` con owner esterno e' fallito silenziosamente e va rifatto puntando a se stessi.
+
+---
+
 ## 100. Un divieto senza la sua procedura e' un divieto che blocca tutto, anche quando la barriera vera non esiste
 
 **Contesto:** all'inizio di settembre 2026 il progetto arriva a venti pull request aperte, quattordici delle quali verso `main`, ferme su una convinzione condivisa: gli agenti non potevano unire a `main` senza l'approvazione di Jacopo o Claudio, e nessuno sapeva come si chiedesse quell'approvazione in modo che contasse. Il 10/9/2026 CLAUDE.md sostituisce la vecchia regola con una vera procedura (sezione "L'unione a `main`", PR #40): la esegue il Capocantiere (il CEO se il ramo e' suo), il consenso lo da' una persona accettando una richiesta di conferma sul compito.
