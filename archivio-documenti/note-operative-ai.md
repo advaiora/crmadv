@@ -1063,3 +1063,14 @@ Regola pratica che ne esce: quando si e' bloccati su un segreto, **al risveglio 
 - In un compito di sicurezza il segreto si **maschera subito**, non dopo: si scrive solo cio' che lo identifica — quale credenziale, in che commit, in che file, il comando per verificarlo (`git show <commit>:<file>`) — mai il valore.
 - Chi ha davvero bisogno del valore lo legge dalla fonte (il blob nella storia, il gestore segreti), non dalla bacheca.
 - I trascritti gia' scritti non si possono richiamare: e' una delle ragioni per cui, una volta successo, la rotazione della credenziale conviene comunque, indipendentemente dal fatto che il resto del rilievo sia gia' stato mascherato. (Descrizione e documento di CRMA-67 sono stati mascherati il 10/9/2026.)
+
+## 88. `node -e "…"` fra virgolette doppie: la shell mangia tutto cio' che sta fra apici rovesci, PRIMA che node lo veda, e non lo dice
+
+**Contesto:** 10/9/2026, apertura di CRMA-86: il testo passato all'API era un markdown con riferimenti tecnici fra backtick (`` `8a30469` ``, `` `.env` ``, `` `git filter-repo` ``), costruito con `node -e "..."` a virgolette doppie invece che con un file intermedio.
+
+**Errore:** quando il comando e' `node -e "testo con \`qualcosa\` dentro"`, la shell (bash) esegue **prima** tutto cio' che sta fra i backtick, come farebbe con qualsiasi altra sostituzione di comando, e solo il suo output — spesso vuoto o un errore silenzioso — arriva a node. Non e' un problema di virgolette che si chiudono in anticipo (quello darebbe un errore di sintassi evidente): qui la POST **riesce**, risponde `ok`, e il corpo arriva all'API con quei pezzi cancellati. Il guasto non si vede finche' qualcuno non rilegge il contenuto pubblicato. E' la variante di scrittura del problema descritto per la lettura alla nota #61: la' mancava lo strumento (`python3`), qui lo strumento c'e' ma lo si invoca nel modo che lo rompe.
+
+**Modo corretto:**
+- Il testo con backtick non passa mai per la riga di comando dentro un `node -e "..."` a doppi apici. Si scrive prima il markdown con lo strumento di scrittura file (nessuna interpretazione di shell), poi lo si legge da un file: `node -e '...'` ad **apici singoli** (la shell non fa sostituzioni dentro apici singoli) leggendo il percorso da `process.argv`, oppure uno script `.mjs` vero e proprio.
+- Controllo che non costa nulla: prima di spedire, contare i backtick nel file JSON gia' costruito — se il numero non torna, qualcosa e' stato eseguito invece che copiato.
+- **Una risposta `ok` non prova che il contenuto sia integro**: dopo una POST con testo tecnico (nomi di file, hash di commit, comandi), rileggerla dall'API e confrontarla con l'originale, non fidarsi del solo codice di stato.
