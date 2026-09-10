@@ -199,6 +199,7 @@ model Workspace {
   webAssetAlerts             WebAssetAlert[]
   auditLogs                  AuditLog[]
   workspaceMessages          WorkspaceMessage[]
+  messageAttachments         WorkspaceMessageAttachment[]
   vaultItems                 VaultItem[]
   vaultKeys                  WorkspaceVaultKey[]
   vaultPolicy                WorkspaceVaultPolicy?
@@ -269,6 +270,7 @@ model User {
   createdWebAssetAlerts                 WebAssetAlert[]             @relation("WebAssetAlertCreatedByUser")
   sentWorkspaceMessages                 WorkspaceMessage[]          @relation("WorkspaceMessageSender")
   receivedWorkspaceMessages             WorkspaceMessage[]          @relation("WorkspaceMessageRecipient")
+  createdMessageAttachments             WorkspaceMessageAttachment[]
   createdVaultItems                     VaultItem[]                 @relation("VaultItemCreatedByUser")
   updatedVaultItems                     VaultItem[]                 @relation("VaultItemUpdatedByUser")
   auditLogs                             AuditLog[]                  @relation("AuditActor")
@@ -1762,10 +1764,58 @@ model WorkspaceMessage {
   workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   senderUser      User      @relation("WorkspaceMessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
   recipientUser   User      @relation("WorkspaceMessageRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  attachments     WorkspaceMessageAttachment[]
 
   @@index([workspaceId, senderUserId, recipientUserId, createdAt(sort: Desc)])
   @@index([workspaceId, recipientUserId, readAt, createdAt(sort: Desc)])
   @@index([workspaceId, createdAt(sort: Desc)])
+}
+
+// Allegato di un messaggio interno (A1 punto 8a). Specchio RIDOTTO di
+// AiConversationAttachment: il record dell'allegato qui, i byte veri in una tabella a
+// parte, cosi' elencare gli allegati di una conversazione non tira su i blob.
+//
+// Due differenze VOLUTE rispetto alla Chat AI, decise su CRMA-30:
+//  - messageId NON e' nullable. La Chat AI carica in BOZZA (messageId null) perche' ha
+//    davvero un composer con bozza persistente; i Messaggi interni no, e un messageId
+//    nullable produrrebbe binari ORFANI - righe con dei byte dentro e nessun messaggio
+//    che le possieda - che oggi nessun mestiere raccoglie. Conseguenza sul client: si
+//    invia prima il messaggio, poi si carica l'allegato sull'id ottenuto.
+//  - niente content/contentChars: quelli servono al RAG della Chat AI, i messaggi
+//    interni non alimentano l'AI.
+//
+// Cestino (CRMA-29): al 10/9/2026 il meccanismo non esiste ancora nel codice. La
+// tabella e' fatta perche' l'aggancio (una colonna deletedAt/deletedByUserId) si possa
+// aggiungere con una migrazione SUCCESSIVA, senza riscrivere quella gia' committata.
+// Intanto la cancellazione del messaggio porta via l'allegato in cascata, che resta il
+// comportamento giusto anche a cestino acceso.
+model WorkspaceMessageAttachment {
+  id              String                            @id @default(cuid())
+  workspaceId     String
+  messageId       String
+  createdByUserId String?
+  label           String                            @db.VarChar(200)
+  mimeType        String                            @db.VarChar(120)
+  fileSize        Int
+  createdAt       DateTime                          @default(now())
+  workspace       Workspace                         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  message         WorkspaceMessage                  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdByUser   User?                             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  binary          WorkspaceMessageAttachmentBinary?
+
+  @@index([messageId])
+  @@index([workspaceId])
+}
+
+// Byte VERI dell'allegato, 1-a-1 con il record (attachmentId e' insieme chiave primaria
+// e chiave esterna). Tabella separata di proposito: i binari possono essere grandi e
+// non devono caricarsi a ogni elenco - si leggono SOLO quando si scarica il file.
+// Cancellato l'allegato, cadono anche i byte (cascade).
+model WorkspaceMessageAttachmentBinary {
+  attachmentId String                     @id
+  data         Bytes
+  createdAt    DateTime                   @default(now())
+  attachment   WorkspaceMessageAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
 }
 
 model VaultItem {
