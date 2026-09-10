@@ -66,8 +66,11 @@ const REGOLE = [
   // sono la stessa cosa con una lettera diversa (personal, oauth, user, server,
   // refresh) e costano zero righe in piu'.
   { nome: 'token GitHub',                re: /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g },
-  // Le chiavi Google sono lunghe esattamente 39 caratteri: `AIza` + 35. Il
-  // conteggio esatto e' voluto, evita di segnalare parole che iniziano per AIza.
+  // Le chiavi Google sono lunghe 39 caratteri: `AIza` + 35. Qui si chiedono
+  // ALMENO 35 caratteri dopo il prefisso, non esattamente 35: non c'e' confine
+  // di chiusura, quindi `AIza` + 45 combacia lo stesso. E' voluto — la soglia
+  // serve a non segnalare le parole CORTE che iniziano per AIza, non le lunghe,
+  // e sbagliare di piu' e' il verso giusto in cui sbagliare.
   { nome: 'chiave API Google',           re: /\bAIza[0-9A-Za-z_-]{35}/g },
   { nome: 'chiave service_role',         re: /service_role[^A-Za-z0-9]{0,12}ey[A-Za-z0-9_.-]{20,}/gi },
   { nome: 'chiave privata',              re: /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/g },
@@ -118,23 +121,54 @@ const PASSWORD_SEGNAPOSTO = new Set([
 //     sopra. Fuori di proposito gli articoli e i possessivi corti (`LA`, `IL`,
 //     `MY`): non servono — `LA-TUA-PASSWORD` combacia gia' su `TUA` e su
 //     `PASSWORD` — e due lettere sono anche la lunghezza di un pezzo casuale.
-const PAROLE_SEGNAPOSTO = new Set([
+//     Le parole stanno su DUE livelli, perche' non valgono tutte uguale
+//     (distinzione introdotta dalla revisione di sicurezza, compito CRMA-89).
+//
+// (2-bis-A) FORTI: parole che compaiono solo nei segnaposto. Nessuno chiama
+//     `TUA` o `INSERISCI` un pezzo di password vera. Una sola basta.
+const PAROLE_SEGNAPOSTO_FORTI = new Set([
   'tua', 'tuo', 'tue', 'tuoi', 'mia', 'mio', 'your', 'yours',
   'change', 'changeme', 'example', 'esempio', 'sample', 'placeholder',
-  'segnaposto', 'password', 'pass', 'passwd', 'secret', 'segreto',
-  'qui', 'here', 'todo', 'dummy', 'fake', 'test', 'xxx', 'inserisci',
+  'segnaposto', 'qui', 'here', 'todo', 'dummy', 'fake', 'inserisci',
 ]);
+
+// (2-bis-B) DEBOLI: parole che NOMINANO un segreto, e che quindi possono
+//     benissimo trovarsi dentro un segreto vero. Servono a `DB-PASSWORD` e
+//     `SECRET-KEY`, ma da sole accettavano anche password vere: misurato in
+//     revisione, `root:PROD-SECRET-2026@10.0.0.5` passava. Ora una parola
+//     debole vale SOLO se nessun pezzo della password sembra casuale.
+const PAROLE_SEGNAPOSTO_DEBOLI = new Set([
+  'password', 'pass', 'passwd', 'secret', 'segreto',
+]);
+
+// ⚠️ Tolte il 10/9/2026, su misura della revisione: `xxx` e `test`. Erano il
+//    buco del punto 1 con tre lettere davanti — `root:XXX-K9QW2MZZ41PLM3G7` e
+//    `root:A1B2-C3D4-TEST` passavano entrambe. Nessuna delle due serviva:
+//    le password tutte-X cadono gia' in /^[*x.]+$/i qui sotto, i file di test
+//    sono gia' esclusi per percorso, e i segnaposto veri che le contengono
+//    (`TEST-PASSWORD`, `XXX-PASSWORD`) combaciano comunque su `PASSWORD`.
+
+// Un pezzo "sembra casuale" se e' lungo almeno 4 e mescola lettere e cifre:
+// `A1B2`, `C3D4`, `K9QW2MZZ41PLM3G7`. La lunghezza minima non e' un dettaglio,
+// evita di bocciare i suffissi di versione dei segnaposto (`MY-DB-PASS-V2`).
+const sembraCasuale = (pezzo) =>
+  pezzo.length >= 4 && /[A-Za-z]/.test(pezzo) && /[0-9]/.test(pezzo);
 
 // Un tetto di lunghezza in piu', per il caso che resta: una password vera,
 // lunga e casuale, che per sfortuna contenga un pezzo tipo `SECRET`. 64 e'
 // largo abbastanza da non dare fastidio ai segnaposto lunghi della
 // documentazione (`INSERISCI-QUI-LA-TUA-PASSWORD-DEL-DATABASE` sono 42).
+// ⚠️ Da solo e' quasi inerte (rilevato in revisione): morde unicamente sopra i
+//    64 caratteri, mentre le password generate stanno fra 16 e 32. Chiude la
+//    coda lunga, non e' la protezione — quella sono le due liste qui sopra.
 const LUNGHEZZA_MASSIMA_SEGNAPOSTO = 64;
 
 function eSegnapostoMaiuscolo(password) {
   if (!/^[A-Z0-9]+([-_][A-Z0-9]+)+$/.test(password)) return false;
   if (password.length > LUNGHEZZA_MASSIMA_SEGNAPOSTO) return false;
-  return password.toLowerCase().split(/[-_]/).some((p) => PAROLE_SEGNAPOSTO.has(p));
+  const pezzi = password.toLowerCase().split(/[-_]/);
+  if (pezzi.some((p) => PAROLE_SEGNAPOSTO_FORTI.has(p))) return true;
+  return pezzi.some((p) => PAROLE_SEGNAPOSTO_DEBOLI.has(p)) && !pezzi.some(sembraCasuale);
 }
 
 function eSegnaposto(utente, password) {
