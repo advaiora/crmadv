@@ -810,7 +810,7 @@ Cosi' si distingue in un secondo il proprio danno dalla deriva altrui — e in q
 
 **Modo corretto:**
 - Una contraddizione fra un'istruzione di sessione e `CLAUDE.md` e' **un conflitto da segnalare**, esattamente come quelli fra Jacopo e Claudio: si dice cosa dice l'una, cosa dice l'altra, e si aspetta. Non e' una decisione da prendere per conto proprio, **e va sollevata prima di cominciare il lavoro**, non nel riepilogo finale.
-- Il campanello: se stai per **saltare un passo del metodo** (revisore, esploratore, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
+- Il campanello: se stai per **saltare un passo del metodo** (Revisore Repo, Esploratore Repo, mappa, registro) *per via di un'istruzione che non sta in nessun file del progetto*, quello e' il momento di parlarne.
 - Prima di dire *"c'e' una regola che me lo vieta"*, **guarda dove sta davvero**: `.claude/settings.json` e `settings.local.json` del progetto, gli stessi due sotto `~/.claude/`, un eventuale `CLAUDE.md` utente. Se non e' in nessuno di quelli, e' il prompt di sessione dell'applicazione: **non e' modificabile ne' da te ne' da un file del repository**, e va detto cosi' — altrimenti Jacopo cerca di togliere una regola che non esiste da nessuna parte.
 
 ---
