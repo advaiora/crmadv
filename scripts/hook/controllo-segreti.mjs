@@ -23,6 +23,31 @@ import { eSegnaposto } from './segnaposto.mjs';
 const git = (...args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
 
+// --- La dichiarazione di essere arrivato in fondo (compito CRMA-100) --------
+// L'hook non puo' fidarsi del solo codice di uscita di `node`: un modulo TRONCATO
+// A META' — o fatto di soli spazi — e' JavaScript valido, gira, non controlla
+// niente e esce 0. Misurato al 10/9/2026 sulla punta di CRMA-93: su 187 punti di
+// troncamento, 104 producevano un file che l'hook accettava, 86 dei quali senza
+// stampare una riga. Le cause citate dall'hook (checkout interrotto, disco pieno,
+// merge andato male) producono molto piu' spesso un file mozzo che un file di zero
+// byte, quindi era il caso piu' probabile a non essere coperto.
+//
+// La chiusura e' che il modulo DICE di essere arrivato in fondo: `esci()` stampa
+// questa riga su stdout come ultimo gesto, su TUTTE le uscite volute (0 e 1), e
+// l'hook rifiuta il commit se non la legge. Un prefisso del file non puo' contenere
+// la propria fine: qualunque troncamento perde la stampa, compresi i troncamenti
+// che restano sintatticamente validi. E' l'unica forma che copre la classe intera.
+//
+// ⚠️ La stessa stringa e' scritta a mano in `.githooks/pre-commit`, che essendo uno
+// script `sh` non puo' importarla. Se le due si separano l'hook blocca OGNI commit:
+// un guasto rumoroso, non silenzioso — ed e' il verso giusto. Che siano identiche
+// lo verifica `controllo-segreti.test.mjs`.
+const SENTINELLA = 'controllo-segreti: arrivato in fondo';
+const esci = (codice) => {
+  console.log(SENTINELLA);
+  process.exit(codice);
+};
+
 // --- Che cosa NON deve mai entrare in un commit --------------------------
 // I nomi di file di ambiente. Qualunque profondita': conta solo il nome.
 const AMBIENTE_AMMESSI = new Set([
@@ -155,7 +180,7 @@ for (const linea of diff) {
   }
 }
 
-if (riscontri.length === 0) process.exit(0);
+if (riscontri.length === 0) esci(0);
 
 // --- Il messaggio: quale file, quale riga, cosa fare -----------------------
 // ⚠️ Solo ASCII da qui in giu': questo testo lo legge anche il terminale di Git
@@ -185,4 +210,8 @@ console.error('');
 console.error('       e poi segnalalo, cosi\' la regola viene corretta:');
 console.error('       scripts/hook/controllo-segreti.mjs, elenco delle esclusioni.');
 console.error('');
-process.exit(1);
+// Anche qui la sentinella, non solo sull'uscita pulita: cosi' l'hook la pretende
+// SEMPRE, e un troncamento che rompe la sintassi (uscita 1 di `node`, che prima
+// finiva nel ramo «ho trovato un segreto» e bloccava senza spiegare perche')
+// prende il messaggio giusto invece del silenzio.
+esci(1);
