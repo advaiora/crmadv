@@ -1420,3 +1420,13 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Modo corretto:**
 - Non insistere col `PATCH`/`checkout`: e' la stessa famiglia della nota gia' nota per le issue di un altro run (si commenta, non si patcha). L'evidenza si lascia in un commento sull'issue bloccata, con il riferimento verificabile (qui: il commit gia' su `origin`), e si segnala nel commento del compito che la sta aspettando (qui: CRMA-90) che lo stato-macchina non riflette il lavoro reale.
 - Non c'e' un endpoint per "liberare" un checkout andato storto dall'esterno: si aspetta che scada da solo o che un `checkout` successivo (anche dello stesso agente, run nuovo) lo sblocchi.
+
+## 97. Un bloccante risolto rimette il compito in coda da solo: non vuol dire che il vero anello mancante sia sparito
+
+**Contesto:** 10/9/2026, risveglio su CRMA-90 con motivo `issue_blockers_resolved`. Il compito era `blocked` con due bloccanti nominati (CRMA-105 e CRMA-107); entrambi sono diventati `done` nel frattempo. Il risveglio ha trovato lo stato gia' `in_progress` — nessun agente lo aveva cambiato, ne' con un `PATCH` ne' con un commento: il runtime sposta da solo un'issue `blocked` quando `blockedBy` si svuota di bloccanti aperti.
+
+**Errore:** leggere `in_progress` come "il lavoro puo' ripartire" senza rileggere *perche'* era `blocked`. Qui il bloccante vero non era ne' CRMA-105 ne' CRMA-107 in se': era l'unione della PR #29 a `main`, un'azione che nessun agente esegue da solo (regola del progetto, vale anche col consenso di Jacopo gia' arrivato). CRMA-105 aveva il compito di *chiedere* quel consenso, non di *eseguire* l'unione: chiuderla come `done` ha tolto un bloccante dal campo, ma l'anello che contava — chi preme il bottone «Merge» — e' rimasto esattamente dove era prima. Fidarsi del solo campo `status` avrebbe fatto sembrare il compito "da continuare" mentre l'unica cosa che manca e' identica a un'ora prima.
+
+**Modo corretto:**
+- A un risveglio `issue_blockers_resolved`, non agire sul nuovo `status` da solo: rileggere il testo dei bloccanti appena chiusi (commenti, interazioni collegate) per capire se la loro chiusura *include* l'azione che serviva o solo un passo verso di essa.
+- Se l'azione che manca e' ancora dovuta — qui, l'unione a `main`, riservata a Jacopo o Claudio anche a consenso gia' dato (nota gia' scritta nella regola di CLAUDE.md sulle unioni) — il compito torna `blocked`, con il nuovo anello nominato per esteso nel commento: non basta lasciarlo `in_progress` per inerzia del campo di stato, ne' richiuderlo `blocked` senza dire cosa manca stavolta.
