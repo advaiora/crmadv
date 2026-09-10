@@ -125,7 +125,27 @@ export const resolveMenuLinkPath = (menu) => {
 // Trova il modulo (voce principale) attivo per il percorso corrente, con le sue
 // sottoschede già filtrate per permessi/moduli. Ritorna null se il percorso non
 // appartiene a un modulo con sottoschede visibili.
+//
+// Il percorso esatto di una voce SENZA sottoschede vince sempre sul prefisso
+// generico di un'altra voce (es. "Profilo" usa "/pages" come contenitore, non
+// come rotta vera — vedi resolveMenuLinkPath). Senza questo controllo, una voce
+// come "Branding Workspace" (path "/pages/workspace-branding", nessuna
+// sottoscheda propria) verrebbe scambiata per una pagina di Profilo solo perché
+// condivide il prefisso "/pages/", e mostrerebbe la barra di schede sbagliata
+// (quella di Profilo, con nessuna scheda attiva). Nato dal riordino del menu
+// CRMA-32, che ha promosso voci prima annidate a voci a sé.
 export const findActiveModuleWithTabs = (menuGroups, currentPath) => {
+  const isExactStandaloneLeaf = menuGroups
+    .flatMap((group) => group.contents)
+    .some((menu) => (
+      menu.path === currentPath
+      && (!Array.isArray(menu.childrens) || menu.childrens.length === 0)
+    ));
+
+  if (isExactStandaloneLeaf) {
+    return null;
+  }
+
   for (const group of menuGroups) {
     for (const menu of group.contents) {
       if (!Array.isArray(menu.childrens) || menu.childrens.length === 0) {

@@ -45,7 +45,7 @@ const MODULE_LABELS = {
   branding: 'Branding',
   messages: 'Messaggi',
   modules: 'Moduli',
-  audit: 'Audit',
+  audit: 'Registro attività',
   mail: 'Server di posta',
 };
 
