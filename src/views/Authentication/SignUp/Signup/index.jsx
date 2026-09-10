@@ -6,6 +6,7 @@ import { Button, Col, Container, Form, InputGroup, Row } from "react-bootstrap";
 import { Link, useHistory, useLocation } from "react-router-dom";
 import CommanFooter1 from "../../CommanFooter1";
 import { useSession } from "../../../../hooks/useSession";
+import { useGoogleSignInAvailability } from "../../../../hooks/useGoogleSignInAvailability";
 import { authenticateWithGoogle, GoogleAuthError } from "../../../../utils/googleAuthClient";
 import { requestGoogleIdToken } from "../../../../utils/googleIdentity";
 import { getClientRuntimeConfig } from "../../../../utils/runtimeConfig";
@@ -119,6 +120,7 @@ const Signup = () => {
   });
 
   const runtimeConfig = getClientRuntimeConfig();
+  const googleSignInAvailable = useGoogleSignInAvailability();
   const apiBaseUrl = runtimeConfig.apiBaseUrl;
   const googleClientId = runtimeConfig.googleClientId;
   const googleRedirectUri = runtimeConfig.googleRedirectUri;
@@ -595,19 +597,21 @@ const Signup = () => {
                       </h4>
 
                       {!isGoogleWorkspaceStep ? (
-                        <>
-                          <Button variant="outline-primary" className="btn-rounded btn-block mb-3" type="button" onClick={handleGoogleSignup} disabled={isGoogleSignupDisabled}>
-                            <span>
-                              <span className="icon">
-                                <FontAwesomeIcon icon={faGoogle} />
+                        googleSignInAvailable && (
+                          <>
+                            <Button variant="outline-primary" className="btn-rounded btn-block mb-3" type="button" onClick={handleGoogleSignup} disabled={isGoogleSignupDisabled}>
+                              <span>
+                                <span className="icon">
+                                  <FontAwesomeIcon icon={faGoogle} />
+                                </span>
+                                <span>{googleLoading ? "Accesso..." : "Registrati con Google"}</span>
                               </span>
-                              <span>{googleLoading ? "Accesso..." : "Registrati con Google"}</span>
-                            </span>
-                          </Button>
-                          <div className="title-sm title-wth-divider divider-center my-4">
-                            <span>Oppure</span>
-                          </div>
-                        </>
+                            </Button>
+                            <div className="title-sm title-wth-divider divider-center my-4">
+                              <span>Oppure</span>
+                            </div>
+                          </>
+                        )
                       ) : (
                         <small className="text-muted d-block mb-3">
                           Account Google collegato. Inserisci il nome del tuo workspace per continuare.
