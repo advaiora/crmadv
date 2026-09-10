@@ -97,6 +97,22 @@ Il 9/9/2026 Jacopo ha aperto la scheda Paperclip «Revisore», l'ha trovata a **
 
 Il motivo dello sdoppiamento è che le due cose costano diversamente: la revisione dentro la sessione è immediata e non rallenta la catena, quella su Paperclip costa un giro di compito in più ma **lascia una traccia che l'utente può controllare da solo**, senza chiedere all'assistente di autocertificarsi. Si paga quel costo dove sbagliare è caro, non su ogni tappa.
 
+### Quali cancelli mettere su un compito Paperclip — la tabella, dal 10/9/2026
+
+La regola mista appena scritta qui sopra **non era applicata**: fino al 10/9 ogni punto della release portava quattro cancelli di revisione, cioè tre run in più a punto e una contraddizione silenziosa con la regola scritta. Da oggi i cancelli si ricavano da inneschi osservabili:
+
+| Cancello | Si mette se e solo se il lavoro tocca... |
+|---|---|
+| **Guardiano** (sicurezza) | autenticazione o sessioni · permessi e ruoli · caricamento o servizio di file · dati non fidati dall'esterno · segreti e `.env` · il perimetro di ciò che è raggiungibile (moduli accesi/spenti) |
+| **Revisore** di Paperclip | `prisma/schema.prisma` o una migrazione · `server/auth/rbac-catalog.ts` · sicurezza · unione a `main` |
+| **Collaudatore** | un comportamento visibile a schermo o una risposta d'API che cambia |
+| **Collaudatore AI** | prompt, generazioni AI, o il motore delle funzioni AI |
+
+Con i tre corollari, che sono la parte che chiude le ambiguità:
+1. **Se non scatta nessun innesco, il compito non ha cancelli** — e non è un compito senza controllo: la revisione è quella del **revisore di repository** dentro la sessione, e chi chiude **dichiara nel commento di chiusura di averlo chiamato e su quali file**. Questo è il raccordo esplicito fra i due revisori che prima mancava.
+2. **Un cancello non può avere come revisore l'assegnatario del compito**: se coincidono, quel cancello salta e restano gli altri (esempio reale: l'audit di sicurezza lo *fa* il Guardiano, quindi lo revisiona il Revisore).
+3. **La politica di un compito già entrato nella catena non si cambia**: se è in revisione, si corregge dopo la chiusura, mai sotto i piedi di chi sta revisionando.
+
 **Mappa del progetto (dal 30/7/2026).** C'è `archivio-documenti/mappa/mappa-progetto.md`, una fotografia strutturale (moduli backend + funzioni esportate, catena permessi, centralini, modelli Prisma, indice dei documenti grossi, file da non aprire interi) prodotta da `npm run mappa` in meno di un secondo. **Non è committata** (è generata, sta in `.gitignore`). **Prima di chiamare l'esploratore o il revisore, rigenerala** (`npm run mappa`): così partono da una mappa fresca invece di aprire i file-mostro. È uno script, il costo in token è nullo — si rigenera senza pensarci. Dal 4/8/2026 la rigenera anche un **hook pre-commit** (`.githooks/pre-commit`, non bloccante, sub-secondo): attivazione una tantum con `git config core.hooksPath .githooks` — già fatta sulla macchina di Jacopo; chi lavora su un altro clone la rifà una volta.
 
 **Consumi.** Si lavora su abbonamento Max 20x (etichetta letta da `/usage` il 3/8/2026; prima nei documenti era scritto "5x" per errore): non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: **`npm run consumi`**. Dal 31/7/2026 il monitor misura **tutti i progetti insieme**, non solo questo: il limite è dell'account, e Jacopo lavora spesso su due progetti in parallelo (in una finestra misurata, il 41% del consumo veniva dall'altro progetto). L'uscita mostra anche la ripartizione per progetto e **il bilancio del team di agent** (quanto sono costati contro quanto hanno tenuto fuori dalla conversazione).
