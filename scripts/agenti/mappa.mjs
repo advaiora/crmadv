@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Generatore della "mappa del progetto".
 //
-// A COSA SERVE: dare all'esploratore (e a chi legge) una fotografia STRUTTURALE
+// A COSA SERVE: dare all'esploratore-repo (e a chi legge) una fotografia STRUTTURALE
 // del progetto — moduli backend, export, catena dei permessi, centralini da
 // allineare, modelli Prisma, indice delle sezioni dei documenti grossi ed elenco
 // dei file da NON aprire interi — cosi' non serve rileggere i file-mostro a ogni
@@ -65,7 +65,7 @@ const rel = (p) => path.relative(RADICE, p).split(path.sep).join('/');
 const est = (f) => path.extname(f).toLowerCase();
 
 // Commit corrente: serve da timbro di freschezza nell'intestazione della mappa,
-// cosi' chi la legge (o l'esploratore) vede su quale stato del codice e' stata
+// cosi' chi la legge (o l'esploratore-repo) vede su quale stato del codice e' stata
 // generata e capisce a colpo d'occhio se e' vecchia.
 function gitHead() {
   try {

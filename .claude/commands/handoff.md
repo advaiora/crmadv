@@ -96,7 +96,7 @@ Per **ogni pezzo di lavoro concluso** in questa sessione, aggiungi una riga al r
 npm run consumi:compito -- "<nome del lavoro, es. spezzatura ClientsList giro 2>"
 ```
 
-Se in sessione si sono chiusi più compiti, delimitali con `--da <ora> --a <ora>` (ore del computer), così ognuno ha il suo consumo invece di prendersi tutta la sessione. Il registro (`archivio-documenti/consumi/registro-compiti.md`) serve a confrontare lavori **simili fra loro** e capire se chiamare l'esploratore convenga: vale solo se si accumula, quindi non saltarlo. Non chiedere il permesso: fa parte della chiusura, come spegnere i server.
+Se in sessione si sono chiusi più compiti, delimitali con `--da <ora> --a <ora>` (ore del computer), così ognuno ha il suo consumo invece di prendersi tutta la sessione. Il registro (`archivio-documenti/consumi/registro-compiti.md`) serve a confrontare lavori **simili fra loro** e capire se chiamare l'Esploratore Repo convenga: vale solo se si accumula, quindi non saltarlo. Non chiedere il permesso: fa parte della chiusura, come spegnere i server.
 
 ### 5-ter. Se serve, chiedi la lettura dei consumi
 

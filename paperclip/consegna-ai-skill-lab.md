@@ -154,7 +154,7 @@ Solo queste quattro si scrivono qui. **Le altre otto sono trascrizioni** di docu
 
 **Deve NON coprire:** come si scrive il codice; come si corregge ciò che trova (non modifica niente); teoria generale di sicurezza web non applicabile a questo progetto.
 
-**Fonti da leggere nel CRM:** `server/auth/rbac-catalog.ts`, un `policies.ts` di esempio, `CLAUDE.md` (sezione «Come nasce una cosa nuova: il nome e il permesso»), `.claude/agents/revisore.md`, `archivio-documenti/mappa/mappa-progetto.md` §3.
+**Fonti da leggere nel CRM:** `server/auth/rbac-catalog.ts`, un `policies.ts` di esempio, `CLAUDE.md` (sezione «Come nasce una cosa nuova: il nome e il permesso»), `.claude/agents/revisore-repo.md`, `archivio-documenti/mappa/mappa-progetto.md` §3.
 
 ---
 

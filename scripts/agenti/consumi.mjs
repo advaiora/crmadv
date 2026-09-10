@@ -42,7 +42,7 @@
 // stampa.mjs (i report in italiano), registri.mjs (le scritture su disco).
 // Il nome e il percorso di QUESTO file non si cambiano: sono fissati a
 // stringa in TRE posti — package.json (consumi, consumi:compito), il
-// permesso Bash dell'agent architetto (.claude/agents/architetto.md) e
+// permesso Bash dell'agent architetto-repo (.claude/agents/architetto-repo.md) e
 // l'allowed-tools del comando /handoff (.claude/commands/handoff.md).
 
 import { quando } from './consumi/formattazione.mjs';
