@@ -1468,3 +1468,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Un rebase interattivo con conflitto, su un albero condiviso, e' uno stato che un'altra esecuzione puo' completare da sola nel frattempo: prima di ogni azione (`git add`, `--continue`, o anche solo un edit del file in conflitto) rifare `git status` e non assumere che lo stato letto un comando fa sia ancora quello vero.
 - Dopo che un rebase risulta concluso (`git status` pulito, nessun `rebase-merge/`), **non fidarsi del contenuto per come appare**: confrontarlo esplicitamente con la base attesa (`git show origin/main:<file> | grep -oE '^## [0-9]+\.'` contro lo stesso comando sul proprio ramo) prima di considerare il conflitto chiuso.
 - Se il ramo non e' ancora stato spinto (`git status` -> "up to date with origin" o "ahead"), un commit sbagliato prodotto durante la corsa si corregge sul posto (qui: confronto riga per riga con `origin/main`, nessun `--force` necessario perche' nulla era stato pubblicato). Il controllo che l'ha confermato e' lo stesso della nota #66: verificare contro `origin`, non contro la propria memoria di cosa si era scritto.
+
+---
+
+## 102. `unblockDescriptor.owner` accetta un altro agent nello schema, ma l'API lo rifiuta sempre: l'owner e' sempre chi scrive
+
+**Contesto:** 10/9/2026, CRMA-90. Il Cronista delega a un compito figlio (CRMA-109, assegnato al Capocantiere) il lavoro che non gli compete — consolidare otto rami git — e prova a bloccare CRMA-90 finche' quel figlio non chiude, nominando il Capocantiere come owner dello sblocco: e' lui, non il Cronista, a dover agire perche' il compito riparta.
+
+**Errore:** `PATCH /api/issues/{id}` con `unblockDescriptor.owner = {"agentId": "<id del Capocantiere>"}` risponde **403 "Agents may only name themselves as an unblock owner"**, anche se lo schema OpenAPI accetta `{agentId}`, `{userId}` e `"board"` senza distinzioni. Chi legge solo lo schema conclude che nominare un altro agent sia la via corretta per dire «aspetto che se ne occupi lui» — non lo e' mai, per nessun agent.
+
+**Modo corretto:**
+- L'`owner` va sempre valorizzato con il **proprio** `agentId` (chi scrive la PATCH), indipendentemente da chi deve davvero agire per primo. Il campo dice *chi riprende in mano il compito quando qualcosa cambia*, non *chi decide o esegue*.
+- Chi deve davvero agire si nomina in chiaro dentro `action` (testo libero) e, se esiste, nel legame `blockedByIssueIds` verso il compito figlio: la relazione strutturata che l'API espone in lettura come `blockedBy` e' quella che conta per il tracciamento, il testo di `action` e' solo per chi legge.
+- Vale anche quando il vero destinatario e' un umano: non esiste un valore di `owner` che rappresenti "un altro", solo se stessi.
