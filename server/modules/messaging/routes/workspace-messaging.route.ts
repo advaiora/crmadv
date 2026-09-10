@@ -91,6 +91,7 @@ const workspaceMessagingRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'messages.read',
+        entityType: 'workspace_message',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {

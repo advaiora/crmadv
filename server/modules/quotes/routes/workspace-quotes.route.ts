@@ -581,6 +581,7 @@ const workspaceQuotesRoute: FastifyPluginAsync = async (app) => {
     );
     await audit.log({
       event: 'quotes.notifications.update_templates',
+      entityType: 'quote_notification_settings',
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: {

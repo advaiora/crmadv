@@ -54,8 +54,11 @@ const workspaceModulesRoute: FastifyPluginAsync = async (app) => {
         event: MODULES_AUDIT_ACTION,
         actorUserId: user.id,
         workspaceId: workspace.id,
-        entityType: 'module',
-        entityId: moduleState.key,
+        // La riga che cambia è `WorkspaceModule`, non `Module`: il bersaglio deve
+        // chiamarsi come il modello scritto, altrimenti la gemella automatica non
+        // viene riconosciuta e in tabella compaiono due righe per lo stesso fatto.
+        // La chiave del modulo resta leggibile nei metadati qui sotto.
+        entityType: 'workspace_module',
         metadata: {
           moduleKey: moduleState.key,
           enabled: moduleState.enabled,
@@ -111,6 +114,9 @@ const workspaceModulesRoute: FastifyPluginAsync = async (app) => {
         event: MODULES_AUDIT_ACTION,
         actorUserId: user.id,
         workspaceId: workspace.id,
+        // Senza id perché questa rotta ne cambia più di uno in un colpo: il segno
+        // vale per tutte le righe di `WorkspaceModule` scritte da questa richiesta.
+        entityType: 'workspace_module',
         metadata: {
           changes,
         },

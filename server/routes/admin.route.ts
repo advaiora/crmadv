@@ -32,6 +32,8 @@ const adminRoute: FastifyPluginAsync = async (app) => {
     if (workspace) {
       await audit.log({
         event: 'admin.workspace.create',
+        entityType: 'workspace',
+        entityId: workspace.id,
         actorUserId: admin.id,
         workspaceId: workspace.id,
         metadata: { name: workspace.name, slug: workspace.slug },
@@ -53,6 +55,8 @@ const adminRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'admin.workspace.update',
+        entityType: 'workspace',
+        entityId: workspace.id,
         actorUserId: admin.id,
         workspaceId: workspace.id,
         metadata: { name: workspace.name, slug: workspace.slug },
@@ -74,6 +78,8 @@ const adminRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'admin.workspace.suspend',
+        entityType: 'workspace',
+        entityId: workspace.id,
         actorUserId: admin.id,
         workspaceId: workspace.id,
         metadata: { slug: workspace.slug },
@@ -95,6 +101,8 @@ const adminRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'admin.workspace.activate',
+        entityType: 'workspace',
+        entityId: workspace.id,
         actorUserId: admin.id,
         workspaceId: workspace.id,
         metadata: { slug: workspace.slug },
