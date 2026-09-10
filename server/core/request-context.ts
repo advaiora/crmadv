@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { normalizeEntityType } from '../audit/entity-type.js';
 
 // Contesto di richiesta basato su AsyncLocalStorage.
 // Serve a portare informazioni "di chi sta agendo" (es. userId) fino ai livelli
@@ -50,6 +51,14 @@ export type RequestStore = {
 // che crea diecimila clienti non deve produrre diecimila righe di registro: oltre
 // il tetto si conta e basta, e il conteggio finisce in una riga di riepilogo.
 export const MAX_PENDING_AUDIT_ENTRIES = 200;
+
+// La chiave con cui un'annotazione a mano e una registrazione automatica si
+// riconoscono come lo stesso fatto. Esiste come funzione, e non come due
+// template ripetuti, perche' la costruiscono due punti diversi (chi marca e chi
+// filtra): finche' erano due stringhe scritte a mano potevano divergere, ed e'
+// esattamente quello che era successo.
+const manualTargetKey = (entityType: string, entityId: string | null | undefined) =>
+  `${normalizeEntityType(entityType)}:${entityId ?? ''}`;
 
 const storage = new AsyncLocalStorage<RequestStore>();
 
@@ -104,10 +113,18 @@ export const requestContext = {
   // `DepartmentMember` senza poterle nominare una per una, e senza il segno per
   // tipo l'automatica comparirebbe accanto a lei come doppione. Il raggio d'azione
   // è una singola richiesta HTTP, quindi non può scartare il lavoro di nessun altro.
+  //
+  // Il tipo passa da `normalizeEntityType` perche' le due parti che devono
+  // riconoscersi lo scrivono in due convenzioni diverse: le annotazioni a mano
+  // spesso col nome del modello Prisma (`'Client'`, `'ChecklistInstanceItem'`),
+  // l'intercettore sempre in forma snake (`client`, `checklist_instance_item`).
+  // Senza normalizzare, quelle annotazioni non scartavano niente e ogni fatto
+  // finiva nel registro due volte. La normalizzazione vale solo come chiave di
+  // confronto: cio' che si salva in `AuditLog.entityType` non cambia.
   markManualAudit(entityType: string | undefined, entityId: string | null | undefined): void {
     const store = storage.getStore();
     if (store && entityType) {
-      store.manualTargets.add(`${entityType}:${entityId ?? ''}`);
+      store.manualTargets.add(manualTargetKey(entityType, entityId));
     }
   },
 
@@ -152,10 +169,10 @@ export const requestContext = {
     const entries = [...store.pendingEntries.values()].filter(
       (entry) =>
         // Il bersaglio preciso è già annotato a mano…
-        !store.manualTargets.has(`${entry.entityType}:${entry.entityId ?? ''}`)
+        !store.manualTargets.has(manualTargetKey(entry.entityType, entry.entityId))
         // …oppure lo è tutto il tipo, per un'annotazione che non poteva nominare
         // le singole righe (vedi markManualAudit).
-        && !store.manualTargets.has(`${entry.entityType}:`),
+        && !store.manualTargets.has(manualTargetKey(entry.entityType, null)),
     );
     const dropped = store.droppedEntries;
 

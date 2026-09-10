@@ -36,6 +36,7 @@
 //    esattamente il guasto che questo file esiste per chiudere.
 
 import { requestContext, type PendingAuditEntry } from '../core/request-context.js';
+import { normalizeEntityType } from './entity-type.js';
 
 // Le operazioni che cambiano dati. Le letture non passano di qui.
 const TRACKED_OPERATIONS = new Set([
@@ -109,23 +110,13 @@ const EXCLUDED_MODELS = new Map<string, string>([
   ['AiConversationAttachmentBinary', 'blob senza workspace: non attribuibile'],
 ]);
 
-// I tre tipi di sito hanno modelli distinti ma le annotazioni scritte a mano li
-// chiamano tutti `web_asset`: se l'intercettore usasse tre nomi diversi, lo
-// scarto dei doppioni non riconoscerebbe più il bersaglio già annotato.
-const ENTITY_TYPE_OVERRIDES: Record<string, string> = {
-  WebsiteAsset: 'web_asset',
-  WebAppAsset: 'web_asset',
-  EcommerceAsset: 'web_asset',
-};
+// La forma canonica del bersaglio - e la tabella delle eccezioni sui tre tipi
+// di sito, che le annotazioni a mano chiamano tutti `web_asset` - sta in
+// server/audit/entity-type.ts: la usa anche l'altro lato del confronto,
+// request-context.ts, quando marca un bersaglio annotato a mano e quando
+// scarta i doppioni.
 
-const toSnakeCase = (modelName: string) =>
-  modelName
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
-    .toLowerCase();
-
-export const resolveEntityType = (modelName: string) =>
-  ENTITY_TYPE_OVERRIDES[modelName] ?? toSnakeCase(modelName);
+export { resolveEntityType } from './entity-type.js';
 
 export const isTrackedModel = (modelName: string | undefined): modelName is string =>
   Boolean(modelName) && !EXCLUDED_MODELS.has(modelName as string);
@@ -227,7 +218,7 @@ export const buildPendingAuditEntry = ({
   }
 
   const verb = OPERATION_VERB[operation];
-  const entityType = resolveEntityType(model);
+  const entityType = normalizeEntityType(model);
   const entityId = resolveEntityId(args, result);
 
   return {

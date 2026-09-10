@@ -8,6 +8,7 @@ import {
   resolveEntityType,
   resolveWorkspaceId,
 } from './audit-interceptor.js';
+import { normalizeEntityType } from './entity-type.js';
 import { MAX_PENDING_AUDIT_ENTRIES, requestContext } from '../core/request-context.js';
 
 const WORKSPACE = 'workspace-1';
@@ -282,6 +283,126 @@ test("un'annotazione a mano su un altro bersaglio non scarta niente", () => {
   assert.equal(entries.length, 1);
   assert.equal(entries[0]?.entityId, 'c-7');
 });
+
+// I casi qui sotto coprono il difetto trovato in revisione: l'annotazione a
+// mano e la registrazione automatica nominavano lo stesso bersaglio in due
+// convenzioni diverse, quindi lo scarto dei doppioni non agganciava mai.
+// Sono scritti apposta con i due lati in forme DIVERSE: una prova con i due
+// tipi gia' identici passerebbe anche col difetto dentro.
+test("l'annotazione a mano in PascalCase scarta la registrazione automatica in forma snake", () => {
+  // Caso reale: clientsService.createClient scrive sul modello `Client` e poi
+  // annota a mano con entityType: 'Client'. Prima della normalizzazione il
+  // registro riceveva DUE righe per ogni cliente creato.
+  requestContext.start();
+
+  const built = buildPendingAuditEntry({
+    model: 'Client',
+    operation: 'create',
+    args: { data: { workspaceId: WORKSPACE } },
+    result: { id: 'c-9', workspaceId: WORKSPACE },
+    actorUserId: USER,
+  });
+  assert.ok(built);
+  requestContext.addPendingAuditEntry(built.key, built.entry);
+
+  requestContext.markManualAudit('Client', 'c-9');
+
+  const { entries } = requestContext.drainPendingAuditEntries();
+  assert.deepEqual(entries, []);
+});
+
+test('lo scarto in PascalCase vale per tutti i modelli censiti, non solo per Client', () => {
+  // I dieci valori scritti a mano trovati in revisione, con il modello Prisma
+  // su cui l'intercettore produce la riga automatica corrispondente.
+  const casi: Array<[manuale: string, modello: string]> = [
+    ['Client', 'Client'],
+    ['Project', 'Project'],
+    ['ChecklistInstanceItem', 'ChecklistInstanceItem'],
+    ['ChecklistTemplate', 'ChecklistTemplate'],
+    ['ChecklistTemplateItem', 'ChecklistTemplateItem'],
+    ['PipelineStage', 'PipelineStage'],
+    ['ProjectCategory', 'ProjectCategory'],
+    ['ProjectSource', 'ProjectSource'],
+    ['Integration', 'Integration'],
+    ['VaultItem', 'VaultItem'],
+  ];
+
+  for (const [manuale, modello] of casi) {
+    requestContext.start();
+
+    const built = buildPendingAuditEntry({
+      model: modello,
+      operation: 'update',
+      args: { where: { id: 'x-1' } },
+      result: { id: 'x-1', workspaceId: WORKSPACE },
+      actorUserId: USER,
+    });
+    assert.ok(built, `nessuna registrazione automatica per ${modello}`);
+    requestContext.addPendingAuditEntry(built.key, built.entry);
+
+    requestContext.markManualAudit(manuale, 'x-1');
+
+    const { entries } = requestContext.drainPendingAuditEntries();
+    assert.deepEqual(entries, [], `doppione rimasto su ${manuale}/${modello}`);
+  }
+});
+
+test('il segno per TUTTO il tipo funziona anche se scritto in PascalCase', () => {
+  requestContext.start();
+
+  const built = buildPendingAuditEntry({
+    model: 'DepartmentMember',
+    operation: 'updateMany',
+    args: { where: { workspaceId: WORKSPACE } },
+    result: { count: 4 },
+    actorUserId: USER,
+  });
+  assert.ok(built);
+  requestContext.addPendingAuditEntry(built.key, built.entry);
+
+  // Senza entityId: copre le righe che questa richiesta ha scritto sul tipo.
+  requestContext.markManualAudit('DepartmentMember', undefined);
+
+  const { entries } = requestContext.drainPendingAuditEntries();
+  assert.deepEqual(entries, []);
+});
+
+test('normalizzare non allarga lo scarto: due modelli diversi restano diversi', () => {
+  // Il controllo negativo che tiene onesta la correzione. Se la normalizzazione
+  // schiacciasse troppo, un'annotazione su un bersaglio scarterebbe quella di un
+  // altro: qui la registrazione automatica deve sopravvivere.
+  requestContext.start();
+
+  const built = buildPendingAuditEntry({
+    model: 'Project',
+    operation: 'update',
+    args: { where: { id: 'p-1' } },
+    result: { id: 'p-1', workspaceId: WORKSPACE },
+    actorUserId: USER,
+  });
+  assert.ok(built);
+  requestContext.addPendingAuditEntry(built.key, built.entry);
+
+  requestContext.markManualAudit('ProjectCategory', 'p-1');
+
+  const { entries } = requestContext.drainPendingAuditEntries();
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.entityType, 'project');
+});
+
+test('normalizeEntityType e idempotente: le annotazioni gia in forma snake non cambiano', () => {
+  // Le 49 annotazioni che erano gia' giuste devono restare identiche a se
+  // stesse, altrimenti la correzione ne romperebbe una meta' per aggiustare
+  // l'altra.
+  for (const gia of ['client', 'quote_template', 'user_role', 'web_asset', 'workspace']) {
+    assert.equal(normalizeEntityType(gia), gia);
+  }
+
+  // E le tre eccezioni sui tipi di sito valgono da entrambi i lati.
+  assert.equal(normalizeEntityType('WebsiteAsset'), 'web_asset');
+  assert.equal(normalizeEntityType('web_asset'), 'web_asset');
+});
+
 
 test('tre scritture sulla stessa riga fanno una registrazione sola, e di UNA riga', () => {
   // Il conteggio dice quante RIGHE sono cambiate, non quante volte le si e'
