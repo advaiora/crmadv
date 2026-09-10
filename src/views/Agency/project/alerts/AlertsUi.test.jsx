@@ -101,7 +101,11 @@ describe('DiagnosisPanel', () => {
   it('durante il caricamento non mostra i riquadri', () => {
     renderConRouter(<DiagnosisPanel diagnosis={null} loading busy={false} message="" error="" />);
 
-    expect(screen.getByText(/Caricamento dell'analisi/)).toBeInTheDocument();
+    // Il componente scrive l'apostrofo come entita' JSX (&rsquo;, U+2019) per
+    // togliersi di torno react/no-unescaped-entities: la regex accetta anche
+    // quella dritta perche' e' il carattere che leggerebbe chi scrive il test
+    // da tastiera.
+    expect(screen.getByText(/Caricamento dell['’]analisi/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Salva analisi' })).not.toBeInTheDocument();
   });
 });
