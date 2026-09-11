@@ -1583,3 +1583,15 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Quando il perimetro di un permesso piatto contiene dati privati, il permesso e' la prima meta' del controllo e la seconda e' un filtro sull'attore (qui: parte della conversazione e autore della cancellazione).
 - Quel filtro si scrive una volta sola e si applica a tutte le rotte che accettano un id — vedere, ripristinare, distruggere — non solo alla lettura; e chi non lo passa riceve `404`, non `403`, perche' un `403` conferma che la riga esiste.
 - Regola gemella per le rotte che distruggono: se la stessa distruzione esiste gia' altrove, le sue guardie si estraggono e si condividono, non si ricopiano — e si controlla che siano tutte, contandole nel codice invece di fidarsi dell'elenco ricevuto (qui erano tre, non due).
+
+---
+
+## 109. La soglia delle 500 righe la supera il merge, non un ramo preso da solo
+
+**Contesto:** 10/9/2026, chiudendo CRMA-169 (allegati scaricabili dopo il cestino), unendo `origin/main` dentro il ramo lungo `backend/crma-29-cestino`. Due rami separati lavoravano sullo stesso modulo (`server/modules/messaging/`) senza incontrarsi.
+
+**Errore:** guardare la soglia delle 500 righe solo sul proprio ramo. Su `main` `repository.ts` era a 393 righe e `service.ts` a 440: entrambi sotto soglia, e nessuno dei due lavori li sforava da solo. Dopo il merge erano a 602 e 523 — la soglia l'ha superata la somma, e nessun autore dei due rami se n'e' accorto mentre scriveva, perche' nessuno dei due vedeva l'altro ramo.
+
+**Modo corretto:**
+- Quando si unisce `main` dentro un ramo lungo che tocca un modulo condiviso, misurare le righe dei file **dopo** la risoluzione del merge, non fidarsi del conteggio visto prima di unire.
+- Se la soglia risulta superata dal merge, non spezzare il file di passaggio (vale la regola di sempre sui mostri): si annota in roadmap con la causa vera ("somma di due lavori nati separati"), non si tratta come un difetto del proprio ramo.
