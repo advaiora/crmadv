@@ -468,8 +468,13 @@ export const messagingService = {
     return { attachment: mapAttachment(attachment) };
   },
 
-  // Byte veri di un allegato, per il download. Due filtri, ENTRAMBI necessari:
-  // il workspace della riga e l'appartenenza alla conversazione.
+  // Byte veri di un allegato, per il download. TRE filtri, tutti necessari:
+  // il workspace della riga, l'appartenenza alla conversazione, e — da CRMA-169
+  // — il fatto che il messaggio padre non sia nel cestino. Il terzo non si vede
+  // qui sotto perche' vive nel `where` del repository
+  // (`buildAttachmentBinaryWhere`): un messaggio cestinato non torna, quindi
+  // `row` e' `null` e si esce dal primo `if`. Chi ritira un messaggio con dentro
+  // un documento si aspetta di aver ritirato anche il documento.
   async getAttachmentFile(input: {
     workspaceId: string;
     userId: string;
@@ -492,7 +497,11 @@ export const messagingService = {
   },
 
   // Cancella un allegato. Lo puo' fare chi l'ha caricato, che per costruzione e' il
-  // mittente del messaggio.
+  // mittente del messaggio — e solo finche' il messaggio non e' nel cestino
+  // (CRMA-169: il filtro sta in `buildAttachmentForDeleteWhere`, quindi qui si
+  // esce dal `notFound` senza un ramo in piu'). Il motivo non e' di permessi: e'
+  // che il Cestino deve poter ripristinare un messaggio INTERO, e una cancella-
+  // zione fatta mentre era nascosto sarebbe irreversibile e invisibile.
   async removeAttachment(input: {
     workspaceId: string;
     userId: string;

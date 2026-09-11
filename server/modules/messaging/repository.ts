@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma.js';
-import { isTrashed, markTrashed, notDeleted } from '../../core/soft-delete.js';
+import { NOT_DELETED, isTrashed, markTrashed, notDeleted } from '../../core/soft-delete.js';
 
 export type WorkspaceMember = {
   userId: string;
@@ -284,6 +284,90 @@ export const buildTrashMessageWhere = (input: TrashMessageInput) =>
     senderUserId: input.actorUserId,
   });
 
+// --- I QUATTRO `where` degli allegati davanti al Cestino (CRMA-169) ---
+//
+// Quattro sono i modi in cui si tocca un allegato — allegarlo, elencarlo nella
+// conversazione, scaricarlo, toglierlo — e tutti e quattro guardano il MESSAGGIO
+// PADRE. Il motivo e' scritto qui una volta sola invece che ripetuto su ognuno:
+//
+// L'allegato non ha una `deletedAt` propria e non deve averla: e' la regola 2 di
+// `server/core/soft-delete.ts` — «un figlio si nasconde guardando il padre». Due
+// date da tenere allineate sono due date che prima o poi divergono, e qui
+// divergerebbero nel modo peggiore: un messaggio ripristinato tornerebbe senza i
+// suoi allegati, oppure — il caso che ha aperto questo compito — un messaggio
+// cestinato resterebbe con i suoi allegati SCARICABILI.
+//
+// Il buco era reale e non era colpa di nessuno dei due lavori: gli allegati
+// (CRMA-30 / CRMA-138) sono nati su `main`, dove la colonna `deletedAt` dei
+// messaggi non esisteva ancora; il Cestino e' nato su questo ramo, dove gli
+// allegati non c'erano. Si sono incontrati solo al merge, ed e' quello il punto
+// in cui il filtro andava aggiunto.
+//
+// ⚠️ La cascata del database NON copre questo caso, ed e' giusto cosi':
+// `WorkspaceMessageAttachment.message` e' `onDelete: Cascade`, che spara solo
+// sull'eliminazione definitiva. Se sparasse anche cestinando, il Cestino non
+// potrebbe piu' ripristinare un messaggio intero.
+//
+// Sono funzioni a se' e non oggetti scritti dentro le query per la stessa
+// ragione dei filtri di CRMA-133: cosi' si possono provare senza database
+// (`repository.attachments.trash.test.ts`).
+
+/**
+ * 1/4 — Il `where` del caricamento: il messaggio a cui si sta allegando.
+ *
+ * Unico dei quattro in cui il filtro sta sul messaggio stesso (`notDeleted`) e
+ * non su una relazione, perche' qui e' il messaggio che si legge. Serve per la
+ * stessa ragione degli altri tre: allegare a un messaggio cestinato vorrebbe
+ * dire scrivere una riga che nessuno vedra' mai piu' — il messaggio non compare
+ * nella conversazione — e che ricomparirebbe a sorpresa il giorno del
+ * ripristino.
+ */
+export const buildMessageForAttachmentWhere = (input: {
+  workspaceId: string;
+  messageId: string;
+}) =>
+  notDeleted({
+    id: input.messageId,
+    workspaceId: input.workspaceId,
+  });
+
+/**
+ * 2/4 — Il `where` degli allegati mostrati nella conversazione aperta.
+ *
+ * Oggi gli id che arrivano qui escono gia' da `listConversationMessages`, che
+ * filtra i cestinati per conto suo: il filtro sarebbe ridondante. Ci sta lo
+ * stesso perche' quella ridondanza e' l'unica cosa che regge se un domani
+ * qualcuno chiamera' questa lettura da un altro punto — ed e' esattamente cosi'
+ * che il buco di questo compito e' nato.
+ */
+export const buildAttachmentsForMessagesWhere = (messageIds: string[]) => ({
+  messageId: { in: messageIds },
+  message: NOT_DELETED,
+});
+
+/** 3/4 — Il `where` del download (`GET /messages/attachments/:id/file`). */
+export const buildAttachmentBinaryWhere = (attachmentId: string) => ({
+  id: attachmentId,
+  binary: { isNot: null },
+  message: NOT_DELETED,
+});
+
+/**
+ * 4/4 — Il `where` della rimozione di un allegato.
+ *
+ * Porta lo stesso filtro degli altri tre, e la conseguenza e' voluta: su un
+ * messaggio cestinato la rimozione risponde «non trovato» invece di eseguire.
+ * Lasciarla passare toglierebbe per sempre un allegato che il Cestino deve
+ * poter riportare indietro **intero** — e lo toglierebbe senza che nessuno
+ * possa vederlo, visto che un messaggio cestinato non compare piu' nella
+ * conversazione. Chi vuole davvero disfarsene ha la strada giusta:
+ * ripristinare il messaggio, togliere l'allegato, ricestinare.
+ */
+export const buildAttachmentForDeleteWhere = (attachmentId: string) => ({
+  id: attachmentId,
+  message: NOT_DELETED,
+});
+
 export const messagingRepository = {
   async listWorkspaceMembers(input: ListWorkspaceMembersInput) {
     const items = await prisma.membership.findMany({
@@ -421,10 +505,7 @@ export const messagingRepository = {
   // chiama deve poter verificare workspace E appartenenza prima di scrivere.
   findMessageForAttachment(workspaceId: string, messageId: string) {
     return prisma.workspaceMessage.findFirst({
-      where: {
-        id: messageId,
-        workspaceId,
-      },
+      where: buildMessageForAttachmentWhere({ workspaceId, messageId }),
       select: {
         id: true,
         workspaceId: true,
@@ -467,9 +548,7 @@ export const messagingRepository = {
     }
 
     return prisma.workspaceMessageAttachment.findMany({
-      where: {
-        messageId: { in: messageIds },
-      },
+      where: buildAttachmentsForMessagesWhere(messageIds),
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: ATTACHMENT_SELECT,
     });
@@ -479,10 +558,7 @@ export const messagingRepository = {
   // workspace e di appartenenza la fa il service: qui si legge e basta.
   findAttachmentBinary(attachmentId: string) {
     return prisma.workspaceMessageAttachment.findFirst({
-      where: {
-        id: attachmentId,
-        binary: { isNot: null },
-      },
+      where: buildAttachmentBinaryWhere(attachmentId),
       select: {
         id: true,
         workspaceId: true,
@@ -502,7 +578,7 @@ export const messagingRepository = {
 
   findAttachmentForDelete(attachmentId: string) {
     return prisma.workspaceMessageAttachment.findFirst({
-      where: { id: attachmentId },
+      where: buildAttachmentForDeleteWhere(attachmentId),
       select: {
         id: true,
         workspaceId: true,

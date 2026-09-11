@@ -38,6 +38,12 @@ test('la conversazione con un contatto cestinato si apre ancora, e la cronologia
     contatto({ isTrashed: true }),
   );
   t.mock.method(messagingRepository, 'listConversationMessages', async () => [messaggio(PEER)]);
+  // Dall'unione con gli allegati (CRMA-30 / CRMA-138) `listConversation` fa una
+  // lettura in piu' per gli allegati della pagina: senza questo mock il test
+  // finirebbe sul Proxy di `server/prisma.ts` e fallirebbe per un database
+  // mancante, non per la regola che sta provando. Gli altri test di questo file
+  // non ne hanno bisogno perche' con zero messaggi quella lettura torna subito.
+  t.mock.method(messagingRepository, 'listAttachmentsForMessages', async () => []);
 
   const risultato = await messagingService.listConversation({
     workspaceId: WORKSPACE_ID,
