@@ -22,6 +22,17 @@ export const SESSION_CHANGED_EVENT = 'advaiora:session-changed';
 // hanno chiavi che non lo condividono: la pulizia per prefisso non le tocca.
 const WORKSPACE_CACHE_KEY_PREFIX = 'agency-os.';
 
+// Chiavi fuori dal prefisso sopra ma comunque legate a un workspace preciso
+// (CRMA-167: censimento di CRMA-164 fatto solo su localStorage.setItem, non
+// le trovava). Elenco esplicito e non un prefisso `projects.`: un prefisso
+// cosi' largo si prenderebbe anche chiavi future non collegate al workspace.
+// Le stringhe devono restare allineate a STORAGE_KEY in
+// src/modules/projects/hooks/useSelectedCategoryId.js e
+// useSelectedPipelineCategoryId.js (non importate qui per non far dipendere
+// src/lib da src/modules/projects e da react-router-dom); session.test.ts
+// importa quelle costanti per far fallire il test se divergono.
+const WORKSPACE_SCOPED_KEYS = ['projects.categoryId', 'projects.pipelineCategoryId'];
+
 const clearWorkspaceCaches = () => {
     const keysToRemove: string[] = [];
 
@@ -33,6 +44,7 @@ const clearWorkspaceCaches = () => {
     }
 
     keysToRemove.forEach((key) => localStorage.removeItem(key));
+    WORKSPACE_SCOPED_KEYS.forEach((key) => localStorage.removeItem(key));
 };
 
 const isBrowser = () => typeof window !== 'undefined';

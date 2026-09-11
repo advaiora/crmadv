@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 
-const STORAGE_KEY = 'projects.categoryId';
+export const STORAGE_KEY = 'projects.categoryId';
 
 const readStoredCategoryId = () => {
     if (typeof window === 'undefined') {

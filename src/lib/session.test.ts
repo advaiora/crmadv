@@ -3,6 +3,8 @@
 // senza toccare le preferenze d'interfaccia.
 import { describe, it, expect, afterEach } from 'vitest';
 import { clearSession, readSession, writeSession } from './session';
+import { STORAGE_KEY as CATEGORY_STORAGE_KEY } from '../modules/projects/hooks/useSelectedCategoryId';
+import { STORAGE_KEY as PIPELINE_CATEGORY_STORAGE_KEY } from '../modules/projects/hooks/useSelectedPipelineCategoryId';
 
 const validSession = {
     accessToken: 'token-123',
@@ -28,6 +30,17 @@ describe('clearSession', () => {
         expect(localStorage.getItem('agency-os.projects')).toBeNull();
         expect(localStorage.getItem('agency-os.ads.project-1')).toBeNull();
         expect(localStorage.getItem('agency-os.discovery.project-1')).toBeNull();
+    });
+
+    it('rimuove anche le categorie selezionate del modulo progetti (CRMA-167)', () => {
+        writeSession(validSession);
+        localStorage.setItem(CATEGORY_STORAGE_KEY, 'category-1');
+        localStorage.setItem(PIPELINE_CATEGORY_STORAGE_KEY, 'category-2');
+
+        clearSession();
+
+        expect(localStorage.getItem(CATEGORY_STORAGE_KEY)).toBeNull();
+        expect(localStorage.getItem(PIPELINE_CATEGORY_STORAGE_KEY)).toBeNull();
     });
 
     it('non tocca le preferenze d\'interfaccia (tema, profilo, modello AI)', () => {
