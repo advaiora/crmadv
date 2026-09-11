@@ -1508,3 +1508,28 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Chi deve davvero agire si nomina in chiaro dentro `action` (testo libero) e, se esiste, nel legame `blockedByIssueIds` verso il compito figlio: la relazione strutturata che l'API espone in lettura come `blockedBy` e' quella che conta per il tracciamento, il testo di `action` e' solo per chi legge.
 - Vale anche quando il vero destinatario e' un umano: non esiste un valore di `owner` che rappresenti "un altro", solo se stessi. Verso un umano il canale e' un commento leggibile sull'issue e/o un'interazione `ask_user_questions` / `request_confirmation` con `resolverPolicy: human_only` — mai il descrittore.
 - **Verifica (aggiunta il 10/9/2026, CRMA-118):** la `PATCH` con `owner` esterno non si limita a ignorare quel campo, fallisce **per intero** — anche gli altri campi passati nella stessa chiamata (es. `status`) restano non applicati. Dopo ogni `PATCH` che tocca `unblockDescriptor`, rileggere l'issue e controllare che il campo non sia tornato `null`: se lo e', la scrittura e' fallita in silenzio e va rifatta con l'owner giusto.
+
+---
+
+## 103. Un commento nel codice che cita un numero di riga in un altro file invecchia al primo refactor — e su un albero condiviso puo' nascere gia' sbagliato
+
+**Contesto:** 10/9/2026, CRMA-123. Un commento sopra `SYSTEM_MODULE_CATALOG` in `server/auth/rbac-catalog.ts` rimandava a `SidebarMenu.jsx:342 e :349` per due voci di menu. Il compito CRMA-32 (riordino del menu) ha spostato quelle voci a `:309` e `:318`, e il commento e' finito stale. Prima revisione della correzione: i numeri erano stati aggiornati a `309`/`318` — ma quei numeri venivano dal lavoro **non committato** di CRMA-32 nell'albero di lavoro condiviso, non da `main` (`git log --oneline origin/main..<ramo-CRMA-32>` era vuoto). Se la correzione fosse arrivata su `main` per prima, sarebbe atterrata gia' sbagliata: lo stesso difetto che doveva togliere, solo spostato.
+
+**Errore:** citare un numero di riga di un altro file dentro un commento persistente e' una scommessa doppia — invecchia al primo refactor di quel file (il difetto originale), e se il numero si legge da un albero condiviso puo' anche non essere mai stato vero su `main` (il difetto scoperto in revisione, vedi anche [[numeri-di-riga-letti-dall-albero-condiviso]]).
+
+**Modo corretto:**
+- In un commento che deve restare valido nel tempo, riferirsi a un'altra posizione nel codice **per nome** (l'etichetta della voce, il nome della chiave, il nome della funzione), mai per numero di riga: il nome sopravvive al refactor, la riga no.
+- Se davvero serve un riferimento verificabile a un file diverso, verificarlo con `git show origin/main:<file> | grep -n <termine>` prima di scriverlo — mai leggere la riga dall'albero di lavoro condiviso quando l'altro file e' oggetto del lavoro non committato di un altro compito.
+- Quando un blocco di commento a cui si rimanda (qui: l'ipotesi di accorciamento etichette, introdotta da "🔸 Da riguardare quando...") viene tolto perche' superato, controllare che nessun'altra riga dello stesso commento vi punti ancora con un "qui sotto" o simile.
+---
+
+## 104. Una sola `request_confirmation` pendente per compito alla volta: la piu' recente soppianta quella prima
+
+**Contesto:** 10-11/9/2026, CRMA-116 e CRMA-144 (coda unioni a `main` in corsia A). Il compito prevedeva di chiedere il consenso di corsia A per piu' pull request insieme, sullo stesso compito: si creavano piu' richieste `request_confirmation`, una per PR, con `idempotencyKey` distinti per ciascuna.
+
+**Errore:** l'API delle interazioni permette **una sola** `request_confirmation` pendente per compito alla volta. Ogni nuova richiesta creata mentre una precedente e' ancora pendente la **soppianta immediatamente**: quella vecchia risulta `status: expired` con `result.outcome: superseded_by_newer_request`, senza che l'assegnatario umano l'abbia mai vista o potuta rispondere. L'`idempotencyKey` distinto trae in inganno: distingue le richieste fra loro, ma non evita che la piu' recente sostituisca la pendente. E' cosi' che le richieste di consenso per le PR #56 e #54 sono scadute due volte senza risposta.
+
+**Modo corretto:**
+- Quando servono piu' consensi di corsia A sullo stesso compito, emetterle **una alla volta**: si crea la richiesta, si aspetta l'esito (accettata, rifiutata o scaduta) leggendolo con `GET /api/issues/{id}/interactions`, e solo allora si crea la successiva.
+- Se il lavoro lo consente, un'alternativa e' aprire un compito figlio per pull request: ognuno ha una coda di interazioni indipendente, e le richieste non si soppiantano a vicenda.
+- Prova: commento su CRMA-144 (id compito `e2d9578d-c46c-4748-b8d4-71a913f52f40`).

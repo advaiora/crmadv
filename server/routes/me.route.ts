@@ -23,6 +23,8 @@ const meRoute: FastifyPluginAsync = async (app) => {
 
     await audit.log({
       event: 'me.view',
+      entityType: 'user',
+      entityId: user.id,
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: {

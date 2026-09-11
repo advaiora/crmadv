@@ -32,6 +32,7 @@ const workspaceCalendarRoute: FastifyPluginAsync = async (app) => {
 
     await audit.log({
       event: 'calendar.events.list',
+      entityType: 'calendar_event',
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: {

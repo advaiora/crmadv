@@ -1,133 +1,43 @@
 #!/bin/sh
-# ===========================================================================
-# Hook pre-commit del progetto. Git ne esegue UNO SOLO: qui dentro stanno
-# due controlli con severita' OPPOSTE, ed e' voluto.
-#
-#   PARTE 1 - rigenerazione della mappa: NON blocca mai (solo un avviso).
-#   PARTE 2 - cintura di sicurezza sui segreti: BLOCCA il commit (exit 1).
-#
-# Tenerle separate serve a non farle scivolare l'una nell'altra: una mappa
-# non rigenerata e' un fastidio, una password committata e' un incidente.
-# Attivazione (una volta per clone):  git config core.hooksPath .githooks
-# ===========================================================================
+{
+  # LANCIATORE, e basta: avvia il modulo e pretende la sua sentinella prima di
+  # credere al suo esito. Tutta la logica — e i commenti che la spiegano — sta in
+  # `scripts/hook/pre-commit.mjs` (compito CRMA-152).
+  #
+  # ⚠️ LE PARENTESI GRAFFE NON SONO UN VEZZO: sono il motivo per cui questo file
+  # non si puo' svuotare in silenzio. Un troncamento (checkout interrotto, disco
+  # pieno, merge andato male) lascia un blocco `{` mai chiuso, e `sh` allora non
+  # esegue NIENTE: errore di sintassi, uscita diversa da zero, commit rifiutato.
+  # Senza graffe ogni riga tagliata darebbe uno script piu' corto ma valido, che
+  # esce 0 — cioe' un commit accettato senza che nessun controllo sia girato: e'
+  # esattamente il guasto misurato in CRMA-102 sull'hook di prima (105 punti di
+  # troncamento su 135 accettavano un segreto vero). Per la stessa ragione anche
+  # questo commento sta DENTRO le graffe: fuori aggiungerebbe punti scoperti.
+  # Restano scoperti i due soli che nessuna forma puo' coprire — il file vuoto e
+  # la sola riga di shebang — ed e' il conto che `scripts/hook/pre-commit.test.mjs`
+  # ricontrolla a ogni `npm run test:scripts`, riga per riga.
+  #
+  # Attivazione (una volta per clone):  git config core.hooksPath .githooks
+  # Via d'uscita dichiarata:            git commit --no-verify
+  if uscita=$(node scripts/hook/pre-commit.mjs); then esito=0; else esito=$?; fi
 
-# ---------------------------------------------------------------------------
-# PARTE 1 - Mappa progetto (archivio-documenti/mappa/, generata, non committata).
-# Forma leggera decisa il 4/8/2026 (registro in archivio-documenti/team-agenti.md):
-# sub-secondo, NON blocca mai il commit — tiene la mappa fresca anche se una
-# sessione dimentica `npm run mappa`.
-# ---------------------------------------------------------------------------
-if ! node scripts/agenti/mappa.mjs >/dev/null 2>&1; then
-  echo "[avviso] mappa non rigenerata (node scripts/agenti/mappa.mjs fallito): rigenerala a mano" >&2
-fi
+  case "$uscita" in
+    *"pre-commit: arrivato in fondo"*) exit "$esito" ;;
+  esac
 
-# ---------------------------------------------------------------------------
-# PARTE 2 - Cintura di sicurezza: segreti in stage. QUESTA BLOCCA (exit 1).
-#
-# Perche' esiste, perche' e' in Node e non in grep/awk, quali regole applica e
-# quali esclusioni ammette: sta tutto scritto in cima al modulo, che e' il posto
-# dove chi cerca quelle risposte va a guardare.
-#
-# ⚠️ Perche' e' un FILE e non piu' un here-document `cat <<'JS'` qui dentro
-# (compito CRMA-93): dentro uno script `sh` il controllo non era importabile,
-# quindi non era testabile — ed e' cosi' che `eSegnapostoMaiuscolo`, una
-# funzione pura con due liste e una soglia, e' arrivata al SECONDO giro di
-# revisione senza un test, col banco ricostruito a mano tre volte. Adesso il
-# banco e' in `scripts/hook/segnaposto.test.mjs` e gira con `npm run test:scripts`.
-#
-# VIA D'USCITA, dichiarata anche nel messaggio d'errore:  git commit --no-verify
-# ---------------------------------------------------------------------------
-CONTROLLO_SEGRETI="scripts/hook/controllo-segreti.mjs"
-
-# RIENTRO A VUOTO: il commit passa SENZA che nessun controllo sia girato.
-# E' il guasto peggiore di questo hook, perche' non si vede: non stampa niente e
-# lascia il commit andare. Storia in tre tappe, tenute qui perche' ognuna spiega
-# una riga di codice qui sotto.
-#
-#   1. CRMA-85 — il controllo era una variabile riempita da `cat`; se `cat`
-#      mancava la variabile restava vuota, `node -e ""` usciva 0, passava tutto.
-#   2. CRMA-93 — estratto in un file, i modi di rientrare a vuoto diventano DUE:
-#        - file ASSENTE (clone parziale, `git checkout` di un commit che non ce
-#          l'ha, cartella rinominata): `node` uscirebbe 1 e il commit sarebbe
-#          rifiutato lo stesso, ma senza dire perche'. Qui la guardia `-s` serve
-#          al MESSAGGIO;
-#        - file PRESENTE ma di ZERO BYTE (checkout interrotto): `node vuoto.mjs`
-#          esce 0. Qui la guardia `-s` serve alla SICUREZZA.
-#   3. CRMA-100 — ⚠️ `-s` NON basta, e il commento che stava qui prima diceva il
-#      contrario. `-s` verifica solo che il file non sia lungo zero: un modulo
-#      TRONCATO A META' o di SOLI SPAZI e' piu' lungo di zero, `node` lo esegue,
-#      esce 0, e il commit passa. Misurato al 10/9/2026 sulla punta di CRMA-93,
-#      su commit veri: 104 punti di troncamento su 187 accettati, 86 in silenzio
-#      — e le cause elencate al punto 2 (checkout interrotto, disco pieno, merge
-#      andato male) producono un file MOZZO molto piu' spesso che uno di zero byte.
-#      Percio' `-s` resta, ma solo come primo filtro col suo messaggio; la
-#      chiusura vera e' la sentinella qui sotto.
-if [ ! -s "$CONTROLLO_SEGRETI" ]; then
-  echo "[BLOCCO] $CONTROLLO_SEGRETI manca o e' vuoto: il controllo sui segreti non c'e'." >&2
-  echo "         Commit rifiutato per prudenza: ripristina il file," >&2
-  echo "         oppure, se sei sicuro, usa  git commit --no-verify" >&2
-  exit 1
-fi
-
-# LA SENTINELLA (CRMA-100). Il modulo, come ultimo gesto prima di uscire — sia
-# quando e' tutto pulito sia quando blocca — stampa questa riga su stdout. Non si
-# controlla piu' soltanto COME e' uscito, ma se e' ARRIVATO IN FONDO: un prefisso
-# di file non puo' contenere la propria ultima riga, quindi qualunque troncamento
-# la perde, anche quelli che restano JavaScript valido. E' l'unica forma che copre
-# la classe intera (le altre valutate stanno nel compito CRMA-100: `node --check`
-# prende solo i troncamenti che rompono la sintassi, il checksum va rigenerato a
-# ogni modifica del modulo).
-#
-# ⚠️ La stringa e' scritta a mano anche in cima al modulo: uno script `sh` non puo'
-# importare una costante da un `.mjs`. Se le due si separano questo hook blocca
-# OGNI commit — guasto rumoroso, che e' il verso giusto in cui sbagliare per una
-# cintura di sicurezza. Che siano identiche lo verifica il banco
-# `scripts/hook/controllo-segreti.test.mjs` (`npm run test:scripts`).
-SENTINELLA_ATTESA="controllo-segreti: arrivato in fondo"
-
-# stdout viene catturato (e' il canale della sentinella, e non contiene altro);
-# stderr NO, passa diretto al terminale — l'elenco dei riscontri va stampato.
-uscita_segreti=$(node "$CONTROLLO_SEGRETI")
-esito_segreti=$?
-
-# ⚠️ L'ORDINE DEI TRE CONTROLLI QUI SOTTO NON E' INDIFFERENTE, e ognuno esiste per
-# dare il messaggio giusto a un guasto diverso. Il modulo esce 0 (pulito) o 1 (ha
-# trovato qualcosa); qualunque altro numero non viene da lui.
-#   a) uscita DIVERSA da 0 e da 1 -> non e' stato lui: `node` assente (127), ucciso,
-#      permessi. Va detto cosi', prima di guardare la sentinella: un `node` che manca
-#      non stampa nessuna sentinella, e accusarlo di essere troncato manderebbe a
-#      cercare il guasto nel file sbagliato;
-#   b) sentinella ASSENTE -> il modulo c'e' e ha girato, ma non e' arrivato in fondo.
-#      Qui cade anche il troncamento che rompe la sintassi, che esce 1 e che prima
-#      finiva nel ramo (c) — bloccava, ma facendo credere di aver trovato un segreto;
-#   c) uscita 1 con la sentinella -> ha trovato davvero qualcosa e l'ha gia' stampato.
-
-# (a) Uscita inattesa: si rifiuta lo stesso. Un controllo di sicurezza che si
-# arrende in silenzio e' peggio che non averlo — la via d'uscita resta --no-verify.
-if [ "$esito_segreti" -ne 0 ] && [ "$esito_segreti" -ne 1 ]; then
-  echo "[BLOCCO] il controllo sui segreti non ha potuto girare (node e' uscito con $esito_segreti)." >&2
-  echo "         Commit rifiutato per prudenza: controlla che node sia installato" >&2
-  echo "         e che $CONTROLLO_SEGRETI sia a posto," >&2
-  echo "         oppure, se sei sicuro, usa  git commit --no-verify" >&2
-  exit 1
-fi
-
-# (b) La sentinella.
-case "$uscita_segreti" in
-  *"$SENTINELLA_ATTESA"*)
-    ;;
-  *)
-    echo "[BLOCCO] $CONTROLLO_SEGRETI non e' arrivato in fondo: e' troncato, di soli" >&2
-    echo "         spazi, o si e' interrotto a meta'. Il controllo sui segreti NON ha" >&2
-    echo "         girato, quindi il commit non e' stato verificato." >&2
+  # Nessuna sentinella: il modulo non e' arrivato in fondo, o non e' mai partito.
+  # I due casi vogliono due messaggi diversi, o si cerca il guasto nel file sbagliato.
+  if [ "$esito" -eq 127 ]; then
+    echo "[BLOCCO] il controllo pre-commit non ha potuto girare: 'node' non e' stato trovato." >&2
+    echo "         Commit rifiutato per prudenza: node e' un requisito del progetto," >&2
+    echo "         installalo, oppure, se sei sicuro, usa  git commit --no-verify" >&2
+  else
+    echo "[BLOCCO] scripts/hook/pre-commit.mjs non e' arrivato in fondo: e' assente," >&2
+    echo "         troncato, di soli spazi, o si e' interrotto a meta' (esito $esito)." >&2
+    echo "         Nessun controllo e' girato, quindi il commit non e' stato verificato." >&2
     echo "         Commit rifiutato per prudenza: ripristina il file con" >&2
-    echo "           git checkout -- $CONTROLLO_SEGRETI" >&2
+    echo "           git checkout -- scripts/hook/pre-commit.mjs" >&2
     echo "         oppure, se sei sicuro, usa  git commit --no-verify" >&2
-    exit 1
-    ;;
-esac
-
-# (c) Ha trovato un segreto: l'elenco e' gia' passato da stderr.
-if [ "$esito_segreti" -eq 1 ]; then
+  fi
   exit 1
-fi
+}

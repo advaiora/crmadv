@@ -52,6 +52,7 @@ const workspaceBrandingRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'branding.manage',
+        entityType: 'workspace_branding',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {

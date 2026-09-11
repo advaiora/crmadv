@@ -28,12 +28,15 @@ export const computeProductivityInsights = (context: DashboardInsightContext): P
     });
   }
 
-  insights.push({
-    id: 'quotes_sent_30d',
-    label: 'Preventivi inviati (30g)',
-    value: String(context.kpis.quotesSent30d),
-    note: null,
-  });
+  // Con Preventivi spento il KPI non arriva affatto: niente riga, non uno zero.
+  if (context.kpis.quotesSent30d !== undefined) {
+    insights.push({
+      id: 'quotes_sent_30d',
+      label: 'Preventivi inviati (30g)',
+      value: String(context.kpis.quotesSent30d),
+      note: null,
+    });
+  }
 
   const busiestStage = [...context.stageCounts].sort((left, right) => right.count - left.count)[0];
   if (busiestStage) {

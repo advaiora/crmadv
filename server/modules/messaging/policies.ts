@@ -11,6 +11,10 @@ export const MESSAGING_PERMISSIONS = {
   // Cestino in avanti `.delete` significa ovunque "sposta nel cestino", e la
   // distruzione vera sta dietro `trash.purge`.
   delete: 'messages.delete',
+  // Caricare un allegato ha una chiave sua: si vuole poter concedere "scrivere testo"
+  // senza "caricare file". SCARICARE invece non ce l'ha - scaricare e' leggere, e passa
+  // da `view` piu' il controllo mittente/destinatario dentro il service.
+  attach: 'messages.attach',
 } as const;
 
 type MessagingPermissionKey =

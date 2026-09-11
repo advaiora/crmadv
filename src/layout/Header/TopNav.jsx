@@ -128,7 +128,7 @@ const resolveMobilePageTitle = (pathname) => {
     if (pathname.startsWith('/apps/calendar')) return 'Calendario';
     if (pathname.startsWith('/apps/vault')) return 'Credenziali';
     if (pathname.startsWith('/apps/web-assets')) return 'Siti in gestione';
-    if (pathname.startsWith('/audit')) return 'Audit';
+    if (pathname.startsWith('/audit')) return 'Registro attività';
     if (pathname.startsWith('/pages/profile')) return 'Profilo';
     if (pathname.startsWith('/settings')) return 'Impostazioni';
 

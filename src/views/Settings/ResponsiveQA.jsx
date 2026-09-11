@@ -12,7 +12,7 @@ const QA_LINKS = [
     { label: 'Credenziali', path: '/apps/vault' },
     { label: 'Team', path: '/apps/team' },
     { label: 'Calendario', path: '/apps/calendar' },
-    { label: 'Audit', path: '/audit' },
+    { label: 'Registro attività', path: '/audit' },
 ];
 
 const ResponsiveQAPage = () => {
