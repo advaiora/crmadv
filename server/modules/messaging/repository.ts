@@ -42,6 +42,28 @@ type MarkConversationAsReadInput = {
   peerUserId: string;
 };
 
+type CreateAttachmentInput = {
+  workspaceId: string;
+  messageId: string;
+  createdByUserId: string;
+  label: string;
+  mimeType: string;
+  fileSize: number;
+  data: Buffer;
+};
+
+// Campi dell'allegato che escono verso il client. I BYTE non ci sono: si leggono solo
+// nel download, con findAttachmentBinary.
+const ATTACHMENT_SELECT = {
+  id: true,
+  messageId: true,
+  label: true,
+  mimeType: true,
+  fileSize: true,
+  createdAt: true,
+  createdByUserId: true,
+} as const;
+
 const mapMembershipRecordToMember = (item: {
   userId: string;
   user: {
@@ -257,6 +279,115 @@ export const messagingRepository = {
       data: {
         readAt: new Date(),
       },
+    });
+  },
+
+  // --- Allegati (A1 punto 8a) ---
+
+  // Il messaggio a cui si vuole allegare, con i due capi della conversazione: chi
+  // chiama deve poter verificare workspace E appartenenza prima di scrivere.
+  findMessageForAttachment(workspaceId: string, messageId: string) {
+    return prisma.workspaceMessage.findFirst({
+      where: {
+        id: messageId,
+        workspaceId,
+      },
+      select: {
+        id: true,
+        workspaceId: true,
+        senderUserId: true,
+        recipientUserId: true,
+      },
+    });
+  },
+
+  countAttachmentsForMessage(messageId: string) {
+    return prisma.workspaceMessageAttachment.count({
+      where: { messageId },
+    });
+  },
+
+  // Record + byte in una transazione sola: un allegato senza i suoi byte sarebbe una
+  // riga che il download non puo' servire.
+  createAttachment(input: CreateAttachmentInput) {
+    return prisma.workspaceMessageAttachment.create({
+      data: {
+        workspaceId: input.workspaceId,
+        messageId: input.messageId,
+        createdByUserId: input.createdByUserId,
+        label: input.label,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+        binary: {
+          create: {
+            data: input.data,
+          },
+        },
+      },
+      select: ATTACHMENT_SELECT,
+    });
+  },
+
+  listAttachmentsForMessages(messageIds: string[]) {
+    if (messageIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return prisma.workspaceMessageAttachment.findMany({
+      where: {
+        messageId: { in: messageIds },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: ATTACHMENT_SELECT,
+    });
+  },
+
+  // Byte veri + i due capi del messaggio che possiede l'allegato. La verifica di
+  // workspace e di appartenenza la fa il service: qui si legge e basta.
+  findAttachmentBinary(attachmentId: string) {
+    return prisma.workspaceMessageAttachment.findFirst({
+      where: {
+        id: attachmentId,
+        binary: { isNot: null },
+      },
+      select: {
+        id: true,
+        workspaceId: true,
+        label: true,
+        mimeType: true,
+        message: {
+          select: {
+            id: true,
+            senderUserId: true,
+            recipientUserId: true,
+          },
+        },
+        binary: { select: { data: true } },
+      },
+    });
+  },
+
+  findAttachmentForDelete(attachmentId: string) {
+    return prisma.workspaceMessageAttachment.findFirst({
+      where: { id: attachmentId },
+      select: {
+        id: true,
+        workspaceId: true,
+        createdByUserId: true,
+        message: {
+          select: {
+            id: true,
+            senderUserId: true,
+            recipientUserId: true,
+          },
+        },
+      },
+    });
+  },
+
+  deleteAttachment(attachmentId: string) {
+    return prisma.workspaceMessageAttachment.delete({
+      where: { id: attachmentId },
     });
   },
 };

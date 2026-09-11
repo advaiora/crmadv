@@ -40,6 +40,19 @@ test('le scritture di macchina ad alta frequenza restano fuori', () => {
   assert.equal(isTrackedModel('PasswordResetToken'), false);
 });
 
+// I byte di un allegato stanno sempre in una tabella a parte, che non ha
+// workspaceId: l'intercettore non saprebbe a chi attribuire la riga, e il fatto
+// e' gia' annotato a mano sull'allegato vero. Vale per la Chat AI e, dal
+// CRMA-30, per gli allegati ai messaggi interni.
+test('i blob degli allegati restano fuori: non sono attribuibili a un workspace', () => {
+  assert.equal(isTrackedModel('AiConversationAttachmentBinary'), false);
+  assert.equal(isTrackedModel('WorkspaceMessageAttachmentBinary'), false);
+
+  // Il record dell'allegato invece il workspace ce l'ha, quindi resta tracciato:
+  // e' il doppione dell'annotazione a mano a essere scartato dopo, per chiave.
+  assert.equal(isTrackedModel('WorkspaceMessageAttachment'), true);
+});
+
 test('un modello mai visto prima è tracciato di default', () => {
   // E' il punto dell'intero intercettore: cio' che si aggiunge domani risulta
   // tracciato senza che nessuno aggiunga una riga di annotazione.
