@@ -514,6 +514,109 @@ test('oltre il tetto per richiesta si conta invece di accumulare', () => {
   assert.equal(dropped, 5);
 });
 
+// CRMA-81 — le operazioni di piattaforma sul modello Workspace.
+
+test('una scrittura su Workspace finisce nel registro del workspace bersaglio', () => {
+  // L'amministratore di piattaforma è entrato da un workspace suo, e ne sospende
+  // un altro: la riga deve andare in quello sospeso, non in quello di partenza.
+  requestContext.start();
+  requestContext.setWorkspaceId('workspace-dell-amministratore');
+
+  assert.equal(
+    resolveWorkspaceId({ where: { id: 'workspace-bersaglio' } }, { id: 'workspace-bersaglio' }, 'Workspace'),
+    'workspace-bersaglio',
+  );
+});
+
+test('senza il nome del modello il workspace bersaglio non si riconosce', () => {
+  // È la ragione per cui resolveWorkspaceId ha bisogno del modello: la riga di un
+  // workspace e quella di un cliente hanno la stessa forma, `{ id }`.
+  requestContext.start();
+  requestContext.setWorkspaceId('workspace-dell-amministratore');
+
+  assert.equal(
+    resolveWorkspaceId({ where: { id: 'workspace-bersaglio' } }, { id: 'workspace-bersaglio' }),
+    'workspace-dell-amministratore',
+  );
+});
+
+test("l'id di un altro modello non viene scambiato per un workspace", () => {
+  requestContext.start();
+  requestContext.setWorkspaceId(null);
+
+  assert.equal(resolveWorkspaceId({ where: { id: 'client-1' } }, { id: 'client-1' }, 'Client'), null);
+});
+
+test('la sospensione di un workspace produce una registrazione leggibile', () => {
+  requestContext.start();
+  requestContext.setWorkspaceId('workspace-dell-amministratore');
+
+  const built = buildPendingAuditEntry({
+    model: 'Workspace',
+    operation: 'update',
+    args: { where: { id: 'workspace-bersaglio' }, data: { status: 'SUSPENDED' } },
+    result: { id: 'workspace-bersaglio', status: 'SUSPENDED' },
+    actorUserId: USER,
+  });
+
+  assert.ok(built);
+  assert.equal(built.entry.action, 'workspace.update');
+  assert.equal(built.entry.entityType, 'workspace');
+  assert.equal(built.entry.entityId, 'workspace-bersaglio');
+  assert.equal(built.entry.workspaceId, 'workspace-bersaglio');
+  assert.equal(built.entry.actorUserId, USER);
+});
+
+test('la creazione di un workspace si annota nel workspace appena creato', () => {
+  // Qui il contesto è vuoto davvero: creando non si è dentro nessun workspace.
+  requestContext.start();
+
+  const built = buildPendingAuditEntry({
+    model: 'Workspace',
+    operation: 'create',
+    args: { data: { name: 'Nuovo', slug: 'nuovo' } },
+    result: { id: 'workspace-nuovo', name: 'Nuovo' },
+    actorUserId: USER,
+  });
+
+  assert.ok(built);
+  assert.equal(built.entry.workspaceId, 'workspace-nuovo');
+});
+
+test('una updateMany su Workspace senza id ripiega sul contesto', () => {
+  // Non c'è un bersaglio unico da leggere: `where` non porta un id e il risultato
+  // è un conteggio. Meglio il contesto che perdere la scrittura.
+  requestContext.start();
+  requestContext.setWorkspaceId(WORKSPACE);
+
+  assert.equal(
+    resolveWorkspaceId({ where: { status: 'ACTIVE' } }, { count: 4 }, 'Workspace'),
+    WORKSPACE,
+  );
+});
+
+test("l'annotazione a mano su un utente scarta l'automatica del cambio di ruolo", () => {
+  // CRMA-81: la promozione a Super Admin di piattaforma si annota a mano, una
+  // riga per workspace. L'automatica sulla riga `User` — che finirebbe nel
+  // workspace dell'attore — non deve sopravviverle.
+  requestContext.start();
+  requestContext.setWorkspaceId('workspace-dell-amministratore');
+
+  const built = buildPendingAuditEntry({
+    model: 'User',
+    operation: 'update',
+    args: { where: { id: 'user-promosso' }, data: { isPlatformAdmin: true } },
+    result: { id: 'user-promosso' },
+    actorUserId: USER,
+  });
+
+  assert.ok(built);
+  requestContext.addPendingAuditEntry(built.key, built.entry);
+  requestContext.markManualAudit('user', 'user-promosso');
+
+  assert.equal(requestContext.drainPendingAuditEntries().entries.length, 0);
+});
+
 test('svuotare due volte non riscrive le stesse registrazioni', () => {
   requestContext.start();
   requestContext.addPendingAuditEntry('client:c-1:create', {

@@ -144,11 +144,25 @@ const readString = (source: unknown, key: string): string | null => {
 // davvero il dato, mentre il contesto dice solo con quale workspace è entrato
 // chi sta agendo — e per un amministratore di piattaforma i due possono
 // differire.
-export const resolveWorkspaceId = (args: unknown, result: unknown): string | null =>
+//
+// ⚠️ IL MODELLO `Workspace` È IL CASO PARTICOLARE (CRMA-81). Un workspace non ha
+// una colonna `workspaceId`: è lui stesso il workspace. Senza il ramo qui sotto
+// ogni scrittura su quella tabella ripiegava sul contesto, cioè sul workspace da
+// cui è entrato l'amministratore — e una sospensione del workspace B finiva
+// annotata nel registro di A, dove non era mai successo niente. Scelta di Jacopo
+// del 10/9/2026 (strada «b1»): la riga va nel registro del workspace bersaglio,
+// perché è chi amministra B a dover vedere cosa gli è stato fatto, anche quando
+// l'attore di B non è membro.
+export const resolveWorkspaceId = (
+  args: unknown,
+  result: unknown,
+  model?: string,
+): string | null =>
   readString(result, 'workspaceId')
   ?? readString((args as { data?: unknown } | null)?.data, 'workspaceId')
   ?? readString((args as { create?: unknown } | null)?.create, 'workspaceId')
   ?? readString((args as { where?: unknown } | null)?.where, 'workspaceId')
+  ?? (model === 'Workspace' ? resolveEntityId(args, result) : null)
   ?? requestContext.getWorkspaceId();
 
 export const resolveEntityId = (args: unknown, result: unknown): string | null =>
@@ -198,7 +212,7 @@ export const buildPendingAuditEntry = ({
     return null;
   }
 
-  const workspaceId = resolveWorkspaceId(args, result);
+  const workspaceId = resolveWorkspaceId(args, result, model);
   if (!workspaceId) {
     // Senza workspace la riga non è scrivibile (è una colonna obbligatoria con
     // vincolo di chiave esterna) e soprattutto non sarebbe leggibile da nessuno:
