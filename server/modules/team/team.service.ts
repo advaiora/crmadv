@@ -6,7 +6,7 @@ import { SYSTEM_ROLE_NAME } from '../../auth/rbac-catalog.js';
 import { badRequest, conflict, forbidden, notFound } from '../../core/errors.js';
 import { prisma } from '../../prisma.js';
 import { userRepository } from '../../repositories/user.repository.js';
-import { teamRepository, type TeamMemberRecord } from './team.repository.js';
+import { classifyMembershipAdmission, teamRepository, type TeamMemberRecord } from './team.repository.js';
 
 const createMemberSchema = z
   .object({
@@ -224,7 +224,10 @@ export const teamService = {
     }
 
     const existingMembership = await teamRepository.findMembershipByUserId(workspaceId, targetUser.id);
-    if (existingMembership) {
+    // Solo `present` blocca. Chi e' stato cestinato va riammesso: dal Team non
+    // si vede, quindi rispondere «e' gia' membro» descrive uno stato che chi
+    // guarda lo schermo non puo' ne' vedere ne' sbloccare (CRMA-163).
+    if (existingMembership && classifyMembershipAdmission(existingMembership) === 'present') {
       throw conflict('User is already a member of this workspace', {
         workspaceId,
         userId: targetUser.id,
@@ -235,7 +238,9 @@ export const teamService = {
     const nextRoleName = resolveRoleNameOrThrow(parsedPayload.roleName);
 
     const createdMember = await prisma.$transaction(async (tx) => {
-      const createdMembership = await teamRepository.createMembership(workspaceId, targetUser.id, tx);
+      // `admitMembership` e non un `create`: sulla persona cestinata la riga
+      // esiste ancora e va ripristinata, non inserita una seconda volta.
+      const createdMembership = await teamRepository.admitMembership(workspaceId, targetUser.id, tx);
 
       await assignWorkspaceUserRole({
         tx,

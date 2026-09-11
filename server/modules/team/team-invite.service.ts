@@ -6,7 +6,7 @@ import {
   getUserWorkspaceSystemRoleName,
 } from '../../auth/workspace-bootstrap.js';
 import { moduleRepository } from '../../repositories/module.repository.js';
-import { teamRepository } from './team.repository.js';
+import { classifyMembershipAdmission, teamRepository } from './team.repository.js';
 import { userRepository } from '../../repositories/user.repository.js';
 import { prisma } from '../../prisma.js';
 import { teamInviteNotifier } from './team-invite.notifier.js';
@@ -96,7 +96,13 @@ export const buildTeamInviteService = (
       const existingUser = await userRepo.findByEmail(email);
       if (existingUser) {
         const existingMembership = await teamRepo.findMembershipByUserId(input.workspaceId, existingUser.id);
-        if (existingMembership) {
+        // Una persona cestinata NON e' un destinatario impossibile: il suo
+        // invito deve poter partire, e accettarlo ripristina la membership che
+        // e' rimasta li' (`team-invite.accept.ts`, CRMA-157). Senza questa
+        // distinzione l'amministratore che prova la strada piu' ovvia —
+        // reinvitare — si sente rispondere che quella persona e' gia' membro,
+        // mentre a schermo non c'e' (CRMA-163).
+        if (classifyMembershipAdmission(existingMembership) === 'present') {
           throw conflict('Invite cannot be created for this recipient');
         }
       }
