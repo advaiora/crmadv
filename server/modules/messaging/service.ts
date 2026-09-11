@@ -54,7 +54,24 @@ const toMessagePreview = (value: string) => {
   return `${normalized.slice(0, 117)}...`;
 };
 
-const ensurePeer = async (workspaceId: string, userId: string, peerUserId: string) => {
+/**
+ * Trova l'altro capo della conversazione.
+ *
+ * `allowTrashed` e' la regola di questo compito messa in una riga: **leggere**
+ * una conversazione con un contatto cestinato si puo' (la cronologia non si
+ * cancella), **scriverci** no. Chi chiama dichiara quale dei due sta facendo,
+ * invece di lasciarlo decidere al filtro del repository.
+ *
+ * La riga si chiede sempre `includeTrashed: true` e si decide qui: cosi' un
+ * contatto nel cestino risponde "non puoi scrivergli" invece di "non esiste",
+ * che sarebbe una bugia e manderebbe chi legge a cercare un guasto altrove.
+ */
+const ensurePeer = async (
+  workspaceId: string,
+  userId: string,
+  peerUserId: string,
+  options: { allowTrashed: boolean },
+) => {
   const normalizedPeerUserId = peerUserId.trim();
   if (!normalizedPeerUserId) {
     throw badRequest('userId is required');
@@ -64,9 +81,15 @@ const ensurePeer = async (workspaceId: string, userId: string, peerUserId: strin
     throw badRequest('Cannot open a conversation with yourself');
   }
 
-  const peer = await messagingRepository.getWorkspaceMember(workspaceId, normalizedPeerUserId);
+  const peer = await messagingRepository.getWorkspaceMember(workspaceId, normalizedPeerUserId, {
+    includeTrashed: true,
+  });
   if (!peer) {
     throw notFound('Workspace member not found');
+  }
+
+  if (peer.isTrashed && !options.allowTrashed) {
+    throw badRequest('Cannot send messages to a contact in the trash');
   }
 
   return peer;
@@ -207,7 +230,10 @@ export const messagingService = {
     peerUserId: string;
     query: unknown;
   }) {
-    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId);
+    // Lettura: un contatto cestinato si apre ancora, la cronologia resta.
+    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId, {
+      allowTrashed: true,
+    });
     const parsedQuery = this.parseConversationQuery(input.query);
     const limit = parsedQuery.limit ?? DEFAULT_MESSAGES_LIMIT;
     const before = parsedQuery.before ? new Date(parsedQuery.before) : undefined;
@@ -240,7 +266,12 @@ export const messagingService = {
     peerUserId: string;
     payload: unknown;
   }) {
-    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId);
+    // Scrittura: qui il cestino chiude. Il picker non lo propone piu', ma
+    // l'indirizzo della conversazione resta raggiungibile a mano, ed e' da li'
+    // che un messaggio nuovo arriverebbe a un contatto cestinato.
+    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId, {
+      allowTrashed: false,
+    });
     const payload = this.parseSendMessagePayload(input.payload);
 
     const message = await messagingRepository.createMessage({
@@ -269,7 +300,12 @@ export const messagingService = {
     userId: string;
     peerUserId: string;
   }) {
-    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId);
+    // Lettura: segnare come letta una conversazione che si puo' ancora aprire
+    // deve restare possibile anche se il contatto e' finito nel cestino,
+    // altrimenti i suoi non-letti resterebbero appesi per sempre.
+    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId, {
+      allowTrashed: true,
+    });
     const result = await messagingRepository.markConversationAsRead({
       workspaceId: input.workspaceId,
       userId: input.userId,
