@@ -1,4 +1,5 @@
 import { HttpError, badRequest, conflict, forbidden, unauthorized } from '../../core/errors.js';
+import { markMembershipReactivated } from '../../core/membership-access.js';
 import { TEAM_MODULE_KEY } from '../../auth/rbac-catalog.js';
 import { enforceTeamInviteAcceptRateLimit } from './rate-limit.js';
 import { normalizeEmail } from './team.utils.js';
@@ -117,6 +118,10 @@ export const acceptTeamInvite = async (
         throw forbidden('Invite has already been accepted');
       }
 
+      // ⚠️ `update` e non `create`: la coppia (workspaceId, userId) resta unica
+      // anche da cestinata, quindi reinvitare una persona rimossa aggiorna la
+      // riga vecchia. Rimettere il solo `status` la lascerebbe cestinata, e
+      // ogni rotta risponderebbe 403 a un invito appena accettato (CRMA-157).
       const membership = await tx.membership.upsert({
         where: {
           workspaceId_userId: {
@@ -124,9 +129,7 @@ export const acceptTeamInvite = async (
             userId: targetUser.id,
           },
         },
-        update: {
-          status: 'ACTIVE',
-        },
+        update: markMembershipReactivated(),
         create: {
           workspaceId: invite.workspaceId,
           userId: targetUser.id,
@@ -158,6 +161,8 @@ export const acceptTeamInvite = async (
       throw conflict('Invite could not be claimed');
     }
 
+    // Stesso ripristino del ramo qui sopra: l'invito accettato deve riportare
+    // indietro la membership, non solo riaccenderne lo stato (CRMA-157).
     const membership = await tx.membership.upsert({
       where: {
         workspaceId_userId: {
@@ -165,9 +170,7 @@ export const acceptTeamInvite = async (
           userId: targetUser.id,
         },
       },
-      update: {
-        status: 'ACTIVE',
-      },
+      update: markMembershipReactivated(),
       create: {
         workspaceId: invite.workspaceId,
         userId: targetUser.id,

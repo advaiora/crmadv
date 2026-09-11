@@ -1,5 +1,35 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
+import { activeMember } from '../../core/membership-access.js';
+
+/**
+ * I ruoli Superadmin che contano davvero in un workspace.
+ *
+ * ⚠️ Il filtro sulla membership non e' un dettaglio di lettura, e' la cosa che
+ * regge la protezione dell'ultimo Superadmin (`team.service.ts:305`, `:362-363`,
+ * `:430-431`). Senza il filtro del Cestino un Superadmin cestinato comanderebbe
+ * ancora il modulo Team e farebbe da riempitivo al conteggio: la protezione
+ * lascerebbe passare la rimozione dell'ultimo Superadmin **reale**, e il
+ * workspace resterebbe senza nessuno che lo amministri (CRMA-157).
+ *
+ * E' esportata perche' quel filtro sia verificabile senza un database: vedi
+ * `team.repository.test.ts`.
+ */
+export const buildSuperadminAssignmentsWhere = (
+  workspaceId: string,
+  userId?: string,
+): Prisma.UserRoleWhereInput => ({
+  workspaceId,
+  ...(userId ? { userId } : {}),
+  role: {
+    isSuperadmin: true,
+  },
+  user: {
+    memberships: {
+      some: activeMember({ workspaceId }),
+    },
+  },
+});
 
 export type TeamMemberRoleRecord = {
   roleId: string;
@@ -214,20 +244,7 @@ export const teamRepository = {
     tx?: Prisma.TransactionClient,
   ): Promise<number> {
     const activeSuperadminAssignments = await withClient(tx).userRole.findMany({
-      where: {
-        workspaceId,
-        role: {
-          isSuperadmin: true,
-        },
-        user: {
-          memberships: {
-            some: {
-              workspaceId,
-              status: 'ACTIVE',
-            },
-          },
-        },
-      },
+      where: buildSuperadminAssignmentsWhere(workspaceId),
       distinct: ['userId'],
       select: {
         userId: true,
@@ -250,21 +267,7 @@ export const teamRepository = {
     tx?: Prisma.TransactionClient,
   ): Promise<boolean> {
     const assignment = await withClient(tx).userRole.findFirst({
-      where: {
-        workspaceId,
-        userId,
-        role: {
-          isSuperadmin: true,
-        },
-        user: {
-          memberships: {
-            some: {
-              workspaceId,
-              status: 'ACTIVE',
-            },
-          },
-        },
-      },
+      where: buildSuperadminAssignmentsWhere(workspaceId, userId),
       select: {
         id: true,
       },

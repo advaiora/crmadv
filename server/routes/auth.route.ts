@@ -4,6 +4,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { HttpError, badRequest, conflict, forbidden, isHttpError, internalServerError, unauthorized } from '../core/errors.js';
 import { ok } from '../core/response.js';
+import { activeMember } from '../core/membership-access.js';
 import { extractBearerToken, signAccessToken, verifyAccessToken } from '../auth/jwt.js';
 import {
   assignWorkspaceUserRole,
@@ -570,11 +571,10 @@ const ensureWorkspaceAccessDefaults = async ({
     return null;
   }
 
+  // I cestinati non contano come membri: se contassero, un workspace svuotato
+  // non promuoverebbe piu' nessuno a Superadmin (CRMA-157).
   const activeWorkspaceUserCount = await tx.membership.count({
-    where: {
-      workspaceId,
-      status: 'ACTIVE',
-    },
+    where: activeMember({ workspaceId }),
   });
 
   const nextRoleName =
@@ -606,12 +606,14 @@ type MembershipRecord = {
   };
 };
 
+// Le membership che l'utente puo' davvero usare: il login, l'aggiornamento del
+// profilo e `/auth/me` partono tutti da qui. Senza il filtro del Cestino una
+// persona tolta da un workspace farebbe login e si ritroverebbe dentro
+// (CRMA-157). Con il filtro, `pickActiveMembership` ripiega da solo su un altro
+// workspace se ce n'e' uno, e se non ce n'e' nessuno la sessione cade da sola.
 const listMemberships = (client: Prisma.TransactionClient | typeof prisma, userId: string) =>
   client.membership.findMany({
-    where: {
-      userId,
-      status: 'ACTIVE',
-    },
+    where: activeMember({ userId }),
     orderBy: {
       createdAt: 'asc',
     },

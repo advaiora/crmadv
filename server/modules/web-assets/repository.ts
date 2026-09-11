@@ -10,6 +10,7 @@ import {
   type WebAssetVersionStatus,
 } from '@prisma/client';
 import { prisma } from '../../prisma.js';
+import { activeMember } from '../../core/membership-access.js';
 
 export type WebAssetType = 'website' | 'webapp' | 'ecommerce';
 
@@ -862,12 +863,11 @@ export const webAssetsRepository = {
     });
   },
 
+  // Verifica di accesso travestita da lettura: e' quello che impedisce di
+  // intestare un asset a chi nel workspace non c'e' piu' (CRMA-157).
   userIsWorkspaceMember(workspaceId: string, userId: string) {
     return prisma.membership.findFirst({
-      where: whereWorkspace<Prisma.MembershipWhereInput>(workspaceId, {
-        userId,
-        status: 'ACTIVE',
-      }),
+      where: whereWorkspace<Prisma.MembershipWhereInput>(workspaceId, activeMember({ userId })),
       select: { id: true },
     });
   },
