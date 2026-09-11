@@ -23,6 +23,22 @@ describe('KpisWidget', () => {
     expect(screen.getByText('Task checklist aperti')).toBeInTheDocument();
   });
 
+  it('con un valore a zero ma chiave presente disegna comunque la card (modulo acceso, zero dati)', () => {
+    render(
+      <KpisWidget
+        data={{
+          clientsActive: 0,
+          projectsActive: 0,
+          quotesSent30d: 0,
+          checklistOpenItems: 0,
+        }}
+      />,
+    );
+    expect(screen.getByText('Clienti attivi')).toBeInTheDocument();
+    expect(screen.getByText('Progetti attivi')).toBeInTheDocument();
+    expect(screen.getAllByText('0')).toHaveLength(4);
+  });
+
   it('con un modulo spento (chiave assente da data) non disegna la sua card', () => {
     render(
       <KpisWidget

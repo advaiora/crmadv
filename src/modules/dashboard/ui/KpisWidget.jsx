@@ -2,6 +2,7 @@ import React from 'react';
 import { Briefcase, ClipboardCheck, FileText, Users } from 'lucide-react';
 import KpiCard from './KpiCard';
 
+// Elenco chiuso: una chiave in piu' in `data` viene ignorata in silenzio, non aggiunge una card.
 const KPI_DEFINITIONS = [
   {
     key: 'clientsActive',
