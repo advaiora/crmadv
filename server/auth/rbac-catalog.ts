@@ -143,8 +143,11 @@ export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   // "Branding" resta comunque inglese perche' e' il termine del mestiere.
   { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
-  { key: 'audit', name: 'Audit', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
-  // isCore come Moduli, Branding e Audit: e' configurazione di sistema, non una
+  // La chiave resta 'audit' (regola ②-bis: le chiavi tecniche seguono la convenzione
+  // dell'elenco in cui entrano, non il nome italiano). Cambia solo l'etichetta, che e'
+  // quella stampata da "Ruoli e permessi" e "Gestione Moduli".
+  { key: 'audit', name: 'Registro attività', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
+  // isCore come Moduli, Branding e Registro attività: e' configurazione di sistema, non una
   // funzione di business che ha senso accendere e spegnere. Un workspace col
   // server di posta "spento" da Gestione Moduli non saprebbe piu' come mandare
   // un invito, e non capirebbe perche'.

@@ -106,6 +106,10 @@ test('RBAC catalog: nomi e descrizioni non usano il vocabolario vecchio', () => 
     'Quotes',
     'Messages',
     'Clients',
+    // 'Audit' -> 'Registro attività' (CRMA-125, dopo il menu di CRMA-32). La CHIAVE del
+    // modulo resta 'audit' e non passa di qui: questo controllo guarda solo i nomi e le
+    // descrizioni, cioe' quello che finisce a schermo.
+    'Audit',
   ];
 
   // Le DESCRIZIONI dei ruoli sono state riscritte in italiano nello stesso giro, quindi
