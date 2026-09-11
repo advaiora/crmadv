@@ -1535,7 +1535,20 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Prova: commento su CRMA-144 (id compito `e2d9578d-c46c-4748-b8d4-71a913f52f40`).
 ---
 
-## 105. Un apostrofo dritto dentro `node -e '...'` ad apici singoli chiude la stringa a bash, come farebbe un backtick con gli apici doppi (variante della #88)
+## 105. `delegation_cycle` scatta sulla creazione di un figlio, non sulla riassegnazione di un compito gia' esistente
+
+**Contesto:** 10-11/9/2026, CRMA-129. Il Capocantiere doveva far arrivare il lavoro allo Sviluppatore frontend, ma il tentativo diretto — assegnarglielo creando un compito figlio — era stato respinto con **409 delegation_cycle** (antenato CRMA-122 creato dallo stesso mestiere). E' stata aperta una domanda umana, e Jacopo ha scelto l'opzione "assegna tu stesso il compito allo Sviluppatore frontend": rimaneva da capire se una `PATCH` di riassegnazione su un compito **gia' esistente** (non un figlio nuovo) avrebbe incontrato lo stesso blocco.
+
+**Errore/dubbio:** non era scontato che i due casi si comportassero uguale. Provata la `PATCH assigneeAgentId` su CRMA-129 (gia' assegnato al Capocantiere) verso lo Sviluppatore frontend: e' riuscita senza errore (200, nessun 409).
+
+**Modo corretto:**
+- Il controllo `delegation_cycle` scatta solo sulla **creazione** di un compito figlio con un assignee a ritroso nella catena delle deleghe, non sulla riassegnazione (`PATCH assigneeAgentId`) di un compito che esiste gia'.
+- Quando un antenato nella catena rende impossibile creare un figlio per un certo assignee, e il lavoro puo' restare sullo stesso compito invece di diramarsi in uno nuovo, la `PATCH` di riassegnazione e' la via che non incontra il blocco — non serve per forza una domanda umana per sbloccare casi simili, se il compito e' gia' apribile senza creare un nuovo figlio.
+- Prova: `PATCH` su CRMA-129, 200 senza 409, dopo il 409 sulla creazione del figlio verso lo stesso assignee.
+
+---
+
+## 106. Un apostrofo dritto dentro `node -e '...'` ad apici singoli chiude la stringa a bash, come farebbe un backtick con gli apici doppi (variante della #88)
 
 **Contesto:** CRMA-158, scrivendo un commento tecnico lungo (markdown con riferimenti fra backtick e con l'apostrofo tipografico reso come apostrofo dritto, es. "gia'", "cosi'", "l'utente") da postare via API con `node -e '...'` ad apici singoli — la forma indicata dalla nota #88 proprio per evitare che bash interpreti i backtick del testo come sostituzione di comando.
 
