@@ -1705,3 +1705,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - **Il messaggio d'errore dell'avvio deve contenere il passo 1**, non solo il nome della variabile: e' l'unico posto dove lo leggera' chi si trova l'API ferma alle otto di sera. Qui dice «set it to the current value of AUTH_JWT_SECRET, otherwise every pending invite stops working».
 - **La prova che il blocco funziona non e' il test unitario.** Un unit test passa un ambiente finto e dimostra solo che la funzione di validazione lancia. La prova vera e' l'avvio reale: `bootstrapRuntime` su una **copia del `.env` vero** (`grep -v` della riga) due volte, una senza la variabile e una con — la prima deve fermarsi col messaggio giusto, la seconda deve partire. Senza la seconda meta' e' un banco verde per caso.
 - **Vale per ogni ripiego silenzioso, non solo per i segreti:** un valore predefinito che qualcuno sta usando senza saperlo e' un dato di produzione. Toglierlo e' una migrazione, e come ogni migrazione si fa in un ordine preciso.
+---
+
+## 119. Un test che congela un'espressione si prova con la mutazione piu' vicina, non con i valori sbagliati che si hanno in mente
+
+**Contesto:** CRMA-159, revisione di stadio 2 (11/9/2026). Scrivere un test che «congela» una riga di configurazione perche' non torni indietro, dopo che quella riga era stata il rilievo bloccante di una revisione precedente del Guardiano — qui `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}` in `.github/workflows/controllo-segreti.yml:47`.
+
+**Errore:** asserire contro **il valore sbagliato che si ha in mente** (la costante `true`) e aggiungere come seconda asserzione che la riga **nomini** la cosa giusta (`includes('refs/heads/main')`). La negazione esatta della condizione — un carattere, `==` al posto di `!=` — soddisfa entrambe le asserzioni: il banco resta verde sulla configurazione **peggiore** di tutte (annulla anche i giri su `main`, il caso che la riga esiste apposta per escludere), e per giunta il test porta il nome del comportamento che ha smesso di verificare. Chi lo legge dopo conclude che quel comportamento e' protetto.
+
+**Modo corretto:**
+- Quando cio' che si congela e' un'**espressione** e non un valore, non elencare i valori sbagliati che si hanno in mente: elencare l'**insieme di quelli sicuri** e rifiutare tutto il resto, confrontando l'espressione **intera, operatore compreso**, dopo aver normalizzato solo cio' che non cambia il significato (spazi, tipo di apici).
+- Il prezzo e' un falso positivo sulle forme equivalenti ma scritte diversamente: va **dichiarato nel commento** del test, non scoperto da chi ci inciampa.
+- Si prova il test iniettando la variante sbagliata **piu' vicina**, non la piu' lontana: se la mutazione di un solo carattere passa il banco, quel test non sta congelando niente.
+- Prova: la debolezza della prova (10) e' stata trovata dal Guardiano in revisione, non dal banco stesso — commento sopra la riga in `.github/workflows/controllo-segreti.yml:42-44`, che la nomina gia' come «prova (10)».
