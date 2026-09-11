@@ -6,9 +6,10 @@ import {
   markMessagingConversationRead,
   sendMessagingMessage,
 } from "../../../modules/messaging/api/messagingApi";
-import { formatListDate, formatTime, newestUnreadIncomingAt } from "./chatShared";
+import { formatListDate, newestUnreadIncomingAt } from "./chatShared";
 import { IconBack, IconSearch } from "./chatIcons";
 import { subscribeMessaging, subscribeStatus } from "../../../realtime/realtimeClient";
+import MessageBubble from "./MessageBubble";
 
 // Il mondo MESSAGGISTICA dentro il popup delle chat (spec 4-ter §1).
 //
@@ -43,22 +44,6 @@ const getErrorMessage = (error, fallback) => {
 };
 
 const contactLabel = (contact) => contact?.name || contact?.email || "Utente";
-
-// Bolla della messaggistica 1-a-1. NON e' ChatBubble (quella della chat AI): li'
-// servono il ruolo assistente, le citazioni RAG, gli allegati e l'etichetta
-// dell'autore — cose che qui non esistono, e in una 1-a-1 l'autore e' ovvio.
-// Inoltre `isMine` lo dice il server, non lo si deduce dall'id dell'autore.
-// Tenerle separate e' la scelta della spec: due mondi, non uno con due nomi.
-const MessageBubble = ({ message }) => (
-  <div className={`d-flex mb-2 ${message.isMine ? "justify-content-end" : "justify-content-start"}`}>
-    <div className="ai-chat-msg-bubble-wrap">
-      <div className={`rounded-3 px-3 py-2 ${message.isMine ? "ai-chat-bubble-mine" : "bg-body-secondary border"}`}>
-        {message.body}
-      </div>
-      <div className={`small text-muted mt-1 ${message.isMine ? "text-end" : ""}`}>{formatTime(message.createdAt)}</div>
-    </div>
-  </div>
-);
 
 // Elenco delle conversazioni con le persone. Sorgente: i membri del workspace, non
 // solo chi ha gia' scritto — quindi compaiono anche i colleghi a zero messaggi, ed
@@ -119,7 +104,7 @@ const ContactList = ({ contacts, loading, error, activePeerId, draft, onDraft, o
 // pannello si SMONTA cambiando mondo ({isMessaging ? <MessagingPanel/> : …}); se il
 // peer stesse qui dentro, tornando ai Messaggi la conversazione aperta sarebbe persa
 // (QoL segnalato il 16/7, spec 4-ter §5). Tenendolo nel padre la casella la ricorda.
-const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
+const MessagingPanel = ({ expanded, canSend, canAttach, peer, onPeerChange }) => {
   const [contacts, setContacts] = React.useState([]);
   const [contactsLoading, setContactsLoading] = React.useState(true);
   const [contactsError, setContactsError] = React.useState("");
@@ -386,7 +371,12 @@ const MessagingPanel = ({ expanded, canSend, peer, onPeerChange }) => {
               ) : (
                 <>
                   {messages.map((message) => (
-                    <MessageBubble key={message.id} message={message} />
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      canAttach={canAttach}
+                      onAttachmentsChanged={() => loadConversation(peerId, { silent: true })}
+                    />
                   ))}
                   <div ref={bottomRef} />
                 </>

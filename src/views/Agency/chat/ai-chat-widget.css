@@ -602,6 +602,28 @@
   opacity: 0.3;
 }
 
+/* Bottone "allega" sotto la bolla di un proprio messaggio (Messaggi, CRMA-138):
+   stessa discrezione dei tasti del chip, accanto all'orario. */
+.ai-chat-msg-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.ai-chat-msg-attach-btn:hover:not(:disabled) {
+  opacity: 1;
+}
+
+.ai-chat-msg-attach-btn:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
 .ai-chat-attach-panel {
   display: flex;
   flex-direction: column;
