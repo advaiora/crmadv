@@ -2,12 +2,27 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildDashboardService } from './dashboard.service.js';
 
+type MockKpiScope = {
+  clients: boolean;
+  projects: boolean;
+  quotes: boolean;
+  checklists: boolean;
+};
+
+const ALL_MODULES_SCOPE: MockKpiScope = {
+  clients: true,
+  projects: true,
+  quotes: true,
+  checklists: true,
+};
+
 const buildMockDashboardRepository = () => ({
-  getKpis: async () => ({
-    clientsActive: 5,
-    projectsActive: 7,
-    quotesSent30d: 3,
-    checklistOpenItems: 9,
+  // Come il repository vero: cio' che non e' nello scope non viene contato.
+  getKpis: async (_workspaceId: string, scope: MockKpiScope = ALL_MODULES_SCOPE) => ({
+    ...(scope.clients ? { clientsActive: 5 } : {}),
+    ...(scope.projects ? { projectsActive: 7 } : {}),
+    ...(scope.quotes ? { quotesSent30d: 3 } : {}),
+    ...(scope.checklists ? { checklistOpenItems: 9 } : {}),
   }),
   getPipelineSnapshot: async () => ([
     { stageId: 'stage-1', stageName: 'Todo', count: 4 },
@@ -99,7 +114,15 @@ test('dashboard home for superadmin includes management and security widgets', a
       listUserRoles: async () => (['Superadmin']),
     } as never,
     moduleRepositoryApi: {
-      listEnabledModules: async () => (['dashboard', 'vault']),
+      listEnabledModules: async () => ([
+        'dashboard',
+        'vault',
+        'team',
+        'projects',
+        'quotes',
+        'checklists',
+        'clients',
+      ]),
     } as never,
   });
 
@@ -135,7 +158,7 @@ test('dashboard home for operativo includes personal widgets', async () => {
       listUserRoles: async () => ([]),
     } as never,
     moduleRepositoryApi: {
-      listEnabledModules: async () => (['dashboard']),
+      listEnabledModules: async () => (['dashboard', 'projects', 'checklists']),
     } as never,
   });
 
@@ -177,6 +200,136 @@ test('dashboard home resolves tier from permissions when role name is lower', as
   assert.equal(result.role, 'superadmin');
   const widgetTypes = new Set(result.widgets.map((widget) => widget.type));
   assert.equal(widgetTypes.has('modules_status'), true);
+});
+
+test('dashboard home hides signals of switched-off modules even with the permission', async () => {
+  const repository = buildMockDashboardRepository();
+  const calls: string[] = [];
+  const trace = <Args extends unknown[], Result>(
+    name: string,
+    fn: (...args: Args) => Promise<Result>,
+  ) => async (...args: Args) => {
+    calls.push(name);
+    return fn(...args);
+  };
+
+  repository.getUrgentBlockedProjects = trace('blocked', repository.getUrgentBlockedProjects) as never;
+  repository.getUrgentStaleProjects = trace('stale', repository.getUrgentStaleProjects) as never;
+  repository.getUrgentUnsentQuotes = trace('quotes', repository.getUrgentUnsentQuotes) as never;
+  repository.getUrgentOverdueChecklistItems = trace('checklists', repository.getUrgentOverdueChecklistItems) as never;
+  repository.getPipelineSnapshot = trace('pipeline', repository.getPipelineSnapshot) as never;
+  repository.getQuotesPipeline = trace('quotesPipeline', repository.getQuotesPipeline) as never;
+  repository.getMyTasks = trace('myTasks', repository.getMyTasks) as never;
+  repository.getMyProjects = trace('myProjects', repository.getMyProjects) as never;
+
+  const service = buildDashboardService({
+    dashboardRepositoryApi: repository as never,
+    rbacRepositoryApi: {
+      listUserPermissions: async () => ([
+        'dashboard.view',
+        'modules.manage',
+        'team.view',
+        'clients.view',
+        'clients.create',
+        'audit.view',
+        // I permessi ci sono ancora: a spegnere i riquadri deve bastare il modulo.
+        'projects.view',
+        'quotes.view',
+        'checklists.view',
+        'checklists.assign',
+      ]),
+      listUserRoles: async () => (['Superadmin']),
+    } as never,
+    moduleRepositoryApi: {
+      // Pipeline, Preventivi e Memo Operativi spenti.
+      listEnabledModules: async () => (['dashboard', 'clients', 'team']),
+    } as never,
+  });
+
+  const result = await service.getHome({
+    workspaceId: 'workspace-1',
+    userId: 'user-4',
+  });
+
+  const widgetTypes = new Set(result.widgets.map((widget) => widget.type));
+  assert.equal(widgetTypes.has('pipeline'), false);
+  assert.equal(widgetTypes.has('pipeline_chart'), false);
+  assert.equal(widgetTypes.has('quotes_pipeline'), false);
+  assert.equal(widgetTypes.has('quotes_funnel'), false);
+  assert.equal(widgetTypes.has('urgent'), false);
+  assert.equal(widgetTypes.has('my_tasks'), false);
+  assert.equal(widgetTypes.has('my_projects'), false);
+  // Team e' acceso, ma i conteggi del riquadro sono voci di memo: sparisce anche lui.
+  assert.equal(widgetTypes.has('team_workload'), false);
+  // Clienti e' acceso: il suo riquadro resta.
+  assert.equal(widgetTypes.has('clients_trend'), true);
+
+  const kpisWidget = result.widgets.find((widget) => widget.type === 'kpis');
+  assert.notEqual(kpisWidget, undefined);
+  assert.deepEqual(kpisWidget?.data, { clientsActive: 5 });
+
+  // Nessuna interrogazione al database per i moduli spenti.
+  assert.deepEqual(calls, []);
+});
+
+test('dashboard overview stops counting the switched-off modules', async () => {
+  const repository = buildMockDashboardRepository();
+  const calls: string[] = [];
+  const trace = <Args extends unknown[], Result>(
+    name: string,
+    fn: (...args: Args) => Promise<Result>,
+  ) => async (...args: Args) => {
+    calls.push(name);
+    return fn(...args);
+  };
+
+  repository.getUrgentBlockedProjects = trace('blocked', repository.getUrgentBlockedProjects) as never;
+  repository.getUrgentStaleProjects = trace('stale', repository.getUrgentStaleProjects) as never;
+  repository.getUrgentUnsentQuotes = trace('quotes', repository.getUrgentUnsentQuotes) as never;
+  repository.getUrgentOverdueChecklistItems = trace('checklists', repository.getUrgentOverdueChecklistItems) as never;
+  repository.getPipelineSnapshot = trace('pipeline', repository.getPipelineSnapshot) as never;
+
+  const service = buildDashboardService({
+    dashboardRepositoryApi: repository as never,
+    rbacRepositoryApi: {
+      listUserPermissions: async () => ([]),
+      listUserRoles: async () => ([]),
+    } as never,
+    moduleRepositoryApi: {
+      listEnabledModules: async () => (['dashboard', 'clients']),
+    } as never,
+  });
+
+  const result = await service.getOverview('workspace-1');
+
+  assert.deepEqual(result.kpis, { clientsActive: 5 });
+  assert.deepEqual(result.urgent, []);
+  assert.deepEqual(result.pipeline, []);
+  assert.deepEqual(calls, []);
+});
+
+test('dashboard overview keeps counting the modules that are on', async () => {
+  const service = buildDashboardService({
+    dashboardRepositoryApi: buildMockDashboardRepository() as never,
+    rbacRepositoryApi: {
+      listUserPermissions: async () => ([]),
+      listUserRoles: async () => ([]),
+    } as never,
+    moduleRepositoryApi: {
+      listEnabledModules: async () => (['dashboard', 'clients', 'projects', 'quotes', 'checklists']),
+    } as never,
+  });
+
+  const result = await service.getOverview('workspace-1');
+
+  assert.deepEqual(result.kpis, {
+    clientsActive: 5,
+    projectsActive: 7,
+    quotesSent30d: 3,
+    checklistOpenItems: 9,
+  });
+  assert.equal(result.pipeline.length, 1);
+  assert.equal(result.urgent.length, 1);
 });
 
 test('dashboard team workload forwards workspace scope to repository', async () => {

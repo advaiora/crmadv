@@ -6,11 +6,23 @@ export const buildAiPromptSummary = (context: DashboardInsightContext): string =
   const draftQuoteCount = context.quotesDraftCount;
   const openTaskCount = context.myTasks.items.length;
   const busiestStage = [...context.stageCounts].sort((left, right) => right.count - left.count)[0];
+  // Un KPI assente e' un modulo spento: si omette dal riepilogo invece di
+  // finirci dentro come "undefined".
+  const kpiParts = [
+    ['clients', context.kpis.clientsActive],
+    ['projects', context.kpis.projectsActive],
+    ['quotesSent30d', context.kpis.quotesSent30d],
+    ['checklistOpen', context.kpis.checklistOpenItems],
+  ] as const;
+  const kpiLine = kpiParts
+    .filter(([, value]) => value !== undefined)
+    .map(([label, value]) => `${label}=${value}`)
+    .join(', ');
 
   const lines = [
     `Workspace: ${context.workspaceId}`,
     `User: ${context.userId}`,
-    `KPI clients=${context.kpis.clientsActive}, projects=${context.kpis.projectsActive}, quotesSent30d=${context.kpis.quotesSent30d}, checklistOpen=${context.kpis.checklistOpenItems}`,
+    `KPI ${kpiLine || 'n/a'}`,
     `Operational risks: blockedProjects=${blockedCount}, staleProjects=${staleCount}, draftQuotes=${draftQuoteCount}, myOpenTasks=${openTaskCount}`,
     `Busiest stage: ${busiestStage ? `${busiestStage.stageName} (${busiestStage.count})` : 'n/a'}`,
   ];
