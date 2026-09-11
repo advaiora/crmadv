@@ -1684,3 +1684,12 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 **Modo corretto:**
 - Prima di aprire un'interazione o dichiarare un rischio su "il database di produzione", verificare la stringa di connessione effettiva usata dall'app (`DATABASE_URL` o simile, nel repo `crmadv` o nella configurazione di deploy) — non dedurla dai processi attivi sulla macchina che la ospita.
+---
+
+## 117. `npm run test:unit` da' rossi che sembrano codice rotto e sono solo una variabile d'ambiente mancante nella shell
+
+**Contesto:** 11/9/2026, revisione di una voce di roadmap durante CRMA-188. Lanciando `npm run test:unit` in una shell nuova, `server/modules/team/team-invite.service.test.ts` dava 3 rossi su 528 test totali.
+
+**Errore:** leggere 3 test rossi in un file di servizio come un difetto nel codice appena letto, e cominciare a indagare la logica dell'invito invece dell'ambiente.
+
+**Modo corretto:** quei 3 test costruiscono un link di invito che dipende da `APP_BASE_URL`; senza quella variabile nell'ambiente della shell il file fallisce (poi torna 18/18 impostandola). Prima di indagare un rosso isolato in un file che non si e' toccato, si verifica se dipende da una variabile d'ambiente assente — si rilancia il singolo file con la variabile impostata prima di sospettare il codice.
