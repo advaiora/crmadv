@@ -173,11 +173,60 @@ Ho verificato oggi: nel codice la voce si chiama ancora «Audit» sotto «Sicure
 le voci dopo che le persone le hanno imparate è il momento peggiore per farlo. **Nessuna rotta da
 cambiare** — in questo CRM la posizione a menu e l'indirizzo sono indipendenti.
 
-### 10 · Nascondere i moduli fuori perimetro ❌ *non iniziato*
+### 10 · Nascondere i moduli fuori perimetro 🟡 *verificato, procedura pronta — restano l'esecuzione e un seguito*
 
-Si spengono da *Gestione Moduli*. **Zero sviluppo.** ✅ Già verificato che il Superadmin non resta
-chiuso fuori: il modulo *Gestione Moduli* è marcato come indispensabile e **non si può spegnere**, né
-dal server né dall'interfaccia. Quindi si può sempre riaccendere tutto.
+Si spengono da *Gestione Moduli*. **Zero sviluppo per l'accensione/spegnimento in sé.** ✅ Già
+verificato che il Superadmin non resta chiuso fuori: il modulo *Gestione Moduli* è marcato come
+indispensabile e **non si può spegnere**, né dal server né dall'interfaccia. Quindi si può sempre
+riaccendere tutto.
+
+**La verifica** (mappa completa nei commenti di CRMA-33 e del compito «Mappa dello spegnimento») ha
+letto, per ognuna delle sei aree accese, ogni punto del codice collegato ai sette moduli da spegnere.
+Ha trovato tre cose reali e due innocue:
+
+- **Clienti → Pipeline**: la card "Progetti associati" mostrava sempre un link cliccabile, anche a
+  Pipeline spenta (portava a una pagina negata). **Corretto** in
+  `src/views/Clients/ClientDetail.jsx` (PR #49).
+- **Registro attività → Memo Operativi/Siti in gestione/Credenziali**: tre filtri rapidi restavano
+  visibili a modulo spento (nessun errore, solo incoerenza a schermo). **Corretto** in
+  `src/views/Audit/index.jsx` (PR #49).
+- **Dashboard** (non è una delle sei aree, ma è `isCore` e sempre raggiungibile): KPI e pannello
+  "Urgent" non filtrano per modulo spento — mostrerebbero conteggi e link live verso Pipeline,
+  Preventivi e Memo Operativi anche spenti. **Fuori dal perimetro frontend**, aperto come compito
+  separato per il backend (CRMA-33, seguito "Dashboard: i KPI non rispettano i moduli spenti") — in
+  lavorazione.
+- **Team → Credenziali** e **Clienti → Produzione AI**: due `import` fra moduli nel codice server,
+  senza effetto a runtime oggi (spegnere è solo un flag, il codice resta tutto presente). Segnalati
+  come accoppiamento da tenere a mente se in futuro "spegnere" volesse dire anche isolare i file.
+- **Profilo, Ruoli e permessi, Messaggi**: verificati, nessuna dipendenza nascosta.
+
+**La procedura di spegnimento, pronta da eseguire** (non richiede sviluppo: usa l'API già esistente,
+`server/routes/workspace-modules.route.ts`, permesso `modules.manage` — di norma solo Superadmin/
+Admin):
+
+```
+PUT /workspaces/:workspaceId/modules
+Authorization: Bearer <token di un Superadmin>
+Content-Type: application/json
+
+{ "modules": [
+  { "key": "ai_production", "enabled": false },
+  { "key": "projects",      "enabled": false },
+  { "key": "quotes",        "enabled": false },
+  { "key": "web",           "enabled": false },
+  { "key": "vault",         "enabled": false },
+  { "key": "calendar",      "enabled": false },
+  { "key": "checklists",    "enabled": false }
+] }
+```
+
+Una sola chiamata, atomica: non serve un ordine fra i sette (nessuna dipendenza trovata fra loro), e
+può essere ripetuta in sicurezza se qualcosa va storto a metà.
+
+⚠️ **Resta una cosa che nessun agent può fare:** eseguire questa chiamata (o il click equivalente in
+*Gestione Moduli*) su un'istanza viva richiede un token di sessione di un Superadmin — è
+un'operazione che tocca la produzione, non un'azione di sviluppo. La fa Jacopo o Claudio al momento
+del lancio, dopo che il compito sul Dashboard sarà chiuso.
 
 ### 11 · Audit di sicurezza ❌ *non iniziato — per definizione l'ultimo*
 
