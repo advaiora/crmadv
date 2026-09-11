@@ -1,11 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
-import {
-  MEMBERSHIP_ACCESS_SELECT,
-  activeMember,
-  markMembershipReactivated,
-} from '../../core/membership-access.js';
-import { isTrashed, notDeleted } from '../../core/soft-delete.js';
+import { activeMember } from '../../core/membership-access.js';
+import { notDeleted } from '../../core/soft-delete.js';
 
 /**
  * I ruoli Superadmin che contano davvero in un workspace.
@@ -35,53 +31,6 @@ export const buildSuperadminAssignmentsWhere = (
     },
   },
 });
-
-/**
- * Le tre risposte alla domanda «questa persona e' gia' dentro?» (CRMA-163).
- *
- * Fino al Cestino le risposte erano due — c'e' una membership oppure no — e
- * bastava il `Boolean` della riga letta. Da quando cestinare e' un gesto
- * possibile ce n'e' una terza, e trattarla come la prima chiude la porta a
- * chiave: le due sole vie per riportare dentro una persona (reinvitarla,
- * riaggiungerla a mano) rispondono «e' gia' membro» mentre a schermo non c'e'.
- *
- * `INACTIVE` resta invece un `present`, ed e' voluto: un membro disattivato e'
- * nella lista del Team, si riaccende da li', e non ha bisogno di un invito
- * nuovo. La terza risposta riguarda solo chi e' stato **tolto**.
- */
-export type MembershipAdmission = 'none' | 'present' | 'trashed';
-
-export const classifyMembershipAdmission = (
-  membership: { status: string; deletedAt: Date | null } | null | undefined,
-): MembershipAdmission => {
-  if (!membership) {
-    return 'none';
-  }
-
-  return isTrashed(membership) ? 'trashed' : 'present';
-};
-
-/**
- * Il `where` delle scritture che agiscono su un membro **come voce del Team**:
- * oggi il cambio di stato attivo/disattivo (CRMA-163).
- *
- * ⚠️ Il filtro del Cestino qui non e' una lettura mascherata, e' una difesa in
- * profondita': riaccendere lo stato di una membership cestinata scriverebbe
- * `status: 'ACTIVE'` senza toccare `deletedAt`, cioe' direbbe all'utente
- * «riattivato» lasciandolo fuori dal CRM (`membership-access.ts`: la riga resta
- * cestinata e ogni rotta risponde 403). Cosi' invece la scrittura non trova
- * niente, e il chiamante alza un 404 — che e' la verita': dal Team quella
- * persona non c'e', sta nel Cestino, e da li' si ripristina.
- *
- * ⚠️ `deleteMember` NON lo usa, e non e' una dimenticanza: quella e'
- * l'eliminazione definitiva, l'unico gesto che deve poter raggiungere proprio
- * una riga cestinata. Un filtro li' renderebbe impossibile svuotare il Cestino.
- */
-export const buildTeamMemberWriteWhere = (workspaceId: string, memberId: string) =>
-  notDeleted({
-    workspaceId,
-    id: memberId,
-  });
 
 export type TeamMemberRoleRecord = {
   roleId: string;
@@ -169,12 +118,61 @@ const mapMembershipToTeamMember = (membership: {
 
 const withClient = (tx?: Prisma.TransactionClient) => tx ?? prisma;
 
+/**
+ * La clausola della lista Team (CRMA-130).
+ *
+ * E' una funzione a se' e non un oggetto scritto dentro la query per un motivo
+ * solo: cosi' si puo' provare che il filtro del Cestino c'e', senza montare un
+ * database. `server/prisma.ts` esporta un Proxy che spara se il client non e'
+ * inizializzato, quindi una clausola che vive dentro `findMany` e' verificabile
+ * solo a integrazione.
+ *
+ * ⚠️ `status: 'ACTIVE'` non e' il filtro del Cestino e non lo sostituisce:
+ * cestinare NON cambia lo stato della membership — la riga resta com'era e si
+ * nasconde solo per la `deletedAt`.
+ */
+export const buildListMembersWhere = (workspaceId: string) =>
+  notDeleted({
+    workspaceId,
+  });
+
+/** La clausola del singolo membro letto dalla scheda Team (CRMA-130). */
+export const buildFindMemberByIdWhere = (workspaceId: string, memberId: string) =>
+  notDeleted({
+    workspaceId,
+    id: memberId,
+  });
+
+/**
+ * Lo stesso perimetro, ma per la SCRITTURA sullo stato di un membro (CRMA-163).
+ *
+ * E' un alias e non una seconda clausola ricopiata: il filtro dev'essere lo
+ * stesso della lettura qui sopra, e due letterali gemelli sono due letterali
+ * che prima o poi divergono. Ha pero' un nome suo, perche' porta un obbligo che
+ * il nome della lettura non racconta:
+ *
+ * ⚠️ senza il filtro del Cestino, riaccendere una membership cestinata
+ * scriverebbe `status: 'ACTIVE'` **senza toccare `deletedAt`**. Il CRM
+ * risponderebbe «riattivato» e la persona resterebbe fuori: la riga e' ancora
+ * cestinata, e `grantsWorkspaceAccess` la respinge su ogni rotta
+ * (`membership-access.ts`, CRMA-157). Con il filtro la scrittura non trova
+ * niente, `setMemberActiveState` alza un 404, e quel 404 e' vero: dal Team
+ * quella persona non c'e', sta nel Cestino, e da li' si ripristina.
+ *
+ * E' una difesa in profondita', non un doppione della lettura: regge anche se
+ * un domani un chiamante arriva a `updateMembershipStatus` senza essere passato
+ * da `findMemberById`.
+ *
+ * ⚠️ `deleteMember` NON lo usa, e non e' una dimenticanza: quella e'
+ * l'eliminazione definitiva, l'unico gesto che deve poter raggiungere proprio
+ * una riga cestinata. Un filtro li' renderebbe impossibile svuotare il Cestino.
+ */
+export const buildTeamMemberWriteWhere = buildFindMemberByIdWhere;
+
 export const teamRepository = {
   async listMembers(workspaceId: string): Promise<TeamMemberRecord[]> {
     const memberships = await prisma.membership.findMany({
-      where: {
-        workspaceId,
-      },
+      where: buildListMembersWhere(workspaceId),
       select: buildMembershipSelect(workspaceId),
       orderBy: [
         {
@@ -195,10 +193,7 @@ export const teamRepository = {
     tx?: Prisma.TransactionClient,
   ): Promise<TeamMemberRecord | null> {
     const membership = await withClient(tx).membership.findFirst({
-      where: {
-        workspaceId,
-        id: memberId,
-      },
+      where: buildFindMemberByIdWhere(workspaceId, memberId),
       select: buildMembershipSelect(workspaceId),
     });
 
@@ -210,13 +205,20 @@ export const teamRepository = {
   },
 
   /**
-   * ⚠️ Questa lettura NON filtra il Cestino di proposito, ed e' l'unica del
-   * modulo che puo' permetterselo: serve alle due porte d'ingresso al Team, che
-   * devono sapere se la riga esiste **anche da cestinata** — altrimenti
-   * riaggiungere la persona sbatterebbe sul vincolo unico `(workspaceId,
-   * userId)`, che resta unico anche nel Cestino (`schema.prisma`, Membership).
-   * Chi la chiama non guarda il `Boolean` della riga: passa per
-   * `classifyMembershipAdmission`, che distingue i tre casi.
+   * ⚠️ Questa NON prende `notDeleted`, ed e' l'unica lettura del Team che non lo
+   * prende (CRMA-130).
+   *
+   * Non e' una lista: e' la prova di unicita' che gira PRIMA di creare una
+   * membership. La coppia `(workspaceId, userId)` e' unica anche da cestinata
+   * (`prisma/schema.prisma`, `@@unique([workspaceId, userId])` sul modello
+   * `Membership`), quindi nascondere qui la riga cestinata direbbe al chiamante
+   * «questa persona non c'e'», lui proverebbe a inserirla, e l'inserimento
+   * sbatterebbe sul vincolo: un 500 al posto di un messaggio.
+   *
+   * Percio' la riga cestinata si legge, e si restituisce `deletedAt` perche' chi
+   * chiama possa dire la cosa vera — «e' nel Cestino, ripristinala» invece di
+   * «e' gia' un membro», che manderebbe a cercare il guasto nella lista Team
+   * dove quella persona giustamente non compare.
    */
   findMembershipByUserId(
     workspaceId: string,
@@ -228,41 +230,21 @@ export const teamRepository = {
         workspaceId,
         userId,
       },
-      // Lo stesso select della catena di accesso: `deletedAt` va chiesto per
-      // nome, e un select che non lo nomina lo fa tornare `undefined` — cioe'
-      // «non cestinato» per chiunque lo legga.
-      select: MEMBERSHIP_ACCESS_SELECT,
+      select: {
+        id: true,
+        status: true,
+        deletedAt: true,
+      },
     });
   },
 
-  /**
-   * Ammette una persona nel workspace: la crea se non c'e' mai stata, la riporta
-   * indietro se era stata cestinata (CRMA-163).
-   *
-   * ⚠️ E' un `upsert` e non un `create`, per la ragione scritta sullo schema: la
-   * coppia `(workspaceId, userId)` resta unica anche da cestinata, quindi un
-   * `create` sulla persona rimossa sbatterebbe sul vincolo. E il ramo `update`
-   * scrive `markMembershipReactivated()` e non il solo `status`, perche'
-   * rimettere lo stato lasciando `deletedAt` valorizzata riammetterebbe qualcuno
-   * che poi ogni rotta respinge con un 403 (CRMA-157).
-   *
-   * Chi chiama ha gia' rifiutato il caso `present`: qui il ramo `update` puo'
-   * toccare solo una riga cestinata.
-   */
-  admitMembership(
+  createMembership(
     workspaceId: string,
     userId: string,
     tx?: Prisma.TransactionClient,
   ) {
-    return withClient(tx).membership.upsert({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId,
-        },
-      },
-      update: markMembershipReactivated(),
-      create: {
+    return withClient(tx).membership.create({
+      data: {
         workspaceId,
         userId,
         status: 'ACTIVE',

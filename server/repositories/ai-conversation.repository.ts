@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../prisma.js';
+import { activeMember } from '../core/membership-access.js';
 
 // Persistenza della Chat AI collaborativa (post-V4). Evoluzione della vecchia
 // project-chat.repository (che era per-utente): la conversazione e' CONDIVISA su
@@ -455,7 +456,7 @@ export const aiConversationRepository = {
   // Membri attivi del workspace, per proporre chi invitare alla conversazione.
   listWorkspaceMembers(workspaceId: string) {
     return prisma.membership.findMany({
-      where: { workspaceId, status: 'ACTIVE' },
+      where: activeMember({ workspaceId }),
       orderBy: { createdAt: 'asc' },
       include: { user: { select: AUTHOR_SELECT } },
     });
