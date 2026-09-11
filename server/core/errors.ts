@@ -23,6 +23,19 @@ export const unauthorized = (message: string, details?: ErrorDetails) =>
 export const forbidden = (message: string, details?: ErrorDetails) =>
   new HttpError(403, 'FORBIDDEN', message, details);
 
+// Codice dedicato al solo 403 che significa "non sei (piu') membro di questo
+// workspace". Il frontend lo distingue dal `FORBIDDEN` generico per chiudere la
+// sessione soltanto in questo caso: un permesso mancante non deve buttare fuori
+// nessuno (`WORKSPACE_MEMBERSHIP_REQUIRED_ERROR_CODE` in src/lib/apiFetch.ts,
+// CRMA-158). La stringa e' un contratto fra i due lati: se cambia qui, cambia
+// anche la costante del frontend, nello stesso lavoro.
+// ⚠️ `forbidden()` qui sopra NON va toccato: lo usano decine di punti di chiamata
+// che devono restare `FORBIDDEN`, a partire da requirePermission.
+export const WORKSPACE_MEMBERSHIP_REQUIRED_CODE = 'WORKSPACE_MEMBERSHIP_REQUIRED';
+
+export const workspaceMembershipRequired = (message: string, details?: ErrorDetails) =>
+  new HttpError(403, WORKSPACE_MEMBERSHIP_REQUIRED_CODE, message, details);
+
 export const notFound = (message: string, details?: ErrorDetails) =>
   new HttpError(404, 'NOT_FOUND', message, details);
 
