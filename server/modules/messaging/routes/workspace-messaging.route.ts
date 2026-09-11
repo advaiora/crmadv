@@ -11,6 +11,10 @@ type ConversationParams = {
   userId: string;
 };
 
+type MessageParams = {
+  messageId: string;
+};
+
 const workspaceMessagingRoute: FastifyPluginAsync = async (app) => {
   app.get<{ Querystring: unknown }>('/messages/users', async (request, reply) => {
     const { user, workspace } = await ensureMessagingAccess(request, MESSAGING_PERMISSIONS.view);
@@ -94,6 +98,43 @@ const workspaceMessagingRoute: FastifyPluginAsync = async (app) => {
       return ok(reply, result);
     },
   );
+
+  /**
+   * Cestina un messaggio (CRMA-165).
+   *
+   * L'indirizzo non passa dalla conversazione (`/messages/conversations/:userId/...`)
+   * perche' il messaggio non ha bisogno di quel contesto per essere trovato:
+   * l'id basta, e il filtro del repository lo lega gia' al workspace e a chi
+   * l'ha scritto. Un `:userId` in piu' nel percorso sarebbe un dato che il
+   * server accetta senza usarlo, cioe' una cosa da controllare in piu' o da
+   * dimenticare.
+   */
+  app.delete<{ Params: MessageParams }>('/messages/:messageId', async (request, reply) => {
+    const { user, workspace } = await ensureMessagingAccess(
+      request,
+      MESSAGING_PERMISSIONS.delete,
+    );
+
+    const result = await messagingService.trashMessage({
+      workspaceId: workspace.id,
+      userId: user.id,
+      messageId: request.params.messageId,
+    });
+
+    await audit.log({
+      event: 'messages.delete',
+      actorUserId: user.id,
+      workspaceId: workspace.id,
+      entityType: 'workspace_message',
+      entityId: result.messageId,
+      metadata: {
+        fieldsUpdated: ['deletedAt', 'deletedByUserId'],
+      },
+      request,
+    });
+
+    return ok(reply, result);
+  });
 };
 
 export default workspaceMessagingRoute;

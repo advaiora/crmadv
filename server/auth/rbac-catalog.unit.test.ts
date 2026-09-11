@@ -6,6 +6,7 @@ import {
   CHAT_PERMISSIONS,
   DASHBOARD_MODULE_KEY,
   DASHBOARD_PERMISSIONS,
+  MESSAGES_MODULE_KEY,
   SYSTEM_MODULE_CATALOG,
   SYSTEM_PERMISSION_CATALOG,
   SYSTEM_ROLE_DEFINITIONS,
@@ -182,4 +183,55 @@ test('RBAC catalog: i ruoli di sistema assegnano solo permessi presenti nel cata
       );
     }
   }
+});
+
+/**
+ * Il permesso «cestina messaggio» (CRMA-165), e chi lo riceve fra i cinque
+ * ruoli di sistema.
+ *
+ * Serve un test e non basta il commento perche' e' proprio questo il punto in
+ * cui il progetto ha gia' sbagliato una volta: una funzione che nasce senza la
+ * sua voce nel catalogo non e' una funzione senza etichetta, e' una funzione
+ * che nessun ruolo puo' governare — e non si vede finche' qualcuno non ne ha
+ * bisogno.
+ */
+test('RBAC catalog: messages.delete esiste ed e sotto il modulo dei messaggi', () => {
+  const voce = SYSTEM_PERMISSION_CATALOG.find((permission) => permission.key === 'messages.delete');
+
+  assert.ok(voce, 'manca messages.delete dal catalogo');
+  assert.equal(voce.moduleKey, MESSAGES_MODULE_KEY);
+  assert.ok(voce.description.length > 0, 'la descrizione la legge chi assegna i permessi');
+});
+
+test('RBAC catalog: cestinare i propri messaggi segue lo scrivere, non il leggere', () => {
+  // Superadmin ('all') e Admin ('all_except') lo ereditano senza essere
+  // nominati: si controllano i tre ruoli con l'elenco esplicito.
+  const conElenco = SYSTEM_ROLE_DEFINITIONS.filter((role) => Array.isArray(role.permissions));
+
+  for (const role of conElenco) {
+    const permessi = new Set(role.permissions as readonly string[]);
+    assert.equal(
+      permessi.has('messages.delete'),
+      permessi.has('messages.send'),
+      `${role.name}: chi scrive messaggi deve poter ritirare i propri, chi non scrive non ha niente da ritirare`,
+    );
+  }
+});
+
+test('RBAC catalog: Admin e Superadmin ereditano messages.delete senza essere nominati', () => {
+  const admin = SYSTEM_ROLE_DEFINITIONS.find((role) => role.name === SYSTEM_ROLE_NAME.admin);
+  assert.ok(admin, 'ruolo Admin assente dal catalogo');
+
+  const selection = admin.permissions as { mode: 'all_except'; exclude: readonly string[] };
+  assert.equal(
+    selection.exclude.includes('messages.delete'),
+    false,
+    "l'Admin poteva gia' cancellare: escluderlo gli toglierebbe un potere che aveva",
+  );
+
+  const superadmin = SYSTEM_ROLE_DEFINITIONS.find(
+    (role) => role.name === SYSTEM_ROLE_NAME.superadmin,
+  );
+  assert.ok(superadmin, 'ruolo Superadmin assente dal catalogo');
+  assert.equal(superadmin.permissions, 'all');
 });

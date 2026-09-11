@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildSuperadminAssignmentsWhere } from './team.repository.js';
+import { markTrashed } from '../../core/soft-delete.js';
+import {
+  buildSuperadminAssignmentsWhere,
+  buildTrashMembershipWhere,
+} from './team.repository.js';
 
 /**
  * La protezione dell'ultimo Superadmin, provata senza database (CRMA-157).
@@ -42,4 +46,36 @@ test('il conteggio non filtra per utente: i due usi condividono il costruttore m
 
   assert.equal('userId' in where, false, 'il conteggio deve vedere tutti i Superadmin del workspace');
   assert.deepEqual(where.role, { isSuperadmin: true });
+});
+
+/**
+ * Il gesto che cestina un membro del Team (CRMA-165).
+ *
+ * «Rimuovi dal Team» non cancella piu' la riga: la sposta nel cestino. Le tre
+ * guardie (solo Superadmin, non te stesso, non l'ultimo Superadmin attivo)
+ * stanno in `assertMembershipDestroyable` e non si provano qui perche'
+ * leggono dal database; qui si prova la clausola, che e' la parte muta.
+ */
+test('cestinare un membro resta dentro il workspace e chiede anche di quale persona sia', () => {
+  const where = buildTrashMembershipWhere(WORKSPACE_ID, 'member-1', USER_ID);
+
+  assert.equal(where.workspaceId, WORKSPACE_ID);
+  assert.equal(where.id, 'member-1');
+  // `userId` non e' un di piu': la membership e la persona devono combaciare,
+  // altrimenti un id di membership sbagliato cestinerebbe la riga di un altro.
+  assert.equal(where.userId, USER_ID);
+});
+
+test('un membro gia cestinato non si ricestina', () => {
+  assert.equal(buildTrashMembershipWhere(WORKSPACE_ID, 'member-1', USER_ID).deletedAt, null);
+});
+
+test('cestinare un membro NON tocca le sue assegnazioni di ruolo', () => {
+  // Regola 1 del Cestino: cestinare non cancella niente, cosi' chi viene
+  // ripristinato torna con i ruoli che aveva senza ricucire niente a mano.
+  // La cancellazione fisica delle `UserRole` resta in `deleteMember`, che da
+  // oggi e' il gesto dell'eliminazione definitiva (`trash.purge`).
+  const dati = markTrashed(USER_ID);
+
+  assert.deepEqual(Object.keys(dati).sort(), ['deletedAt', 'deletedByUserId']);
 });

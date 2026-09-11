@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma.js';
-import { isTrashed, notDeleted } from '../../core/soft-delete.js';
+import { isTrashed, markTrashed, notDeleted } from '../../core/soft-delete.js';
 
 export type WorkspaceMember = {
   userId: string;
@@ -48,6 +48,12 @@ type MarkConversationAsReadInput = {
   workspaceId: string;
   userId: string;
   peerUserId: string;
+};
+
+type TrashMessageInput = {
+  workspaceId: string;
+  messageId: string;
+  actorUserId: string;
 };
 
 const mapMembershipRecordToMember = (item: {
@@ -227,6 +233,35 @@ export const buildMarkConversationAsReadWhere = (input: MarkConversationAsReadIn
     readAt: null,
   });
 
+/**
+ * Il `where` del gesto «cestina messaggio» (CRMA-165).
+ *
+ * Quattro condizioni, e nessuna e' di troppo:
+ *
+ * 1. `id` — il messaggio indicato;
+ * 2. `workspaceId` — la regola di sempre: nessuna scrittura esce dall'azienda
+ *    di chi la chiede;
+ * 3. `senderUserId: actorUserId` — **cestina solo chi ha scritto**. La riga e'
+ *    una sola e condivisa fra i due capi della conversazione, quindi metterla
+ *    nel cestino la toglie a tutti e due: permetterlo anche a chi l'ha
+ *    ricevuta vorrebbe dire far cancellare a qualcuno le parole di un altro.
+ *    Se un domani servira' anche il "nascondi solo a me" del destinatario,
+ *    serve una seconda colonna, non un allargamento di questo filtro;
+ * 4. `notDeleted` — un messaggio gia' cestinato non si ricestina, o il secondo
+ *    gesto riscriverebbe data e autore del primo.
+ *
+ * ⚠️ Questo `where` non e' il controllo del permesso e non lo sostituisce:
+ * `messages.delete` dice se puoi cestinare messaggi, questo dice **quali**.
+ * Servono tutti e due, e il secondo e' quello che tiene anche se il primo un
+ * giorno venisse assegnato a un ruolo in piu'.
+ */
+export const buildTrashMessageWhere = (input: TrashMessageInput) =>
+  notDeleted({
+    id: input.messageId,
+    workspaceId: input.workspaceId,
+    senderUserId: input.actorUserId,
+  });
+
 export const messagingRepository = {
   async listWorkspaceMembers(input: ListWorkspaceMembersInput) {
     const items = await prisma.membership.findMany({
@@ -336,5 +371,25 @@ export const messagingRepository = {
         readAt: new Date(),
       },
     });
+  },
+
+  /**
+   * Sposta un messaggio nel cestino (CRMA-165).
+   *
+   * ⚠️ `deletedByUserId` prende sempre l'id vero di chi ha premuto, mai un id
+   * di servizio e mai `null`: su questa entita' quel campo e' meta' del
+   * controllo di accesso al Cestino — la pagina rilegge i messaggi cestinati
+   * con «partecipo alla conversazione **e** li ho cestinati io» — e non
+   * un'etichetta da riempire per fare bella figura nel registro. Un `null` li'
+   * dentro non e' un dato mancante: e' una riga che non appartiene a nessuno e
+   * che quindi nessuno potra' piu' ripristinare.
+   */
+  async markMessageTrashed(input: TrashMessageInput) {
+    const trashed = await prisma.workspaceMessage.updateMany({
+      where: buildTrashMessageWhere(input),
+      data: markTrashed(input.actorUserId),
+    });
+
+    return trashed.count > 0;
   },
 };

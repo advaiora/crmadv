@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { markTrashed } from '../../core/soft-delete.js';
 import {
   buildConversationMessagesForPeersWhere,
   buildConversationMessagesWhere,
   buildMarkConversationAsReadWhere,
+  buildTrashMessageWhere,
   buildWorkspaceMemberWhere,
   buildWorkspaceMembersWhere,
 } from './repository.js';
@@ -195,4 +197,83 @@ test('ogni lettura resta chiusa nel suo workspace', () => {
   for (const where of letture) {
     assert.equal((where as { workspaceId?: string }).workspaceId, WORKSPACE_ID);
   }
+});
+
+/**
+ * Il gesto che cestina un messaggio (CRMA-165).
+ *
+ * E' l'unico dei quattro che prima non esisteva affatto: un messaggio interno,
+ * una volta inviato, non si poteva togliere in nessun modo. Le tre condizioni
+ * del `where` sono quelle che tengono in piedi il controllo di accesso, e
+ * nessuna di loro ha un sintomo visibile se salta.
+ */
+test('cestina solo chi ha scritto il messaggio, non chi lo ha ricevuto', () => {
+  const where = buildTrashMessageWhere({
+    workspaceId: WORKSPACE_ID,
+    messageId: 'msg-1',
+    actorUserId: ME,
+  });
+
+  // La riga e' UNA e la vedono in due: toglierla la toglie a entrambi. Se il
+  // filtro guardasse anche `recipientUserId`, chi riceve potrebbe cancellare
+  // le parole di un altro dalla cronologia di quell'altro.
+  assert.equal(where.senderUserId, ME);
+  assert.equal('recipientUserId' in where, false);
+});
+
+test('cestinare un messaggio non esce dal workspace', () => {
+  const where = buildTrashMessageWhere({
+    workspaceId: WORKSPACE_ID,
+    messageId: 'msg-1',
+    actorUserId: ME,
+  });
+
+  assert.equal(where.workspaceId, WORKSPACE_ID);
+  assert.equal(where.id, 'msg-1');
+});
+
+test('un messaggio gia cestinato non si ricestina', () => {
+  const where = buildTrashMessageWhere({
+    workspaceId: WORKSPACE_ID,
+    messageId: 'msg-1',
+    actorUserId: ME,
+  });
+
+  assert.equal(where.deletedAt, null);
+});
+
+test('il messaggio cestinato sparisce dalle letture gia filtrate, ma la riga resta', () => {
+  // Le due meta' del Cestino messe una accanto all'altra: a sinistra cio' che
+  // si scrive (la riga resta, con chi e quando), a destra cio' che le letture
+  // gia' filtrate chiedono (niente cestinati). Il messaggio sparisce dalla
+  // conversazione e dai non-letti perche' `deletedAt` smette di essere `null`,
+  // non perche' qualcuno abbia cancellato qualcosa.
+  const scritto = markTrashed(ME, new Date('2026-09-11T10:00:00.000Z'));
+  assert.equal(scritto.deletedByUserId, ME);
+  assert.notEqual(scritto.deletedAt, null);
+
+  const conversazione = buildConversationMessagesWhere({
+    workspaceId: WORKSPACE_ID,
+    userId: ME,
+    peerUserId: PEER,
+    limit: 100,
+  });
+  const nonLetti = buildMarkConversationAsReadWhere({
+    workspaceId: WORKSPACE_ID,
+    userId: ME,
+    peerUserId: PEER,
+  });
+
+  assert.equal(conversazione.deletedAt, null);
+  assert.equal(nonLetti.deletedAt, null);
+});
+
+test('deletedByUserId e sempre l attore reale: e meta del controllo di accesso al Cestino', () => {
+  // Non e' un'etichetta. La pagina Cestino dei messaggi rilegge con
+  // «partecipo alla conversazione E l'ho cestinato io»: un id di servizio o un
+  // `null` qui dentro renderebbe la riga di nessuno, cioe' irrecuperabile.
+  const scritto = markTrashed(ME);
+
+  assert.equal(scritto.deletedByUserId, ME);
+  assert.notEqual(scritto.deletedByUserId, null);
 });

@@ -317,4 +317,42 @@ export const messagingService = {
       updatedCount: result.count,
     };
   },
+
+  /**
+   * Sposta un messaggio nel cestino (CRMA-165).
+   *
+   * E' l'unica delle quattro entita' del perimetro per cui il gesto non
+   * esisteva affatto: fino a oggi un messaggio interno, una volta inviato, non
+   * si poteva togliere in nessun modo.
+   *
+   * Il 404 quando il messaggio non e' tuo e' voluto e non e' un 403
+   * mascherato: rispondere «esiste ma non e' tuo» direbbe a chiunque, provando
+   * un id alla volta, quali conversazioni esistono in azienda. Chi cestina un
+   * messaggio proprio vede la stessa risposta che vedrebbe se l'id fosse
+   * inventato, ed e' quello che deve succedere.
+   */
+  async trashMessage(input: {
+    workspaceId: string;
+    userId: string;
+    messageId: string;
+  }) {
+    const messageId = input.messageId.trim();
+    if (!messageId) {
+      throw badRequest('messageId is required');
+    }
+
+    const trashed = await messagingRepository.markMessageTrashed({
+      workspaceId: input.workspaceId,
+      messageId,
+      actorUserId: input.userId,
+    });
+
+    if (!trashed) {
+      throw notFound('Message not found');
+    }
+
+    return {
+      messageId,
+    };
+  },
 };
