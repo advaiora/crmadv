@@ -16,6 +16,25 @@ export type SessionState = {
 const SESSION_STORAGE_KEY = 'advaiora.session';
 export const SESSION_CHANGED_EVENT = 'advaiora:session-changed';
 
+// Tutte le cache di dati di workspace (agency-os/data/agencyDataAdapter.js:
+// discovery, ads, web, reports, client-report, diagnosis, projects) usano
+// questo prefisso. Le preferenze d'interfaccia (tema, profilo, modello AI)
+// hanno chiavi che non lo condividono: la pulizia per prefisso non le tocca.
+const WORKSPACE_CACHE_KEY_PREFIX = 'agency-os.';
+
+const clearWorkspaceCaches = () => {
+    const keysToRemove: string[] = [];
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith(WORKSPACE_CACHE_KEY_PREFIX)) {
+            keysToRemove.push(key);
+        }
+    }
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+};
+
 const isBrowser = () => typeof window !== 'undefined';
 
 const notifySessionChanged = () => {
@@ -24,6 +43,16 @@ const notifySessionChanged = () => {
     }
 
     window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+};
+
+// Unico punto che smonta la sessione sul browser: usato da clearSession() e
+// dai due punti dove una sessione illeggibile o non valida va scartata allo
+// stesso modo (CRMA-164 — un solo ramo che pulisce non basta, la fuga era
+// proprio in un secondo ramo dimenticato).
+const wipeStoredSession = () => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    clearWorkspaceCaches();
+    notifySessionChanged();
 };
 
 const normalizeValue = (value: unknown) => {
@@ -78,8 +107,7 @@ export const readSession = (): SessionState | null => {
         const parsed = JSON.parse(rawValue) as unknown;
         return normalizeSession(parsed);
     } catch {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-        notifySessionChanged();
+        wipeStoredSession();
         return null;
     }
 };
@@ -91,8 +119,7 @@ export const writeSession = (nextSession: unknown): SessionState | null => {
     }
 
     if (!normalized) {
-        localStorage.removeItem(SESSION_STORAGE_KEY);
-        notifySessionChanged();
+        wipeStoredSession();
         return null;
     }
 
@@ -106,6 +133,5 @@ export const clearSession = () => {
         return;
     }
 
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-    notifySessionChanged();
+    wipeStoredSession();
 };
