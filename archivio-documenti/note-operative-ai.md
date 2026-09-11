@@ -1521,3 +1521,15 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - In un commento che deve restare valido nel tempo, riferirsi a un'altra posizione nel codice **per nome** (l'etichetta della voce, il nome della chiave, il nome della funzione), mai per numero di riga: il nome sopravvive al refactor, la riga no.
 - Se davvero serve un riferimento verificabile a un file diverso, verificarlo con `git show origin/main:<file> | grep -n <termine>` prima di scriverlo — mai leggere la riga dall'albero di lavoro condiviso quando l'altro file e' oggetto del lavoro non committato di un altro compito.
 - Quando un blocco di commento a cui si rimanda (qui: l'ipotesi di accorciamento etichette, introdotta da "🔸 Da riguardare quando...") viene tolto perche' superato, controllare che nessun'altra riga dello stesso commento vi punti ancora con un "qui sotto" o simile.
+---
+
+## 104. Una sola `request_confirmation` pendente per compito alla volta: la piu' recente soppianta quella prima
+
+**Contesto:** 10-11/9/2026, CRMA-116 e CRMA-144 (coda unioni a `main` in corsia A). Il compito prevedeva di chiedere il consenso di corsia A per piu' pull request insieme, sullo stesso compito: si creavano piu' richieste `request_confirmation`, una per PR, con `idempotencyKey` distinti per ciascuna.
+
+**Errore:** l'API delle interazioni permette **una sola** `request_confirmation` pendente per compito alla volta. Ogni nuova richiesta creata mentre una precedente e' ancora pendente la **soppianta immediatamente**: quella vecchia risulta `status: expired` con `result.outcome: superseded_by_newer_request`, senza che l'assegnatario umano l'abbia mai vista o potuta rispondere. L'`idempotencyKey` distinto trae in inganno: distingue le richieste fra loro, ma non evita che la piu' recente sostituisca la pendente. E' cosi' che le richieste di consenso per le PR #56 e #54 sono scadute due volte senza risposta.
+
+**Modo corretto:**
+- Quando servono piu' consensi di corsia A sullo stesso compito, emetterle **una alla volta**: si crea la richiesta, si aspetta l'esito (accettata, rifiutata o scaduta) leggendolo con `GET /api/issues/{id}/interactions`, e solo allora si crea la successiva.
+- Se il lavoro lo consente, un'alternativa e' aprire un compito figlio per pull request: ognuno ha una coda di interazioni indipendente, e le richieste non si soppiantano a vicenda.
+- Prova: commento su CRMA-144 (id compito `e2d9578d-c46c-4748-b8d4-71a913f52f40`).
