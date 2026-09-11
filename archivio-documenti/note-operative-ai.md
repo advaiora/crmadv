@@ -1595,3 +1595,17 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Modo corretto:**
 - Quando si unisce `main` dentro un ramo lungo che tocca un modulo condiviso, misurare le righe dei file **dopo** la risoluzione del merge, non fidarsi del conteggio visto prima di unire.
 - Se la soglia risulta superata dal merge, non spezzare il file di passaggio (vale la regola di sempre sui mostri): si annota in roadmap con la causa vera ("somma di due lavori nati separati"), non si tratta come un difetto del proprio ramo.
+
+---
+
+## 110. Piu' pull request che aggiungono note allo stesso file, nello stesso punto, scelgono lo stesso numero senza saperlo
+
+**Contesto:** 11/9/2026, CRMA-170 (coda unioni corsia B). Tre pull request (#60, #66, #68) modificavano tutte `archivio-documenti/note-operative-ai.md`, ciascuna aggiungendo una o due note in coda al file con lo stesso numero (tutte partivano da "## 105.", scritte prima che le altre fossero unite).
+
+**Errore:** unendole in sequenza su `main`, la seconda e la terza sono arrivate `dirty` con un conflitto di contenuto reale (non solo di riga): due blocchi "## 105." diversi nello stesso punto del file. GitHub non lo segnala come "richiede consenso umano", ma come `mergeable_state` `dirty` ordinario — la stessa forma di qualunque altro conflitto di codice.
+
+**Modo corretto:**
+- Un conflitto di questo tipo su `note-operative-ai.md` non e' una decisione di prodotto: si risolve rinumerando in sequenza il blocco che arriva dopo (qui: la nota della seconda PR e' diventata 106, quelle della terza 107 e 108), senza toccare il contenuto delle note stesse.
+- Prima di rinumerare, controllare che il testo della nota non contenga un riferimento a se stessa per numero (es. "vedi nota #105 qui sopra"): in questo caso non ce n'erano, ma se ci fossero andrebbero aggiornati insieme al numero.
+- Quando piu' pull request aggiungono note allo stesso file nello stesso punto (fine del file), unirle **senza fidarsi del numero scritto nel branch**: il numero giusto si decide al momento dell'unione, guardando qual e' l'ultima nota gia' su `main`.
+- Prova: PR #66 e #68 su CRMA-170, entrambe arrivate `dirty` con lo stesso conflitto dopo l'unione di #60 e poi di #66; risolte con `git merge-tree` per individuare il conflitto e un merge locale con rinumerazione, poi push sul ramo della PR e nuova unione.
