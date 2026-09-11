@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Prendi il codice, con la storia
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # ⚠️ `fetch-depth: 0` e non il clone superficiale di serie: serve il tronco
           # comune con `main` per sapere da dove in poi questo ramo aggiunge righe.
@@ -48,7 +48,7 @@ jobs:
           fetch-depth: 0
 
       - name: Prepara node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
 
