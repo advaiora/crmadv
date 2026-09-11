@@ -202,24 +202,29 @@ test('node assente: il commit e\' rifiutato, e il motivo non incolpa il modulo',
 // ---------------------------------------------------------------------------
 // (4) Le due copie della sentinella devono essere la stessa stringa.
 //     La si ricava DALLA BOCCA DEL MODULO — cioe' da cio' che stampa davvero,
-//     non da una costante riletta — e la si cerca nell'hook. Se qualcuno cambia
-//     una delle due e non l'altra, l'hook comincerebbe a rifiutare ogni commit:
-//     questo e' il test che lo dice prima, con il motivo scritto.
+//     non da una costante riletta — e la si cerca in chi lo invoca. Se qualcuno
+//     cambia una delle due e non l'altra, l'hook comincerebbe a rifiutare ogni
+//     commit: questo e' il test che lo dice prima, con il motivo scritto.
+//     ⚠️ Da CRMA-152 chi invoca questo modulo non e' piu' `.githooks/pre-commit`
+//     (ridotto a lanciatore) ma `scripts/hook/pre-commit.mjs`, che la costante se
+//     la scrive a mano allo stesso modo: importarla da qui farebbe girare questo
+//     modulo al solo scopo di leggere una stringa.
 // ---------------------------------------------------------------------------
-test('la sentinella che il modulo stampa e\' la stessa che l\'hook pretende', () => {
+test('la sentinella che il modulo stampa e\' la stessa che chi lo invoca pretende', () => {
   scriviModulo(sorgenteModulo);
   stagePulito();
   const r = spawnSync('node', ['scripts/hook/controllo-segreti.mjs'], { cwd: repo, encoding: 'utf8' });
   assert.equal(r.status, 0);
 
   const righe = r.stdout.split('\n').filter((l) => l.trim() !== '');
-  assert.equal(righe.length, 1, 'su stdout deve esserci SOLO la sentinella, l\'hook lo cattura');
+  assert.equal(righe.length, 1, 'su stdout deve esserci SOLO la sentinella, chi lo invoca lo cattura');
   const sentinella = righe[0];
 
-  const hook = fs.readFileSync(path.join(RADICE, '.githooks/pre-commit'), 'utf8');
+  const invocante = fs.readFileSync(path.join(RADICE, 'scripts/hook/pre-commit.mjs'), 'utf8');
   assert.ok(
-    hook.includes('SENTINELLA_ATTESA="' + sentinella + '"'),
-    'l\'hook non pretende la sentinella che il modulo stampa (' + JSON.stringify(sentinella) +
+    invocante.includes('SENTINELLA_SEGRETI = \'' + sentinella + '\''),
+    'scripts/hook/pre-commit.mjs non pretende la sentinella che il modulo stampa (' +
+      JSON.stringify(sentinella) +
       '): le due copie si sono separate, e l\'hook sta rifiutando ogni commit.',
   );
 });
