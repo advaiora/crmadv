@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
 import { activeMember } from '../../core/membership-access.js';
+import { notDeleted } from '../../core/soft-delete.js';
 
 /**
  * I ruoli Superadmin che contano davvero in un workspace.
@@ -117,12 +118,35 @@ const mapMembershipToTeamMember = (membership: {
 
 const withClient = (tx?: Prisma.TransactionClient) => tx ?? prisma;
 
+/**
+ * La clausola della lista Team (CRMA-130).
+ *
+ * E' una funzione a se' e non un oggetto scritto dentro la query per un motivo
+ * solo: cosi' si puo' provare che il filtro del Cestino c'e', senza montare un
+ * database. `server/prisma.ts` esporta un Proxy che spara se il client non e'
+ * inizializzato, quindi una clausola che vive dentro `findMany` e' verificabile
+ * solo a integrazione.
+ *
+ * ⚠️ `status: 'ACTIVE'` non e' il filtro del Cestino e non lo sostituisce:
+ * cestinare NON cambia lo stato della membership — la riga resta com'era e si
+ * nasconde solo per la `deletedAt`.
+ */
+export const buildListMembersWhere = (workspaceId: string) =>
+  notDeleted({
+    workspaceId,
+  });
+
+/** La clausola del singolo membro letto dalla scheda Team (CRMA-130). */
+export const buildFindMemberByIdWhere = (workspaceId: string, memberId: string) =>
+  notDeleted({
+    workspaceId,
+    id: memberId,
+  });
+
 export const teamRepository = {
   async listMembers(workspaceId: string): Promise<TeamMemberRecord[]> {
     const memberships = await prisma.membership.findMany({
-      where: {
-        workspaceId,
-      },
+      where: buildListMembersWhere(workspaceId),
       select: buildMembershipSelect(workspaceId),
       orderBy: [
         {
@@ -143,10 +167,7 @@ export const teamRepository = {
     tx?: Prisma.TransactionClient,
   ): Promise<TeamMemberRecord | null> {
     const membership = await withClient(tx).membership.findFirst({
-      where: {
-        workspaceId,
-        id: memberId,
-      },
+      where: buildFindMemberByIdWhere(workspaceId, memberId),
       select: buildMembershipSelect(workspaceId),
     });
 
@@ -157,6 +178,22 @@ export const teamRepository = {
     return mapMembershipToTeamMember(membership);
   },
 
+  /**
+   * ⚠️ Questa NON prende `notDeleted`, ed e' l'unica lettura del Team che non lo
+   * prende (CRMA-130).
+   *
+   * Non e' una lista: e' la prova di unicita' che gira PRIMA di creare una
+   * membership. La coppia `(workspaceId, userId)` e' unica anche da cestinata
+   * (`prisma/schema.prisma`, `@@unique([workspaceId, userId])` sul modello
+   * `Membership`), quindi nascondere qui la riga cestinata direbbe al chiamante
+   * «questa persona non c'e'», lui proverebbe a inserirla, e l'inserimento
+   * sbatterebbe sul vincolo: un 500 al posto di un messaggio.
+   *
+   * Percio' la riga cestinata si legge, e si restituisce `deletedAt` perche' chi
+   * chiama possa dire la cosa vera — «e' nel Cestino, ripristinala» invece di
+   * «e' gia' un membro», che manderebbe a cercare il guasto nella lista Team
+   * dove quella persona giustamente non compare.
+   */
   findMembershipByUserId(
     workspaceId: string,
     userId: string,
@@ -170,6 +207,7 @@ export const teamRepository = {
       select: {
         id: true,
         status: true,
+        deletedAt: true,
       },
     });
   },

@@ -97,7 +97,17 @@ export const buildTeamInviteService = (
       if (existingUser) {
         const existingMembership = await teamRepo.findMembershipByUserId(input.workspaceId, existingUser.id);
         if (existingMembership) {
-          throw conflict('Invite cannot be created for this recipient');
+          // Anche da cestinata la membership esiste ancora, quindi l'invito
+          // resta rifiutato: creare la seconda riga sbatterebbe sull'unicita'
+          // di (workspaceId, userId). Cambia solo il motivo che si legge, e
+          // cambia dove si va a rimediare — il Cestino, non la lista Team
+          // (CRMA-130). Il messaggio resta volutamente avaro sul resto: chi
+          // invita non deve poter sondare chi e' gia' dentro al workspace.
+          throw conflict(
+            existingMembership.deletedAt
+              ? 'Invite cannot be created for this recipient: the membership is in the trash and must be restored'
+              : 'Invite cannot be created for this recipient',
+          );
         }
       }
 

@@ -225,11 +225,22 @@ export const teamService = {
 
     const existingMembership = await teamRepository.findMembershipByUserId(workspaceId, targetUser.id);
     if (existingMembership) {
-      throw conflict('User is already a member of this workspace', {
-        workspaceId,
-        userId: targetUser.id,
-        memberId: existingMembership.id,
-      });
+      // Due conflitti diversi, e vanno detti diversi (CRMA-130). Chi e' nel
+      // Cestino non compare piu' nella lista Team: rispondergli «e' gia' un
+      // membro» lo manda a cercarlo dove giustamente non c'e'. La via d'uscita
+      // e' il ripristino dal Cestino, non un secondo inserimento — che
+      // sbatterebbe comunque sull'unicita' di (workspaceId, userId).
+      throw conflict(
+        existingMembership.deletedAt
+          ? 'User is in the trash for this workspace: restore the membership instead of creating a new one'
+          : 'User is already a member of this workspace',
+        {
+          workspaceId,
+          userId: targetUser.id,
+          memberId: existingMembership.id,
+          trashed: Boolean(existingMembership.deletedAt),
+        },
+      );
     }
 
     const nextRoleName = resolveRoleNameOrThrow(parsedPayload.roleName);

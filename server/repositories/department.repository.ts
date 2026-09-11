@@ -1,4 +1,5 @@
 import { prisma } from '../prisma.js';
+import { activeMember } from '../core/membership-access.js';
 
 export const departmentRepository = {
   async listDepartments(workspaceId: string) {
@@ -149,9 +150,14 @@ export const departmentRepository = {
     return rows.map((row) => row.departmentId);
   },
 
+  // Chi si puo' mettere in un reparto adesso: i due chiamanti la usano per
+  // validare un'assegnazione NUOVA (workspace-departments.service.ts,
+  // project-access.service.ts), non per rileggere quelle gia' fatte. Percio'
+  // esclude i cestinati: chi e' nel Cestino non si puo' piu' scegliere, ma i
+  // reparti a cui era gia' assegnato non si svuotano da soli (CRMA-130).
   async listActiveWorkspaceMemberUserIds(workspaceId: string): Promise<string[]> {
     const rows = await prisma.membership.findMany({
-      where: { workspaceId, status: 'ACTIVE' },
+      where: activeMember({ workspaceId }),
       select: { userId: true },
     });
 

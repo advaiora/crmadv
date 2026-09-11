@@ -961,9 +961,13 @@ export const webAssetsRepository = {
     workspaceId: string,
     filters: WebAssetLookupFilters,
   ): Promise<WebAssetLookupItem[]> {
+    // Tendina "proprietario" di un asset: propone chi c'e' adesso, quindi
+    // esclude i cestinati (CRMA-130). Gli asset gia' intestati a chi e' finito
+    // nel Cestino non cambiano proprietario da soli — questa e' la lista delle
+    // scelte possibili, non la rilettura di quelle gia' fatte.
     const memberships = await prisma.membership.findMany({
-      where: whereWorkspace<Prisma.MembershipWhereInput>(workspaceId, {
-        status: 'ACTIVE',
+      where: activeMember({
+        workspaceId,
         ...(filters.q
           ? {
               user: {
@@ -975,7 +979,7 @@ export const webAssetsRepository = {
               },
             }
           : {}),
-      }),
+      }) satisfies Prisma.MembershipWhereInput,
       orderBy: [{ updatedAt: 'desc' }],
       take: filters.limit,
       select: {
