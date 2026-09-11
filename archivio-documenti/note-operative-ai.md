@@ -1533,7 +1533,6 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Quando servono piu' consensi di corsia A sullo stesso compito, emetterle **una alla volta**: si crea la richiesta, si aspetta l'esito (accettata, rifiutata o scaduta) leggendolo con `GET /api/issues/{id}/interactions`, e solo allora si crea la successiva.
 - Se il lavoro lo consente, un'alternativa e' aprire un compito figlio per pull request: ognuno ha una coda di interazioni indipendente, e le richieste non si soppiantano a vicenda.
 - Prova: commento su CRMA-144 (id compito `e2d9578d-c46c-4748-b8d4-71a913f52f40`).
-
 ---
 
 ## 105. `delegation_cycle` scatta sulla creazione di un figlio, non sulla riassegnazione di un compito gia' esistente
@@ -1546,3 +1545,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Il controllo `delegation_cycle` scatta solo sulla **creazione** di un compito figlio con un assignee a ritroso nella catena delle deleghe, non sulla riassegnazione (`PATCH assigneeAgentId`) di un compito che esiste gia'.
 - Quando un antenato nella catena rende impossibile creare un figlio per un certo assignee, e il lavoro puo' restare sullo stesso compito invece di diramarsi in uno nuovo, la `PATCH` di riassegnazione e' la via che non incontra il blocco — non serve per forza una domanda umana per sbloccare casi simili, se il compito e' gia' apribile senza creare un nuovo figlio.
 - Prova: `PATCH` su CRMA-129, 200 senza 409, dopo il 409 sulla creazione del figlio verso lo stesso assignee.
+
+---
+
+## 106. Un apostrofo dritto dentro `node -e '...'` ad apici singoli chiude la stringa a bash, come farebbe un backtick con gli apici doppi (variante della #88)
+
+**Contesto:** CRMA-158, scrivendo un commento tecnico lungo (markdown con riferimenti fra backtick e con l'apostrofo tipografico reso come apostrofo dritto, es. "gia'", "cosi'", "l'utente") da postare via API con `node -e '...'` ad apici singoli — la forma indicata dalla nota #88 proprio per evitare che bash interpreti i backtick del testo come sostituzione di comando.
+
+**Errore:** la nota #88 risolve il problema dei backtick, ma non quello degli apostrofi. Se il testo contiene un **apostrofo dritto**, bash lo legge come la **chiusura** della stringa `'...'` in corso, non come testo: il comando fallisce con un errore di sintassi (`unexpected token`). Rumoroso stavolta, non silenzioso come nella #88, ma comunque un tentativo perso e un file da ricostruire.
+
+**Modo corretto:**
+- Per testo tecnico lungo (commenti API, corpi di pull request, ecc.) non passare **mai** per la riga di comando, a prescindere dal tipo di apici scelto: scrivere prima il testo con lo strumento di scrittura file (quello che non interpreta nulla), poi costruire il JSON leggendo da quel file con `node -e 'require("fs")...'` — qui lo script node stesso non contiene backtick ne' apostrofi del testo, solo il percorso del file.
+- Verifica a costo zero prima di spedire: confrontare il conteggio dei backtick (o di un altro carattere sensibile) fra il file sorgente e il JSON costruito.
+- Prova: CRMA-158, tentativo di postare un commento tecnico con `node -e '...'` fallito con errore di sintassi bash per un apostrofo dritto nel testo.
