@@ -110,12 +110,6 @@ export const SidebarMenu = [
             grp_name: "apps",
           },
           {
-            name: "Nuovo Cliente",
-            path: "/apps/clients/new",
-            requiredPermission: "clients.create",
-            grp_name: "apps",
-          },
-          {
             name: "Campi personalizzati",
             path: "/apps/clients/custom-fields",
             requiredPermission: "clients.edit",
@@ -143,6 +137,12 @@ export const SidebarMenu = [
             requiredPermission: "team.view",
             grp_name: "apps",
           },
+          {
+            name: "Reparti",
+            path: "/settings/departments",
+            requiredPermission: "departments.view",
+            grp_name: "apps",
+          },
         ],
       },
       {
@@ -157,12 +157,6 @@ export const SidebarMenu = [
             name: "Elenco Preventivi",
             path: "/apps/quotes",
             requiredPermission: "quotes.view",
-            grp_name: "apps",
-          },
-          {
-            name: "Nuovo Preventivo",
-            path: "/apps/quotes/new",
-            requiredPermission: "quotes.create",
             grp_name: "apps",
           },
           {
@@ -280,10 +274,21 @@ export const SidebarMenu = [
     ],
   },
   {
-    group: "Sicurezza",
+    // Nato il 10/9/2026 (CRMA-32): il Registro attività e' primo apposta — e'
+    // l'unica voce del gruppo che si consulta invece di configurarsi.
+    group: "Impostazioni",
     contents: [
       {
-        id: "security_roles",
+        id: "settings_audit",
+        name: "Registro attività",
+        icon: <Icons.History />,
+        path: "/audit",
+        requiredModule: "audit",
+        requiredPermission: "audit.view",
+        grp_name: "apps",
+      },
+      {
+        id: "settings_roles",
         name: "Ruoli e permessi",
         icon: <Icons.LockAccess />,
         path: "/settings/roles",
@@ -291,20 +296,30 @@ export const SidebarMenu = [
         grp_name: "apps",
       },
       {
-        id: "security_departments",
-        name: "Reparti",
-        icon: <Icons.BuildingCommunity />,
-        path: "/settings/departments",
-        requiredPermission: "departments.view",
+        id: "settings_mail_server",
+        name: "Server di posta",
+        icon: <Icons.Mail />,
+        path: "/settings/mail-server",
+        requiredModule: "mail",
+        requiredPermission: "mail.manage",
         grp_name: "apps",
       },
       {
-        id: "security_audit",
-        name: "Audit",
-        icon: <Icons.History />,
-        path: "/audit",
-        requiredModule: "audit",
-        requiredPermission: "audit.view",
+        id: "settings_branding",
+        name: "Branding Workspace",
+        icon: <Icons.Palette />,
+        path: "/pages/workspace-branding",
+        requiredModule: "branding",
+        requiredPermission: "branding.manage",
+        grp_name: "apps",
+      },
+      {
+        id: "settings_modules",
+        name: "Gestione Moduli",
+        icon: <Icons.Apps />,
+        path: "/settings/modules",
+        requiredModule: "modules",
+        requiredPermission: "modules.manage",
         grp_name: "apps",
       },
     ],
@@ -336,27 +351,6 @@ export const SidebarMenu = [
           {
             name: "Scorciatoie",
             path: "/settings/shortcuts",
-            grp_name: "apps",
-          },
-          {
-            name: "Branding Workspace",
-            path: "/pages/workspace-branding",
-            requiredModule: "branding",
-            requiredPermission: "branding.manage",
-            grp_name: "apps",
-          },
-          {
-            name: "Gestione Moduli",
-            path: "/settings/modules",
-            requiredModule: "modules",
-            requiredPermission: "modules.manage",
-            grp_name: "apps",
-          },
-          {
-            name: "Server di posta",
-            path: "/settings/mail-server",
-            requiredModule: "mail",
-            requiredPermission: "mail.manage",
             grp_name: "apps",
           },
           {

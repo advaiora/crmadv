@@ -304,6 +304,34 @@ describe('AssetsCompetitorsCard', () => {
     expect(screen.getByText('Ricerca non riuscita.')).toBeInTheDocument();
   });
 
+  it('col budget esaurito mostra il motivo vero del server, non "non configurata"', () => {
+    monta({
+      searchResult: {
+        providerStatus: 'budget_exceeded',
+        realSearch: false,
+        budgetExceeded: true,
+        budgetMessage: 'Budget AI giornaliero superato: spesi $12 su un limite di $10.',
+        suggestions: [],
+      },
+    });
+
+    expect(screen.getByText('Budget AI giornaliero superato: spesi $12 su un limite di $10.')).toBeInTheDocument();
+    expect(screen.queryByText(/non configurata/)).not.toBeInTheDocument();
+  });
+
+  // `competitors` e `searchResult` sono due prop indipendenti della card (l'elenco
+  // vero arriva da `assets.competitorRoster`, non da `suggestions`): questo non e'
+  // un test di regressione sul codice della card, ma documenta il criterio di
+  // accettazione di CRMA-97 ("i competitor gia' confermati restano in elenco").
+  it('un esito di ricerca (anche di budget esaurito) non nasconde i competitor gia\' confermati', () => {
+    monta({
+      competitors: [{ id: 'c1', name: 'Rivale', url: 'https://rivale.it', source: 'manual', status: 'confirmed' }],
+      searchResult: { providerStatus: 'budget_exceeded', realSearch: false, budgetExceeded: true },
+    });
+
+    expect(screen.getByText('Rivale')).toBeInTheDocument();
+  });
+
   it('mentre cerca blocca il pulsante', () => {
     monta({ searching: true });
 

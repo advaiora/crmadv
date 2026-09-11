@@ -4,19 +4,28 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { forbidden } from '../../../core/errors.js';
 import { buildWorkspaceDashboardRoute } from './workspace-dashboard.route.js';
 
+// Il parametro di buildWorkspaceDashboardRoute ha un valore di default, quindi il suo
+// tipo comprende `undefined`: senza NonNullable, leggerci dentro una singola dipendenza
+// non compila (TS2339).
+type RouteDependencies = NonNullable<Parameters<typeof buildWorkspaceDashboardRoute>[0]>;
+
 const createTestApp = async (input?: {
-  ensureDashboardAccessFn?: Parameters<typeof buildWorkspaceDashboardRoute>[0]['ensureDashboardAccessFn'];
-  requirePermissionFn?: Parameters<typeof buildWorkspaceDashboardRoute>[0]['requirePermissionFn'];
+  ensureDashboardAccessFn?: RouteDependencies['ensureDashboardAccessFn'];
+  requireModuleEnabledFn?: RouteDependencies['requireModuleEnabledFn'];
+  requirePermissionFn?: RouteDependencies['requirePermissionFn'];
 }) => {
   const app = Fastify({ logger: false });
 
   await app.register(
     buildWorkspaceDashboardRoute({
+      // Il doppione restituisce i soli campi che la rotta legge (user.id e workspace.id),
+      // non l'utente e il workspace interi di ensureDashboardAccess: da qui il cast.
       ensureDashboardAccessFn: input?.ensureDashboardAccessFn
-        ?? (async () => ({
+        ?? ((async () => ({
           user: { id: 'user-1' },
           workspace: { id: 'workspace-1' },
-        })),
+        })) as unknown as RouteDependencies['ensureDashboardAccessFn']),
+      requireModuleEnabledFn: input?.requireModuleEnabledFn ?? (async () => undefined),
       requirePermissionFn: input?.requirePermissionFn ?? (async () => undefined),
       dashboardServiceApi: {
         getOverview: async () => ({
@@ -151,6 +160,75 @@ test('dashboard team workload route returns 403 when permission is missing', asy
     });
 
     assert.equal(response.statusCode, 403);
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('dashboard team workload route returns 403 when checklists module is disabled', async () => {
+  let app: FastifyInstance | null = null;
+
+  try {
+    app = await createTestApp({
+      requireModuleEnabledFn: async (_workspaceId: string, moduleKey: string) => {
+        if (moduleKey === 'checklists') {
+          throw forbidden('Module is disabled for this workspace');
+        }
+      },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/team-workload',
+    });
+
+    assert.equal(response.statusCode, 403);
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('dashboard team workload route returns 403 when team module is disabled', async () => {
+  let app: FastifyInstance | null = null;
+
+  try {
+    app = await createTestApp({
+      requireModuleEnabledFn: async (_workspaceId: string, moduleKey: string) => {
+        if (moduleKey === 'team') {
+          throw forbidden('Module is disabled for this workspace');
+        }
+      },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/team-workload',
+    });
+
+    assert.equal(response.statusCode, 403);
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('dashboard team workload route checks both modules and answers when they are enabled', async () => {
+  let app: FastifyInstance | null = null;
+  const checkedModuleKeys: string[] = [];
+
+  try {
+    app = await createTestApp({
+      requireModuleEnabledFn: async (_workspaceId: string, moduleKey: string) => {
+        checkedModuleKeys.push(moduleKey);
+      },
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/team-workload',
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(checkedModuleKeys, ['team', 'checklists']);
   } finally {
     await closeApp(app);
   }

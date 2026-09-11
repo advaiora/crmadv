@@ -46,11 +46,12 @@ export type DashboardInsightContext = {
   userId: string;
   nowIso: string;
   canCreateClients: boolean;
+  // Ogni KPI puo' mancare: il suo modulo e' spento e non e' stato nemmeno contato.
   kpis: {
-    clientsActive: number;
-    projectsActive: number;
-    quotesSent30d: number;
-    checklistOpenItems: number;
+    clientsActive?: number;
+    projectsActive?: number;
+    quotesSent30d?: number;
+    checklistOpenItems?: number;
   };
   urgentItems: Array<{
     type: 'blocked_project' | 'stale_project' | 'unsent_quote' | 'overdue_checklist';

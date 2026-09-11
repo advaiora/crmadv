@@ -37,11 +37,24 @@ Sul progetto lavorano **due assistenti, in due ambienti diversi, con mestieri di
 4. La **fonte di verità del prodotto** è `archivio-documenti/02-brief-operativo-definitivo-bibbia.md` (la "bibbia"); la roadmap di sviluppo è `archivio-documenti/03-roadmap-confronto-e-build.md`.
 5. **Se l'utente si allontana dal PC** e vuole che il lavoro prosegua senza di lui, lancia `/vado` (`/vado 2h`, `/vado tutto`). Il lavoro avanza **a pezzi committabili** — il tempo non taglia un pezzo, decide solo se cominciarne un altro — con commit e push a ogni pezzo chiuso. Ciò che richiede una sua decisione non viene deciso: viene **parcheggiato con le opzioni già istruite** e presentato al rientro in `archivio-documenti/rapporto-al-rientro.md`. Non è un handoff e non tocca la cartella degli handoff: sono due cose diverse (l'handoff chiude una sessione, il rapporto al rientro riprende una conversazione ancora aperta).
 
-## L'unione a `main`: la esegue un agente, il consenso lo dà una persona (dal 10/9/2026)
+## L'unione a `main`: due corsie, e chi preme il pulsante (dal 10/9/2026)
 
 **Cosa cambia, in una riga: la regola precedente era «nessun merge su `main` senza approvazione», e non diceva come si ottiene l'approvazione — così ogni agente si fermava e il pulsante lo premeva a mano Jacopo o Claudio su GitHub.** Il 10/9/2026 le pull request aperte erano venti. La sicurezza non era data dal fatto che gli agenti non potessero unire (possono: il token ha `push`, `main` non ha branch protection, ed è già successo il 9/9), ma dal fatto che non sapessero come chiedere. Adesso lo sanno, e il consenso è un passaggio formale che lascia una traccia.
 
-**Il consenso resta obbligatorio, sempre e senza eccezioni. Cambia solo chi preme il pulsante.**
+**Lo stesso giorno, alle 14:01, la regola è stata corretta una seconda volta.** Con diciotto pull request in coda, un consenso per ciascuna — anche per un refuso o una nota — era diventato di per sé il collo di bottiglia (ce n'erano già di scadute prima che qualcuno le leggesse). Rispondendo alla richiesta `crma-23-coda-unioni`, Jacopo ha scelto **due corsie** invece di una fila unica: il consenso dove il rischio è vero, i cancelli da soli dove non lo è. **Il consenso non è stato abolito: si applica dove serve.** Quello che segue sostituisce la frase «il consenso resta obbligatorio, sempre e senza eccezioni», che era vera fino a quel momento e non lo è più.
+
+### Le due corsie, e come si sceglie fra loro
+
+Il criterio è **meccanico**, come gli inneschi di R1 qui sotto: si guardano i file toccati dalla pull request (`git diff --name-only` contro la base), non il rischio percepito o il giudizio di chi ha scritto il ramo.
+
+| | |
+|---|---|
+| **Corsia A — serve il consenso singolo di Jacopo o Claudio** | la pull request tocca almeno uno fra: `prisma/schema.prisma`, una migrazione (`prisma/migrations/**`), `server/auth/rbac-catalog.ts`, autenticazione o sessioni, segreti o `.env`, permessi e ruoli |
+| **Corsia B — il Capocantiere unisce senza chiedere** | nessuno dei punti sopra è toccato: documenti, note operative, roadmap, etichette e testi a schermo, correzioni di interfaccia, strumenti di sviluppo |
+
+**Corsia B non è "senza controllo": è "a cancelli superati, senza un secondo passaggio umano".** I cancelli del compito (passo 2 dei sei passi qui sotto) restano obbligatori in entrambe le corsie — quello che cambia è solo il passo 4. Nel dubbio su quale corsia tocchi una pull request, si tratta come corsia A: chiedere un consenso di troppo costa un passaggio in più, ometterlo su un rischio vero costa una migrazione applicata due volte o un permesso che nessuno ha visto arrivare.
+
+**Il cancello Revisore su «unione a `main`» (tabella R1 qui sotto) non è quello che questa sezione descrive, e il consenso di corsia A non lo sostituisce.** Sono due controlli diversi, che possono coesistere sullo stesso compito: il cancello Revisore è una revisione dell'agente Paperclip fatta *prima* che la pull request arrivi a questo punto; il consenso di corsia A è la decisione finale di Jacopo o Claudio *su quella pull request specifica*. Un compito con il cancello Revisore superato entra comunque in corsia A se tocca uno dei punti della tabella sopra.
 
 ### Chi può unire
 
@@ -49,29 +62,33 @@ Sul progetto lavorano **due assistenti, in due ambienti diversi, con mestieri di
 |---|---|
 | **Esegue l'unione** | **Capocantiere** (`4c8f15c8-070f-41bf-95f3-3c5c9004959e`). Se il ramo da unire è suo, la esegue il **CEO** (`acdb80ad-1600-4ab6-94b3-ca75fe6b9833`) |
 | **Non uniscono mai** | tutti gli altri: sviluppatori, Cronista, Guardiano, Revisore, Collaudatori, Esploratore. Portano il lavoro fino alla pull request e si fermano lì |
-| **Dà il consenso** | **solo Jacopo o Claudio**, rispondendo alla richiesta di conferma sul compito |
+| **Dà il consenso, in corsia A** | **solo Jacopo o Claudio**, rispondendo alla richiesta di conferma sul compito |
 
-La ragione della separazione è una sola e non è negoziabile: **chi ha scritto il ramo non lo unisce.** È lo stesso principio per cui un cancello non può avere come revisore l'assegnatario del compito.
+La ragione della separazione fra chi scrive e chi unisce è una sola e non è negoziabile, in entrambe le corsie: **chi ha scritto il ramo non lo unisce.** È lo stesso principio per cui un cancello non può avere come revisore l'assegnatario del compito.
 
 ### I sei passi, in ordine, senza scorciatoie
 
 1. **La pull request verso `main` esiste** ed è aperta. Un ramo senza pull request non si unisce, mai — nemmeno con un `git push` diretto su `main`.
-2. **I cancelli del compito sono chiusi.** Se il compito prevedeva Guardiano, Revisore, Collaudatore o Collaudatore AI, quelli devono risultare superati. Se non ne prevedeva nessuno, il commento di chiusura deve dichiarare la revisione del revisore di repository.
-3. **`mergeable_state` è `clean`.** Se è `dirty`, `blocked` o `behind`, prima si sistema il ramo. Non si chiede il consenso su una pull request che non è unibile: significherebbe far decidere l'utente su qualcosa che poi cambia.
-4. **Si chiede il consenso con una richiesta di conferma sul compito** (`POST /api/issues/{issueId}/interactions`, `kind: request_confirmation`, `continuationPolicy: wake_assignee`), con `idempotencyKey` `confirmation:{issueId}:merge:{numeroPR}:{shaTesta}`. La richiesta deve contenere, per esteso: **numero e titolo della pull request**, **nome del ramo**, **elenco dei file toccati**, **le sette cifre iniziali dello sha della testa**, **quali cancelli sono stati superati e da chi**, e **una riga che dica cosa cambia per chi usa il CRM**. Una richiesta che non contiene queste sei cose non è una richiesta di consenso: è un disturbo.
-5. **Si unisce solo dopo l'accettazione, e solo se la testa non si è mossa.** Prima di eseguire si rilegge `head.sha` dalla pull request: se è diverso da quello scritto nella conferma, **la conferma è decaduta** e ne serve una nuova. Il consenso vale per quel codice lì, non per quel ramo in generale.
-6. **Il metodo è `squash`, e la prova non è la risposta dell'API.** `PUT /repos/advaiora/crmadv/pulls/{n}/merge` con `{"merge_method":"squash"}`; poi `git fetch origin` e si verifica che il commit sia davvero antenato di `origin/main` (nota operativa #66). Infine si scrive l'esito nel compito.
+2. **I cancelli del compito sono chiusi.** Se il compito prevedeva Guardiano, Revisore, Collaudatore o Collaudatore AI, quelli devono risultare superati. Se non ne prevedeva nessuno, il commento di chiusura deve dichiarare la revisione del revisore di repository. Vale in entrambe le corsie.
+3. **`mergeable_state` è `clean`.** Se è `dirty`, `blocked` o `behind`, prima si sistema il ramo. In corsia A non si chiede il consenso su una pull request che non è unibile: significherebbe far decidere l'utente su qualcosa che poi cambia. In corsia B non si unisce comunque una pull request non pulita.
+4. **Solo in corsia A: si chiede il consenso con una richiesta di conferma sul compito** (`POST /api/issues/{issueId}/interactions`, `kind: request_confirmation`, `continuationPolicy: wake_assignee`), con `idempotencyKey` `confirmation:{issueId}:merge:{numeroPR}:{shaTesta}`. La richiesta deve contenere, per esteso: **numero e titolo della pull request**, **nome del ramo**, **elenco dei file toccati**, **le sette cifre iniziali dello sha della testa**, **quali cancelli sono stati superati e da chi**, e **una riga che dica cosa cambia per chi usa il CRM**. Una richiesta che non contiene queste sei cose non è una richiesta di consenso: è un disturbo. **In corsia B questo passo non esiste**: dal passo 3 si va direttamente al passo 5.
+5. **In corsia A si unisce solo dopo l'accettazione, e solo se la testa non si è mossa.** Prima di eseguire si rilegge `head.sha` dalla pull request: se è diverso da quello scritto nella conferma, **la conferma è decaduta** e ne serve una nuova (vedi sotto: non si chiede il permesso di richiederla). Il consenso vale per quel codice lì, non per quel ramo in generale. In corsia B si rilegge comunque `head.sha` subito prima di unire, per la stessa ragione: si unisce il codice che si è appena verificato, non quello di qualche minuto prima.
+6. **Il metodo è `squash`, e la prova non è la risposta dell'API.** `PUT /repos/advaiora/crmadv/pulls/{n}/merge` con `{"merge_method":"squash"}`; poi `git fetch origin` e si verifica che il commit sia davvero antenato di `origin/main` (nota operativa #66). Infine si scrive l'esito nel compito, con la corsia usata.
+
+### Quando una conferma di corsia A scade, si riemette da sola
+
+**È già la terza risposta alla stessa domanda, non serve chiederla una quarta volta.** Se la richiesta di conferma scade prima che Jacopo o Claudio la leggano — come già successo alla PR #34 — il Capocantiere la **riemette da solo**, con lo sha aggiornato (se nel frattempo si è mosso) e senza chiedere il permesso di richiedere di nuovo: il permesso è stato dato il 10/9/2026 rispondendo a `crma-23-coda-unioni`. La nuova richiesta segue comunque il passo 4: numero e titolo della PR, ramo, file toccati, sha, cancelli, e cosa cambia per chi usa il CRM.
 
 ### I quattro divieti che rendono la regola impenetrabile
 
-- **Mai unire senza il passo 4.** Un'approvazione arrivata in chat, in un commento generico, a voce o «già data l'altra volta per un ramo simile» **non conta**. Conta solo un'accettazione registrata su quella richiesta di conferma. Se hai un dubbio su cosa valga come consenso, allora non ce l'hai.
-- **Mai un consenso cumulativo.** Una conferma vale **una pull request**. Non esistono «unisci tutte quelle pronte», né deleghe permanenti.
-- **Mai durante `/vado`.** Se l'utente non è al PC non può dare il consenso, e il consenso non si presume: il ramo lo trova pronto al rientro. Resta com'era scritto in `.claude/commands/vado.md`.
-- **Mai `--force`, mai riscrivere la storia, mai unire una pull request altrui senza che il suo compito sia chiuso.**
+- **Mai unire in corsia A senza il passo 4.** Un'approvazione arrivata in chat, in un commento generico, a voce o «già data l'altra volta per un ramo simile» **non conta**. Conta solo un'accettazione registrata su quella richiesta di conferma. Se hai un dubbio su cosa valga come consenso, allora non ce l'hai — e se hai un dubbio su quale corsia tocchi, tratta la pull request come corsia A.
+- **Mai un consenso cumulativo.** Una conferma vale **una pull request**. Non esistono «unisci tutte quelle pronte», né deleghe permanenti — la corsia B copre già il caso dove il consenso singolo era solo un tappo, non serve derogare al resto.
+- **Mai durante `/vado`, in nessuna delle due corsie.** Se l'utente non è al PC non può dare il consenso in corsia A, e non c'è nessuno che possa accorgersi di un cancello superato per errore in corsia B: il ramo lo trova pronto al rientro, qualunque sia la corsia. Resta com'era scritto in `.claude/commands/vado.md`.
+- **Mai `--force`, mai riscrivere la storia, mai unire una pull request altrui senza che il suo compito sia chiuso.** Vale in entrambe le corsie.
 
 ### Se il consenso è negato
 
-Non si insiste e non si riformula la stessa richiesta sperando in un sì. Il motivo del rifiuto si scrive nel compito, il ramo resta aperto, e se serve una modifica si apre il lavoro corrispondente. Un rifiuto è una decisione, non un ostacolo da aggirare.
+Vale per la corsia A, l'unica dove il consenso esiste. Non si insiste e non si riformula la stessa richiesta sperando in un sì. Il motivo del rifiuto si scrive nel compito, il ramo resta aperto, e se serve una modifica si apre il lavoro corrispondente. Un rifiuto è una decisione, non un ostacolo da aggirare.
 
 ## Regola sui conflitti tra le due persone (IMPORTANTE)
 
@@ -94,6 +111,8 @@ Lavorando si incontrano di continuo **altre cose da sistemare o migliorare**, sl
 1. **Si apre `archivio-documenti/03-roadmap-confronto-e-build.md` e la si colloca nel punto giusto** — sotto la V di competenza se è una scelta di prodotto, sotto *"Debito tecnico / tooling (trasversale)"* se è manutenzione. Scritta in modo che chi la legge fra tre mesi capisca cos'è, dove sta e perché non è stata fatta subito (con la misura: quanti file, quali).
 2. **Si torna immediatamente all'obiettivo corrente.**
 
+**Chi scrive materialmente la voce** *(precisazione del 9/9/2026, perché la riga «Memoria e documenti» della tabella qui sotto manda al Cronista «ogni voce di roadmap trovata per strada»)*: **la scrive la sessione stessa** se in quel lavoro sta già toccando la roadmap; se invece la cosa è saltata fuori in un giro che quel documento non apre, si **apre un compito al Cronista** e si torna all'obiettivo. In nessuno dei due casi la voce resta in chat.
+
 Il motivo è pratico: l'obiettivo in corso costa già parecchio tempo di suo, e ogni deviazione lo allunga; ma se la cosa trovata non viene scritta da qualche parte, si perde. La roadmap è il posto dove non si perde.
 
 Vale anche per le **domande** che meritano una decisione di Jacopo o Claudio: non restano appese in chat (la chat finisce), finiscono nella roadmap con le opzioni già istruite.
@@ -104,40 +123,68 @@ Esiste il file `archivio-documenti/note-operative-ai.md` con gli errori operativ
 
 - **Leggilo a inizio sessione** ed evita gli errori già annotati.
 - Quando ti accorgi di aver eseguito un'operazione in modo inefficiente o sbagliato, **aggiorna quel file in autonomia** (senza che l'utente lo chieda), aggiungendo una voce breve nel formato *Contesto → Errore → Modo corretto*.
+- **Chi tiene la penna** *(precisazione del 9/9/2026, perché la riga «Memoria e documenti» della tabella più sotto manda al Cronista «ogni nota operativa nuova»)*: **scrive la sessione**, come dice la riga qui sopra, quando in quel lavoro sta già toccando `note-operative-ai.md`; se la nota nasce in un run che quel file non apre, si **apre un compito al Cronista** consegnandogli la bozza già pronta nel formato. La regola che non cambia mai è che a fine lavoro si esce in un modo solo dei due — o la nota, o «in questo compito non c'era niente da annotare».
 
 ## Team di agent (dal 23/7/2026)
 
-Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può modificare file**.
+Esistono tre assistenti secondari in `.claude/agents/`, **nessuno dei quali può modificare file**. Dal 9/9/2026 i loro nomi finiscono tutti in **`-repo`**, e il motivo sta nel riquadro subito dopo l'elenco: non è un vezzo, serve a non confonderli con gli agenti Paperclip che si chiamano allo stesso modo.
 
 > **Li chiama l'assistente, non l'utente.** Fanno parte del metodo di lavoro: non si chiede il permesso di usarli e non si aspetta che l'utente li nomini. Le condizioni qui sotto sono verificabili apposta — non sono un "quando ti sembra utile".
 
-- **`esploratore`** — **chiamalo prima di scrivere codice** ogni volta che ricorre almeno una di queste: la modifica tocca un file oltre le ~800 righe; aggiunge o cambia un permesso, una rotta, una tabella o una colonna; tocca l'area Agency, Web Assets o la chat; oppure **non sai già con certezza l'elenco completo dei file da toccare**. Se non ricorre nessuna, procedi senza. Torna la mappa e la **lista dei punti da collegare**: quella lista è ciò che il revisore spunterà dopo.
-- **`revisore`** — **chiamalo a ogni tappa conclusa**, non solo prima del commit: (a) subito dopo schema+migrazione, prima di costruirci sopra; (b) subito dopo aver completato il collegamento; (c) prima di proporre il commit. Due chiamate per pezzo di lavoro sono il default, si sale a tre-quattro se si toccano schema, permessi o generazioni AI. Per le **rifattorizzazioni senza schema, permessi o AI** (es. spezzatura di file-mostro), dal 4/8/2026 basta **una revisione sola, a giro completo** — regola allineata alla pratica reale del registro compiti. **Mai su codice a metà.**
-- **`architetto`** — ogni 5-10 sessioni: misura i consumi e **propone** modifiche al team. Non applica mai niente: le modifiche approvate le applica la sessione principale, e si annotano nel registro.
+- **`esploratore-repo`** (Esploratore Repo) — **chiamalo prima di scrivere codice** ogni volta che ricorre almeno una di queste: la modifica tocca un file oltre le ~800 righe; aggiunge o cambia un permesso, una rotta, una tabella o una colonna; tocca l'area Agency, Web Assets o la chat; oppure **non sai già con certezza l'elenco completo dei file da toccare**. Se non ricorre nessuna, procedi senza. Torna la mappa e la **lista dei punti da collegare**: quella lista è ciò che il Revisore Repo spunterà dopo.
+- **`revisore-repo`** (Revisore Repo) — **chiamalo a ogni tappa conclusa**, non solo prima del commit: (a) subito dopo schema+migrazione, prima di costruirci sopra; (b) subito dopo aver completato il collegamento; (c) prima di proporre il commit. Due chiamate per pezzo di lavoro sono il default, si sale a tre-quattro se si toccano schema, permessi o generazioni AI. Per le **rifattorizzazioni senza schema, permessi o AI** (es. spezzatura di file-mostro), dal 4/8/2026 basta **una revisione sola, a giro completo** — regola allineata alla pratica reale del registro compiti. **Mai su codice a metà.**
+- **`architetto-repo`** (Architetto Repo) — ogni 5-10 sessioni: misura i consumi e **propone** modifiche al team. Non applica mai niente: le modifiche approvate le applica la sessione principale, e si annotano nel registro.
 
-### ⚠️ Gli stessi tre nomi esistono in due sistemi diversi (dal 9/9/2026)
+### ⚠️ Gli stessi tre ruoli esistono in due sistemi diversi — e i nomi ora lo dicono (dal 9/9/2026)
 
-`esploratore`, `revisore` e `architetto` sono **due cose distinte con lo stesso nome**:
+Esploratore, Revisore e Architetto sono **due cose distinte con lo stesso ruolo**:
 
-- gli **agent di repository** — i file in `.claude/agents/` descritti qui sopra. Girano **dentro** la sessione che li chiama: non hanno un risveglio, non hanno un run, e **non compaiono mai sulla dashboard di Paperclip**. La prova che hanno lavorato sta nei registri di sessione della VPS (`~/.claude/projects/<slug>/<sessione>/subagents/agent-*.jsonl`), non in dashboard;
-- le **schede agente di Paperclip** con lo stesso nome, che lavorano solo se qualcuno assegna loro un compito.
+- i **subagent di repository** — i file in `.claude/agents/` descritti qui sopra, che dal 9/9/2026 si chiamano **`esploratore-repo`, `revisore-repo`, `architetto-repo`**. Girano **dentro** la sessione che li chiama: non hanno un risveglio, non hanno un run, e **non compaiono mai sulla dashboard di Paperclip**. La prova che hanno lavorato sta nei registri di sessione della VPS (`~/.claude/projects/<slug>/<sessione>/subagents/agent-*.jsonl`), non in dashboard;
+- le **schede agente di Paperclip** — **Esploratore**, **Revisore** (e accanto a loro Guardiano e Capo del personale), senza suffisso, che lavorano solo se qualcuno assegna loro un compito e lasciano traccia in dashboard.
 
-Il 9/9/2026 Jacopo ha aperto la scheda Paperclip «Revisore», l'ha trovata a **zero attività**, e ha ragionevolmente concluso che le revisioni dichiarate non fossero mai avvenute. Erano avvenute — ma con l'altro revisore. **L'ambiguità l'aveva creata chi scriveva.** Quindi: **quando citi una revisione o un'esplorazione, di' sempre quale dei due**, «revisore di repository» oppure «agente Revisore di Paperclip». Mai «il Revisore» e basta.
+**Perché il suffisso.** Il 9/9/2026 Jacopo ha aperto la scheda Paperclip «Revisore», l'ha trovata a **zero attività**, e ha ragionevolmente concluso che le revisioni dichiarate non fossero mai avvenute. Erano avvenute — ma con l'altro revisore. **L'ambiguità l'aveva creata chi scriveva.** La prima risposta era stata una regola di stile («di' sempre quale dei due»); su richiesta di Jacopo, lo stesso giorno, è diventata una **differenza nei nomi**, che è più difficile da dimenticare di una buona intenzione.
+
+**Come si citano, e come si chiamano:**
+- il subagent di repository si scrive **`esploratore-repo` / `revisore-repo` / `architetto-repo`** quando si passa il nome al programma, e **«Esploratore Repo» / «Revisore Repo» / «Architetto Repo»** in un discorso;
+- l'agente Paperclip si scrive **«agente Revisore di Paperclip»** (o Esploratore, Guardiano, Capo del personale), mai con il suffisso;
+- **«il Revisore» e basta non è più una citazione valida**: se leggi quella forma in un documento vecchio, è quasi sempre il subagent di repository, ma verificalo invece di darlo per scontato.
 
 **Come si sceglie fra i due — regola mista, decisa da Jacopo il 9/9/2026** (le alternative scartate erano "solo repository" e "solo Paperclip"):
 
 | Cosa si sta revisionando | Chi la fa |
 |---|---|
-| Le tappe correnti di un lavoro (collegamento completato, prima del commit, rifattorizzazioni) | **revisore di repository**, dentro la sessione, come sempre |
+| Le tappe correnti di un lavoro (collegamento completato, prima del commit, rifattorizzazioni) | **`revisore-repo`**, dentro la sessione, come sempre |
 | **Schema e migrazioni · permessi e ruoli · sicurezza · unioni a `main`** | **compito Paperclip assegnato all'agente Revisore**, che nasce, gira e si chiude in dashboard |
 
 Il motivo dello sdoppiamento è che le due cose costano diversamente: la revisione dentro la sessione è immediata e non rallenta la catena, quella su Paperclip costa un giro di compito in più ma **lascia una traccia che l'utente può controllare da solo**, senza chiedere all'assistente di autocertificarsi. Si paga quel costo dove sbagliare è caro, non su ogni tappa.
 
-**Mappa del progetto (dal 30/7/2026).** C'è `archivio-documenti/mappa/mappa-progetto.md`, una fotografia strutturale (moduli backend + funzioni esportate, catena permessi, centralini, modelli Prisma, indice dei documenti grossi, file da non aprire interi) prodotta da `npm run mappa` in meno di un secondo. **Non è committata** (è generata, sta in `.gitignore`). **Prima di chiamare l'esploratore o il revisore, rigenerala** (`npm run mappa`): così partono da una mappa fresca invece di aprire i file-mostro. È uno script, il costo in token è nullo — si rigenera senza pensarci. Dal 4/8/2026 la rigenera anche un **hook pre-commit** (`.githooks/pre-commit`, non bloccante, sub-secondo): attivazione una tantum con `git config core.hooksPath .githooks` — già fatta sulla macchina di Jacopo; chi lavora su un altro clone la rifà una volta.
+### La regola mista vale per tutta la squadra, non solo per chi revisiona (dal 9/9/2026)
+
+Il 9/9/2026, guardando le schede Paperclip, sei mestieri su tredici risultavano a **zero attività**: Esploratore, Revisore, Collaudatore, Collaudatore AI, Capocantiere, Capo del personale. Decisione di Jacopo, quello stesso giorno: **«gli agenti di Paperclip servono al 100%, nessuna rimozione»** — e la regola mista si estende a tutti.
+
+Il principio è identico a quello della revisione: ogni mestiere ha, dove esiste, **una forma dentro la sessione** (immediata, senza traccia in dashboard) e **una scheda Paperclip** (un giro di compito in più, ma la traccia la può controllare l'utente da solo). Quello che segue è il momento preciso in cui si paga quel giro. Sono condizioni verificabili, non consigli: valgono come quelle degli agent di repository, e come quelle **non si chiede il permesso di applicarle**.
+
+| Mestiere | Dentro la sessione | Compito Paperclip — obbligatorio quando |
+|---|---|---|
+| **Esplorazione** | esploratore di repository, alle condizioni dell'elenco qui sopra | **agente Esploratore**, quando la mappa serve a **qualcun altro**: prima di aprire un compito che verrà assegnato a un altro agente, o quando il lavoro tocca due mestieri insieme (backend *e* frontend). Una mappa che resta nella sessione non arriva a chi poi scrive il codice |
+| **Scrittura del codice** | *non esiste un gemello* — nessun agent di repository può modificare file, li scrive la sessione | **agente Sviluppatore backend / Sviluppatore frontend**, per **ogni punto di roadmap o di release**: cioè tutto ciò che vale un ramo, un collaudo e una revisione propri. Restano nella sessione del CEO solo i documenti, la configurazione, gli script di servizio e le correzioni dentro un giro già aperto. **«Giro già aperto» ha un confine preciso, altrimenti è la scappatoia che svuota la riga:** è un compito **già esistente sulla bacheca** che ha già il suo ramo, e la correzione è ciò che serve per chiuderlo — tipicamente i rilievi di una revisione che è tornata indietro, o un difetto trovato collaudando quel compito. **Non** è un giro aperto: un punto di roadmap nuovo, una cosa trovata per strada, o «già che c'ero». Il test: *se questa correzione non si fa, resta aperto un compito che esisteva già?* Se la risposta è no, si apre un compito allo sviluppatore. Se il punto tocca `server/**` va al backend, se tocca `src/**` al frontend; se tocca entrambi si aprono **due compiti legati**, non uno solo — un compito che cammina su due mestieri è il modo più veloce per trovarsi metà lavoro fatto e nessuno che risponda dell'altra metà |
+| **Revisione** | revisore di repository, a ogni tappa | **agente Revisore**: schema e migrazioni, permessi e ruoli, sicurezza, unioni a `main` (tabella qui sopra, invariata) |
+| **Collaudo a schermo** | *non esiste un gemello* — il browser dell'anteprima esiste e la sessione lo pilota (note operative **#45** e **#47**), ma **si pianta quando il suo pannello non è visibile**: `navigate` va in timeout a 300s e lo screenshot fallisce con *«the Browser pane is not displayed»* (nota **#50**) | **agente Collaudatore, sempre**, prima di dichiarare finito un punto che si vede a schermo. Il «sempre» sta lì perché la sessione non può **garantire** la prova a schermo: dipende da una condizione che non controlla. È lo stesso muro che il 7 e l'8/8/2026 ha chiuso due handoff con «verifica a schermo non fatta», ed è ciò che finora ogni recap ha dovuto lasciare a Jacopo |
+| **Collaudo delle generazioni AI** | *non esiste* — sono chiamate a pagamento vere | **agente Collaudatore AI**, ogni volta che il diff tocca uno dei **cinque innesti** decisi il 24/8/2026 (codice che arriva al motore AI anche via catena di import, prompt, schemi di uscita, catalogo/modello/provider, fonti e RAG). ⚠️ Lo script `npm run tocca-ai` che doveva riconoscerli da solo **non è ancora stato scritto**: finché non c'è, l'innesco è a giudizio, e **in dubbio si collauda**. Unico ruolo autorizzato a spendere |
+| **Sicurezza e permessi** | *non esiste un gemello* — un `guardiano` di repository non c'è, e dal 25/8/2026 il revisore di repository **non guarda più** né la catena dei permessi né i nomi delle chiavi (`.claude/agents/revisore.md`, §«Permessi e sicurezza sono del guardiano») | **agente Guardiano**: ogni permesso nuovo, ogni rotta nuova, e la passata a codice fermo prima di ogni release |
+| **Ordine dei compiti** | il CEO apre i compiti a mano finché sono pochi | **agente Capocantiere**: quando i compiti aperti in una volta sono **più di tre**, o quando un compito torna indietro bloccato |
+| **Memoria e documenti** | l'assistente aggiorna i documenti che sta già toccando | **agente Cronista**: ogni nota operativa nuova, ogni voce di roadmap trovata per strada, il registro dei lavori chiusi |
+| **Squadra e costi** | architetto di repository, per la misura dei consumi in sessione | **agente Capo del personale** ogni 5-10 sessioni, e ogni volta che si aggiunge o si ridefinisce un mestiere. ⚠️ Qui i due sistemi si sovrappongono davvero: il Capo del personale **è** l'`architetto` rinominato al passaggio a Paperclip (registro decisioni, 19/8/2026) |
+
+**Il conto delle tredici schede, così nessuno resta scoperto.** Nove righe di tabella coprono dieci mestieri (**la seconda** ne copre due, backend e frontend). L'**undicesima** scheda è il **CEO**, che non ha una riga per un motivo: è la sessione che legge questa tabella e apre i compiti agli altri — non può assegnare un compito a sé stesso per decidere se assegnarlo. La sua regola è l'altra faccia della riga «Scrittura del codice»: **il CEO non tiene per sé il lavoro che una riga qui sopra assegna a qualcun altro**, nemmeno quando farlo in sessione sarebbe più rapido. Le ultime due sono *Summarizer* e *Reflection Coach*, agenti di serie di Paperclip, in pausa da quando l'azienda è stata creata: non fanno parte dei dieci mestieri decisi il 19/8/2026 e restano fuori da questa regola finché qualcuno non decide che servono.
+
+⚠️ **Il campanello d'allarme, che adesso vale per tutti e due i sistemi.** `team-agenti.md` §2 dice già che una quota subagent vicina a zero significa che le condizioni di innesco sono scritte male, non che gli agent siano inutili. **Vale identico per le schede Paperclip: una scheda a zero attività non è un mestiere che non serve, è una condizione che non è mai scattata.** Chi se ne accorge non propone di spegnere l'agente: guarda quale riga di questa tabella non ha funzionato, e la sistema.
+
+**Mappa del progetto (dal 30/7/2026).** C'è `archivio-documenti/mappa/mappa-progetto.md`, una fotografia strutturale (moduli backend + funzioni esportate, catena permessi, centralini, modelli Prisma, indice dei documenti grossi, file da non aprire interi) prodotta da `npm run mappa` in meno di un secondo. **Non è committata** (è generata, sta in `.gitignore`). **Prima di chiamare l'Esploratore Repo o il Revisore Repo, rigenerala** (`npm run mappa`): così partono da una mappa fresca invece di aprire i file-mostro. È uno script, il costo in token è nullo — si rigenera senza pensarci. Dal 4/8/2026 la rigenera anche un **hook pre-commit** (`.githooks/pre-commit`, non bloccante, sub-secondo): attivazione una tantum con `git config core.hooksPath .githooks` — già fatta sulla macchina di Jacopo; chi lavora su un altro clone la rifà una volta.
 
 **Consumi.** Si lavora su abbonamento Max 20x (etichetta letta da `/usage` il 3/8/2026; prima nei documenti era scritto "5x" per errore): non si paga a token, il vincolo è **non saturare la finestra di 5 ore**. Per il quadro: **`npm run consumi`**. Dal 31/7/2026 il monitor misura **tutti i progetti insieme**, non solo questo: il limite è dell'account, e Jacopo lavora spesso su due progetti in parallelo (in una finestra misurata, il 41% del consumo veniva dall'altro progetto). L'uscita mostra anche la ripartizione per progetto e **il bilancio del team di agent** (quanto sono costati contro quanto hanno tenuto fuori dalla conversazione).
 
-**A fine sessione, per ogni pezzo di lavoro chiuso**, si annota una riga con `npm run consumi:compito -- "<nome del lavoro>"`: finisce in `archivio-documenti/consumi/registro-compiti.md` con durata, consumo e agent usati. Serve a confrontare lavori **simili fra loro** — i giri di spezzatura dei file, per esempio — e capire se chiamare l'esploratore convenga davvero. Il registro ha senso solo se si accumula: non saltarlo. Dettagli e avvertenze di lettura in `archivio-documenti/team-agenti.md`, §3.
+**A fine sessione, per ogni pezzo di lavoro chiuso**, si annota una riga con `npm run consumi:compito -- "<nome del lavoro>"`: finisce in `archivio-documenti/consumi/registro-compiti.md` con durata, consumo e agent usati. Serve a confrontare lavori **simili fra loro** — i giri di spezzatura dei file, per esempio — e capire se chiamare l'Esploratore Repo convenga davvero. Il registro ha senso solo se si accumula: non saltarlo. Dettagli e avvertenze di lettura in `archivio-documenti/team-agenti.md`, §3.
 
 **Promemoria da fare all'utente (non aspettare che lo chieda).** Il monitor non può leggere la percentuale del limite: nessun comando e nessun file locale la espongono, verificato. Quando la finestra risulta **già carica** e i campioni registrati sono meno di 5, chiedi la lettura — appoggiandola a qualcosa che si sta già facendo, tipicamente l'handoff:
 
@@ -148,6 +195,132 @@ I campioni vanno in `archivio-documenti/consumi/calibrazione.json`. Non chiederl
 **Il campione migliore si prende subito dopo un reset** (`/usage` dice l'ora del prossimo), riferendolo alla finestra **appena chiusa**: così il periodo misurato dallo script e quello del limite coincidono davvero, invece di sfasarsi come succede con la finestra scorrevole delle ultime 5 ore. Chiedi anche **quali modelli** e **se stava lavorando su altri progetti**: sono le due cose che il solo numero non racconta.
 
 Tutto il resto — com'è composto il team, l'archivio delle alternative scartate, il registro delle decisioni — sta in `archivio-documenti/team-agenti.md`.
+
+## Regole della bacheca: chi revisiona, cosa blocca, cosa è fermo (dal 10/9/2026)
+
+Nella notte fra il 9 e il 10/9/2026, durante la release di settembre, tredici compiti della catena
+sono rimasti fermi otto ore senza che nessuno se ne accorgesse in tempo, e un compito `critical` su
+un segreto trapelato è rimasto senza assegnatario per quindici ore. Nessuna delle tre cause era una
+decisione sbagliata: erano tre punti in cui la regola in vigore diceva *"valuta"* invece di *"se X
+allora Y"*. R1-R4 chiudono quei tre punti, in modo verificabile invece che lasciato al giudizio del
+momento. R5 e R6 nascono da un secondo episodio, lo stesso giorno: passando in rassegna la bacheca
+dopo l'incidente, Jacopo ha trovato compiti fermi per motivi mai verificati — un sospetto scambiato
+per un fatto, un vincolo letto su un documento invece che sul sistema. Sei regole, due episodi
+distinti, un solo principio comune: quello che comanda una decisione sulla bacheca dev'essere
+verificato, non presunto. Valgono per **tutto il progetto**, da qui in avanti — non sono un
+provvedimento per la sola release di settembre, anche se è la release ad averle fatte nascere.
+
+**R1 — Chi revisiona si ricava dal lavoro, non si sceglie.** La «regola mista» scritta qui sopra
+(revisore di repository per le tappe ordinarie, agente Revisore di Paperclip per schema/permessi/
+sicurezza/unioni a `main`) **non era applicata**: fino al 10/9 ogni punto della release portava
+quattro cancelli di revisione, cioè tre run in più a punto e una contraddizione silenziosa con la
+regola scritta. R1 la raffina — non la sostituisce — dicendo che i cancelli si ricavano da inneschi
+osservabili. **Guardiano, Revisore di Paperclip, Collaudatore e Collaudatore AI sono agenti
+Paperclip** — non i tre subagent di repository (esploratore/revisore/architetto) descritti sopra —
+e si assegnano come cancello sul compito, non si chiamano dentro la sessione. **L'elenco completo
+del team Paperclip e il gesto per assegnare un cancello vivono fuori da questo repository**, nel
+pacchetto azienda di Paperclip — non in una cartella clonabile da qui, e non in
+`archivio-documenti/team-agenti.md`: quel file descrive un team diverso, i tre subagent di
+repository (esploratore/revisore/architetto) appena esclusi sopra.
+
+| Cancello | Si mette se e solo se il lavoro tocca... |
+|---|---|
+| **Guardiano** (sicurezza) | autenticazione o sessioni · permessi e ruoli · caricamento o servizio di file · dati non fidati dall'esterno · segreti e `.env` · il perimetro di ciò che è raggiungibile (moduli accesi/spenti) |
+| **Revisore** di Paperclip | `prisma/schema.prisma` o una migrazione · `server/auth/rbac-catalog.ts` · sicurezza · unione a `main` |
+| **Collaudatore** | un comportamento visibile a schermo o una risposta d'API che cambia |
+| **Collaudatore AI** | prompt, generazioni AI, o il motore delle funzioni AI |
+
+Sui **permessi e ruoli** gli inneschi di Guardiano e Revisore scattano insieme, non in alternativa:
+il Guardiano copre la sicurezza della scelta (chi deve poter fare cosa), il Revisore copre
+`rbac-catalog.ts` come file che tocca schema/permessi.
+
+Tre corollari, che sono la parte che chiude le ambiguità:
+1. **Se non scatta nessun innesco, il compito non ha cancelli** — e non è un compito senza
+   controllo: la revisione è quella del **revisore di repository** dentro la sessione, e chi chiude
+   **dichiara nel commento di chiusura di averlo chiamato e su quali file**.
+2. **Un cancello non può avere come revisore l'assegnatario del compito**: se coincidono, quel
+   cancello salta e restano gli altri (esempio reale: l'audit di sicurezza lo *fa* il Guardiano,
+   quindi lo revisiona il Revisore).
+3. **La politica di un compito già entrato nella catena non si cambia sotto i piedi di chi sta
+   revisionando**: se è già in `in_review`, si corregge dopo la chiusura, mai durante.
+
+**R2 — Un legame di blocco è tecnico o non esiste.** `blockedBy` significa una sola cosa: senza il
+primo compito, il secondo non è costruibile. Motivi ammessi, da **nominare per esteso nel compito
+bloccato**: stesso file riscritto in profondità (si nomina il file), stessa tabella o stessa
+migrazione (si nomina), un dato o una funzione che il secondo consuma e che non esiste finché il
+primo non è chiuso (si nomina). *«Prima questo poi quello»* non è un motivo: quello è l'**ordine**,
+e si esprime con la **priorità**, non con un blocco. Senza il motivo nominato, il legame va tolto.
+**Tetto duro: nessuna catena più lunga di tre anelli** — quella dell'incidente ne aveva dieci
+(`28 → 45 → 29 → 46 → 30 → 31 → 32 → 47 → 33 → 34 → 23`), senza una sola diramazione: una
+quarantina di run in sequenza, mai due agenti al lavoro insieme.
+
+**R3 — Fermo è chi non ha attività, non chi sta in una colonna.** Lo stato e il grafo dei bloccanti
+sono due cose diverse: nessuno dei tredici compiti dell'incidente era in `blocked`, erano già tutti
+in `todo`, e spostarli di colonna non poteva avere nessun effetto — il fermo stava nel grafo, non
+nella colonna. Il criterio meccanico da passare a ogni giro, riportato così com'è:
+
+```
+attività più vecchia di 2 ore senza run attivo  → si rilancia con un commento
+blocked senza bloccanti                         → si rimette in todo
+fuori da backlog senza assegnatario             → si assegna
+tutti i bloccanti chiusi ma il compito è fermo   → si rilancia
+```
+
+**Un risveglio differito non si ritenta da solo:** se `claimedAt` e `runId` restano nulli, quella
+revisione non è lenta, non è mai iniziata (nell'incidente: otto ore).
+
+**R4 — Un compito senza assegnatario è invisibile.** Nessun compito esce da `backlog` senza
+assegnatario, a prescindere dalla priorità scritta sopra: è così che un compito `critical` su un
+segreto trapelato è rimasto fermo quindici ore, perché nessuno lo vedeva.
+
+**R5 — Un sospetto non parcheggia un compito: apre una domanda (dal 10/9/2026).** Il 10/9/2026
+Jacopo ha trovato in `backlog` quattro compiti che non ci dovevano stare: tre il cui scopo era
+**già raggiunto** (le chiavi AI c'erano già, l'account Superadmin esisteva già, i dati erano già
+migrati) e uno parcheggiato perché **si sospettava** servisse un accesso a hPanel — accesso che
+Jacopo aveva. Nessuno dei quattro sarebbe riemerso da solo: in `backlog` un compito non risulta
+mai in ritardo, quindi nessuno lo controlla. **La regola, in una riga: se il motivo per cui si
+starebbe parcheggiando un compito è una cosa non verificata, non si parcheggia — si chiede.** Due
+obblighi che la rendono verificabile:
+1. **Ogni compito che entra in `backlog` porta in fondo alla descrizione la riga**
+   `**Uscita dal magazzino:** <cosa deve essere vero perché riparta> — <chi lo verifica>`. Senza
+   quella riga, il compito non entra in backlog: è quella riga che permette, mesi dopo, di capire
+   se lo scopo è già stato raggiunto per un'altra via.
+2. **Il parcheggio si fonda su un fatto verificato, mai su un sospetto.** Il motivo va scritto al
+   passato e con la prova («verificato il 10/9: `GOOGLE_CLIENT_ID` assente dal `.env` di
+   produzione»), non al condizionale.
+
+**R6 — Un vincolo d'ambiente si verifica oggi, non si eredita (dal 10/9/2026).** Nella stessa
+ricognizione della bacheca del 10/9/2026, tre compiti pronti sono rimasti in magazzino perché
+«l'albero di lavoro è uno solo e condiviso, metterne in coda più di tre-quattro li fa scontrare
+sugli stessi file». Quella frase descriveva una condizione reale al momento in cui fu scritta, ma è
+stata poi **ripetuta come motivo di parcheggio senza ricontrollarla** — trattandola come una
+proprietà permanente del sistema invece che come uno stato da verificare a ogni volta. **Un vincolo
+d'ambiente — l'albero di lavoro, i dev server, le porte, il database, i permessi della macchina —
+vale solo se è stato verificato *in quella sessione*, con la prova**: prima di parcheggiare
+qualcosa per contesa di risorse, si guarda com'è fatto il sistema adesso, non cosa diceva un
+documento. In pratica: nessun compito va in `backlog` per contesa di risorse. Se la contesa è
+reale (verificata, non presunta), il compito resta in coda con la **priorità** più bassa (che è il
+modo giusto di dire «prima quello, poi questo», R2), oppure si nomina il vincolo e si chiede la
+decisione a chi di dovere. Il magazzino non è il posto dove si mettono i lavori che aspettano una
+risorsa: è il posto dove si perdono. ⚠️ **Il caso concreto che ha fatto da innesco, e resta valido
+oggi:** i compiti hanno un campo che dovrebbe scegliere, per ogni singolo compito, se lavorare
+sull'albero condiviso o su uno isolato (`executionWorkspacePreference`) — cioè la scelta *non*
+dovrebbe più essere un destino fisso dell'intero progetto. Ma quel campo, scritto via API, **non si
+applica**: la richiesta risponde "riuscita" e il valore resta vuoto, cioè resta l'albero condiviso
+di default (verificato il 10/9/2026 su CRMA-56). È un'impostazione che si cambia **solo dalla
+dashboard di Paperclip**: finché non viene impostata da lì, il vincolo dell'albero condiviso **è
+ancora vero** — non si toglie da solo, e non si toglie ritentando la stessa scrittura via API. Chi
+lo trova ancora attivo non deve dedurne che sia falso: deve nominarlo e chiedere l'impostazione da
+dashboard, invece di parcheggiare il compito in silenzio.
+
+**R1-R6 vivono anche nelle istruzioni permanenti del CEO**; R1-R4 vivono inoltre nella conoscenza
+del capocantiere (`knowledge/crm-pianificazione/`, riferimenti `R04:DETERMINISTIC` e
+`R05:REVIEWER_TRIGGERS` — **fuori da questo repository**, nel pacchetto azienda di Paperclip, non
+in una cartella clonabile da qui; quelle sigle `R0x:` identificano voci di quella conoscenza e non
+corrispondono numero per numero alle `R1`-`R6` di questa sezione). Se R5 e R6 non sono ancora
+arrivate anche lì, vanno riportate nello stesso modo in cui lo furono R1-R4. Il repository è la
+copia che legge chi sviluppa: **se le copie dovessero divergere, vince il repository**, e le altre
+si correggono di conseguenza. Una regola, più lettori, mai varianti in contraddizione.
 
 ## Regole di scrittura degli handoff
 
@@ -196,7 +369,7 @@ Il frontend è la parte più fragile del progetto (niente tipi, storicamente nie
 - **Il codice nuovo nasce col suo test.** Vale per helper/funzioni pure (sempre) e per i componenti quando hanno logica propria (condizioni, varianti, stati). Quando si tocca un file esistente estraendone logica, la parte estratta va coperta.
 - **Soglie di dimensione file:** vedi la sezione dedicata «Dimensione dei file» qui sotto — dal 5/8/2026 non riguarda più solo il frontend.
 - **I warning dei guardrail non si zittiscono** con `eslint-disable`: si leggono e si riducono. Il lint resta "blocca solo sul rosso".
-- **Per spezzare un file-mostro** (sessioni dedicate, una alla volta): `npm run mappa` → **esploratore in modalità piano di estrazione** (consegna blocchi, ordine, confini e test dell'intero giro — sezione dedicata in `.claude/agents/esploratore.md`) → si estrae tutto in **un giro solo** (deciso il 4/8/2026 per i mostri sotto le ~1.000 righe), **committando per estrazione** così la sessione può interrompersi senza perdere pezzi → verifica in anteprima → **revisore una volta sola, a giro completo** → commit di chiusura. Mai rifattorizzare un mostro "di passaggio" mentre si fa altro.
+- **Per spezzare un file-mostro** (sessioni dedicate, una alla volta): `npm run mappa` → **Esploratore Repo in modalità piano di estrazione** (consegna blocchi, ordine, confini e test dell'intero giro — sezione dedicata in `.claude/agents/esploratore-repo.md`) → si estrae tutto in **un giro solo** (deciso il 4/8/2026 per i mostri sotto le ~1.000 righe), **committando per estrazione** così la sessione può interrompersi senza perdere pezzi → verifica in anteprima → **Revisore Repo una volta sola, a giro completo** → commit di chiusura. Mai rifattorizzare un mostro "di passaggio" mentre si fa altro.
 
 ## Dimensione dei file (dal 5/8/2026 vale per tutto il codice, non solo per il frontend)
 

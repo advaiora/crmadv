@@ -90,7 +90,7 @@ const MORE_ITEMS = [
     },
     {
         key: 'audit',
-        label: 'Audit',
+        label: 'Registro attività',
         path: '/audit',
         requiredModule: 'audit',
         requiredPermission: 'audit.view',

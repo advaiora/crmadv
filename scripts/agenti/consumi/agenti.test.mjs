@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { PREZZI, PREZZO_IGNOTO } from './prezzi.mjs';
 import { abbinaPerOrdine, analizzaAgenti, costoSeFosseInLinea } from './agenti.mjs';
+import { TEAM_DI_PROGETTO } from './config.mjs';
 
 describe('costoSeFosseInLinea', () => {
   it('niente testo tenuto fuori, niente costo', () => {
@@ -36,8 +37,8 @@ describe('costoSeFosseInLinea', () => {
 describe('abbinaPerOrdine', () => {
   it('accoppia in ordine di tempo, sessione per sessione, saltando i gia' + ' abbinati', () => {
     const lanci = new Map([
-      ['l1', { sessione: 's1', t: 10, abbinato: false, tipo: 'esploratore' }],
-      ['l2', { sessione: 's1', t: 20, abbinato: false, tipo: 'revisore' }],
+      ['l1', { sessione: 's1', t: 10, abbinato: false, tipo: 'esploratore-repo' }],
+      ['l2', { sessione: 's1', t: 20, abbinato: false, tipo: 'revisore-repo' }],
       ['l3', { sessione: 's1', t: 5, abbinato: true, tipo: 'gia-abbinato' }],
       ['l4', { sessione: 's2', t: 1, abbinato: false, tipo: 'altro' }],
     ]);
@@ -46,8 +47,8 @@ describe('abbinaPerOrdine', () => {
       { id: 'a1', sessione: 's1', inizio: 12 },
     ];
     const abbinamenti = abbinaPerOrdine(agenti, lanci);
-    assert.equal(abbinamenti.get('a1').tipo, 'esploratore');
-    assert.equal(abbinamenti.get('a2').tipo, 'revisore');
+    assert.equal(abbinamenti.get('a1').tipo, 'esploratore-repo');
+    assert.equal(abbinamenti.get('a2').tipo, 'revisore-repo');
     assert.equal(abbinamenti.size, 2);
   });
 
@@ -65,7 +66,7 @@ describe('abbinaPerOrdine', () => {
 
 describe('analizzaAgenti', () => {
   // Scenario minimo: una sessione principale con tre chiamate, un agent del
-  // team (esploratore) che lavora in mezzo, un agent in una sessione ripresa
+  // team (esploratore-repo) che lavora in mezzo, un agent in una sessione ripresa
   // (senza chiamate principali) che NON deve essere conteggiato.
   const M = 'claude-opus-5';
   const chiamate = [
@@ -89,7 +90,7 @@ describe('analizzaAgenti', () => {
   ];
   const anagrafica = {
     tipiAgente: new Map([
-      ['ag1', { tipo: 'esploratore', descrizione: 'mappa' }],
+      ['ag1', { tipo: 'esploratore-repo', descrizione: 'mappa' }],
       ['ag2', { tipo: 'claude', descrizione: 'di serie' }],
       ['ag3', { tipo: 'general-purpose', descrizione: 'in chiusura' }],
     ]),
@@ -139,5 +140,25 @@ describe('analizzaAgenti', () => {
     assert.equal(esito.serie.conteggiati, 1);
     assert.equal(esito.serie.esclusi, 1);
     assert.equal(esito.serie.costoEsclusi, 4);
+  });
+});
+
+describe('TEAM_DI_PROGETTO dopo la rinomina del 9/9/2026', () => {
+  // Il rischio, rinominando: che il bilancio smetta di riconoscere i nostri
+  // agent e li conti fra quelli "di serie" di Claude Code, senza dare errore.
+  it('riconosce i nomi nuovi col suffisso -repo', () => {
+    for (const nome of ['esploratore-repo', 'revisore-repo', 'architetto-repo']) {
+      assert.ok(TEAM_DI_PROGETTO.includes(nome), `manca ${nome}`);
+    }
+  });
+
+  // I registri di sessione scritti prima del 9/9/2026 contengono i nomi senza
+  // suffisso: se sparissero dalla lista, sparirebbe dal bilancio tutta la
+  // storia precedente — cioe' proprio il confronto su cui si decide se un
+  // agent conviene.
+  it('continua a riconoscere i nomi storici, per non perdere lo storico', () => {
+    for (const nome of ['esploratore', 'revisore', 'architetto']) {
+      assert.ok(TEAM_DI_PROGETTO.includes(nome), `manca lo storico ${nome}`);
+    }
   });
 });

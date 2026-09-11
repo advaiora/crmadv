@@ -49,7 +49,7 @@ list, not a piece that blocks the others. It was confirmed on 18/8/2026 with non
 
 | # | Milestone | Trades | Gate |
 |---|---|---|---|
-| 1 | Server di posta (coda) + invito Team | backend + esploratore | 🔴 real email sending · 🟡 two open product points on *«Prova connessione»* |
+| 1 | Server di posta (coda) + invito Team | backend + esploratore | 🔴 real email sending · 🟢 the two *«Prova connessione»* product points closed 9/9/2026 |
 | 2 | Cambio e recupero password | backend + esploratore + 🛡️ | 🔴 migration |
 | 3 | Controllo automatico dei permessi, metà 1 | backend | 🟢 |
 | 4 | Le due correzioni rosse dei Messaggi | backend + frontend | 🟢 |
@@ -76,7 +76,7 @@ These are written couplings. Encode each as a blocker; never reorder them on you
 | Constraint | Why it exists |
 |---|---|
 | **① before ②** — the mail server precedes password change/recovery | recovery uses email; without the mail server it cannot be built or tested |
-| **The «Prova connessione» decision closes *inside* ②** — *«non prima, non dopo»* | from the moment recovery exists, whoever holds `mail.manage` can redirect anyone's reset emails. It stops being "who sends invitations" and becomes "who can take over any account" |
+| **The «Prova connessione» decision closes *inside* ②** — *«non prima, non dopo»* — ✅ satisfied early: the guard (`server/modules/mail/mail.net-guard.ts`) was already on `main` before password recovery was built, merges `46e8d4f`/`4699268` | from the moment recovery exists, whoever holds `mail.manage` can redirect anyone's reset emails. It stops being "who sends invitations" and becomes "who can take over any account" |
 | **④ (first correction) before ⑥** | the activity log is flooded by a *«ha letto»* row every 1.5s per open conversation; build the log first and it is born unreadable |
 | **The menu-placement discussion before ⑥** | explicitly *«si decide in un confronto con Jacopo, non da soli»* → a decision issue that blocks the build → [R02:MANDATORY_SPLITS] ② |
 | **⑤ before ⑦** — Clienti before the recycle bin | deliberately after, so that which entities are really in play is settled first |

@@ -6,7 +6,10 @@ import { createId, deriveNameFromUrl } from "./assetsFormatters";
 // Il messaggio, il titolo e il colore dell'avviso di ricerca sono tre funzioni
 // separate perche' non seguono lo stesso taglio: la ricerca riuscita davvero
 // (`realSearch`) vince sul titolo e sul colore, ma non sul messaggio, dove
-// contano prima gli stati di errore del servizio.
+// contano prima gli stati di errore del servizio. Il fusibile di budget
+// (`budget_exceeded`) manda sempre `realSearch: false`, quindi non entra mai
+// in conflitto con quella precedenza: se un domani arrivasse insieme a un
+// risultato parziale, va rivista anche qui.
 
 export const mergeCompetitorsFromUrls = (competitors, urls) => {
   const merged = [];
@@ -44,6 +47,9 @@ export const mergeCompetitorsFromUrls = (competitors, urls) => {
 
 export const getFriendlyCompetitorSearchMessage = (result) => {
   const rawMessage = String(result?.message || "").trim();
+  if (result?.providerStatus === "budget_exceeded") {
+    return rawMessage || String(result?.budgetMessage || "").trim() || "Budget AI giornaliero superato.";
+  }
   if (result?.providerStatus === "configured_error") {
     return rawMessage || "Ricerca online configurata, ma il servizio non ha risposto correttamente. Verifica chiave, modello e limiti API in Impostazioni AI.";
   }
@@ -63,6 +69,9 @@ export const getCompetitorSearchAlertTitle = (result) => {
   if (result?.realSearch) {
     return "Ricerca automatica completata.";
   }
+  if (result?.providerStatus === "budget_exceeded") {
+    return "Budget AI giornaliero superato.";
+  }
   if (result?.providerStatus === "configured_error") {
     return "Ricerca non riuscita.";
   }
@@ -78,6 +87,9 @@ export const getCompetitorSearchAlertTitle = (result) => {
 export const getCompetitorSearchAlertVariant = (result) => {
   if (result?.realSearch) {
     return "info";
+  }
+  if (result?.providerStatus === "budget_exceeded") {
+    return "warning";
   }
   if (result?.providerStatus === "configured_error") {
     return "danger";
