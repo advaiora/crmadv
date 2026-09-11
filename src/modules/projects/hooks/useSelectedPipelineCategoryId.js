@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
 
-const STORAGE_KEY = 'projects.pipelineCategoryId';
+export const STORAGE_KEY = 'projects.pipelineCategoryId';
 const QUERY_KEY = 'pipelineCategoryId';
 
 const readStoredCategoryId = () => {
