@@ -1,0 +1,87 @@
+# Il controllo sui segreti che gira su codice GIA' SPINTO (compito CRMA-159).
+#
+# Perche' esiste: l'hook pre-commit locale non puo', per costruzione, difendersi dal
+# proprio non essere invocato. Se `.githooks/pre-commit` non esiste, se chi committa
+# non ha mai dato `git config core.hooksPath .githooks`, se il file ha perso il bit
+# `+x`, o se si usa la via d'uscita `git commit --no-verify`, allora sulla macchina
+# di chi committa NON GIRA NIENTE e il segreto entra nel commit. Verificato, non
+# presunto, l'11/9/2026. Questo e' il secondo filtro: gira qui, dove gli hook di chi
+# ha committato non contano.
+#
+# La logica NON sta in questo file: sta in `scripts/hook/controllo-ci.mjs`, ed e' la
+# stessa scelta fatta in CRMA-152 per l'hook locale. Un file YAML non e' testabile e
+# non e' eseguibile a mano; un modulo `.mjs` ha il suo banco
+# (`scripts/hook/controllo-ci.test.mjs`) e si lancia con `npm run test:scripts`.
+name: Controllo segreti
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# Un push che ne segue un altro a distanza di secondi non deve accodare due giri
+# sullo stesso ramo: vince l'ultimo. `cancel-in-progress` NON e' un buco — il giro
+# annullato e' quello su un commit che nessuno guardera' piu', e quello nuovo
+# rilegge comunque tutto il ramo dal tronco comune con `main`.
+concurrency:
+  group: controllo-segreti-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  segreti:
+    name: Segreti nel codice spinto
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prendi il codice, con la storia
+        uses: actions/checkout@v4
+        with:
+          # ⚠️ `fetch-depth: 0` e non il clone superficiale di serie: serve il tronco
+          # comune con `main` per sapere da dove in poi questo ramo aggiunge righe.
+          # Con la profondita' 1 il tronco non esiste nel clone, il confronto
+          # ripiegherebbe sulla storia intera, e ogni fixture di test del repository
+          # diventerebbe un riscontro. Rumore, cioe' un controllo che si impara a
+          # ignorare: il modo piu' comune in cui una cintura di sicurezza muore.
+          fetch-depth: 0
+
+      - name: Prepara node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cerca i segreti in cio' che questo push aggiunge
+        env:
+          # La base che l'evento dichiara. Per una pull request e' la punta del ramo
+          # di destinazione; per un push e' il commit da cui si e' partiti (che su un
+          # ramo nuovo e' una fila di zeri). Il modulo la valida e, se non e' usabile,
+          # ripiega sul tronco comune con `main`.
+          BASE_DICHIARATA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          # LANCIATORE, e basta — stessa forma e stessa ragione di `.githooks/pre-commit`.
+          #
+          # ⚠️ LE PARENTESI GRAFFE NON SONO UN VEZZO: sono il motivo per cui questo
+          # blocco non si puo' svuotare in silenzio. Un troncamento lascia un blocco
+          # `{` mai chiuso, e `bash` allora non esegue NIENTE: errore di sintassi,
+          # uscita diversa da zero, controllo rosso. Senza graffe ogni riga tagliata
+          # darebbe uno script piu' corto ma valido, che esce 0 — cioe' un controllo
+          # VERDE senza che nessun controllo sia girato.
+          {
+            if uscita=$(node scripts/hook/controllo-ci.mjs); then esito=0; else esito=$?; fi
+            echo "$uscita"
+
+            # La sentinella, pretesa come il lanciatore locale pretende la sua. Un
+            # modulo troncato a meta' o di soli spazi e' JavaScript valido, gira, non
+            # controlla niente ed esce 0: senza questa riga sarebbe un verde silenzioso.
+            case "$uscita" in
+              *"controllo-ci: arrivato in fondo"*) exit "$esito" ;;
+            esac
+
+            echo "[ROSSO] scripts/hook/controllo-ci.mjs non e' arrivato in fondo: e' assente," >&2
+            echo "        troncato, di soli spazi, o si e' interrotto a meta' (esito $esito)." >&2
+            echo "        Nessun controllo e' girato, quindi questo push non e' stato verificato." >&2
+            exit 1
+          }
