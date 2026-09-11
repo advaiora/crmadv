@@ -12,6 +12,29 @@ const DEFAULT_WORKSPACE_SLUG =
 
 const isAbsoluteUrl = (path: string) => /^https?:\/\//i.test(path);
 
+// Codice che il backend restituisce in `error.code` quando un 403 significa
+// "non sei piu' membro di questo workspace" (es. membership cestinata), da
+// distinguere da un 403 generico di permesso mancante (`FORBIDDEN`), che non
+// deve far cadere la sessione. Vedi CRMA-158.
+export const WORKSPACE_MEMBERSHIP_REQUIRED_ERROR_CODE = 'WORKSPACE_MEMBERSHIP_REQUIRED';
+
+const dropSession = () => {
+    clearSession();
+
+    if (typeof window !== 'undefined') {
+        window.location.assign('/login');
+    }
+};
+
+const isWorkspaceMembershipRequiredResponse = async (response: Response): Promise<boolean> => {
+    try {
+        const payload = await response.clone().json();
+        return payload?.error?.code === WORKSPACE_MEMBERSHIP_REQUIRED_ERROR_CODE;
+    } catch {
+        return false;
+    }
+};
+
 const normalizeString = (value: unknown): string | undefined => {
     if (typeof value !== 'string') {
         return undefined;
@@ -117,11 +140,9 @@ export const apiFetch = async (path: string, options: ApiFetchOptions = {}) => {
     });
 
     if (response.status === 401) {
-        clearSession();
-
-        if (typeof window !== 'undefined') {
-            window.location.assign('/login');
-        }
+        dropSession();
+    } else if (response.status === 403 && (await isWorkspaceMembershipRequiredResponse(response))) {
+        dropSession();
     }
 
     return response;
