@@ -6,6 +6,15 @@ export const MESSAGING_MODULE_KEY = 'messages';
 export const MESSAGING_PERMISSIONS = {
   view: 'messages.view',
   send: 'messages.send',
+  // «Cestina messaggio» (CRMA-165). Il nome segue quello dei vicini
+  // (`clients.delete`) invece di inventare un verbo nuovo, regola ②-bis: dal
+  // Cestino in avanti `.delete` significa ovunque "sposta nel cestino", e la
+  // distruzione vera sta dietro `trash.purge`.
+  delete: 'messages.delete',
+  // Caricare un allegato ha una chiave sua: si vuole poter concedere "scrivere testo"
+  // senza "caricare file". SCARICARE invece non ce l'ha - scaricare e' leggere, e passa
+  // da `view` piu' il controllo mittente/destinatario dentro il service.
+  attach: 'messages.attach',
 } as const;
 
 type MessagingPermissionKey =

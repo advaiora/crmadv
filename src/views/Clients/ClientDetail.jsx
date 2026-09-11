@@ -39,7 +39,7 @@ import {
     getClientNameLabel,
 } from '../../modules/clients/ui/helpers';
 import '../../modules/clients/ui/clients-ui.css';
-import { hasPermission } from '../../utils/workspaceAccess';
+import { hasModuleEnabled, hasPermission } from '../../utils/workspaceAccess';
 
 const ClientDetail = () => {
     const history = useHistory();
@@ -180,6 +180,7 @@ const ClientDetail = () => {
                 const hasEmail = Boolean(client?.email);
                 const hasPhone = Boolean(client?.phone);
                 const associatedProjects = Array.isArray(client?.projects) ? client.projects : [];
+                const projectsModuleEnabled = hasModuleEnabled(access, 'projects');
 
                 return (
                     <>
@@ -441,9 +442,13 @@ const ClientDetail = () => {
                                                         {associatedProjects.map((project) => (
                                                             <div key={project.id} className="border rounded-3 p-2">
                                                                 <div className="d-flex justify-content-between align-items-center gap-2">
-                                                                    <Link to={`/projects/${project.id}`} className="fw-semibold text-decoration-none">
-                                                                        {project.name}
-                                                                    </Link>
+                                                                    {projectsModuleEnabled ? (
+                                                                        <Link to={`/projects/${project.id}`} className="fw-semibold text-decoration-none">
+                                                                            {project.name}
+                                                                        </Link>
+                                                                    ) : (
+                                                                        <span className="fw-semibold">{project.name}</span>
+                                                                    )}
                                                                     {project?.stage?.name && (
                                                                         <span className="badge bg-light text-dark border">
                                                                             {project.stage.name}

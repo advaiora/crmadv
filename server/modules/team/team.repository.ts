@@ -1,14 +1,18 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
 import { activeMember } from '../../core/membership-access.js';
-import { notDeleted } from '../../core/soft-delete.js';
+import { markTrashed, notDeleted } from '../../core/soft-delete.js';
 
 /**
  * I ruoli Superadmin che contano davvero in un workspace.
  *
  * ⚠️ Il filtro sulla membership non e' un dettaglio di lettura, e' la cosa che
- * regge la protezione dell'ultimo Superadmin (`team.service.ts:305`, `:362-363`,
- * `:430-431`). Senza il filtro del Cestino un Superadmin cestinato comanderebbe
+ * regge la protezione dell'ultimo Superadmin — i tre punti che ci si appoggiano
+ * sono, in `team.service.ts`, le chiamate a `isSuperadmin` e a
+ * `countActiveSuperadmins` (fra cui `assertMembershipDestroyable`; i numeri di
+ * riga che stavano qui sono stati tolti il 11/9/2026 perche' erano gia'
+ * sbagliati dopo il primo spostamento). Senza il filtro del Cestino un
+ * Superadmin cestinato comanderebbe
  * ancora il modulo Team e farebbe da riempitivo al conteggio: la protezione
  * lascerebbe passare la rimozione dell'ultimo Superadmin **reale**, e il
  * workspace resterebbe senza nessuno che lo amministri (CRMA-157).
@@ -169,6 +173,25 @@ export const buildFindMemberByIdWhere = (workspaceId: string, memberId: string) 
  */
 export const buildTeamMemberWriteWhere = buildFindMemberByIdWhere;
 
+/**
+ * Il `where` del gesto «rimuovi dal Team», che dal 11/9/2026 cestina (CRMA-165).
+ *
+ * `userId` c'e' oltre a `id` perche' c'era gia' nella cancellazione fisica che
+ * questo gesto sostituisce: chi chiama ha appena letto quella membership e
+ * dichiara di quale persona sia. Se i due non combaciano la scrittura non
+ * avviene, e il servizio risponde 404 invece di cestinare la riga sbagliata.
+ */
+export const buildTrashMembershipWhere = (
+  workspaceId: string,
+  memberId: string,
+  userId: string,
+) =>
+  notDeleted({
+    workspaceId,
+    id: memberId,
+    userId,
+  });
+
 export const teamRepository = {
   async listMembers(workspaceId: string): Promise<TeamMemberRecord[]> {
     const memberships = await prisma.membership.findMany({
@@ -271,6 +294,45 @@ export const teamRepository = {
     return updated.count > 0;
   },
 
+  /**
+   * Sposta un membro nel cestino (CRMA-165).
+   *
+   * Ha preso il posto di `deleteMember` nella rimozione dal Team: quella
+   * resta qui sotto, ma da oggi e' il gesto dell'eliminazione definitiva
+   * (`trash.purge`, CRMA-135) e non piu' quello che si esercita da «Rimuovi».
+   *
+   * Non serve una transazione, a differenza della cancellazione fisica: li'
+   * erano due scritture da tenere insieme (membership + assegnazioni), qui e'
+   * una sola riga, e le assegnazioni si lasciano dov'erano apposta.
+   *
+   * `notDeleted` nel `where` evita che un secondo "rimuovi" sulla stessa
+   * persona riscriva data e autore del primo.
+   */
+  async markMemberTrashed(
+    workspaceId: string,
+    memberId: string,
+    userId: string,
+    actorUserId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<boolean> {
+    const trashed = await withClient(tx).membership.updateMany({
+      where: buildTrashMembershipWhere(workspaceId, memberId, userId),
+      data: markTrashed(actorUserId),
+    });
+
+    return trashed.count > 0;
+  },
+
+  /**
+   * Distrugge davvero la membership e le sue assegnazioni di ruolo.
+   *
+   * ⚠️ Dal 11/9/2026 questa NON e' piu' la rimozione dal Team: e'
+   * l'eliminazione definitiva dal Cestino, e il suo unico chiamante sara' la
+   * rotta dietro `trash.purge` (CRMA-135). Resta qui, invece di essere
+   * riscritta la' da zero, perche' la cancellazione a due scritture dentro una
+   * transazione e' gia' giusta e riscriverla sarebbe l'occasione per sbagliarla.
+   * Chi la chiama deve prima passare da `assertMembershipDestroyable`.
+   */
   async deleteMember(
     workspaceId: string,
     memberId: string,

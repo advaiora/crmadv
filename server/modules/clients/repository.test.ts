@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Client } from '@prisma/client';
-import { buildCreateData, clientSelect } from './repository.js';
+import { markTrashed } from '../../core/soft-delete.js';
+import { buildCreateData, buildTrashClientWhere, clientSelect } from './repository.js';
 
 /**
  * Un cliente completo. Il tipo `Client` viene generato da `schema.prisma`, e
@@ -163,4 +164,41 @@ test('tutto cio\' che si scrive alla creazione viene anche riletto', () => {
       `"${colonna}" si scrive ma non si rilegge`,
     );
   }
+});
+
+/**
+ * Il gesto che cestina un cliente (CRMA-165).
+ *
+ * Prima di questo compito `clients.delete` faceva sparire la riga; adesso la
+ * lascia dov'e' e le scrive sopra chi e quando. Quello che si prova qui e' la
+ * clausola, perche' e' la parte che puo' sbagliarsi senza che nessuno se ne
+ * accorga: una scrittura che esce dal workspace, o che ricestina una riga
+ * gia' cestinata, non fa rumore.
+ */
+test('cestinare un cliente resta dentro il suo workspace', () => {
+  const where = buildTrashClientWhere('ws-1', 'cli-1');
+
+  assert.equal(where.workspaceId, 'ws-1');
+  assert.equal(where.id, 'cli-1');
+});
+
+test('un cliente gia nel cestino non si ricestina: il secondo gesto non trova niente', () => {
+  // Senza questo filtro la seconda cancellazione riscriverebbe `deletedAt` e
+  // `deletedByUserId`, cioe' cancellerebbe la traccia di chi aveva buttato il
+  // cliente per primo — ed e' proprio quella la traccia che serve a
+  // ripristinarlo.
+  assert.equal(buildTrashClientWhere('ws-1', 'cli-1').deletedAt, null);
+});
+
+test('cestinare scrive chi e quando, e non tocca nient altro', () => {
+  const istante = new Date('2026-09-11T10:00:00.000Z');
+  const dati = markTrashed('user-7', istante);
+
+  assert.deepEqual(dati, {
+    deletedAt: istante,
+    deletedByUserId: 'user-7',
+  });
+  // La riga non perde niente: nessun campo del cliente compare fra quelli
+  // scritti. E' la regola 1 del Cestino — cestinare non cancella.
+  assert.deepEqual(Object.keys(dati).sort(), ['deletedAt', 'deletedByUserId']);
 });

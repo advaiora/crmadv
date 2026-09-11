@@ -162,20 +162,24 @@ export type SystemRoleDefinition = {
 // inglese: allineare non vuol dire tradurre tutto.
 export const SYSTEM_MODULE_CATALOG: readonly ModuleCatalogEntry[] = [
   // ⚠️ Queste due voci sono ACCORCIATE rispetto al menu, che dice "Branding Workspace" e
-  // "Gestione Moduli" (SidebarMenu.jsx:342 e :349, e cosi' si chiamano anche le due
-  // pagine). Qui il contesto lo da' gia' la colonna dei moduli, quindi ripetere
-  // "Gestione" e "Workspace" sarebbe rumore. Non e' un disallineamento sfuggito: e' la
-  // stessa scelta fatta per "Impostazioni Pipeline" -> "Impostazioni" sotto un genitore
-  // che dice gia' Pipeline.
-  //   🔸 Da riguardare quando si esegue il nuovo gruppo "Impostazioni" del menu
-  //   (decisioni-cliente-e-menu-2026-08-07.md §3.2): li' dentro anche il menu potrebbe
-  //   accorciarsi a "Moduli" e "Branding", e allora le due copie combacerebbero da sole.
+  // "Gestione Moduli" (le voci "Branding Workspace" e "Gestione Moduli" in
+  // SidebarMenu.jsx, e cosi' si chiamano anche le due pagine). Qui il contesto lo da'
+  // gia' la colonna dei moduli, quindi ripetere "Gestione" e "Workspace" sarebbe
+  // rumore. Non e' un disallineamento sfuggito: e' la stessa scelta fatta per
+  // "Impostazioni Pipeline" -> "Impostazioni" sotto un genitore che dice gia' Pipeline.
+  // Col riordino del gruppo "Impostazioni" (CRMA-32, 10/9/2026) le etichette del menu
+  // sono rimaste per esteso ("Server di posta", "Branding Workspace", "Gestione
+  // Moduli"): l'accorciamento ipotizzato in passato per questo modulo non e' avvenuto,
+  // e le due copie restano intenzionalmente diverse.
   // "Branding" resta comunque inglese perche' e' il termine del mestiere.
   { key: 'modules', name: 'Moduli', isCore: true, description: 'Accendere e spegnere i moduli del workspace' },
   { key: 'branding', name: 'Branding', isCore: true, description: 'Logo, colori e nome del workspace' },
-  { key: 'audit', name: 'Audit', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
+  // La chiave resta 'audit' (regola ②-bis: le chiavi tecniche seguono la convenzione
+  // dell'elenco in cui entrano, non il nome italiano). Cambia solo l'etichetta, che e'
+  // quella stampata da "Ruoli e permessi" e "Gestione Moduli".
+  { key: 'audit', name: 'Registro attività', isCore: true, description: 'Registro di chi ha fatto cosa e quando' },
   { key: TRASH_MODULE_KEY, name: 'Cestino', isCore: true, description: 'Le cose cancellate: si riportano indietro, o si eliminano per davvero' },
-  // isCore come Moduli, Branding e Audit: e' configurazione di sistema, non una
+  // isCore come Moduli, Branding e Registro attività: e' configurazione di sistema, non una
   // funzione di business che ha senso accendere e spegnere. Un workspace col
   // server di posta "spento" da Gestione Moduli non saprebbe piu' come mandare
   // un invito, e non capirebbe perche'.
@@ -325,6 +329,34 @@ export const SYSTEM_PERMISSION_CATALOG: readonly PermissionCatalogEntry[] = [
   { key: 'seo.manage_settings', moduleKey: 'seo', description: 'Gestire le impostazioni SEO (funzione non ancora disponibile)' },
   { key: 'messages.view', moduleKey: MESSAGES_MODULE_KEY, description: 'Leggere i messaggi interni' },
   { key: 'messages.send', moduleKey: MESSAGES_MODULE_KEY, description: 'Scrivere messaggi interni' },
+  // Chiave dedicata e non riuso di messages.send: si vuole poter concedere "scrivere
+  // testo" senza "caricare file". Lo SCARICARE invece resta su messages.view - scaricare
+  // e' leggere, e un allegato leggibile ma non scaricabile non e' una separazione che
+  // qualcuno chiedera'. La barriera vera e' il filtro per workspace + mittente/
+  // destinatario nel service, non una terza chiave.
+  { key: 'messages.attach', moduleKey: MESSAGES_MODULE_KEY, description: 'Allegare file ai messaggi interni' },
+  // CRMA-165. Fino al 11/9/2026 un messaggio interno, una volta inviato, non si
+  // poteva togliere: non c'era nessuna rotta, quindi nessun permesso. Adesso il
+  // gesto esiste e quindi la sua voce deve esistere qui (regola ①), perche' un
+  // gesto senza voce nel catalogo e' un gesto che nessun ruolo puo' governare.
+  // Cestina solo chi ha scritto il messaggio, e quel controllo NON sta qui: sta
+  // nel `where` del repository (`buildTrashMessageWhere`). Questa voce dice se
+  // il ruolo puo' cestinare i propri messaggi, non quali.
+  //
+  // ⚠️ Sui RUOLI PERSONALIZZATI non c'e' migrazione di riporto, ed e' una
+  // decisione (regola ①-bis, seconda meta'). La migrazione serve quando un
+  // permesso nuovo copre qualcosa che quei ruoli **potevano gia' fare**, e va
+  // scritta perche' non lo perdano. Qui non c'e' niente da conservare: prima
+  // del 11/9/2026 questa azione non esisteva per nessuno. Scriverla lo stesso
+  // significherebbe **concedere** un potere nuovo a ruoli che nessuno ha
+  // riesaminato — che e' l'allargamento silenzioso su cui il Guardiano ha gia'
+  // bloccato una migrazione di questo ramo. Un ruolo personalizzato che deve
+  // poter cestinare i messaggi lo riceve da «Ruoli e permessi», in un clic e
+  // con qualcuno che se ne assume la scelta. I cinque ruoli di sistema invece
+  // si allineano da soli a ogni accesso (`ensureWorkspaceSystemRoles`): per
+  // loro basta l'elenco qui sotto, e infatti non c'e' nessuna migrazione in
+  // questo compito.
+  { key: 'messages.delete', moduleKey: MESSAGES_MODULE_KEY, description: 'Cestinare i messaggi interni che si sono scritti' },
 
   { key: AI_PRODUCTION_PERMISSIONS.view, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Vedere i progetti di Produzione AI e i loro contenuti' },
   { key: AI_PRODUCTION_PERMISSIONS.edit, moduleKey: AI_PRODUCTION_MODULE_KEY, description: 'Creare e modificare progetti, contenuti, report e dati di performance' },
@@ -442,6 +474,11 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'seo.run_scan',
       'messages.view',
       'messages.send',
+      // Cestinare i propri messaggi segue lo scrivere, non il leggere
+      // (CRMA-165): chi ha potuto scrivere ha qualcosa di suo da ritirare.
+      'messages.delete',
+      // Allega: chi puo' scrivere un messaggio puo' anche allegarci un file.
+      'messages.attach',
       // Produzione AI: il Manager ci lavora, quindi vede, modifica e fa generare.
       // Corrisponde a cio' che poteva gia' fare quando l'area girava sui permessi
       // della Pipeline (aveva projects.view/create/edit): nessun allargamento.
@@ -480,6 +517,11 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'seo.view',
       'messages.view',
       'messages.send',
+      // Stessa ragione del Manager (CRMA-165): l'Operativo scrive messaggi,
+      // quindi puo' ritirare i propri.
+      'messages.delete',
+      // Come il Manager: scrive messaggi, quindi puo' allegare.
+      'messages.attach',
       // Solo lettura sulla Produzione AI: e' esattamente cio' che l'Operativo
       // poteva fare finora (aveva projects.view ma non projects.edit, e le rotte
       // di modifica e generazione chiedono edit). Se un domani si vuole che
@@ -507,7 +549,15 @@ export const SYSTEM_ROLE_DEFINITIONS: readonly SystemRoleDefinition[] = [
       'web.view',
       'seo.view',
       'audit.view',
+      // Il Viewer legge i messaggi ma non ne scrive (niente messages.send), quindi non
+      // allega: niente messages.attach. SCARICARE un allegato pero' si', e gli basta
+      // messages.view - il download non ha una chiave sua.
       'messages.view',
+      // ⚠️ Niente 'messages.delete', e non e' una dimenticanza (CRMA-165): il
+      // Viewer non ha 'messages.send', quindi non ha messaggi propri da
+      // cestinare. Darglielo non gli farebbe cancellare niente — il filtro
+      // della rotta guarda `senderUserId` — ma metterebbe a schermo una voce
+      // di permesso che non puo' mai produrre nessun effetto.
       AI_PRODUCTION_PERMISSIONS.view,
       // Il Viewer e' in sola lettura: consulta le chat di cui fa parte ma non
       // scrive e non spende (niente chat.use). E' il punto della separazione.

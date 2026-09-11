@@ -28,6 +28,8 @@ const customFieldsRoute: FastifyPluginAsync = async (app) => {
 
     await audit.log({
       event: 'client.customField.create',
+      entityType: 'custom_field_definition',
+      entityId: definition.id,
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: { id: definition.id, key: definition.key, type: definition.type },
@@ -43,6 +45,8 @@ const customFieldsRoute: FastifyPluginAsync = async (app) => {
 
     await audit.log({
       event: 'client.customField.update',
+      entityType: 'custom_field_definition',
+      entityId: definition.id,
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: { id: definition.id, key: definition.key },
@@ -58,6 +62,8 @@ const customFieldsRoute: FastifyPluginAsync = async (app) => {
 
     await audit.log({
       event: 'client.customField.delete',
+      entityType: 'custom_field_definition',
+      entityId: request.params.id,
       actorUserId: user.id,
       workspaceId: workspace.id,
       metadata: { id: request.params.id },

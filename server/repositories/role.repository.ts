@@ -1,3 +1,4 @@
+import { markTrashed, notDeleted } from '../core/soft-delete.js';
 import { prisma } from '../prisma.js';
 
 type RolePermissionRecord = {
@@ -12,6 +13,16 @@ type RoleRecord = {
   isSuperadmin: boolean;
   permissions: string[];
 };
+
+/**
+ * Il `where` del gesto «cestina ruolo» (CRMA-165), esportato per essere
+ * provabile senza database.
+ */
+export const buildTrashRoleWhere = (workspaceId: string, roleId: string) =>
+  notDeleted({
+    id: roleId,
+    workspaceId,
+  });
 
 export const roleRepository = {
   async listRolesWithPermissions(workspaceId: string): Promise<RoleRecord[]> {
@@ -207,6 +218,34 @@ export const roleRepository = {
     });
   },
 
+  /**
+   * Sposta un ruolo nel cestino (CRMA-165).
+   *
+   * Ha preso il posto della `deleteMany` che stava qui. Il permesso resta
+   * `roles.manage`: e' lo stesso gesto, cambia cosa ne resta a database.
+   *
+   * `notDeleted` nel `where` evita che cancellare due volte lo stesso ruolo
+   * riscriva la data e il nome di chi l'ha buttato la prima volta.
+   */
+  async markRoleTrashed(
+    workspaceId: string,
+    roleId: string,
+    actorUserId: string,
+  ): Promise<boolean> {
+    const result = await prisma.role.updateMany({
+      where: buildTrashRoleWhere(workspaceId, roleId),
+      data: markTrashed(actorUserId),
+    });
+
+    return result.count > 0;
+  },
+
+  /**
+   * Distrugge davvero il ruolo.
+   *
+   * ⚠️ Dal 11/9/2026 non e' piu' il gesto di «Elimina ruolo»: e'
+   * l'eliminazione definitiva dal Cestino, dietro `trash.purge` (CRMA-135).
+   */
   async deleteRole(workspaceId: string, roleId: string): Promise<boolean> {
     const result = await prisma.role.deleteMany({
       where: {

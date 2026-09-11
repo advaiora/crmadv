@@ -1,9 +1,13 @@
 import { z } from 'zod';
-import { badRequest, notFound } from '../../core/errors.js';
+import { badRequest, forbidden, notFound } from '../../core/errors.js';
 import {
   messagingRepository,
   type WorkspaceMember,
 } from './repository.js';
+import {
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  validateAttachment,
+} from './attachments.js';
 import { broadcastToUser } from '../realtime/hub.js';
 
 const DEFAULT_CONTACTS_LIMIT = 50;
@@ -95,6 +99,25 @@ const ensurePeer = async (
   return peer;
 };
 
+type AttachmentRecord = {
+  id: string;
+  messageId: string;
+  label: string;
+  mimeType: string;
+  fileSize: number;
+  createdAt: Date;
+  createdByUserId: string | null;
+};
+
+const mapAttachment = (item: AttachmentRecord) => ({
+  id: item.id,
+  messageId: item.messageId,
+  label: item.label,
+  mimeType: item.mimeType,
+  fileSize: item.fileSize,
+  createdAt: item.createdAt.toISOString(),
+});
+
 const mapMessage = (
   item: {
     id: string;
@@ -105,6 +128,7 @@ const mapMessage = (
     createdAt: Date;
   },
   userId: string,
+  attachments: AttachmentRecord[] = [],
 ) => ({
   id: item.id,
   senderUserId: item.senderUserId,
@@ -113,7 +137,21 @@ const mapMessage = (
   readAt: toIso(item.readAt),
   createdAt: item.createdAt.toISOString(),
   isMine: item.senderUserId === userId,
+  attachments: attachments.map(mapAttachment),
 });
+
+// Il messaggio dev'essere di QUESTO workspace e l'utente dev'esserne uno dei due capi.
+// E' il controllo che regge tutto il resto: senza, un id indovinato basterebbe a
+// leggere l'allegato di una conversazione altrui. Sta qui, sul server, e non dipende
+// da quali bottoni l'interfaccia mostra o nasconde.
+const ensureMessageParticipant = (
+  message: { senderUserId: string; recipientUserId: string },
+  userId: string,
+) => {
+  if (message.senderUserId !== userId && message.recipientUserId !== userId) {
+    throw forbidden('Questo messaggio non fa parte delle tue conversazioni.');
+  }
+};
 
 type ConversationStats = {
   lastMessagePreview: string | null;
@@ -249,9 +287,25 @@ export const messagingService = {
     const orderedMessages = [...messages].reverse();
     const oldestMessage = orderedMessages[0] ?? null;
 
+    // Gli allegati della pagina in una lettura sola (niente N+1), senza i byte.
+    const attachments = await messagingRepository.listAttachmentsForMessages(
+      orderedMessages.map((item) => item.id),
+    );
+    const attachmentsByMessage = new Map<string, AttachmentRecord[]>();
+    for (const attachment of attachments) {
+      const bucket = attachmentsByMessage.get(attachment.messageId);
+      if (bucket) {
+        bucket.push(attachment);
+      } else {
+        attachmentsByMessage.set(attachment.messageId, [attachment]);
+      }
+    }
+
     return {
       peer,
-      items: orderedMessages.map((item) => mapMessage(item, input.userId)),
+      items: orderedMessages.map((item) =>
+        mapMessage(item, input.userId, attachmentsByMessage.get(item.id) ?? []),
+      ),
       pageInfo: {
         limit,
         hasMore: messages.length === limit,
@@ -316,5 +370,154 @@ export const messagingService = {
       peer,
       updatedCount: result.count,
     };
+  },
+
+  /**
+   * Sposta un messaggio nel cestino (CRMA-165).
+   *
+   * E' l'unica delle quattro entita' del perimetro per cui il gesto non
+   * esisteva affatto: fino a oggi un messaggio interno, una volta inviato, non
+   * si poteva togliere in nessun modo.
+   *
+   * Il 404 quando il messaggio non e' tuo e' voluto e non e' un 403
+   * mascherato: rispondere «esiste ma non e' tuo» direbbe a chiunque, provando
+   * un id alla volta, quali conversazioni esistono in azienda. Chi cestina un
+   * messaggio proprio vede la stessa risposta che vedrebbe se l'id fosse
+   * inventato, ed e' quello che deve succedere.
+   */
+  async trashMessage(input: {
+    workspaceId: string;
+    userId: string;
+    messageId: string;
+  }) {
+    const messageId = input.messageId.trim();
+    if (!messageId) {
+      throw badRequest('messageId is required');
+    }
+
+    const trashed = await messagingRepository.markMessageTrashed({
+      workspaceId: input.workspaceId,
+      messageId,
+      actorUserId: input.userId,
+    });
+
+    if (!trashed) {
+      throw notFound('Message not found');
+    }
+
+    return {
+      messageId,
+    };
+  },
+
+  // --- Allegati (A1 punto 8a) ---
+
+  // Carica un allegato SU UN MESSAGGIO GIA' INVIATO. Niente bozze: vedi il commento
+  // sul modello WorkspaceMessageAttachment in schema.prisma.
+  //
+  // Chi puo': solo il MITTENTE del messaggio. Ricevere un messaggio non da' il diritto
+  // di attaccarci qualcosa - il messaggio resta di chi l'ha scritto.
+  async addAttachment(input: {
+    workspaceId: string;
+    userId: string;
+    messageId: string;
+    file: { buffer: Buffer; fileName: string; mimeType: string };
+  }) {
+    const message = await messagingRepository.findMessageForAttachment(
+      input.workspaceId,
+      input.messageId,
+    );
+    if (!message) {
+      throw notFound('Messaggio non trovato.');
+    }
+
+    if (message.senderUserId !== input.userId) {
+      throw forbidden('Si possono allegare file solo ai messaggi che hai inviato tu.');
+    }
+
+    const alreadyAttached = await messagingRepository.countAttachmentsForMessage(message.id);
+    if (alreadyAttached >= MAX_ATTACHMENTS_PER_MESSAGE) {
+      throw badRequest(
+        `Un messaggio puo' avere al massimo ${MAX_ATTACHMENTS_PER_MESSAGE} allegati.`,
+      );
+    }
+
+    const validated = validateAttachment(input.file);
+
+    const attachment = await messagingRepository.createAttachment({
+      workspaceId: input.workspaceId,
+      messageId: message.id,
+      createdByUserId: input.userId,
+      label: validated.label,
+      mimeType: validated.mimeType,
+      fileSize: validated.fileSize,
+      data: validated.buffer,
+    });
+
+    // Stesso segnale leggero dell'invio: chi riceve ricarica dal proprio endpoint
+    // autorizzato. Best-effort, non deve mai far fallire il caricamento.
+    broadcastToUser(message.recipientUserId, {
+      type: 'message.new',
+      withUserId: message.senderUserId,
+    });
+    broadcastToUser(message.senderUserId, {
+      type: 'message.new',
+      withUserId: message.recipientUserId,
+    });
+
+    return { attachment: mapAttachment(attachment) };
+  },
+
+  // Byte veri di un allegato, per il download. TRE filtri, tutti necessari:
+  // il workspace della riga, l'appartenenza alla conversazione, e — da CRMA-169
+  // — il fatto che il messaggio padre non sia nel cestino. Il terzo non si vede
+  // qui sotto perche' vive nel `where` del repository
+  // (`buildAttachmentBinaryWhere`): un messaggio cestinato non torna, quindi
+  // `row` e' `null` e si esce dal primo `if`. Chi ritira un messaggio con dentro
+  // un documento si aspetta di aver ritirato anche il documento.
+  async getAttachmentFile(input: {
+    workspaceId: string;
+    userId: string;
+    attachmentId: string;
+  }) {
+    const row = await messagingRepository.findAttachmentBinary(input.attachmentId);
+    // Workspace diverso: "non trovato", non "vietato" - un 403 confermerebbe che quell'id
+    // esiste da qualche altra parte.
+    if (!row || row.binary === null || row.workspaceId !== input.workspaceId) {
+      throw notFound('Allegato non trovato.');
+    }
+
+    ensureMessageParticipant(row.message, input.userId);
+
+    return {
+      data: Buffer.from(row.binary.data),
+      mimeType: row.mimeType,
+      label: row.label,
+    };
+  },
+
+  // Cancella un allegato. Lo puo' fare chi l'ha caricato, che per costruzione e' il
+  // mittente del messaggio — e solo finche' il messaggio non e' nel cestino
+  // (CRMA-169: il filtro sta in `buildAttachmentForDeleteWhere`, quindi qui si
+  // esce dal `notFound` senza un ramo in piu'). Il motivo non e' di permessi: e'
+  // che il Cestino deve poter ripristinare un messaggio INTERO, e una cancella-
+  // zione fatta mentre era nascosto sarebbe irreversibile e invisibile.
+  async removeAttachment(input: {
+    workspaceId: string;
+    userId: string;
+    attachmentId: string;
+  }) {
+    const row = await messagingRepository.findAttachmentForDelete(input.attachmentId);
+    if (!row || row.workspaceId !== input.workspaceId) {
+      throw notFound('Allegato non trovato.');
+    }
+
+    if (row.message.senderUserId !== input.userId) {
+      throw forbidden('Puoi togliere solo gli allegati dei messaggi che hai inviato tu.');
+    }
+
+    await messagingRepository.deleteAttachment(row.id);
+
+    return { id: row.id, messageId: row.message.id };
   },
 };

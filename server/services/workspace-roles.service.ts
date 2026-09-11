@@ -224,7 +224,19 @@ export const workspaceRolesService = {
     };
   },
 
-  async deleteRole(workspaceId: string, roleId: string) {
+  /**
+   * Sposta il ruolo nel cestino (CRMA-165).
+   *
+   * Le due guardie restano intatte — un ruolo di sistema non si tocca, un
+   * ruolo ancora assegnato a qualcuno nemmeno — e sono anzi il motivo per cui
+   * qui non serve altro: nel cestino finisce solo un ruolo personalizzato su
+   * cui nessuno e' appeso, quindi ripristinarlo non deve ricucire niente.
+   *
+   * `actorUserId` e' un parametro nuovo, e non e' un dettaglio di registro: e'
+   * il valore che finisce in `deletedByUserId`, cioe' il nome che la pagina
+   * Cestino mostra accanto alla riga.
+   */
+  async deleteRole(workspaceId: string, roleId: string, actorUserId: string) {
     const role = await roleRepository.findRoleById(workspaceId, roleId);
     if (!role) {
       throw notFound('Role not found');
@@ -245,7 +257,10 @@ export const workspaceRolesService = {
       });
     }
 
-    await roleRepository.deleteRole(workspaceId, roleId);
+    const trashed = await roleRepository.markRoleTrashed(workspaceId, roleId, actorUserId);
+    if (!trashed) {
+      throw notFound('Role not found');
+    }
 
     return {
       role: {

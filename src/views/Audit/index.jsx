@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Form, Row, Spinner } from 'react-bootstrap';
 import ModulePermissionGate from '../../components/guards/ModulePermissionGate';
 import { listAuditLogs } from '../../modules/audit/api/auditApi';
+import { useWorkspaceAccess } from '../../hooks/useWorkspaceAccess';
+import { hasModuleEnabled } from '../../utils/workspaceAccess';
 
 const DEFAULT_LIMIT = 200;
 
@@ -17,9 +19,9 @@ const COMMON_ACTIONS = [
 const QUICK_FILTERS = [
   { label: 'Moduli', patch: { actionPrefix: 'modules.' } },
   { label: 'Team', patch: { actionPrefix: 'team.' } },
-  { label: 'Checklist', patch: { actionPrefix: 'checklists.' } },
-  { label: 'Web', patch: { actionPrefix: 'web.' } },
-  { label: 'Credenziali', patch: { actionPrefix: 'vault.' } },
+  { label: 'Checklist', patch: { actionPrefix: 'checklists.' }, moduleKey: 'checklists' },
+  { label: 'Web', patch: { actionPrefix: 'web.' }, moduleKey: 'web' },
+  { label: 'Credenziali', patch: { actionPrefix: 'vault.' }, moduleKey: 'vault' },
   { label: 'Branding', patch: { actionPrefix: 'branding.' } },
 ];
 
@@ -192,11 +194,16 @@ const AuditPage = () => {
     return Array.from(new Set(dynamic)).sort((left, right) => left.localeCompare(right));
   }, [rows]);
 
+  const { access: moduleAccess } = useWorkspaceAccess();
+  const visibleQuickFilters = QUICK_FILTERS.filter(
+    (entry) => !entry.moduleKey || hasModuleEnabled(moduleAccess, entry.moduleKey),
+  );
+
   return (
-    <ModulePermissionGate requiredModule="audit" requiredPermission="audit.view" moduleName="Audit">
+    <ModulePermissionGate requiredModule="audit" requiredPermission="audit.view" moduleName="Registro attività">
       <div className="container-fluid">
         <div className="hk-pg-header pt-7 pb-4">
-          <h1 className="pg-title">Audit Log</h1>
+          <h1 className="pg-title">Registro attività</h1>
           <p>Filtri rapidi per periodo, area funzionale e utente (email, nome o userId).</p>
         </div>
 
@@ -222,7 +229,7 @@ const AuditPage = () => {
           <Card className="card-border mb-3">
             <Card.Body className="d-flex flex-wrap gap-2">
               <span className="small text-muted align-self-center">Filtri rapidi:</span>
-              {QUICK_FILTERS.map((entry) => (
+              {visibleQuickFilters.map((entry) => (
                 <Button
                   key={entry.label}
                   size="sm"

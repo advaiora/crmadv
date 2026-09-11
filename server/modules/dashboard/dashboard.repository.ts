@@ -293,48 +293,87 @@ const buildDailyBuckets = (days: number) => {
   return buckets;
 };
 
+/**
+ * Quali KPI calcolare: un modulo spento non deve nemmeno essere contato.
+ */
+export type DashboardKpiScope = {
+  clients: boolean;
+  projects: boolean;
+  quotes: boolean;
+  checklists: boolean;
+};
+
+/**
+ * I KPI del modulo spento non valgono zero: mancano proprio dalla risposta,
+ * cosi' chi legge distingue "nessun progetto" da "Pipeline non c'e'".
+ */
+export type DashboardKpis = {
+  clientsActive?: number;
+  projectsActive?: number;
+  quotesSent30d?: number;
+  checklistOpenItems?: number;
+};
+
+const ALL_KPIS_SCOPE: DashboardKpiScope = {
+  clients: true,
+  projects: true,
+  quotes: true,
+  checklists: true,
+};
+
 export const dashboardRepository = {
-  async getKpis(workspaceId: string) {
+  async getKpis(
+    workspaceId: string,
+    scope: DashboardKpiScope = ALL_KPIS_SCOPE,
+  ): Promise<DashboardKpis> {
     const thirtyDaysAgo = new Date(now().getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [clientsActive, projectsActive, quotesSent30d, checklistOpenItems] = await Promise.all([
-      prisma.client.count({
-        where: {
-          workspaceId,
-        },
-      }),
-      prisma.project.count({
-        where: {
-          workspaceId,
-          OR: [
-            { pipelineStageId: null },
-            {
-              pipelineStage: {
-                isClosed: false,
-              },
-            },
-          ],
-        },
-      }),
-      prisma.quote.count({
-        where: {
-          workspaceId,
-          status: 'SENT',
-          createdAt: {
-            gte: thirtyDaysAgo,
+      scope.clients
+        ? prisma.client.count({
+          where: {
+            workspaceId,
           },
-        },
-      }),
-      prisma.checklistInstanceItem.count({
-        where: listIncompleteRequiredChecklistItemsWhere(workspaceId),
-      }),
+        })
+        : Promise.resolve(null),
+      scope.projects
+        ? prisma.project.count({
+          where: {
+            workspaceId,
+            OR: [
+              { pipelineStageId: null },
+              {
+                pipelineStage: {
+                  isClosed: false,
+                },
+              },
+            ],
+          },
+        })
+        : Promise.resolve(null),
+      scope.quotes
+        ? prisma.quote.count({
+          where: {
+            workspaceId,
+            status: 'SENT',
+            createdAt: {
+              gte: thirtyDaysAgo,
+            },
+          },
+        })
+        : Promise.resolve(null),
+      scope.checklists
+        ? prisma.checklistInstanceItem.count({
+          where: listIncompleteRequiredChecklistItemsWhere(workspaceId),
+        })
+        : Promise.resolve(null),
     ]);
 
     return {
-      clientsActive,
-      projectsActive,
-      quotesSent30d,
-      checklistOpenItems,
+      ...(clientsActive === null ? {} : { clientsActive }),
+      ...(projectsActive === null ? {} : { projectsActive }),
+      ...(quotesSent30d === null ? {} : { quotesSent30d }),
+      ...(checklistOpenItems === null ? {} : { checklistOpenItems }),
     };
   },
 

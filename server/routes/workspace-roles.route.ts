@@ -74,6 +74,8 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'role.create',
+        entityType: 'role',
+        entityId: role.id,
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {
@@ -109,6 +111,8 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'role.update',
+        entityType: 'role',
+        entityId: role.id,
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {
@@ -136,10 +140,16 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await requirePermission(user.id, workspace.id, MANAGE_ROLES_PERMISSION);
 
-      const { role } = await workspaceRolesService.deleteRole(workspace.id, request.params.roleId);
+      const { role } = await workspaceRolesService.deleteRole(
+        workspace.id,
+        request.params.roleId,
+        user.id,
+      );
 
       await audit.log({
         event: 'role.delete',
+        entityType: 'role',
+        entityId: role.id,
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {
@@ -176,6 +186,7 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'role.assign',
+        entityType: 'user_role',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {
@@ -212,6 +223,7 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'role.custom_assign',
+        entityType: 'user_role',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: {

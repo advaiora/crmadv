@@ -1,5 +1,5 @@
 import { prisma } from '../../prisma.js';
-import { isTrashed, notDeleted } from '../../core/soft-delete.js';
+import { NOT_DELETED, isTrashed, markTrashed, notDeleted } from '../../core/soft-delete.js';
 
 export type WorkspaceMember = {
   userId: string;
@@ -49,6 +49,34 @@ type MarkConversationAsReadInput = {
   userId: string;
   peerUserId: string;
 };
+
+type TrashMessageInput = {
+  workspaceId: string;
+  messageId: string;
+  actorUserId: string;
+};
+
+type CreateAttachmentInput = {
+  workspaceId: string;
+  messageId: string;
+  createdByUserId: string;
+  label: string;
+  mimeType: string;
+  fileSize: number;
+  data: Buffer;
+};
+
+// Campi dell'allegato che escono verso il client. I BYTE non ci sono: si leggono solo
+// nel download, con findAttachmentBinary.
+const ATTACHMENT_SELECT = {
+  id: true,
+  messageId: true,
+  label: true,
+  mimeType: true,
+  fileSize: true,
+  createdAt: true,
+  createdByUserId: true,
+} as const;
 
 const mapMembershipRecordToMember = (item: {
   userId: string;
@@ -227,6 +255,119 @@ export const buildMarkConversationAsReadWhere = (input: MarkConversationAsReadIn
     readAt: null,
   });
 
+/**
+ * Il `where` del gesto «cestina messaggio» (CRMA-165).
+ *
+ * Quattro condizioni, e nessuna e' di troppo:
+ *
+ * 1. `id` — il messaggio indicato;
+ * 2. `workspaceId` — la regola di sempre: nessuna scrittura esce dall'azienda
+ *    di chi la chiede;
+ * 3. `senderUserId: actorUserId` — **cestina solo chi ha scritto**. La riga e'
+ *    una sola e condivisa fra i due capi della conversazione, quindi metterla
+ *    nel cestino la toglie a tutti e due: permetterlo anche a chi l'ha
+ *    ricevuta vorrebbe dire far cancellare a qualcuno le parole di un altro.
+ *    Se un domani servira' anche il "nascondi solo a me" del destinatario,
+ *    serve una seconda colonna, non un allargamento di questo filtro;
+ * 4. `notDeleted` — un messaggio gia' cestinato non si ricestina, o il secondo
+ *    gesto riscriverebbe data e autore del primo.
+ *
+ * ⚠️ Questo `where` non e' il controllo del permesso e non lo sostituisce:
+ * `messages.delete` dice se puoi cestinare messaggi, questo dice **quali**.
+ * Servono tutti e due, e il secondo e' quello che tiene anche se il primo un
+ * giorno venisse assegnato a un ruolo in piu'.
+ */
+export const buildTrashMessageWhere = (input: TrashMessageInput) =>
+  notDeleted({
+    id: input.messageId,
+    workspaceId: input.workspaceId,
+    senderUserId: input.actorUserId,
+  });
+
+// --- I QUATTRO `where` degli allegati davanti al Cestino (CRMA-169) ---
+//
+// Quattro sono i modi in cui si tocca un allegato — allegarlo, elencarlo nella
+// conversazione, scaricarlo, toglierlo — e tutti e quattro guardano il MESSAGGIO
+// PADRE. Il motivo e' scritto qui una volta sola invece che ripetuto su ognuno:
+//
+// L'allegato non ha una `deletedAt` propria e non deve averla: e' la regola 2 di
+// `server/core/soft-delete.ts` — «un figlio si nasconde guardando il padre». Due
+// date da tenere allineate sono due date che prima o poi divergono, e qui
+// divergerebbero nel modo peggiore: un messaggio ripristinato tornerebbe senza i
+// suoi allegati, oppure — il caso che ha aperto questo compito — un messaggio
+// cestinato resterebbe con i suoi allegati SCARICABILI.
+//
+// Il buco era reale e non era colpa di nessuno dei due lavori: gli allegati
+// (CRMA-30 / CRMA-138) sono nati su `main`, dove la colonna `deletedAt` dei
+// messaggi non esisteva ancora; il Cestino e' nato su questo ramo, dove gli
+// allegati non c'erano. Si sono incontrati solo al merge, ed e' quello il punto
+// in cui il filtro andava aggiunto.
+//
+// ⚠️ La cascata del database NON copre questo caso, ed e' giusto cosi':
+// `WorkspaceMessageAttachment.message` e' `onDelete: Cascade`, che spara solo
+// sull'eliminazione definitiva. Se sparasse anche cestinando, il Cestino non
+// potrebbe piu' ripristinare un messaggio intero.
+//
+// Sono funzioni a se' e non oggetti scritti dentro le query per la stessa
+// ragione dei filtri di CRMA-133: cosi' si possono provare senza database
+// (`repository.attachments.trash.test.ts`).
+
+/**
+ * 1/4 — Il `where` del caricamento: il messaggio a cui si sta allegando.
+ *
+ * Unico dei quattro in cui il filtro sta sul messaggio stesso (`notDeleted`) e
+ * non su una relazione, perche' qui e' il messaggio che si legge. Serve per la
+ * stessa ragione degli altri tre: allegare a un messaggio cestinato vorrebbe
+ * dire scrivere una riga che nessuno vedra' mai piu' — il messaggio non compare
+ * nella conversazione — e che ricomparirebbe a sorpresa il giorno del
+ * ripristino.
+ */
+export const buildMessageForAttachmentWhere = (input: {
+  workspaceId: string;
+  messageId: string;
+}) =>
+  notDeleted({
+    id: input.messageId,
+    workspaceId: input.workspaceId,
+  });
+
+/**
+ * 2/4 — Il `where` degli allegati mostrati nella conversazione aperta.
+ *
+ * Oggi gli id che arrivano qui escono gia' da `listConversationMessages`, che
+ * filtra i cestinati per conto suo: il filtro sarebbe ridondante. Ci sta lo
+ * stesso perche' quella ridondanza e' l'unica cosa che regge se un domani
+ * qualcuno chiamera' questa lettura da un altro punto — ed e' esattamente cosi'
+ * che il buco di questo compito e' nato.
+ */
+export const buildAttachmentsForMessagesWhere = (messageIds: string[]) => ({
+  messageId: { in: messageIds },
+  message: NOT_DELETED,
+});
+
+/** 3/4 — Il `where` del download (`GET /messages/attachments/:id/file`). */
+export const buildAttachmentBinaryWhere = (attachmentId: string) => ({
+  id: attachmentId,
+  binary: { isNot: null },
+  message: NOT_DELETED,
+});
+
+/**
+ * 4/4 — Il `where` della rimozione di un allegato.
+ *
+ * Porta lo stesso filtro degli altri tre, e la conseguenza e' voluta: su un
+ * messaggio cestinato la rimozione risponde «non trovato» invece di eseguire.
+ * Lasciarla passare toglierebbe per sempre un allegato che il Cestino deve
+ * poter riportare indietro **intero** — e lo toglierebbe senza che nessuno
+ * possa vederlo, visto che un messaggio cestinato non compare piu' nella
+ * conversazione. Chi vuole davvero disfarsene ha la strada giusta:
+ * ripristinare il messaggio, togliere l'allegato, ricestinare.
+ */
+export const buildAttachmentForDeleteWhere = (attachmentId: string) => ({
+  id: attachmentId,
+  message: NOT_DELETED,
+});
+
 export const messagingRepository = {
   async listWorkspaceMembers(input: ListWorkspaceMembersInput) {
     const items = await prisma.membership.findMany({
@@ -335,6 +476,127 @@ export const messagingRepository = {
       data: {
         readAt: new Date(),
       },
+    });
+  },
+
+  /**
+   * Sposta un messaggio nel cestino (CRMA-165).
+   *
+   * ⚠️ `deletedByUserId` prende sempre l'id vero di chi ha premuto, mai un id
+   * di servizio e mai `null`: su questa entita' quel campo e' meta' del
+   * controllo di accesso al Cestino — la pagina rilegge i messaggi cestinati
+   * con «partecipo alla conversazione **e** li ho cestinati io» — e non
+   * un'etichetta da riempire per fare bella figura nel registro. Un `null` li'
+   * dentro non e' un dato mancante: e' una riga che non appartiene a nessuno e
+   * che quindi nessuno potra' piu' ripristinare.
+   */
+  async markMessageTrashed(input: TrashMessageInput) {
+    const trashed = await prisma.workspaceMessage.updateMany({
+      where: buildTrashMessageWhere(input),
+      data: markTrashed(input.actorUserId),
+    });
+
+    return trashed.count > 0;
+  },
+
+  // --- Allegati (A1 punto 8a) ---
+
+  // Il messaggio a cui si vuole allegare, con i due capi della conversazione: chi
+  // chiama deve poter verificare workspace E appartenenza prima di scrivere.
+  findMessageForAttachment(workspaceId: string, messageId: string) {
+    return prisma.workspaceMessage.findFirst({
+      where: buildMessageForAttachmentWhere({ workspaceId, messageId }),
+      select: {
+        id: true,
+        workspaceId: true,
+        senderUserId: true,
+        recipientUserId: true,
+      },
+    });
+  },
+
+  countAttachmentsForMessage(messageId: string) {
+    return prisma.workspaceMessageAttachment.count({
+      where: { messageId },
+    });
+  },
+
+  // Record + byte in una transazione sola: un allegato senza i suoi byte sarebbe una
+  // riga che il download non puo' servire.
+  createAttachment(input: CreateAttachmentInput) {
+    return prisma.workspaceMessageAttachment.create({
+      data: {
+        workspaceId: input.workspaceId,
+        messageId: input.messageId,
+        createdByUserId: input.createdByUserId,
+        label: input.label,
+        mimeType: input.mimeType,
+        fileSize: input.fileSize,
+        binary: {
+          create: {
+            data: input.data,
+          },
+        },
+      },
+      select: ATTACHMENT_SELECT,
+    });
+  },
+
+  listAttachmentsForMessages(messageIds: string[]) {
+    if (messageIds.length === 0) {
+      return Promise.resolve([]);
+    }
+
+    return prisma.workspaceMessageAttachment.findMany({
+      where: buildAttachmentsForMessagesWhere(messageIds),
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: ATTACHMENT_SELECT,
+    });
+  },
+
+  // Byte veri + i due capi del messaggio che possiede l'allegato. La verifica di
+  // workspace e di appartenenza la fa il service: qui si legge e basta.
+  findAttachmentBinary(attachmentId: string) {
+    return prisma.workspaceMessageAttachment.findFirst({
+      where: buildAttachmentBinaryWhere(attachmentId),
+      select: {
+        id: true,
+        workspaceId: true,
+        label: true,
+        mimeType: true,
+        message: {
+          select: {
+            id: true,
+            senderUserId: true,
+            recipientUserId: true,
+          },
+        },
+        binary: { select: { data: true } },
+      },
+    });
+  },
+
+  findAttachmentForDelete(attachmentId: string) {
+    return prisma.workspaceMessageAttachment.findFirst({
+      where: buildAttachmentForDeleteWhere(attachmentId),
+      select: {
+        id: true,
+        workspaceId: true,
+        createdByUserId: true,
+        message: {
+          select: {
+            id: true,
+            senderUserId: true,
+            recipientUserId: true,
+          },
+        },
+      },
+    });
+  },
+
+  deleteAttachment(attachmentId: string) {
+    return prisma.workspaceMessageAttachment.delete({
+      where: { id: attachmentId },
     });
   },
 };

@@ -249,6 +249,18 @@ export const clientsService = {
     return mapClient(updated);
   },
 
+  /**
+   * Sposta il cliente nel cestino (CRMA-165).
+   *
+   * Il nome del metodo, la rotta e il permesso (`clients.delete`) restano
+   * quelli di prima ed e' voluto: per chi usa il CRM il gesto e' lo stesso —
+   * cambia cosa succede al database, non chi puo' premere. Il permesso nuovo
+   * sarebbe stato un allargamento travestito da rifattorizzazione.
+   *
+   * L'evento del registro attivita' resta `clients.delete` per la stessa
+   * ragione; a cambiare e' `fieldsUpdated`, che ora dice quali colonne sono
+   * state scritte invece dell'etichetta generica `deleted`.
+   */
   async deleteClient(input: {
     workspaceId: string;
     clientId: string;
@@ -256,8 +268,12 @@ export const clientsService = {
     request: FastifyRequest;
   }) {
     const client = await this.requireClient(input.workspaceId, input.clientId);
-    const deleted = await clientsRepository.delete(input.workspaceId, client.id);
-    if (deleted.count === 0) {
+    const trashed = await clientsRepository.markTrashed(
+      input.workspaceId,
+      client.id,
+      input.actorUserId,
+    );
+    if (trashed.count === 0) {
       throw notFound('Client not found');
     }
 
@@ -269,7 +285,7 @@ export const clientsService = {
       entityId: client.id,
       metadata: {
         clientId: client.id,
-        fieldsUpdated: ['deleted'],
+        fieldsUpdated: ['deletedAt', 'deletedByUserId'],
       },
       request: input.request,
     });

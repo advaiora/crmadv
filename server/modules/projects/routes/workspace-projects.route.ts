@@ -309,6 +309,7 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'project.departments_set',
+        entityType: 'project_department',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: { projectId: result.projectId, departmentIds: result.departmentIds },
@@ -332,6 +333,7 @@ const workspaceProjectsRoute: FastifyPluginAsync = async (app) => {
 
       await audit.log({
         event: 'project.access_set',
+        entityType: 'project_access',
         actorUserId: user.id,
         workspaceId: workspace.id,
         metadata: { projectId: result.projectId, userIds: result.userIds },

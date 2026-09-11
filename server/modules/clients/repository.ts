@@ -1,4 +1,5 @@
 import { Prisma, type ClientType } from '@prisma/client';
+import { markTrashed, notDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 
 export type ClientSortField = 'name' | 'createdAt' | 'updatedAt';
@@ -212,6 +213,20 @@ export const buildCreateData = (
   customFields: input.customFields ?? {},
 });
 
+/**
+ * Il `where` del gesto «cestina cliente» (CRMA-165).
+ *
+ * E' una funzione a se', e non un oggetto scritto dentro la query, per la
+ * stessa ragione dei filtri di lettura del Cestino: cosi' si puo' provare
+ * senza database (`repository.test.ts`), ed e' proprio la clausola che puo'
+ * sbagliarsi in silenzio.
+ */
+export const buildTrashClientWhere = (workspaceId: string, id: string) =>
+  notDeleted({
+    workspaceId,
+    id,
+  });
+
 export const clientsRepository = {
   async listClients(input: ListClientsInput) {
     const skip = (input.page - 1) * input.pageSize;
@@ -338,12 +353,22 @@ export const clientsRepository = {
     return this.findById(workspaceId, id);
   },
 
-  delete(workspaceId: string, id: string) {
-    return prisma.client.deleteMany({
-      where: {
-        workspaceId,
-        id,
-      },
+  /**
+   * Sposta un cliente nel cestino (CRMA-165).
+   *
+   * ⚠️ Ha preso il posto della `deleteMany` che stava qui: dal Cestino in
+   * avanti `clients.delete` significa "sposta nel cestino", e la distruzione
+   * vera vive dietro `trash.purge` (vedi `server/auth/rbac-catalog.ts`).
+   *
+   * Il `notDeleted` nel `where` non e' un di piu': senza, cestinare due volte
+   * lo stesso cliente riscriverebbe data e autore, cioe' il secondo gesto
+   * cancellerebbe la traccia del primo. Con quel filtro il secondo tentativo
+   * torna `count: 0`, che il servizio traduce nel 404 che dava gia' prima.
+   */
+  markTrashed(workspaceId: string, id: string, actorUserId: string) {
+    return prisma.client.updateMany({
+      where: buildTrashClientWhere(workspaceId, id),
+      data: markTrashed(actorUserId),
     });
   },
 };
