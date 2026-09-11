@@ -1558,3 +1558,28 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Per testo tecnico lungo (commenti API, corpi di pull request, ecc.) non passare **mai** per la riga di comando, a prescindere dal tipo di apici scelto: scrivere prima il testo con lo strumento di scrittura file (quello che non interpreta nulla), poi costruire il JSON leggendo da quel file con `node -e 'require("fs")...'` — qui lo script node stesso non contiene backtick ne' apostrofi del testo, solo il percorso del file.
 - Verifica a costo zero prima di spedire: confrontare il conteggio dei backtick (o di un altro carattere sensibile) fra il file sorgente e il JSON costruito.
 - Prova: CRMA-158, tentativo di postare un commento tecnico con `node -e '...'` fallito con errore di sintassi bash per un apostrofo dritto nel testo.
+
+---
+
+## 107. Gli inneschi di un permesso di riporto si scelgono leggendo cosa fa il codice, non il nome del permesso vecchio
+
+**Contesto:** 11/9/2026, CRMA-29 (verdetto "blocca" del Guardiano). Una migrazione dati doveva riportare un permesso nuovo sui ruoli personalizzati, col criterio meccanico "chi poteva gia' fare X continua a poterlo fare" — cioe' scegliere quali permessi vecchi danno diritto al permesso nuovo.
+
+**Errore:** gli inneschi erano stati scelti leggendo il nome e la descrizione dei permessi vecchi, non cosa quei permessi fanno davvero nel codice. `team.deactivate` sembra una semplice disattivazione e non lo e': la rimozione vera ha un controllo Superadmin dentro il service, che nel catalogo compare solo come un inciso fra parentesi nella descrizione. Scrivendo la migrazione sul nome si otteneva un allargamento di potere travestito da conservazione — e invisibile al collaudo, perche' la rotta che lo esercita arriva solo in un compito successivo.
+
+**Modo corretto:**
+- Prima di scrivere un `WHERE pd."key" IN (…)` in una migrazione di riporto, aprire per ognuna di quelle chiavi il punto in cui viene verificata nel codice e leggere cosa succede dopo il controllo — non fermarsi al nome o alla descrizione nel catalogo permessi.
+- Quando il permesso nuovo e' piatto su piu' entita', la parita' va verificata entita' per entita': "poteva gia' distruggere i ruoli" non autorizza a dargli la distruzione dei clienti.
+
+---
+
+## 108. Un permesso piatto su un perimetro con dati privati protegge solo se il filtro sull'attore copre tutte le rotte per id, non solo la lettura
+
+**Contesto:** 11/9/2026, CRMA-135 punto 6. Il modulo Cestino nasce con permessi "piatti": un solo `trash.view` / `restore` / `purge` per tutte le entita' del perimetro, una delle quali contiene dati privati fra due persone (i messaggi).
+
+**Errore:** dare per scontato che il permesso decida chi vede cosa, e proteggere la sola lettura. Con un permesso piatto, chi ha il permesso per un'entita' ce l'ha per tutte: la persona che poteva cancellare i clienti si ritrovava a leggere i messaggi privati cestinati da altri. E una difesa messa solo sulla `GET` lasciava in piedi le rotte per id (`restore`, `purge`): si distruggeva per id cio' che non si poteva vedere.
+
+**Modo corretto:**
+- Quando il perimetro di un permesso piatto contiene dati privati, il permesso e' la prima meta' del controllo e la seconda e' un filtro sull'attore (qui: parte della conversazione e autore della cancellazione).
+- Quel filtro si scrive una volta sola e si applica a tutte le rotte che accettano un id — vedere, ripristinare, distruggere — non solo alla lettura; e chi non lo passa riceve `404`, non `403`, perche' un `403` conferma che la riga esiste.
+- Regola gemella per le rotte che distruggono: se la stessa distruzione esiste gia' altrove, le sue guardie si estraggono e si condividono, non si ricopiano — e si controlla che siano tutte, contandole nel codice invece di fidarsi dell'elenco ricevuto (qui erano tre, non due).
