@@ -8,12 +8,12 @@ import { hasModuleEnabled } from '../../utils/workspaceAccess';
 const DEFAULT_LIMIT = 200;
 
 const COMMON_ACTIONS = [
-  'modules.',
-  'branding.',
-  'team.',
-  'checklists.',
-  'vault.',
-  'web.',
+  { prefix: 'modules.' },
+  { prefix: 'branding.' },
+  { prefix: 'team.' },
+  { prefix: 'checklists.', moduleKey: 'checklists' },
+  { prefix: 'vault.', moduleKey: 'vault' },
+  { prefix: 'web.', moduleKey: 'web' },
 ];
 
 const QUICK_FILTERS = [
@@ -179,13 +179,22 @@ const AuditPage = () => {
 
   const rows = useMemo(() => items, [items]);
 
+  const { access: moduleAccess } = useWorkspaceAccess();
+
+  const commonActionPrefixes = useMemo(
+    () => COMMON_ACTIONS
+      .filter((entry) => !entry.moduleKey || hasModuleEnabled(moduleAccess, entry.moduleKey))
+      .map((entry) => entry.prefix),
+    [moduleAccess],
+  );
+
   const actionPrefixOptions = useMemo(() => {
     const dynamic = rows
       .map((entry) => String(entry.action || '').split('.').slice(0, 1).join('.'))
       .filter(Boolean)
       .map((entry) => `${entry}.`);
-    return Array.from(new Set([...COMMON_ACTIONS, ...dynamic])).sort((left, right) => left.localeCompare(right));
-  }, [rows]);
+    return Array.from(new Set([...commonActionPrefixes, ...dynamic])).sort((left, right) => left.localeCompare(right));
+  }, [rows, commonActionPrefixes]);
 
   const actorSuggestions = useMemo(() => {
     const dynamic = rows
@@ -194,7 +203,6 @@ const AuditPage = () => {
     return Array.from(new Set(dynamic)).sort((left, right) => left.localeCompare(right));
   }, [rows]);
 
-  const { access: moduleAccess } = useWorkspaceAccess();
   const visibleQuickFilters = QUICK_FILTERS.filter(
     (entry) => !entry.moduleKey || hasModuleEnabled(moduleAccess, entry.moduleKey),
   );
