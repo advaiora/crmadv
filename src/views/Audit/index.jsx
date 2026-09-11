@@ -200,10 +200,10 @@ const AuditPage = () => {
   );
 
   return (
-    <ModulePermissionGate requiredModule="audit" requiredPermission="audit.view" moduleName="Audit">
+    <ModulePermissionGate requiredModule="audit" requiredPermission="audit.view" moduleName="Registro attività">
       <div className="container-fluid">
         <div className="hk-pg-header pt-7 pb-4">
-          <h1 className="pg-title">Audit Log</h1>
+          <h1 className="pg-title">Registro attività</h1>
           <p>Filtri rapidi per periodo, area funzionale e utente (email, nome o userId).</p>
         </div>
 
