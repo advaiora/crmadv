@@ -365,3 +365,46 @@ test('la sentinella c\'e\' anche sull\'uscita che va rossa', () => {
       + ' da «il modulo si e\' rotto a meta\'»',
   );
 });
+
+// ---------------------------------------------------------------------------
+// (10) `cancel-in-progress` non deve annullare i giri su `main`. E' un guasto
+//      che nessuna prova sul modulo puo' vedere — sta nello YAML, non nel
+//      codice — e la prova (9) del banco lo dimostra all'incontrario: su `main`
+//      la base e' quella dichiarata dall'evento, quindi il giro sul push B
+//      guarda SOLO A..B. Se il giro su A viene annullato, il contenuto di A non
+//      lo guarda nessuno, e un giro annullato non e' nemmeno rosso: e'
+//      `cancelled`. Bastano due unioni a pochi secondi di distanza.
+//
+//      Queste righe esistono perche' la condizione non torni la costante `true`
+//      «per semplificare»: la semplificazione e' invisibile e riapre il buco per
+//      cui questo intero compito esiste.
+// ---------------------------------------------------------------------------
+test('il workflow non annulla i giri in corso su main', () => {
+  const workflow = fs.readFileSync(path.join(RADICE, WORKFLOW), 'utf8');
+  const righe = workflow
+    .split('\n')
+    .filter((riga) => /^\s*cancel-in-progress\s*:/.test(riga));
+
+  // Nessuna riga e' un esito legittimo: il valore di serie e' `false`, cioe' i
+  // giri non si annullano mai e su `main` non si perde niente.
+  if (righe.length === 0) return;
+
+  assert.equal(righe.length, 1, `mi aspetto una sola riga cancel-in-progress in ${WORKFLOW}`);
+  const valore = righe[0].split(':').slice(1).join(':').trim();
+
+  assert.notEqual(
+    valore,
+    'true',
+    `${WORKFLOW}: cancel-in-progress e' tornato la costante \`true\`. Su \`main\` il giro`
+      + ' annullato e\' l\'unico che avrebbe guardato quel commit, perche\' li\' la base e\''
+      + ' quella dichiarata dall\'evento: due unioni a pochi secondi di distanza fanno'
+      + ' sparire il contenuto della prima.',
+  );
+
+  assert.ok(
+    valore.includes('refs/heads/main'),
+    `${WORKFLOW}: cancel-in-progress deve escludere \`main\` nominandolo`
+      + ` (atteso qualcosa come \${{ github.ref != 'refs/heads/main' }}), trovato invece`
+      + ` ${JSON.stringify(valore)}.`,
+  );
+});

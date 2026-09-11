@@ -21,12 +21,30 @@ on:
     branches: [main]
 
 # Un push che ne segue un altro a distanza di secondi non deve accodare due giri
-# sullo stesso ramo: vince l'ultimo. `cancel-in-progress` NON e' un buco — il giro
-# annullato e' quello su un commit che nessuno guardera' piu', e quello nuovo
-# rilegge comunque tutto il ramo dal tronco comune con `main`.
+# sullo stesso ramo: vince l'ultimo.
+#
+# ⚠️ MA SOLO FUORI DA `main`, E LA DIFFERENZA NON E' UNA PRUDENZA: e' che nei due
+# posti la base del confronto si sceglie in due modi diversi
+# (`scripts/hook/controllo-ci.mjs`, funzione `trovaBase`).
+#
+#   - su un RAMO la base e' il tronco comune con `main`, quindi il giro nuovo
+#     rilegge il ramo da capo: annullare quello vecchio non perde niente, perche'
+#     tutto cio' che il giro annullato avrebbe guardato lo guarda comunque il
+#     giro nuovo;
+#   - su `main` no. Li' la base e' quella dichiarata dall'evento
+#     (`github.event.before`) e DEVE esserlo, altrimenti il tronco comune con
+#     `main` sarebbe la punta stessa e il diff sarebbe vuoto. Quindi il giro sul
+#     push B guarda solo A..B: se il giro su A viene annullato, il contenuto di A
+#     non lo guarda NESSUNO. Bastano due unioni a pochi secondi di distanza — e
+#     le unioni le fa il Capocantiere una dietro l'altra. Un giro annullato per
+#     giunta non e' rosso: si presenta come `cancelled`, e nessuno riceve niente.
+#
+# Rilievo bloccante del Guardiano sulla revisione di CRMA-159, riprodotto su un
+# banco usa-e-getta. La prova (10) del banco tiene ferma questa riga: non deve
+# tornare la costante `true` «per semplificare».
 concurrency:
   group: controllo-segreti-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
