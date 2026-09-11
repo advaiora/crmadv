@@ -2,7 +2,7 @@
 
 ## Security Decisions
 - Duplicate invite policy: if a `PENDING` invite exists for the same `workspaceId + email`, token is regenerated and `expiresAt` refreshed.
-- Invite token hashing: `tokenHash = HMAC-SHA256(token, TEAM_INVITE_TOKEN_SECRET || AUTH_JWT_SECRET)`.
+- Invite token hashing: `tokenHash = HMAC-SHA256(token, TEAM_INVITE_TOKEN_SECRET)`. The variable is mandatory and validated at startup (`server/bootstrap/runtime-env.ts`). ~~Fallback on `AUTH_JWT_SECRET`~~ removed on 2026-09-11 (CRMA-180): with the fallback in place, rotating the session secret silently invalidated every pending invite, and a single secret served two purposes.
 - Default invite duration: 7 days (`expiresInDays` max 30).
 - Dev fallback when SMTP is missing: API returns `inviteLink` only in non-production.
 - Dev email delivery fallback: if SMTP is not configured, invite email uses Ethereal test SMTP and API can return `invitePreviewUrl` (openable link to inspect the message in dev).

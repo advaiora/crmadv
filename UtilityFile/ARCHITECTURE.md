@@ -137,7 +137,7 @@ Business (MVP 1):
 
 ## 14) Team Phase 3 Invites (2026-03-04)
 - Duplicate invite policy: per stessa `workspaceId + email`, se esiste un invito `PENDING` viene rigenerato token/hash e aggiornata scadenza (no nuovo record).
-- Token persistence: il token plain non viene mai salvato; in DB si salva solo `tokenHash` (HMAC-SHA256 con `TEAM_INVITE_TOKEN_SECRET`, fallback `AUTH_JWT_SECRET`).
+- Token persistence: il token plain non viene mai salvato; in DB si salva solo `tokenHash` (HMAC-SHA256 con `TEAM_INVITE_TOKEN_SECRET`, ~~fallback `AUTH_JWT_SECRET`~~ — **ripiego rimosso l'11/9/2026, CRMA-180**: la variabile e' obbligatoria e validata all'avvio, perche' con il ripiego ruotare `AUTH_JWT_SECRET` invalidava in silenzio tutti gli inviti in sospeso).
 - Default expiry: 7 giorni (`expiresInDays` override consentito fino a 30).
 - Accept endpoint usa il workspace dal record invito (no workspace param), quindi il token determina sempre il tenant corretto.
 - Se modulo `team` e disabilitato per il workspace dell'invito, `accept` risponde `403`.
