@@ -1684,3 +1684,24 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 **Modo corretto:**
 - Prima di aprire un'interazione o dichiarare un rischio su "il database di produzione", verificare la stringa di connessione effettiva usata dall'app (`DATABASE_URL` o simile, nel repo `crmadv` o nella configurazione di deploy) — non dedurla dai processi attivi sulla macchina che la ospita.
+---
+
+## 117. `npm run test:unit` da' rossi che sembrano codice rotto e sono solo una variabile d'ambiente mancante nella shell
+
+**Contesto:** 11/9/2026, revisione di una voce di roadmap durante CRMA-188. Lanciando `npm run test:unit` in una shell nuova, `server/modules/team/team-invite.service.test.ts` dava 3 rossi su 528 test totali.
+
+**Errore:** leggere 3 test rossi in un file di servizio come un difetto nel codice appena letto, e cominciare a indagare la logica dell'invito invece dell'ambiente.
+
+**Modo corretto:** quei 3 test costruiscono un link di invito che dipende da `APP_BASE_URL`; senza quella variabile nell'ambiente della shell il file fallisce (poi torna 18/18 impostandola). Prima di indagare un rosso isolato in un file che non si e' toccato, si verifica se dipende da una variabile d'ambiente assente — si rilancia il singolo file con la variabile impostata prima di sospettare il codice.
+
+## 118. Rendere obbligatoria una variabile d'ambiente che finora poteva mancare e' un rilascio in tre tempi, e il primo non si fa nel codice
+
+**Contesto:** 11/9/2026, CRMA-180. Un rilievo dell'audit di sicurezza chiedeva di togliere un ripiego: l'impronta dei link d'invito al Team era un HMAC la cui chiave, se `TEAM_INVITE_TOKEN_SECRET` mancava, ripiegava su `AUTH_JWT_SECRET`. La correzione chiesta era «variabile obbligatoria, errore chiaro all'avvio».
+
+**Errore:** trattarlo come una modifica di codice e basta. Rendere obbligatoria una variabile che oggi puo' mancare **ferma all'avvio ogni ambiente che sta girando** — verificato: nel `.env` dello spazio di lavoro condiviso della VPS c'era `AUTH_JWT_SECRET` e *non* c'era `TEAM_INVITE_TOKEN_SECRET`, quindi il ripiego era in uso davvero, non in teoria. E il seguito e' peggio del blocco: chi trova l'API ferma legge «manca questa variabile», genera una chiave nuova a caso e riparte — e in quel momento **ogni dato gia' firmato con la chiave vecchia diventa irraggiungibile in silenzio**. Qui erano tutti gli inviti in sospeso: rispondono «Invito non valido o scaduto» senza che nessun log colleghi la cosa alla chiave appena generata.
+
+**Modo corretto:**
+- **Tre tempi, e il primo si fa sull'ambiente, prima che il codice cambi.** (1) Si imposta la variabile nuova con il **valore vecchio su cui si ripiegava**, su tutti gli ambienti: e' un cambio a costo zero, le impronte restano identiche perche' la chiave e' la stessa. (2) Solo dopo si toglie il ripiego e la si rende obbligatoria. (3) La chiave davvero indipendente — quella che rende utile la separazione — si genera in un **terzo** momento, scelto quando non ci sono dati in sospeso firmati con la vecchia, o dichiarando che si stanno invalidando.
+- **Il messaggio d'errore dell'avvio deve contenere il passo 1**, non solo il nome della variabile: e' l'unico posto dove lo leggera' chi si trova l'API ferma alle otto di sera. Qui dice «set it to the current value of AUTH_JWT_SECRET, otherwise every pending invite stops working».
+- **La prova che il blocco funziona non e' il test unitario.** Un unit test passa un ambiente finto e dimostra solo che la funzione di validazione lancia. La prova vera e' l'avvio reale: `bootstrapRuntime` su una **copia del `.env` vero** (`grep -v` della riga) due volte, una senza la variabile e una con — la prima deve fermarsi col messaggio giusto, la seconda deve partire. Senza la seconda meta' e' un banco verde per caso.
+- **Vale per ogni ripiego silenzioso, non solo per i segreti:** un valore predefinito che qualcuno sta usando senza saperlo e' un dato di produzione. Toglierlo e' una migrazione, e come ogni migrazione si fa in un ordine preciso.
