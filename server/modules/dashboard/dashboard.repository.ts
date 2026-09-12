@@ -1,3 +1,4 @@
+import { notDeleted, parentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 import { activeMember } from '../../core/membership-access.js';
 
@@ -331,9 +332,9 @@ export const dashboardRepository = {
     const [clientsActive, projectsActive, quotesSent30d, checklistOpenItems] = await Promise.all([
       scope.clients
         ? prisma.client.count({
-          where: {
+          where: notDeleted({
             workspaceId,
-          },
+          }),
         })
         : Promise.resolve(null),
       scope.projects
@@ -607,6 +608,7 @@ export const dashboardRepository = {
       where: {
         workspaceId,
         status: 'DRAFT',
+        ...parentNotDeleted('client'),
         createdAt: {
           lt: threeDaysAgo,
         },
@@ -1184,7 +1186,7 @@ export const dashboardRepository = {
     }
 
     const clients = await prisma.client.findMany({
-      where: {
+      where: notDeleted({
         workspaceId,
         createdAt: {
           gte: firstBucketStart,
@@ -1194,7 +1196,7 @@ export const dashboardRepository = {
               }
             : {}),
         },
-      },
+      }),
       select: {
         createdAt: true,
       },
@@ -1222,12 +1224,12 @@ export const dashboardRepository = {
 
   async getClientsCreatedSince(workspaceId: string, since: Date): Promise<number> {
     return prisma.client.count({
-      where: {
+      where: notDeleted({
         workspaceId,
         createdAt: {
           gte: since,
         },
-      },
+      }),
     });
   },
 

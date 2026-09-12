@@ -1,5 +1,5 @@
 import { Prisma, type ClientType } from '@prisma/client';
-import { markTrashed, notDeleted } from '../../core/soft-delete.js';
+import { markTrashed, notDeleted, parentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 
 export type ClientSortField = 'name' | 'createdAt' | 'updatedAt';
@@ -227,14 +227,33 @@ export const buildTrashClientWhere = (workspaceId: string, id: string) =>
     id,
   });
 
+/**
+ * Il `where` con cui si leggono i clienti: elenco, ricerca ed export CSV (CRMA-127).
+ *
+ * E' una funzione a se' per la stessa ragione di `buildTrashClientWhere` qui
+ * sopra — si prova senza database — e per una in piu': elenco ed export usavano
+ * due copie identiche della stessa clausola. Due copie sono il modo in cui, fra
+ * sei mesi, il filtro del Cestino resta su una e sparisce dall'altra: la lista
+ * a schermo si comporta bene e il CSV esporta i cestinati, senza che nulla
+ * diventi rosso.
+ *
+ * Il `notDeleted` copre anche il conteggio della paginazione, perche' `listClients`
+ * passa questo stesso oggetto a `findMany` e a `count`: e' cio' che impedisce
+ * una pagina che dice «13 clienti» e ne mostra 12.
+ */
+export const buildListClientsWhere = (
+  input: Pick<ListClientsInput, 'workspaceId' | 'type' | 'query'>,
+): Prisma.ClientWhereInput =>
+  notDeleted({
+    workspaceId: input.workspaceId,
+    ...(input.type ? { type: input.type } : {}),
+    ...(input.query ? buildSearchWhere(input.query) : {}),
+  });
+
 export const clientsRepository = {
   async listClients(input: ListClientsInput) {
     const skip = (input.page - 1) * input.pageSize;
-    const where: Prisma.ClientWhereInput = {
-      workspaceId: input.workspaceId,
-      ...(input.type ? { type: input.type } : {}),
-      ...(input.query ? buildSearchWhere(input.query) : {}),
-    };
+    const where = buildListClientsWhere(input);
 
     const orderBy: Prisma.ClientOrderByWithRelationInput[] = [
       { [input.sortField]: input.sortDirection },
@@ -261,11 +280,10 @@ export const clientsRepository = {
   },
 
   listForExport(input: ExportClientsInput) {
-    const where: Prisma.ClientWhereInput = {
-      workspaceId: input.workspaceId,
-      ...(input.type ? { type: input.type } : {}),
-      ...(input.query ? buildSearchWhere(input.query) : {}),
-    };
+    // L'export CSV e' una lettura come le altre: un cliente cestinato non deve
+    // uscire dal CRM in un file che poi qualcuno ricarica altrove. Stessa
+    // clausola dell'elenco, non una copia — vedi `buildListClientsWhere`.
+    const where = buildListClientsWhere(input);
 
     const orderBy: Prisma.ClientOrderByWithRelationInput[] = [
       { [input.sortField]: input.sortDirection },
@@ -281,10 +299,10 @@ export const clientsRepository = {
 
   findById(workspaceId: string, id: string) {
     return prisma.client.findFirst({
-      where: {
+      where: notDeleted({
         workspaceId,
         id,
-      },
+      }),
       select: clientSelect,
     });
   },
@@ -302,6 +320,7 @@ export const clientsRepository = {
           clientLinks: {
             some: {
               clientId,
+              ...parentNotDeleted('client'),
             },
           },
         },
@@ -318,6 +337,7 @@ export const clientsRepository = {
         where: {
           workspaceId,
           clientId,
+          ...parentNotDeleted('client'),
         },
         orderBy: [
           { updatedAt: 'desc' },
@@ -338,11 +358,14 @@ export const clientsRepository = {
   },
 
   async update(workspaceId: string, id: string, input: UpdateClientInput) {
+    // Anche la modifica passa dal filtro: un cliente nel cestino non si
+    // modifica di nascosto da una scheda rimasta aperta in un'altra scheda del
+    // browser. Senza `notDeleted` la updateMany lo troverebbe e lo scriverebbe.
     const updated = await prisma.client.updateMany({
-      where: {
+      where: notDeleted({
         workspaceId,
         id,
-      },
+      }),
       data: input,
     });
 

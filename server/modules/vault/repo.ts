@@ -1,3 +1,4 @@
+import { notDeleted, optionalParentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 import type {
   CreateVaultItemInput,
@@ -167,17 +168,17 @@ export const vaultRepo = {
     const limit = clampClientLookupLimit(options.limit);
 
     const clients = await prisma.client.findMany({
-      where: {
+      where: notDeleted({
         workspaceId,
         ...(normalizedSearch
           ? {
               OR: [
-                { name: { contains: normalizedSearch, mode: 'insensitive' } },
-                { email: { contains: normalizedSearch, mode: 'insensitive' } },
+                { name: { contains: normalizedSearch, mode: 'insensitive' as const } },
+                { email: { contains: normalizedSearch, mode: 'insensitive' as const } },
               ],
             }
           : {}),
-      },
+      }),
       select: {
         id: true,
         name: true,
@@ -195,10 +196,10 @@ export const vaultRepo = {
 
   async findWorkspaceClientById(workspaceId: string, clientId: string): Promise<VaultClientLookupItem | null> {
     const client = await prisma.client.findFirst({
-      where: {
+      where: notDeleted({
         workspaceId,
         id: clientId,
-      },
+      }),
       select: {
         id: true,
         name: true,
@@ -221,6 +222,9 @@ export const vaultRepo = {
     const items = await prisma.vaultItem.findMany({
       where: {
         workspaceId,
+        // `VaultItem.clientId` e' facoltativo (schema :1873): una credenziale
+        // senza cliente e' una credenziale dell'agenzia, e deve restare.
+        ...optionalParentNotDeleted('client', 'clientId'),
         ...(normalizedSearch
           ? {
               OR: [
@@ -282,6 +286,7 @@ export const vaultRepo = {
       where: {
         workspaceId,
         id,
+        ...optionalParentNotDeleted('client', 'clientId'),
       },
       select: recordSelect,
     });

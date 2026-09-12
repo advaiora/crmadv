@@ -9,6 +9,7 @@ import {
   type WebAssetStatus,
   type WebAssetVersionStatus,
 } from '@prisma/client';
+import { notDeleted, optionalParentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 import { activeMember } from '../../core/membership-access.js';
 
@@ -291,6 +292,10 @@ const buildWebsiteWhere = (
   workspaceId: string,
   filters: WebAssetListFilters,
 ): Prisma.WebsiteAssetWhereInput => whereWorkspace<Prisma.WebsiteAssetWhereInput>(workspaceId, {
+  // Il cliente e' facoltativo su tutti e tre i modelli di asset (schema :1085,
+  // :1112, :1139): serve la forma a due casi, o sparirebbero anche gli asset
+  // interni. Sotto `AND`, perche' la ricerca testuale qui sotto usa gia' `OR`.
+  ...optionalParentNotDeleted('client', 'clientId'),
   ...(filters.status ? { status: filters.status } : {}),
   ...(filters.environment ? { deploymentEnvironment: filters.environment } : {}),
   ...(filters.clientId ? { clientId: filters.clientId } : {}),
@@ -303,6 +308,10 @@ const buildWebAppWhere = (
   workspaceId: string,
   filters: WebAssetListFilters,
 ): Prisma.WebAppAssetWhereInput => whereWorkspace<Prisma.WebAppAssetWhereInput>(workspaceId, {
+  // Il cliente e' facoltativo su tutti e tre i modelli di asset (schema :1085,
+  // :1112, :1139): serve la forma a due casi, o sparirebbero anche gli asset
+  // interni. Sotto `AND`, perche' la ricerca testuale qui sotto usa gia' `OR`.
+  ...optionalParentNotDeleted('client', 'clientId'),
   ...(filters.status ? { status: filters.status } : {}),
   ...(filters.environment ? { deploymentEnvironment: filters.environment } : {}),
   ...(filters.clientId ? { clientId: filters.clientId } : {}),
@@ -315,6 +324,10 @@ const buildEcommerceWhere = (
   workspaceId: string,
   filters: WebAssetListFilters,
 ): Prisma.EcommerceAssetWhereInput => whereWorkspace<Prisma.EcommerceAssetWhereInput>(workspaceId, {
+  // Il cliente e' facoltativo su tutti e tre i modelli di asset (schema :1085,
+  // :1112, :1139): serve la forma a due casi, o sparirebbero anche gli asset
+  // interni. Sotto `AND`, perche' la ricerca testuale qui sotto usa gia' `OR`.
+  ...optionalParentNotDeleted('client', 'clientId'),
   ...(filters.status ? { status: filters.status } : {}),
   ...(filters.environment ? { deploymentEnvironment: filters.environment } : {}),
   ...(filters.clientId ? { clientId: filters.clientId } : {}),
@@ -847,9 +860,9 @@ export const webAssetsRepository = {
 
   clientExists(workspaceId: string, clientId: string) {
     return prisma.client.findFirst({
-      where: whereWorkspace<Prisma.ClientWhereInput>(workspaceId, {
+      where: whereWorkspace<Prisma.ClientWhereInput>(workspaceId, notDeleted({
         id: clientId,
-      }),
+      })),
       select: { id: true },
     });
   },
@@ -877,17 +890,22 @@ export const webAssetsRepository = {
     filters: WebAssetLookupFilters,
   ): Promise<WebAssetLookupItem[]> {
     const items = await prisma.client.findMany({
-      where: whereWorkspace<Prisma.ClientWhereInput>(workspaceId, {
+      where: whereWorkspace<Prisma.ClientWhereInput>(workspaceId, notDeleted({
         ...(filters.q
           ? {
+              // `as const` e non `'insensitive'` e basta: passando per la firma
+              // generica di `notDeleted`, il letterale si allargherebbe a
+              // `string` e non combacerebbe piu' con `Prisma.QueryMode`. Stessa
+              // forma gia' usata in `buildQuoteClientLookupWhere` e in
+              // `vault/repo.ts` (rilievo del Revisore su CRMA-127).
               OR: [
-                { id: { contains: filters.q, mode: 'insensitive' } },
-                { name: { contains: filters.q, mode: 'insensitive' } },
-                { email: { contains: filters.q, mode: 'insensitive' } },
+                { id: { contains: filters.q, mode: 'insensitive' as const } },
+                { name: { contains: filters.q, mode: 'insensitive' as const } },
+                { email: { contains: filters.q, mode: 'insensitive' as const } },
               ],
             }
           : {}),
-      }),
+      })),
       orderBy: [{ updatedAt: 'desc' }],
       take: filters.limit,
       select: {
@@ -910,6 +928,7 @@ export const webAssetsRepository = {
   ): Promise<WebAssetLookupItem[]> {
     const items = await prisma.project.findMany({
       where: whereWorkspace<Prisma.ProjectWhereInput>(workspaceId, {
+        ...optionalParentNotDeleted('client', 'clientId'),
         ...(filters.clientId
           ? {
               OR: [

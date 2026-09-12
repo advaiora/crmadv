@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { notDeleted, parentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 
 // Perimetro di visibilità di un utente non privilegiato (senza projects.view_all).
@@ -123,6 +124,10 @@ const buildProjectSelect = ({
   ...(includeClientLinks
     ? {
         clientLinks: {
+          // `ProjectClient.clientId` e' obbligatorio (schema :916): un legame
+          // verso un cliente cestinato non si mostra. Qui il filtro si puo'
+          // mettere sul join, perche' la relazione e' a molti.
+          where: parentNotDeleted('client'),
           select: {
             client: {
               select: {
@@ -808,10 +813,10 @@ export const projectsRepository = {
 
   findClientById(workspaceId: string, clientId: string) {
     return prisma.client.findFirst({
-      where: {
+      where: notDeleted({
         workspaceId,
         id: clientId,
-      },
+      }),
       select: {
         id: true,
         name: true,
@@ -821,12 +826,12 @@ export const projectsRepository = {
 
   findClientsByIds(workspaceId: string, clientIds: string[]) {
     return prisma.client.findMany({
-      where: {
+      where: notDeleted({
         workspaceId,
         id: {
           in: clientIds,
         },
-      },
+      }),
       select: {
         id: true,
         name: true,

@@ -16,6 +16,7 @@
 // modello. Il modulo Fonti resta invariato (decisione separata).
 
 import { prisma } from '../../prisma.js';
+import { notDeleted, optionalParentNotDeleted, parentNotDeleted } from '../../core/soft-delete.js';
 import { badRequest, notFound } from '../../core/errors.js';
 import { sourceExtractor, SourceExtractionError } from '../sources/sources.extractor.js';
 
@@ -74,7 +75,7 @@ export const buildEntitySnapshot = async (
 ): Promise<EntitySnapshot | null> => {
   if (entityType === 'project') {
     const project = await prisma.project.findFirst({
-      where: { workspaceId, id: entityId },
+      where: { workspaceId, id: entityId, ...optionalParentNotDeleted('client', 'clientId') },
       select: {
         id: true,
         name: true,
@@ -112,7 +113,7 @@ export const buildEntitySnapshot = async (
 
   if (entityType === 'client') {
     const client = await prisma.client.findFirst({
-      where: { workspaceId, id: entityId },
+      where: notDeleted({ workspaceId, id: entityId }),
       select: {
         id: true,
         name: true,
@@ -186,7 +187,7 @@ export const buildEntitySnapshot = async (
 
   // quote
   const quote = await prisma.quote.findFirst({
-    where: { workspaceId, id: entityId },
+    where: { workspaceId, id: entityId, ...parentNotDeleted('client') },
     select: {
       id: true,
       status: true,

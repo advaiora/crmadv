@@ -9,6 +9,8 @@ import {
   markTrashed,
   notDeleted,
   onlyDeleted,
+  optionalParentNotDeleted,
+  parentNotDeleted,
 } from './soft-delete.js';
 
 test('notDeleted aggiunge il filtro senza perdere per strada il resto del where', () => {
@@ -81,4 +83,44 @@ test('il perimetro acceso e quello deciso il 17/8/2026, non uno piu largo', () =
     'Role',
     'WorkspaceMessage',
   ]);
+});
+
+test('parentNotDeleted guarda il padre, e nomina la relazione che gli si passa', () => {
+  // La regola 2 del Cestino in codice: il figlio si nasconde guardando il
+  // padre. Serve su un legame OBBLIGATORIO (Quote.client, ProjectClient.client).
+  assert.deepEqual(parentNotDeleted('client'), {
+    client: { deletedAt: null },
+  });
+});
+
+test('optionalParentNotDeleted tiene dentro le righe che un padre non ce l hanno', () => {
+  // E' la differenza che conta: su una relazione che ammette il nulla, il solo
+  // `{ client: { deletedAt: null } }` butterebbe fuori anche i progetti interni
+  // e gli asset non assegnati, che col Cestino non c'entrano niente.
+  const filtro = optionalParentNotDeleted('client', 'clientId');
+
+  assert.deepEqual(filtro, {
+    AND: [
+      {
+        OR: [
+          { clientId: null },
+          { client: { deletedAt: null } },
+        ],
+      },
+    ],
+  });
+});
+
+test('optionalParentNotDeleted esce sotto AND, cosi non si scontra con la ricerca', () => {
+  // Quasi tutte le liste del CRM usano gia' un `OR` per la ricerca testuale.
+  // Due `OR` sulla stessa `where` si sovrascrivono a vicenda in silenzio: un
+  // filtro che sparisce senza dare errore. Uscire sotto `AND` lo impedisce.
+  const filtro = optionalParentNotDeleted('client', 'clientId');
+
+  assert.ok(!('OR' in filtro), 'il filtro non deve occupare l OR di primo livello');
+  assert.ok('AND' in filtro);
+
+  const where = { workspaceId: 'ws-1', OR: [{ name: { contains: 'rossi' } }], ...filtro };
+  assert.equal(where.OR.length, 1, 'la ricerca per testo deve sopravvivere al filtro');
+  assert.equal(where.AND.length, 1);
 });
