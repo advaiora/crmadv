@@ -1718,3 +1718,16 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Il prezzo e' un falso positivo sulle forme equivalenti ma scritte diversamente: va **dichiarato nel commento** del test, non scoperto da chi ci inciampa.
 - Si prova il test iniettando la variante sbagliata **piu' vicina**, non la piu' lontana: se la mutazione di un solo carattere passa il banco, quel test non sta congelando niente.
 - Prova: la debolezza della prova (10) e' stata trovata dal Guardiano in revisione, non dal banco stesso — commento sopra la riga in `.github/workflows/controllo-segreti.yml:42-44`, che la nomina gia' come «prova (10)».
+---
+
+## 120. In un albero condiviso un `checkout` che fallisce in silenzio fa girare il `reset --hard` successivo sul ramo sbagliato
+
+**Contesto:** 12/9/2026, CRMA-199 (ribasare otto pull request in conflitto con `main`). Passando in sequenza da un ramo all'altro nell'albero di lavoro condiviso, mentre un'altra sessione (CRMA-197) lavorava in parallelo sullo stesso albero.
+
+**Errore:** un `git checkout <ramo-B>` è comparso in output insieme al messaggio *"Another git process seems to be running in this repository"* dell'altra sessione, ed è fallito senza che il comando successivo se ne accorgesse: lo script ha proseguito lanciando `git reset --hard origin/<ramo-B>` **mentre `HEAD` era ancora sul ramo precedente `<ramo-A>`** (già pushato correttamente). L'effetto: il puntatore locale di `<ramo-A>` è stato sovrascritto con il commit di `<ramo-B>`, e `git status` ha cominciato a segnalare "diverged, 2 e 9 commit diversi" — un sintomo, non la causa.
+
+**Modo corretto:**
+- In un albero condiviso, dopo ogni `git checkout <ramo>` verificare con `git branch --show-current` che il cambio sia avvenuto davvero, **prima** di lanciare qualunque `reset --hard` o `merge`: i comandi git non si accodano da soli in una pipeline sicura, un comando può fallire e i successivi girano lo stesso sullo stato precedente.
+- Il segnale d'allarme è proprio quel messaggio ("Another git process seems to be running..."): quando compare, non si continua come se nulla fosse — si rilegge subito il branch attivo.
+- Il danno è recuperabile solo se il ramo sovrascritto era già stato pushato: la correzione è `git reset --hard origin/<ramo-A>` una volta tornati su di esso, e poi si ricontrollano **tutti** i rami già toccati nella sessione (`git rev-parse <ramo>` contro `git rev-parse origin/<ramo>`), non solo quello appena scoperto rotto — qui erano già sei, e sono risultati tutti intatti solo perché il controllo è stato fatto su tutti insieme.
+- Prova: CRMA-199, ramo `cronista/crma-193-nota-connection-string-produzione` sovrascritto per un istante dal commit di `cronista/crma-188-roadmap-stepup-secret-e-smoke-test`, corretto con `git reset --hard origin/cronista/crma-193-...` e verificato confrontando tutti i rami locali già processati con i rispettivi `origin/`.
