@@ -148,6 +148,32 @@ export const buildFindMemberByIdWhere = (workspaceId: string, memberId: string) 
   });
 
 /**
+ * Lo stesso perimetro, ma per la SCRITTURA sullo stato di un membro (CRMA-163).
+ *
+ * E' un alias e non una seconda clausola ricopiata: il filtro dev'essere lo
+ * stesso della lettura qui sopra, e due letterali gemelli sono due letterali
+ * che prima o poi divergono. Ha pero' un nome suo, perche' porta un obbligo che
+ * il nome della lettura non racconta:
+ *
+ * ⚠️ senza il filtro del Cestino, riaccendere una membership cestinata
+ * scriverebbe `status: 'ACTIVE'` **senza toccare `deletedAt`**. Il CRM
+ * risponderebbe «riattivato» e la persona resterebbe fuori: la riga e' ancora
+ * cestinata, e `grantsWorkspaceAccess` la respinge su ogni rotta
+ * (`membership-access.ts`, CRMA-157). Con il filtro la scrittura non trova
+ * niente, `setMemberActiveState` alza un 404, e quel 404 e' vero: dal Team
+ * quella persona non c'e', sta nel Cestino, e da li' si ripristina.
+ *
+ * E' una difesa in profondita', non un doppione della lettura: regge anche se
+ * un domani un chiamante arriva a `updateMembershipStatus` senza essere passato
+ * da `findMemberById`.
+ *
+ * ⚠️ `deleteMember` NON lo usa, e non e' una dimenticanza: quella e'
+ * l'eliminazione definitiva, l'unico gesto che deve poter raggiungere proprio
+ * una riga cestinata. Un filtro li' renderebbe impossibile svuotare il Cestino.
+ */
+export const buildTeamMemberWriteWhere = buildFindMemberByIdWhere;
+
+/**
  * Il `where` del gesto «rimuovi dal Team», che dal 11/9/2026 cestina (CRMA-165).
  *
  * `userId` c'e' oltre a `id` perche' c'era gia' nella cancellazione fisica che
@@ -259,10 +285,7 @@ export const teamRepository = {
     tx?: Prisma.TransactionClient,
   ): Promise<boolean> {
     const updated = await withClient(tx).membership.updateMany({
-      where: {
-        workspaceId,
-        id: memberId,
-      },
+      where: buildTeamMemberWriteWhere(workspaceId, memberId),
       data: {
         status,
       },
