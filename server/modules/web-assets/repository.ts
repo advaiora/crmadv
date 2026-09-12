@@ -893,10 +893,15 @@ export const webAssetsRepository = {
       where: whereWorkspace<Prisma.ClientWhereInput>(workspaceId, notDeleted({
         ...(filters.q
           ? {
+              // `as const` e non `'insensitive'` e basta: passando per la firma
+              // generica di `notDeleted`, il letterale si allargherebbe a
+              // `string` e non combacerebbe piu' con `Prisma.QueryMode`. Stessa
+              // forma gia' usata in `buildQuoteClientLookupWhere` e in
+              // `vault/repo.ts` (rilievo del Revisore su CRMA-127).
               OR: [
-                { id: { contains: filters.q, mode: 'insensitive' } },
-                { name: { contains: filters.q, mode: 'insensitive' } },
-                { email: { contains: filters.q, mode: 'insensitive' } },
+                { id: { contains: filters.q, mode: 'insensitive' as const } },
+                { name: { contains: filters.q, mode: 'insensitive' as const } },
+                { email: { contains: filters.q, mode: 'insensitive' as const } },
               ],
             }
           : {}),
