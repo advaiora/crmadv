@@ -5,6 +5,7 @@ import {
   MEMBERSHIP_ACCESS_SELECT,
   activeMember,
   grantsWorkspaceAccess,
+  heldByActiveMember,
   markMembershipReactivated,
 } from './membership-access.js';
 import { markRestored, markTrashed } from './soft-delete.js';
@@ -82,4 +83,31 @@ test("l'accettazione di un invito riporta indietro una membership cestinata", ()
   assert.equal(update.status, 'ACTIVE');
   assert.equal(update.deletedAt, null, 'rimettere il solo status lascia la riga nel cestino');
   assert.equal(update.deletedByUserId, null, 'anche l etichetta di chi ha cestinato va via');
+});
+
+test("heldByActiveMember porta le due condizioni su una riga che non e' la membership", () => {
+  // Usato dalle letture di `UserRole` (CRMA-132): quella tabella non ha una
+  // relation verso `Membership`, si arriva alla membership solo passando per
+  // `User`. Il salto e' scritto qui una volta perche' ricopiato a mano nei punti
+  // che lo vogliono sarebbe sbagliato in almeno uno.
+  const where = heldByActiveMember(WORKSPACE_ID);
+
+  assert.deepEqual(where, {
+    user: {
+      memberships: {
+        some: {
+          workspaceId: WORKSPACE_ID,
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+      },
+    },
+  });
+});
+
+test('heldByActiveMember guarda solo il workspace chiesto', () => {
+  // `some` e non `every`, e col `workspaceId` dentro: una persona sta in piu'
+  // workspace, cestinarla in A non deve toccarla in B — e una membership sana in
+  // B non deve salvare quella cestinata in A.
+  assert.equal(heldByActiveMember('workspace-2').user.memberships.some.workspaceId, 'workspace-2');
 });
