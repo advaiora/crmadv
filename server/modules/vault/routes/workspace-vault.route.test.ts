@@ -451,6 +451,118 @@ test('vault stepup endpoint is rate limited', async () => {
   }
 });
 
+const buildVaultPolicyApiWithPassword = (isPasswordValid: () => boolean) => ({
+  getStatus: async () => ({ exists: true }),
+  setupMasterPassword: async () => {
+    throw new Error('not used');
+  },
+  verifyPassword: async () => isPasswordValid(),
+} as unknown as typeof vaultPolicyService);
+
+test('vault unlock endpoint blocks brute force after five failed attempts', async () => {
+  let app: FastifyInstance | null = null;
+
+  try {
+    resetVaultRateLimitStoreForTests();
+    const auditCalls: Array<Record<string, unknown>> = [];
+
+    app = await createTestApp({
+      vaultPolicyServiceApi: buildVaultPolicyApiWithPassword(() => false),
+      logVaultAuditFn: async (event) => {
+        auditCalls.push(event);
+      },
+    });
+
+    for (let index = 0; index < 5; index += 1) {
+      const refusedResponse: InjectResponse = await (app as FastifyInstance).inject({
+        method: 'POST',
+        url: '/vault/unlock',
+        payload: { password: `tentativo-${index}` },
+      });
+
+      assert.equal(refusedResponse.statusCode, 400);
+    }
+
+    const limitedResponse: InjectResponse = await (app as FastifyInstance).inject({
+      method: 'POST',
+      url: '/vault/unlock',
+      payload: { password: 'tentativo-6' },
+    });
+
+    assert.equal(limitedResponse.statusCode, 429);
+    const body = limitedResponse.json() as { error?: { code?: string }; code?: string };
+    assert.equal(body.error?.code ?? body.code, 'RATE_LIMITED');
+
+    // Le cinque prove fallite lasciano la loro riga nel Registro; la richiesta respinta
+    // dal limitatore no, altrimenti chi insiste si scriverebbe il Registro da solo.
+    assert.equal(auditCalls.length, 5);
+    assert.ok(auditCalls.every((event) => event.action === 'vault.unlock_fail'));
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('vault unlock successes are not counted by the rate limiter', async () => {
+  let app: FastifyInstance | null = null;
+
+  try {
+    resetVaultRateLimitStoreForTests();
+    app = await createTestApp({
+      vaultPolicyServiceApi: buildVaultPolicyApiWithPassword(() => true),
+      logVaultAuditFn: async () => undefined,
+    });
+
+    for (let index = 0; index < 10; index += 1) {
+      const unlockedResponse: InjectResponse = await (app as FastifyInstance).inject({
+        method: 'POST',
+        url: '/vault/unlock',
+        payload: { password: 'password-giusta' },
+      });
+
+      assert.equal(unlockedResponse.statusCode, 204);
+    }
+  } finally {
+    await closeApp(app);
+  }
+});
+
+test('a successful vault unlock does not reset the failed attempts counter', async () => {
+  let app: FastifyInstance | null = null;
+
+  try {
+    resetVaultRateLimitStoreForTests();
+    let passwordIsValid = false;
+
+    app = await createTestApp({
+      vaultPolicyServiceApi: buildVaultPolicyApiWithPassword(() => passwordIsValid),
+      logVaultAuditFn: async () => undefined,
+    });
+
+    const postUnlock = () => (app as FastifyInstance).inject({
+      method: 'POST',
+      url: '/vault/unlock',
+      payload: { password: 'qualsiasi' },
+    });
+
+    for (let index = 0; index < 4; index += 1) {
+      assert.equal((await postUnlock()).statusCode, 400);
+    }
+
+    passwordIsValid = true;
+    assert.equal((await postUnlock()).statusCode, 204);
+
+    passwordIsValid = false;
+    assert.equal((await postUnlock()).statusCode, 400);
+
+    // Quinto fallimento raggiunto: il tetto scatta anche presentando la password giusta.
+    passwordIsValid = true;
+    const limitedResponse: InjectResponse = await postUnlock();
+    assert.equal(limitedResponse.statusCode, 429);
+  } finally {
+    await closeApp(app);
+  }
+});
+
 test('vault reveal endpoint is rate limited', async () => {
   let app: FastifyInstance | null = null;
 

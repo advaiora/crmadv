@@ -10,6 +10,8 @@ import { VaultPermissions, type VaultPermissionKey } from '../policies.js';
 import {
   enforceVaultRevealRateLimit,
   enforceVaultStepUpRateLimit,
+  enforceVaultUnlockRateLimit,
+  registerVaultUnlockFailure,
   resolveRequestClientIp,
 } from '../rate-limit.js';
 import { vaultPolicyService } from '../vault-policy.service.js';
@@ -202,8 +204,24 @@ export const buildWorkspaceVaultRoute = (
         throw badRequest('Vault workspace password is not configured');
       }
 
+      // Il limitatore si consulta PRIMA del confronto con bcrypt: bcrypt rallenta ogni
+      // singolo tentativo ma non ne limita il numero, quindi senza questo controllo la
+      // password maestra si potrebbe provare a raffica. Il 429 non lascia una riga nel
+      // Registro: le cinque prove che hanno portato al blocco ci sono già, e una richiesta
+      // respinta qui costa quasi niente a chi la manda — scriverne una ciascuna vorrebbe
+      // dire farsi riempire il Registro a comando.
+      enforceVaultUnlockRateLimit({
+        userId: user.id,
+        workspaceId: workspace.id,
+      });
+
       const passwordValid = await vaultPolicyServiceApi.verifyPassword(workspace.id, payload.password);
       if (!passwordValid) {
+        registerVaultUnlockFailure({
+          userId: user.id,
+          workspaceId: workspace.id,
+        });
+
         await logVaultAuditFn({
           action: VaultAuditActions.unlockFail,
           workspaceId: workspace.id,

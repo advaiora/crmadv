@@ -67,7 +67,10 @@ Environment (optional overrides):
   - requires `vault.view_list`
   - body: `{ password }`
   - on success: `204` + issues unlock cookie + audit `vault.unlock_success`
-  - on invalid password: `401` + audit `vault.unlock_fail`
+  - on invalid password: `400` + audit `vault.unlock_fail`
+  - rate limited on **failed** attempts only: 5 failures per 5 minutes per `workspace + user`,
+    then `429` + code `RATE_LIMITED` until the window expires (`rate-limit.ts`).
+    A successful unlock neither consumes budget nor resets the counter.
 
 - `POST /vault/lock`
   - requires `vault.view_list`
