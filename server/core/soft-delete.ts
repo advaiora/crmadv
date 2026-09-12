@@ -53,7 +53,9 @@ export const ONLY_DELETED = { deletedAt: { not: null } } as const;
  * La differenza non e' estetica: la prima forma si trova con una ricerca sola
  * quando fra sei mesi si accendera' il cestino sul resto del CRM.
  */
-export const notDeleted = <T extends Record<string, unknown>>(where: T) => ({
+export const notDeleted = <T extends Record<string, unknown>>(
+  where: T,
+): Omit<T, 'deletedAt'> & typeof NOT_DELETED => ({
   ...where,
   ...NOT_DELETED,
 });
