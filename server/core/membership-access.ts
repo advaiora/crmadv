@@ -51,6 +51,30 @@ export const activeMember = <T extends Record<string, unknown>>(where: T) => ({
 });
 
 /**
+ * Le stesse due condizioni, guardate da una riga che NON e' la membership: una
+ * riga intestata a una persona (`UserRole`, e domani qualunque tabella con un
+ * `userId`) che vale solo se quella persona e' ancora dentro il workspace.
+ *
+ * Serve perche' `UserRole` non ha una relation verso `Membership` — le due
+ * tabelle si incontrano solo passando per `User` (`prisma/schema.prisma:1473-1486`)
+ * — quindi il filtro non e' un `deletedAt` da aggiungere al `where`: e' un salto
+ * di due relazioni, e ricopiato a mano in ognuno dei punti che lo vogliono
+ * sarebbe sbagliato in almeno uno.
+ *
+ * ⚠️ `some` e non `every`: una persona sta in piu' workspace, e qui conta solo la
+ * sua membership in QUESTO. Con `every`, chi e' cestinato in un altro workspace
+ * perderebbe i permessi anche qui — l'errore opposto, e piu' difficile da vedere
+ * perche' si manifesta solo a chi lavora su due workspace.
+ */
+export const heldByActiveMember = (workspaceId: string) => ({
+  user: {
+    memberships: {
+      some: activeMember({ workspaceId }),
+    },
+  },
+});
+
+/**
  * Il `select` minimo per decidere se una membership da' accesso.
  *
  * Serve dove la lettura passa per `findUnique` sulla chiave `(workspaceId,
