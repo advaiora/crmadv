@@ -5,6 +5,7 @@ import {
   ProjectAlertStatus,
   ProjectOpportunityStatus,
 } from '@prisma/client';
+import { notDeleted, optionalParentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 
 const PROJECT_TABLE = 'Project';
@@ -490,10 +491,10 @@ export const agencyRepository = {
 
   async findClientLite(workspaceId: string, clientId: string) {
     return prisma.client.findFirst({
-      where: {
+      where: notDeleted({
         workspaceId,
         id: clientId,
-      },
+      }),
       select: {
         id: true,
         name: true,
@@ -505,6 +506,7 @@ export const agencyRepository = {
     return prisma.project.findMany({
       where: {
         workspaceId,
+        ...optionalParentNotDeleted('client', 'clientId'),
       },
       orderBy: [
         { updatedAt: 'desc' },
@@ -531,6 +533,11 @@ export const agencyRepository = {
     return prisma.project.findMany({
       where: {
         workspaceId,
+        // `Project.clientId` e' facoltativo (schema :442): serve la forma a due
+        // casi, o questa lista perderebbe anche i progetti interni, che con il
+        // Cestino non c'entrano. Esce sotto `AND` apposta: l'`OR` qui sotto e'
+        // gia' occupato dal filtro «progetto d'agenzia».
+        ...optionalParentNotDeleted('client', 'clientId'),
         OR: [
           {
             projectTypeId: {
@@ -569,6 +576,7 @@ export const agencyRepository = {
     const projects = await prisma.project.findMany({
       where: {
         workspaceId,
+        ...optionalParentNotDeleted('client', 'clientId'),
         ...(scope ? { OR: buildAgencyProjectVisibilityOr(scope) } : {}),
       },
       orderBy: [{ updatedAt: 'desc' }, { name: 'asc' }],
@@ -619,7 +627,7 @@ export const agencyRepository = {
   // Cliente del workspace (nome per il prompt della Chat, ambito Cliente — Fase 2).
   findAgencyClient(workspaceId: string, clientId: string) {
     return prisma.client.findFirst({
-      where: { workspaceId, id: clientId },
+      where: notDeleted({ workspaceId, id: clientId }),
       select: { id: true, name: true },
     });
   },

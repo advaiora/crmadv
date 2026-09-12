@@ -1,4 +1,5 @@
 import { Prisma, type QuoteDiscountType, type QuoteStatus } from '@prisma/client';
+import { notDeleted, parentNotDeleted } from '../../core/soft-delete.js';
 import { prisma } from '../../prisma.js';
 
 export type QuoteListFilters = {
@@ -319,13 +320,63 @@ export type QuotesRepository = {
   ): Promise<QuoteNotificationSettingsRecord>;
 };
 
+/**
+ * Il `where` del menu a tendina «scegli il cliente» dei Preventivi (CRMA-127).
+ *
+ * E' uno dei quattro elenchi-a-tendina dei clienti sparsi per il CRM
+ * (Preventivi, Web Assets, Cassaforte, Agency): sono implementazioni
+ * indipendenti, e ognuna andava chiusa da sola. Questo e' l'unico estratto in
+ * una funzione provabile, ed e' il campione che il test copre — perche' e'
+ * anche quello dove il filtro convive con un `OR` di ricerca, cioe' il posto
+ * dove un filtro puo' sparire senza dare errore.
+ */
+export const buildQuoteClientLookupWhere = (
+  workspaceId: string,
+  filters: QuoteLookupFilters,
+): Prisma.ClientWhereInput =>
+  notDeleted({
+    workspaceId,
+    ...(filters.q
+      ? {
+          OR: [
+            {
+              id: {
+                contains: filters.q,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              name: {
+                contains: filters.q,
+                mode: 'insensitive' as const,
+              },
+            },
+            {
+              email: {
+                contains: filters.q,
+                mode: 'insensitive' as const,
+              },
+            },
+          ],
+        }
+      : {}),
+    ...((filters.createdFrom || filters.createdTo)
+      ? {
+          createdAt: {
+            ...(filters.createdFrom ? { gte: filters.createdFrom } : {}),
+            ...(filters.createdTo ? { lte: filters.createdTo } : {}),
+          },
+        }
+      : {}),
+  });
+
 export const quotesRepository: QuotesRepository = {
   clientExists(workspaceId: string, clientId: string) {
     return prisma.client.findFirst({
-      where: {
+      where: notDeleted({
         workspaceId,
         id: clientId,
-      },
+      }),
       select: {
         id: true,
       },
@@ -347,6 +398,11 @@ export const quotesRepository: QuotesRepository = {
   async listQuotes(workspaceId: string, filters: QuoteListFilters) {
     const where: Prisma.QuoteWhereInput = {
       workspaceId,
+      // `Quote.clientId` e' obbligatorio (schema :1631): ogni preventivo ha un
+      // cliente, quindi qui basta guardare il padre. Un preventivo il cui
+      // cliente e' nel cestino sparisce dall'elenco — non gli viene scritta
+      // addosso una seconda data.
+      ...parentNotDeleted('client'),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.clientId ? { clientId: filters.clientId } : {}),
       ...(filters.projectId ? { projectId: filters.projectId } : {}),
@@ -399,41 +455,7 @@ export const quotesRepository: QuotesRepository = {
 
   listClientsForLookup(workspaceId: string, filters: QuoteLookupFilters) {
     return prisma.client.findMany({
-      where: {
-        workspaceId,
-        ...(filters.q
-          ? {
-              OR: [
-                {
-                  id: {
-                    contains: filters.q,
-                    mode: 'insensitive',
-                  },
-                },
-                {
-                  name: {
-                    contains: filters.q,
-                    mode: 'insensitive',
-                  },
-                },
-                {
-                  email: {
-                    contains: filters.q,
-                    mode: 'insensitive',
-                  },
-                },
-              ],
-            }
-          : {}),
-        ...((filters.createdFrom || filters.createdTo)
-          ? {
-              createdAt: {
-                ...(filters.createdFrom ? { gte: filters.createdFrom } : {}),
-                ...(filters.createdTo ? { lte: filters.createdTo } : {}),
-              },
-            }
-          : {}),
-      },
+      where: buildQuoteClientLookupWhere(workspaceId, filters),
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
       take: filters.limit,
       select: {
@@ -493,6 +515,7 @@ export const quotesRepository: QuotesRepository = {
       where: {
         workspaceId,
         id: quoteId,
+        ...parentNotDeleted('client'),
       },
       select: quoteDetailSelect,
     });
@@ -503,6 +526,7 @@ export const quotesRepository: QuotesRepository = {
       where: {
         workspaceId,
         id: quoteId,
+        ...parentNotDeleted('client'),
       },
       select: quoteStatusSelect,
     });
