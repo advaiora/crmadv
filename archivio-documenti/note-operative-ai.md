@@ -1586,11 +1586,51 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 109. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
+## 109. Un 403 su un endpoint non dice che la cosa non esiste: puo' dire che e' implementata con un altro meccanismo
+
+**Contesto:** 11/9/2026, CRMA-182. Per sapere se `main` fosse protetto si e' interrogato `GET /repos/{owner}/{repo}/branches/main/protection`, che ha risposto **403 `Resource not accessible by personal access token`**. Da li' la conclusione: la protezione non e' ne' leggibile ne' impostabile da un agente, serve una persona anche solo per **guardare**.
+
+**Errore:** il 403 riguardava l'endpoint *legacy*. La protezione c'era gia' — dal 31/8/2026 — ma realizzata come **ruleset**, che si legge da un endpoint diverso e non protetto: `GET /repos/{owner}/{repo}/rules/branches/main` risponde **200** con lo stesso token. Il segnale che avrebbe dovuto insospettire era gia' nella risposta di `GET /repos/{owner}/{repo}/branches/main`: `protected: true` accanto a `protection.enabled: false`. Conseguenza: a una persona sono stati chiesti due minuti di lavoro **con i passi sbagliati** (una regola nuova invece della modifica di quella esistente) e **una domanda gia' risposta dal sistema** (il push diretto era gia' vietato).
+
+**Modo corretto:**
+- Su GitHub la protezione di un ramo si legge da **`/rules/branches/{ramo}`** (rulesets) *e* da `/branches/{ramo}/protection` (legacy), piu' `/rulesets` per l'elenco: tre chiamate, costano niente.
+- `protected: true` con `protection.enabled: false` non e' una contraddizione, e' la firma di un ruleset: quando si presenta, si controlla subito l'endpoint dei rulesets prima di concludere qualsiasi cosa.
+- Un 403 dimostra che **quel token non puo' fare quella chiamata**, non che la cosa non esista. Vale anche al contrario della nota #92: un vincolo va verificato oggi pure quando verificarlo fa sembrare il lavoro **meno** necessario.
+- Prova: CRMA-182, `GET /repos/advaiora/crmadv/branches/main/protection` → 403; `GET /repos/advaiora/crmadv/rules/branches/main` → 200.
+
+---
+
+## 110. Il `helpText` di una domanda nelle interazioni si ferma a 1000 caratteri
+
+**Contesto:** 11/9/2026, CRMA-182, componendo una `ask_user_questions` con una domanda che spiegava nel dettaglio le opzioni disponibili dentro `helpText`.
+
+**Errore:** `POST /api/issues/{id}/interactions` ha risposto **400 `too_big`** su `payload.questions[N].helpText`. E' il fratello del tetto gia' annotato sulle `label` delle opzioni (120 caratteri, nota #98 — vedi `interactions-payload-wrapper` in memoria): un secondo limite sullo stesso endpoint, su un campo diverso.
+
+**Modo corretto:**
+- `helpText` si ferma a **1000 caratteri**. Il testo lungo — motivazione, contesto, alternative scartate — va nel **commento del compito**, non nell'aiuto della domanda: la domanda resta breve e rimanda al commento per i dettagli.
+- Prima di comporre un'interazione con testo non banale, contare i caratteri di `helpText` e delle `label` prima di spedire, non dopo il 400.
+- Prova: CRMA-182, `POST /api/issues/.../interactions` → 400 `too_big` su `payload.questions[0].helpText`.
+
+---
+
+## 111. Le pull request degli agent le apre il proprietario del token, non un utente-bot distinto
+
+**Contesto:** 11/9/2026, CRMA-182, valutando se proporre "1 approvazione obbligatoria" come regola del ruleset su `main`.
+
+**Errore:** si stava per proporre quella spunta senza aver controllato chi appare come autore delle pull request create dagli agent. Verificato sulla PR #71: `user.login` e' `advaiora`, che e' anche uno dei due soli collaboratori del repository — non un account bot separato.
+
+**Modo corretto:**
+- GitHub vieta di approvare la propria pull request. Se le PR degli agent sono aperte dallo stesso utente che dovrebbe approvarle, **pretendere 1 approvazione obbligatoria fermerebbe ogni unione automatica** (corsia B compresa): nessuno potrebbe mai approvarla.
+- Prima di proporre a una persona una regola di approvazione sul ruleset, controllare `user.login` di una pull request recente aperta da un agente e confrontarlo con l'elenco dei collaboratori (`GET /repos/{owner}/{repo}/collaborators`).
+- Prova: PR #71 su `crmadv`, `user.login: advaiora`.
+
+---
+
+## 112. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
 
 **Contesto:** 11/9/2026, CRMA-159 (controllo sui segreti). Verificare che GitHub **valuti davvero** un'espressione `${{ }}` in un campo che decide un comportamento di sicurezza (`cancel-in-progress`), non che la accetti soltanto come stringa.
 
-**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#110**, gemella di questa).
+**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#113**, gemella di questa).
 
 **Errore, seconda meta' — come non si butta via la prova dopo averla costruita:** cancellare **le tracce dei giri** insieme ai rami, per pulizia. I rami vanno cancellati; i giri no. Il giro **e' la prova**: cancellato lui, chi revisiona dopo trova un'affermazione senza riscontro e deve rifare la misura da capo. E' successo davvero qui: la sonda a due arm che dimostrava che GitHub valuta l'espressione era corretta e ben disegnata, ma i suoi quattro giri erano stati cancellati — quindi il Guardiano ha dovuto rieseguirla per intero (due rami, quattro push, tre minuti di attesa), e nel farlo ha dovuto **spingere di nuovo su un repository pubblico**, il gesto che si voleva fare una volta sola.
 
@@ -1601,10 +1641,10 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 110. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
+## 113. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
 
 **Contesto:** 11/9/2026, CRMA-159. Iniettare un guasto in un file che contiene la propria correzione non ancora committata, per provare che un test la rilevi davvero.
 
-**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#109**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
+**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#112**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
 
 **Modo corretto:** committare la correzione **prima** di iniettare il guasto, oppure ripristinare da una copia separata (mai dall'ultimo commit se contiene una correzione non committata); e dopo il ripristino **rileggere** la riga corretta invece di fidarsi del colore del banco.

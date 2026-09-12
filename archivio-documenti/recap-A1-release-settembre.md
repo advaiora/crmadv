@@ -220,6 +220,15 @@ Content-Type: application/json
 ] }
 ```
 
+**L'elenco dei sette è esaustivo.** La chiamata qui sopra tocca **solo** i moduli che nomina
+(`server/repositories/module.repository.ts`, `updateWorkspaceModules`: fa un `upsert` sulle sole
+chiavi ricevute), quindi ogni altro modulo del catalogo resta com'è oggi, cioè **acceso** —
+**`departments` («Reparti») compreso**. Non è un'omissione: **Reparti resta acceso per decisione del
+CEO dell'11/9/2026** (CRMA-171), in linea con il punto 9 che lo sposta sotto *Team*. Le «sei aree»
+promesse in testa a questo documento (righe 16-18) descrivono la **navigazione**, non un censimento
+dei moduli: fuori da quelle sei restano accesi anche `dashboard` e `modules`, per i motivi già detti
+qui sopra.
+
 Una sola chiamata, atomica: non serve un ordine fra i sette (nessuna dipendenza trovata fra loro), e
 può essere ripetuta in sicurezza se qualcosa va storto a metà.
 

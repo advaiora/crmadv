@@ -378,7 +378,28 @@ test('la sentinella c\'e\' anche sull\'uscita che va rossa', () => {
 //      Queste righe esistono perche' la condizione non torni la costante `true`
 //      «per semplificare»: la semplificazione e' invisibile e riapre il buco per
 //      cui questo intero compito esiste.
+//
+//      ⚠️ La prova asserisce sull'ESPRESSIONE INTERA, operatore compreso, e non
+//      sul fatto che la riga «nomini» `main`. Il perche' e' un rilievo del
+//      Revisore su CRMA-159: la prima stesura chiedeva due cose — che il valore
+//      non fosse la costante `true`, e che CONTENESSE `refs/heads/main` — e la
+//      negazione esatta della condizione le soddisfaceva entrambe. Un carattere:
+//      `==` al posto di `!=`. E quella variante e' PEGGIORE di quella
+//      intercettata, perche' annulla i giri solo su `main`, cioe' esattamente
+//      dove il giro annullato e' l'unico che avrebbe guardato quel commit.
+//
+//      Quindi si elenca cio' che e' sicuro e si rifiuta tutto il resto, invece
+//      di elencare i due valori sbagliati che si avevano in mente. Chi cambia
+//      quella riga di proposito cambia anche `CANCEL_SICURI`, e in quel momento
+//      rilegge il perche' scritto qui sopra.
 // ---------------------------------------------------------------------------
+
+// Le sole forme sicure, oltre all'assenza della riga: `false` non annulla mai
+// niente, e l'espressione annulla su ogni ramo TRANNE `main`. Si confrontano
+// dopo aver normalizzato cio' che non cambia il significato — gli spazi dentro
+// `${{ }}` e il tipo di apici — e nient'altro.
+const CANCEL_SICURI = ['false', '${{ github.ref != \'refs/heads/main\' }}'];
+
 test('il workflow non annulla i giri in corso su main', () => {
   const workflow = fs.readFileSync(path.join(RADICE, WORKFLOW), 'utf8');
   const righe = workflow
@@ -390,21 +411,32 @@ test('il workflow non annulla i giri in corso su main', () => {
   if (righe.length === 0) return;
 
   assert.equal(righe.length, 1, `mi aspetto una sola riga cancel-in-progress in ${WORKFLOW}`);
-  const valore = righe[0].split(':').slice(1).join(':').trim();
+  const valore = righe[0]
+    .split(':')
+    .slice(1)
+    .join(':')
+    .replace(/"/g, '\'')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  assert.notEqual(
-    valore,
-    'true',
-    `${WORKFLOW}: cancel-in-progress e' tornato la costante \`true\`. Su \`main\` il giro`
-      + ' annullato e\' l\'unico che avrebbe guardato quel commit, perche\' li\' la base e\''
-      + ' quella dichiarata dall\'evento: due unioni a pochi secondi di distanza fanno'
-      + ' sparire il contenuto della prima.',
-  );
+  // La diagnosi dei due modi conosciuti di sbagliare, perche' chi legge il rosso
+  // sappia subito quale dei due ha davanti — il secondo non si vede a occhio.
+  let perche = 'non e\' nessuna delle forme sicure';
+  if (valore === 'true') {
+    perche = 'e\' la costante `true`, cioe\' annulla sempre, anche su `main`';
+  } else if (/github\.ref\s*==\s*'refs\/heads\/main'/.test(valore)) {
+    perche = 'e\' la condizione ROVESCIATA (`==` invece di `!=`): annulla i giri SOLO su'
+      + ' `main`, cioe\' esattamente dove non si deve. E\' il caso peggiore di tutti, ed e\''
+      + ' quello che si ottiene rileggendo in fretta le righe di commento qui sopra';
+  }
 
   assert.ok(
-    valore.includes('refs/heads/main'),
-    `${WORKFLOW}: cancel-in-progress deve escludere \`main\` nominandolo`
-      + ` (atteso qualcosa come \${{ github.ref != 'refs/heads/main' }}), trovato invece`
+    CANCEL_SICURI.includes(valore),
+    `${WORKFLOW}: cancel-in-progress ${perche}. Su \`main\` il giro annullato e' l'unico che`
+      + ' avrebbe guardato quel commit, perche\' li\' la base e\' quella dichiarata'
+      + ' dall\'evento: due unioni a pochi secondi di distanza fanno sparire il contenuto'
+      + ` della prima. Valori ammessi: la riga assente, oppure uno fra`
+      + ` ${CANCEL_SICURI.map((v) => JSON.stringify(v)).join(' e ')}. Trovato invece`
       + ` ${JSON.stringify(valore)}.`,
   );
 });

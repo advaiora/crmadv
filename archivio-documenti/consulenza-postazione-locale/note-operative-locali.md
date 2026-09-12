@@ -90,3 +90,13 @@ Nel dubbio vale l'esempio concreto: la regola *«nei comandi per Jacopo niente `
 - **Un'operazione che dipende da una finestra grafica non è automatizzabile.** Prima di dire che una configurazione «funziona», va provata **senza interazione possibile**: se compare una richiesta, per un assistente è un blocco, non un passaggio.
 - **La verifica giusta e' un `git push --dry-run`** nel repository che si teme di aver rotto: non modifica niente e mette alla prova proprio l'autenticazione. Farlo **prima** di dichiarare che il resto è salvo, non dopo.
 - **Vale anche al contrario:** un clone nuovo di questo stesso repository nascerebbe con l'account di casa e prenderebbe 403. L'eccezione locale va rimessa a ogni clone.
+
+---
+
+## L6. Un documento lungo si scrive con lo strumento di scrittura, non con un heredoc
+
+**Contesto:** 9/9/2026. Scrivendo il dossier dell'incidente VPS (~150 righe di italiano con tabelle, virgolette basse, emoji e sequenze tipo `^[[200~`) ho usato un heredoc `cat > file << 'EOF'` dal terminale.
+
+**Errore:** la shell si e' impuntata con `unexpected EOF while looking for matching quote` e il file non e' stato creato. Un giro sprecato, con il rischio peggiore di scrivere un file troncato a meta' senza accorgersene.
+
+**Modo corretto:** per qualsiasi documento oltre le poche righe si usa direttamente lo **strumento di scrittura file**. L'heredoc va bene per due righe di appunto; da li' in su il rapporto fra rischio e comodita' si inverte. Il segnale per decidere non e' la lunghezza in se': e' la **presenza di caratteri che la shell interpreta** (apici, backtick, `$`, sequenze di escape). Se ce ne sono, non passare dalla shell.
