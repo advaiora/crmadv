@@ -1586,7 +1586,47 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 109. La soglia delle 500 righe la supera il merge, non un ramo preso da solo
+## 109. Un 403 su un endpoint non dice che la cosa non esiste: puo' dire che e' implementata con un altro meccanismo
+
+**Contesto:** 11/9/2026, CRMA-182. Per sapere se `main` fosse protetto si e' interrogato `GET /repos/{owner}/{repo}/branches/main/protection`, che ha risposto **403 `Resource not accessible by personal access token`**. Da li' la conclusione: la protezione non e' ne' leggibile ne' impostabile da un agente, serve una persona anche solo per **guardare**.
+
+**Errore:** il 403 riguardava l'endpoint *legacy*. La protezione c'era gia' — dal 31/8/2026 — ma realizzata come **ruleset**, che si legge da un endpoint diverso e non protetto: `GET /repos/{owner}/{repo}/rules/branches/main` risponde **200** con lo stesso token. Il segnale che avrebbe dovuto insospettire era gia' nella risposta di `GET /repos/{owner}/{repo}/branches/main`: `protected: true` accanto a `protection.enabled: false`. Conseguenza: a una persona sono stati chiesti due minuti di lavoro **con i passi sbagliati** (una regola nuova invece della modifica di quella esistente) e **una domanda gia' risposta dal sistema** (il push diretto era gia' vietato).
+
+**Modo corretto:**
+- Su GitHub la protezione di un ramo si legge da **`/rules/branches/{ramo}`** (rulesets) *e* da `/branches/{ramo}/protection` (legacy), piu' `/rulesets` per l'elenco: tre chiamate, costano niente.
+- `protected: true` con `protection.enabled: false` non e' una contraddizione, e' la firma di un ruleset: quando si presenta, si controlla subito l'endpoint dei rulesets prima di concludere qualsiasi cosa.
+- Un 403 dimostra che **quel token non puo' fare quella chiamata**, non che la cosa non esista. Vale anche al contrario della nota #92: un vincolo va verificato oggi pure quando verificarlo fa sembrare il lavoro **meno** necessario.
+- Prova: CRMA-182, `GET /repos/advaiora/crmadv/branches/main/protection` → 403; `GET /repos/advaiora/crmadv/rules/branches/main` → 200.
+
+---
+
+## 110. Il `helpText` di una domanda nelle interazioni si ferma a 1000 caratteri
+
+**Contesto:** 11/9/2026, CRMA-182, componendo una `ask_user_questions` con una domanda che spiegava nel dettaglio le opzioni disponibili dentro `helpText`.
+
+**Errore:** `POST /api/issues/{id}/interactions` ha risposto **400 `too_big`** su `payload.questions[N].helpText`. E' il fratello del tetto gia' annotato sulle `label` delle opzioni (120 caratteri, nota #98 — vedi `interactions-payload-wrapper` in memoria): un secondo limite sullo stesso endpoint, su un campo diverso.
+
+**Modo corretto:**
+- `helpText` si ferma a **1000 caratteri**. Il testo lungo — motivazione, contesto, alternative scartate — va nel **commento del compito**, non nell'aiuto della domanda: la domanda resta breve e rimanda al commento per i dettagli.
+- Prima di comporre un'interazione con testo non banale, contare i caratteri di `helpText` e delle `label` prima di spedire, non dopo il 400.
+- Prova: CRMA-182, `POST /api/issues/.../interactions` → 400 `too_big` su `payload.questions[0].helpText`.
+
+---
+
+## 111. Le pull request degli agent le apre il proprietario del token, non un utente-bot distinto
+
+**Contesto:** 11/9/2026, CRMA-182, valutando se proporre "1 approvazione obbligatoria" come regola del ruleset su `main`.
+
+**Errore:** si stava per proporre quella spunta senza aver controllato chi appare come autore delle pull request create dagli agent. Verificato sulla PR #71: `user.login` e' `advaiora`, che e' anche uno dei due soli collaboratori del repository — non un account bot separato.
+
+**Modo corretto:**
+- GitHub vieta di approvare la propria pull request. Se le PR degli agent sono aperte dallo stesso utente che dovrebbe approvarle, **pretendere 1 approvazione obbligatoria fermerebbe ogni unione automatica** (corsia B compresa): nessuno potrebbe mai approvarla.
+- Prima di proporre a una persona una regola di approvazione sul ruleset, controllare `user.login` di una pull request recente aperta da un agente e confrontarlo con l'elenco dei collaboratori (`GET /repos/{owner}/{repo}/collaborators`).
+- Prova: PR #71 su `crmadv`, `user.login: advaiora`.
+
+---
+
+## 112. La soglia delle 500 righe la supera il merge, non un ramo preso da solo
 
 **Contesto:** 10/9/2026, chiudendo CRMA-169 (allegati scaricabili dopo il cestino), unendo `origin/main` dentro il ramo lungo `backend/crma-29-cestino`. Due rami separati lavoravano sullo stesso modulo (`server/modules/messaging/`) senza incontrarsi.
 

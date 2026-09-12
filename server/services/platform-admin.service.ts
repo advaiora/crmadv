@@ -2,7 +2,10 @@ import { badRequest, conflict, notFound } from '../core/errors.js';
 import { prisma } from '../prisma.js';
 import { ensureWorkspaceSystemRoles } from '../auth/workspace-bootstrap.js';
 import { platformAdminRepository } from '../repositories/platform-admin.repository.js';
-import { aiUsageRepository } from '../repositories/ai-usage.repository.js';
+import {
+  aiUsageRepository,
+  type AiUsageCrossWorkspaceFilter,
+} from '../repositories/ai-usage.repository.js';
 
 const AI_SETTING_KEYS = {
   enabled: 'agency_ai_enabled',
@@ -265,11 +268,15 @@ export const platformAdminService = {
   // Impostazioni Agency: qui resta solo la vista d'insieme del gestore piattaforma.
   async getAiUsage(filter: { windowDays: number }) {
     const since = new Date(Date.now() - filter.windowDays * 24 * 60 * 60 * 1000);
-    const periodFilter = { since };
+    // `allWorkspaces: true` e' la dichiarazione esplicita che qui i dati NON si
+    // filtrano per workspace: e' il mestiere di questa Console, e le sue rotte
+    // sono protette dal guard `requirePlatformAdmin` (`admin.route.ts`). Scritto
+    // per esteso perche' si veda in revisione (CRMA-179).
+    const periodFilter: AiUsageCrossWorkspaceFilter = { since, allWorkspaces: true };
 
     const [groupedWorkspace, totals, workspaces] = await Promise.all([
       aiUsageRepository.aggregateByWorkspace(periodFilter),
-      aiUsageRepository.totals(periodFilter),
+      aiUsageRepository.totalsAcrossWorkspaces(periodFilter),
       platformAdminRepository.listWorkspaces(),
     ]);
 
