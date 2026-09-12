@@ -65,7 +65,13 @@ describe('ClientForm — campi personalizzati', () => {
     // Il campo nuovo e' subito li', e il cliente in corso non si e' perso.
     const nuovoCampo = await screen.findByLabelText('Settore merceologico');
     expect(campoNome()).toHaveValue('Trattoria Da Beppe');
-    expect(screen.queryByText('Nuovo campo personalizzato')).not.toBeInTheDocument();
+    // La modale si chiude subito (`setModalOpen(false)`), ma il Modal di
+    // react-bootstrap resta montato durante la sua dissolvenza in uscita
+    // (`Fade`, timeout 300ms reali anche in jsdom): un'asserzione sincrona
+    // qui e' in corsa con quel timer, non con lo stato dell'app (nota #41,
+    // stessa famiglia: un aggiornamento non e' sincrono solo perche' di solito
+    // e' rapido).
+    await waitFor(() => expect(screen.queryByText('Nuovo campo personalizzato')).not.toBeInTheDocument());
 
     // Ed e' compilabile: il valore arriva nel salvataggio del cliente.
     fireEvent.change(nuovoCampo, { target: { value: 'Ristorazione' } });
