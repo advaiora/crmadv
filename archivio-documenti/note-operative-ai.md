@@ -1626,11 +1626,23 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 112. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
+## 112. La soglia delle 500 righe la supera il merge, non un ramo preso da solo
+
+**Contesto:** 10/9/2026, chiudendo CRMA-169 (allegati scaricabili dopo il cestino), unendo `origin/main` dentro il ramo lungo `backend/crma-29-cestino`. Due rami separati lavoravano sullo stesso modulo (`server/modules/messaging/`) senza incontrarsi.
+
+**Errore:** guardare la soglia delle 500 righe solo sul proprio ramo. Su `main` `repository.ts` era a 393 righe e `service.ts` a 440: entrambi sotto soglia, e nessuno dei due lavori li sforava da solo. Dopo il merge erano a 602 e 523 — la soglia l'ha superata la somma, e nessun autore dei due rami se n'e' accorto mentre scriveva, perche' nessuno dei due vedeva l'altro ramo.
+
+**Modo corretto:**
+- Quando si unisce `main` dentro un ramo lungo che tocca un modulo condiviso, misurare le righe dei file **dopo** la risoluzione del merge, non fidarsi del conteggio visto prima di unire.
+- Se la soglia risulta superata dal merge, non spezzare il file di passaggio (vale la regola di sempre sui mostri): si annota in roadmap con la causa vera ("somma di due lavori nati separati"), non si tratta come un difetto del proprio ramo.
+
+---
+
+## 113. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
 
 **Contesto:** 11/9/2026, CRMA-159 (controllo sui segreti). Verificare che GitHub **valuti davvero** un'espressione `${{ }}` in un campo che decide un comportamento di sicurezza (`cancel-in-progress`), non che la accetti soltanto come stringa.
 
-**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#113**, gemella di questa).
+**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#114**, gemella di questa).
 
 **Errore, seconda meta' — come non si butta via la prova dopo averla costruita:** cancellare **le tracce dei giri** insieme ai rami, per pulizia. I rami vanno cancellati; i giri no. Il giro **e' la prova**: cancellato lui, chi revisiona dopo trova un'affermazione senza riscontro e deve rifare la misura da capo. E' successo davvero qui: la sonda a due arm che dimostrava che GitHub valuta l'espressione era corretta e ben disegnata, ma i suoi quattro giri erano stati cancellati — quindi il Guardiano ha dovuto rieseguirla per intero (due rami, quattro push, tre minuti di attesa), e nel farlo ha dovuto **spingere di nuovo su un repository pubblico**, il gesto che si voleva fare una volta sola.
 
@@ -1641,10 +1653,10 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 113. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
+## 114. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
 
 **Contesto:** 11/9/2026, CRMA-159. Iniettare un guasto in un file che contiene la propria correzione non ancora committata, per provare che un test la rilevi davvero.
 
-**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#112**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
+**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#113**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
 
 **Modo corretto:** committare la correzione **prima** di iniettare il guasto, oppure ripristinare da una copia separata (mai dall'ultimo commit se contiene una correzione non committata); e dopo il ripristino **rileggere** la riga corretta invece di fidarsi del colore del banco.
