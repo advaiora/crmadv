@@ -1674,3 +1674,13 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 **Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#114**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
 
 **Modo corretto:** committare la correzione **prima** di iniettare il guasto, oppure ripristinare da una copia separata (mai dall'ultimo commit se contiene una correzione non committata); e dopo il ripristino **rileggere** la riga corretta invece di fidarsi del colore del banco.
+---
+
+## 116. Un Postgres locale attivo sulla VPS non è il database di produzione — la stringa di connessione lo dice, i processi in ascolto no
+
+**Contesto:** 11/9/2026, CRMA-96. Il Guardiano ha rilevato un'installazione locale di PostgreSQL 17 con database `crmadv` attiva dentro lo strato scrivibile del container sulla VPS, e da lì ha dedotto un rischio di perdita dati legato alla ricreazione del container, trattandolo come il database di produzione del CRM.
+
+**Errore:** si è dato per scontato che il Postgres osservato sulla macchina fosse quello usato in produzione da `crmadv`, senza verificare la stringa di connessione effettiva dell'applicazione. Il CEO ha chiarito (risposta su CRMA-96, 11/9/2026) che il database reale è su Supabase; il Postgres locale non è collegato al prodotto.
+
+**Modo corretto:**
+- Prima di aprire un'interazione o dichiarare un rischio su "il database di produzione", verificare la stringa di connessione effettiva usata dall'app (`DATABASE_URL` o simile, nel repo `crmadv` o nella configurazione di deploy) — non dedurla dai processi attivi sulla macchina che la ospita.
