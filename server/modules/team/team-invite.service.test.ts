@@ -8,6 +8,50 @@ const FIXED_NOW = new Date('2026-03-04T10:00:00.000Z');
 const TEST_TOKEN = 'f'.repeat(64);
 const TEST_CLIENT_IP = '127.0.0.1';
 
+// L'indirizzo pubblico se lo dichiara il test, non lo eredita dall'ambiente.
+//
+// `resolveInviteBaseUrl` (team-invite.service.ts) prova quattro variabili e,
+// se nessuna c'e', ripiega su `http://localhost:5173` SOLO fuori produzione:
+// con `NODE_ENV=production` restituisce `null`, il link non e' componibile e
+// il servizio risponde "Invite link cannot be built". Gli agent girano proprio
+// con `NODE_ENV=production`, quindi senza queste righe tre test qui sotto
+// erano verdi sul PC di chi sviluppa e rossi in ogni run automatico - e uno
+// dei tre (l'invio dell'email) non provava piu' niente, perche' senza link il
+// notificatore non viene nemmeno chiamato.
+//
+// Si azzerano tutte e quattro le variabili e se ne imposta una sola: cosi' il
+// risultato non dipende ne' da `NODE_ENV` ne' dal `.env` della macchina.
+const TEST_INVITE_BASE_URL = 'https://crm.test.invalid';
+const TEST_INVITE_LINK = `${TEST_INVITE_BASE_URL}/accept-invite?token=${TEST_TOKEN}`;
+const INVITE_BASE_URL_KEYS = [
+  'TEAM_INVITE_BASE_URL',
+  'APP_BASE_URL',
+  'FRONTEND_BASE_URL',
+  'WEB_BASE_URL',
+] as const;
+
+const previousInviteBaseUrls = new Map<string, string | undefined>();
+
+test.before(() => {
+  for (const key of INVITE_BASE_URL_KEYS) {
+    previousInviteBaseUrls.set(key, process.env[key]);
+    delete process.env[key];
+  }
+
+  process.env.TEAM_INVITE_BASE_URL = TEST_INVITE_BASE_URL;
+});
+
+test.after(() => {
+  for (const [key, value] of previousInviteBaseUrls) {
+    if (value === undefined) {
+      delete process.env[key];
+      continue;
+    }
+
+    process.env[key] = value;
+  }
+});
+
 const makeInvite = (overrides: Record<string, unknown> = {}) => ({
   id: 'invite-1',
   workspaceId: 'workspace-1',
@@ -167,7 +211,9 @@ test('createInvite stores token hash only and not plain token', async () => {
   assert.ok(createPayload);
   assert.equal(createPayload?.tokenHash, `hashed:${TEST_TOKEN}`);
   assert.equal('token' in (createPayload as Record<string, unknown>), false);
-  assert.ok(typeof result.inviteLink === 'string' && result.inviteLink.includes(`token=${TEST_TOKEN}`));
+  // Il link e' costruito sull'indirizzo dichiarato in cima al file: se un
+  // giorno tornasse a dipendere dall'ambiente, qui si vede subito.
+  assert.equal(result.inviteLink, TEST_INVITE_LINK);
   // L'invito e' stato creato ma l'email non e' partita: la risposta deve dirlo.
   assert.equal(result.delivery.emailSent, false);
   assert.equal(result.delivery.reason, 'MAIL_NOT_CONFIGURED');
@@ -343,7 +389,7 @@ test('regenerateInviteLink issues a fresh link without moving the expiry', async
     actorUserId: 'user-admin',
   });
 
-  assert.ok(result.inviteLink.includes(`token=${TEST_TOKEN}`));
+  assert.equal(result.inviteLink, TEST_INVITE_LINK);
   assert.ok(refreshPayload);
   // Il token cambia (il precedente smette di valere)...
   assert.equal((refreshPayload as Record<string, unknown>).tokenHash, `hashed:${TEST_TOKEN}`);
