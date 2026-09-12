@@ -1,139 +1,42 @@
-import { z } from 'zod';
-import { HttpError, badRequest, conflict, forbidden, notFound, unauthorized } from '../../core/errors.js';
+import { badRequest, conflict, notFound } from '../../core/errors.js';
 import { signAccessToken } from '../../auth/jwt.js';
 import {
   SYSTEM_ROLE_NAME,
   assignWorkspaceUserRole,
   getUserWorkspaceSystemRoleName,
-  isSystemRoleAtOrBelow,
-  normalizeWorkspaceSystemRoleName,
 } from '../../auth/workspace-bootstrap.js';
-import { TEAM_MODULE_KEY, type WorkspaceSystemRoleName } from '../../auth/rbac-catalog.js';
 import { moduleRepository } from '../../repositories/module.repository.js';
 import { teamRepository } from './team.repository.js';
 import { userRepository } from '../../repositories/user.repository.js';
 import { prisma } from '../../prisma.js';
 import { teamInviteNotifier } from './team-invite.notifier.js';
-import { teamInviteRepository, type TeamInviteRecord } from './team-invite.repository.js';
+import { teamInviteRepository } from './team-invite.repository.js';
 import { generateInviteToken, hashInviteToken } from './team-invite.tokens.js';
-import { enforceTeamInviteAcceptRateLimit } from './rate-limit.js';
 import { normalizeEmail } from './team.utils.js';
+import { acceptTeamInvite } from './team-invite.accept.js';
+import {
+  assertActorCanInviteRole,
+  isDevelopment,
+  mapInviteToDto,
+  parseCreateInvitePayload,
+  resolveInviteBaseUrl,
+  resolveInviteExpiry,
+  resolveRolePresetForAcceptance,
+  resolveRolePresetNameOrThrow,
+} from './team-invite.helpers.js';
+import type {
+  AcceptTeamInviteResult,
+  CreateTeamInviteResult,
+  RegenerateInviteLinkResult,
+  TeamInviteDelivery,
+  TeamInviteDto,
+  TeamInviteServiceDependencies,
+} from './team-invite.types.js';
 
-const DEFAULT_INVITE_EXPIRES_IN_DAYS = 7;
-const MAX_INVITE_EXPIRES_IN_DAYS = 30;
+// Ri-esportati perche' erano parte della superficie di questo file prima della
+// spezzatura: chi li importava da qui continua a trovarli.
+export type { TeamInviteDelivery, TeamInviteDeliveryFailure } from './team-invite.types.js';
 
-const createInviteSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  rolePreset: z
-    .union([
-      z.string().trim().min(1),
-      z.array(z.string().trim().min(1)).min(1),
-    ])
-    .optional(),
-  expiresInDays: z
-    .number()
-    .int()
-    .min(1)
-    .max(MAX_INVITE_EXPIRES_IN_DAYS)
-    .optional(),
-}).strict();
-
-const acceptInviteSchema = z.object({
-  token: z.string().trim().min(32),
-}).strict();
-
-type InviteRolePresetInput = z.infer<typeof createInviteSchema>['rolePreset'];
-
-type TeamInviteDto = {
-  inviteId: string;
-  workspaceId: string;
-  email: string;
-  status: string;
-  rolePreset: string;
-  expiresAt: string;
-  createdAt: string;
-  acceptedAt: string | null;
-  revokedAt: string | null;
-  invitedBy: {
-    userId: string;
-    name: string | null;
-    email: string;
-  };
-  acceptedBy: {
-    userId: string;
-    name: string | null;
-    email: string;
-  } | null;
-};
-
-/**
- * Perche' l'email non e' partita. Tre cause distinte, che si raccontano
- * all'utente in tre modi diversi: prima del 17/8/2026 erano tutte appiattite
- * su "SMTP non configurato", che nel caso della base URL mancante era falso.
- */
-export type TeamInviteDeliveryFailure =
-  /** Non esiste un server di posta configurato. */
-  | 'MAIL_NOT_CONFIGURED'
-  /** Il server c'e' ma ha rifiutato il messaggio. */
-  | 'SEND_FAILED'
-  /** Il server e' configurato nel CRM ma la sua password non si decifra piu'. */
-  | 'MAIL_CONFIG_UNREADABLE'
-  /** Non si sa a quale indirizzo pubblico risponde il CRM: il link non e' componibile. */
-  | 'INVITE_LINK_UNAVAILABLE';
-
-export type TeamInviteDelivery = {
-  emailSent: boolean;
-  reason?: TeamInviteDeliveryFailure;
-};
-
-type CreateTeamInviteResult = {
-  inviteId: string;
-  email: string;
-  expiresAt: string;
-  status: string;
-  rolePreset: string;
-  /** L'esito reale della consegna. L'invito puo' esistere e l'email non essere partita. */
-  delivery: TeamInviteDelivery;
-  inviteLink?: string;
-  invitePreviewUrl?: string;
-};
-
-type RegenerateInviteLinkResult = {
-  invite: TeamInviteDto;
-  inviteLink: string;
-};
-
-type AcceptTeamInviteResult = {
-  inviteId: string;
-  workspaceId: string;
-  workspaceSlug: string;
-  membershipId: string;
-  accessToken: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-    name: string | null;
-  };
-};
-
-type TeamInviteServiceDependencies = {
-  inviteRepository: typeof teamInviteRepository;
-  teamRepo: typeof teamRepository;
-  userRepo: typeof userRepository;
-  prismaClient: typeof prisma;
-  moduleRepo: typeof moduleRepository;
-  notifier: typeof teamInviteNotifier;
-  getActorSystemRoleFn: (input: {
-    workspaceId: string;
-    userId: string;
-  }) => Promise<WorkspaceSystemRoleName | null>;
-  assignWorkspaceUserRoleFn: typeof assignWorkspaceUserRole;
-  signAccessTokenFn: typeof signAccessToken;
-  generateTokenFn: typeof generateInviteToken;
-  hashTokenFn: typeof hashInviteToken;
-  nowFn: () => Date;
-};
 
 const defaultDependencies: TeamInviteServiceDependencies = {
   inviteRepository: teamInviteRepository,
@@ -150,167 +53,6 @@ const defaultDependencies: TeamInviteServiceDependencies = {
   hashTokenFn: hashInviteToken,
   nowFn: () => new Date(),
 };
-
-const isDevelopment = () => process.env.NODE_ENV !== 'production';
-
-const resolveInviteBaseUrl = () => {
-  const candidate =
-    process.env.TEAM_INVITE_BASE_URL?.trim()
-    || process.env.APP_BASE_URL?.trim()
-    || process.env.FRONTEND_BASE_URL?.trim()
-    || process.env.WEB_BASE_URL?.trim();
-
-  if (!candidate) {
-    return isDevelopment() ? 'http://localhost:5173' : null;
-  }
-
-  try {
-    const parsed = new URL(candidate);
-    return parsed.toString().replace(/\/+$/, '');
-  } catch {
-    return isDevelopment() ? 'http://localhost:5173' : null;
-  }
-};
-
-/**
- * Il ruolo Superadmin non si concede per invito, nemmeno da un altro Superadmin.
- *
- * ⚠️ Sembra ridondante con la gerarchia qui sotto - se solo un Superadmin puo'
- * invitare un Superadmin, e un Superadmin puo' gia' promuovere chiunque, che
- * differenza fa? Ne fa una grossa, ed e' il motivo per cui questa regola
- * esiste: **promuovere e invitare non sono lo stesso potere.**
- *  - promuovere passa da `assignWorkspaceUserRole`, che pretende un destinatario
- *    gia' membro attivo del workspace: una persona con un account e una password;
- *  - invitare produce **una stringa al portatore**. La rotta di accettazione e'
- *    pubblica, l'autenticazione e' facoltativa, e senza sessione l'invito
- *    **crea l'utente** sull'email indicata e restituisce un token d'accesso.
- *
- * Dal 17/8/2026 quel link viene mostrato a schermo e copiato negli appunti
- * quando l'email non parte: finisce in chat, in un messaggio, in un blocco note.
- * Un invito da Superadmin sarebbe un oggetto per cui *chi lo apre per primo
- * comanda* - compreso chi non era il destinatario. Il resto del progetto la
- * pensa gia' cosi': la registrazione declassa a Viewer chi chiede Superadmin.
- */
-const assertInvitablePreset = (roleName: WorkspaceSystemRoleName) => {
-  if (roleName === SYSTEM_ROLE_NAME.superadmin) {
-    throw badRequest(
-      'Il ruolo Superadmin non puo essere assegnato tramite invito: va concesso a un membro gia esistente da Ruoli e permessi',
-    );
-  }
-};
-
-const resolveRolePresetNameOrThrow = (rolePreset: InviteRolePresetInput) => {
-  const rawValue = Array.isArray(rolePreset) ? rolePreset[0] : rolePreset;
-  if (!rawValue) {
-    return SYSTEM_ROLE_NAME.viewer;
-  }
-
-  const normalizedRoleName = normalizeWorkspaceSystemRoleName(rawValue);
-  if (!normalizedRoleName) {
-    throw badRequest('Invalid rolePreset. Allowed values: Admin, Manager, Operativo, Viewer');
-  }
-
-  assertInvitablePreset(normalizedRoleName);
-
-  return normalizedRoleName;
-};
-
-/**
- * Nessuno puo' invitare a un ruolo piu' alto del proprio.
- *
- * Regola di Jacopo, 17/8/2026, valida universalmente: non avrebbe senso che un
- * Manager faccia entrare un Admin. Prima non c'era nessun controllo e la
- * conseguenza era grossa: chiunque avesse `team.invite` poteva crearsi un invito
- * con preset **Superadmin**, aprirlo, e ritrovarsi una sessione da Superadmin -
- * mentre in ogni altro punto del CRM i ruoli di sistema li assegna solo un
- * Superadmin. Restava teorica solo perche' senza posta configurata il link non
- * usciva mai; col pulsante "Link invito" non lo sarebbe piu' stata.
- *
- * Stesso livello e' concesso: un Admin puo' invitare un Admin.
- */
-const assertActorCanInviteRole = ({
-  actorRoleName,
-  rolePresetName,
-}: {
-  actorRoleName: WorkspaceSystemRoleName | null;
-  rolePresetName: WorkspaceSystemRoleName;
-}) => {
-  if (!actorRoleName) {
-    throw forbidden('Actor has no system role in this workspace');
-  }
-
-  if (!isSystemRoleAtOrBelow(rolePresetName, actorRoleName)) {
-    throw forbidden(
-      `Non puoi invitare qualcuno al ruolo ${rolePresetName}: e piu alto del tuo (${actorRoleName})`,
-      { actorRole: actorRoleName, requestedRole: rolePresetName },
-    );
-  }
-};
-
-const resolveRolePresetForAcceptance = (rolePresetName: string | null) =>
-  normalizeWorkspaceSystemRoleName(rolePresetName) ?? SYSTEM_ROLE_NAME.viewer;
-
-const resolveInviteExpiry = (now: Date, expiresInDays: number | undefined) => {
-  const days = expiresInDays ?? DEFAULT_INVITE_EXPIRES_IN_DAYS;
-  return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
-};
-
-const mapInviteToDto = (invite: TeamInviteRecord): TeamInviteDto => ({
-  inviteId: invite.id,
-  workspaceId: invite.workspaceId,
-  email: invite.email,
-  status: invite.status,
-  rolePreset: invite.rolePresetName ?? SYSTEM_ROLE_NAME.viewer,
-  expiresAt: invite.expiresAt.toISOString(),
-  createdAt: invite.createdAt.toISOString(),
-  acceptedAt: invite.acceptedAt ? invite.acceptedAt.toISOString() : null,
-  revokedAt: invite.revokedAt ? invite.revokedAt.toISOString() : null,
-  invitedBy: {
-    userId: invite.invitedByUser.id,
-    name: invite.invitedByUser.name,
-    email: invite.invitedByUser.email,
-  },
-  acceptedBy: invite.acceptedByUser
-    ? {
-      userId: invite.acceptedByUser.id,
-      name: invite.acceptedByUser.name,
-      email: invite.acceptedByUser.email,
-    }
-    : null,
-});
-
-const parseCreateInvitePayload = (payload: unknown) => {
-  const parsed = createInviteSchema.safeParse(payload);
-  if (!parsed.success) {
-    throw badRequest('Invalid team invite payload', {
-      issues: parsed.error.flatten(),
-    });
-  }
-
-  return parsed.data;
-};
-
-const parseAcceptInvitePayload = (payload: unknown) => {
-  const parsed = acceptInviteSchema.safeParse(payload);
-  if (!parsed.success) {
-    throw badRequest('Invalid invite accept payload', {
-      issues: parsed.error.flatten(),
-    });
-  }
-
-  return parsed.data;
-};
-
-const assertAcceptableInviteStatus = (invite: TeamInviteRecord) => {
-  if (invite.status === 'REVOKED') {
-    throw new HttpError(410, 'INVITE_REVOKED', 'Invite has been revoked');
-  }
-
-  if (invite.status === 'EXPIRED') {
-    throw new HttpError(410, 'INVITE_EXPIRED', 'Invite has expired');
-  }
-};
-
 export const buildTeamInviteService = (
   dependencies: TeamInviteServiceDependencies = defaultDependencies,
 ) => {
@@ -355,7 +97,17 @@ export const buildTeamInviteService = (
       if (existingUser) {
         const existingMembership = await teamRepo.findMembershipByUserId(input.workspaceId, existingUser.id);
         if (existingMembership) {
-          throw conflict('Invite cannot be created for this recipient');
+          // Anche da cestinata la membership esiste ancora, quindi l'invito
+          // resta rifiutato: creare la seconda riga sbatterebbe sull'unicita'
+          // di (workspaceId, userId). Cambia solo il motivo che si legge, e
+          // cambia dove si va a rimediare — il Cestino, non la lista Team
+          // (CRMA-130). Il messaggio resta volutamente avaro sul resto: chi
+          // invita non deve poter sondare chi e' gia' dentro al workspace.
+          throw conflict(
+            existingMembership.deletedAt
+              ? 'Invite cannot be created for this recipient: the membership is in the trash and must be restored'
+              : 'Invite cannot be created for this recipient',
+          );
         }
       }
 
@@ -555,195 +307,7 @@ export const buildTeamInviteService = (
       authenticatedUserId: string | null;
       clientIp?: string | null;
     }): Promise<AcceptTeamInviteResult> {
-      const now = nowFn();
-      const parsedPayload = parseAcceptInvitePayload(input.payload);
-      const tokenHash = hashTokenFn(parsedPayload.token);
-      enforceTeamInviteAcceptRateLimit({
-        clientIp: input.clientIp?.trim() || 'unknown',
-        tokenHash,
-      });
-
-      const inviteSnapshot = await inviteRepository.findInviteByTokenHash(tokenHash);
-      if (!inviteSnapshot) {
-        throw badRequest('Invalid or expired invite token');
-      }
-
-      const teamModuleEnabled = await moduleRepo.isEnabled(inviteSnapshot.workspaceId, TEAM_MODULE_KEY);
-      if (!teamModuleEnabled) {
-        throw forbidden('Module is disabled for this workspace', {
-          workspaceId: inviteSnapshot.workspaceId,
-          moduleKey: TEAM_MODULE_KEY,
-        });
-      }
-
-      const transactionResult = await prismaClient.$transaction(async (tx) => {
-        const invite = await inviteRepository.findInviteByTokenHash(tokenHash, tx);
-        if (!invite) {
-          throw badRequest('Invalid or expired invite token');
-        }
-
-        assertAcceptableInviteStatus(invite);
-        if (invite.status === 'PENDING' && invite.expiresAt < now) {
-          await inviteRepository.expirePendingInviteById(invite.id, now, tx);
-          throw new HttpError(410, 'INVITE_EXPIRED', 'Invite has expired');
-        }
-
-        let targetUser = null as null | {
-          id: string;
-          email: string;
-          name: string | null;
-          role: string;
-        };
-
-        if (input.authenticatedUserId) {
-          targetUser = await tx.user.findUnique({
-            where: {
-              id: input.authenticatedUserId,
-            },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              role: true,
-            },
-          });
-
-          if (!targetUser) {
-            throw unauthorized('Authenticated user was not found');
-          }
-
-          if (normalizeEmail(targetUser.email) !== normalizeEmail(invite.email)) {
-            throw forbidden('Invite email does not match authenticated user');
-          }
-        } else {
-          targetUser = await tx.user.upsert({
-            where: {
-              email: invite.email,
-            },
-            update: {},
-            create: {
-              email: invite.email,
-              name: null,
-              role: 'member',
-            },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              role: true,
-            },
-          });
-        }
-
-        if (invite.status === 'ACCEPTED') {
-          if (invite.acceptedByUserId && invite.acceptedByUserId !== targetUser.id) {
-            throw forbidden('Invite has already been accepted');
-          }
-
-          const membership = await tx.membership.upsert({
-            where: {
-              workspaceId_userId: {
-                workspaceId: invite.workspaceId,
-                userId: targetUser.id,
-              },
-            },
-            update: {
-              status: 'ACTIVE',
-            },
-            create: {
-              workspaceId: invite.workspaceId,
-              userId: targetUser.id,
-              status: 'ACTIVE',
-            },
-            select: {
-              id: true,
-            },
-          });
-
-          return {
-            inviteId: invite.id,
-            workspaceId: invite.workspace.id,
-            workspaceSlug: invite.workspace.slug,
-            membershipId: membership.id,
-            sessionRole: targetUser.role,
-            targetUser,
-          };
-        }
-
-        const claimedInvite = await inviteRepository.markInviteAccepted(
-          invite.id,
-          targetUser.id,
-          now,
-          tx,
-        );
-
-        if (claimedInvite.count === 0) {
-          throw conflict('Invite could not be claimed');
-        }
-
-        const membership = await tx.membership.upsert({
-          where: {
-            workspaceId_userId: {
-              workspaceId: invite.workspaceId,
-              userId: targetUser.id,
-            },
-          },
-          update: {
-            status: 'ACTIVE',
-          },
-          create: {
-            workspaceId: invite.workspaceId,
-            userId: targetUser.id,
-            status: 'ACTIVE',
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        const rolePresetName = resolveRolePresetForAcceptance(invite.rolePresetName);
-        const roleAssignment = await assignWorkspaceUserRoleFn({
-          tx,
-          workspaceId: invite.workspaceId,
-          targetUserId: targetUser.id,
-          actorUserId: targetUser.id,
-          nextRoleName: rolePresetName,
-          sourceAction: 'team.invite.accept',
-          enforceHierarchy: false,
-          auditAction: 'rbac.user.role.assigned',
-        });
-
-        return {
-          inviteId: invite.id,
-          workspaceId: invite.workspace.id,
-          workspaceSlug: invite.workspace.slug,
-          membershipId: membership.id,
-          sessionRole: roleAssignment.assignedUserRole,
-          targetUser,
-        };
-      });
-
-      const accessToken = await signAccessTokenFn({
-        sub: transactionResult.targetUser.id,
-        email: transactionResult.targetUser.email,
-        role: transactionResult.sessionRole,
-        workspaceId: transactionResult.workspaceId,
-        workspaceSlug: transactionResult.workspaceSlug,
-      });
-
-      return {
-        inviteId: transactionResult.inviteId,
-        workspaceId: transactionResult.workspaceId,
-        workspaceSlug: transactionResult.workspaceSlug,
-        membershipId: transactionResult.membershipId,
-        accessToken,
-        user: {
-          id: transactionResult.targetUser.id,
-          email: transactionResult.targetUser.email,
-          role: transactionResult.sessionRole,
-          name: transactionResult.targetUser.name,
-        },
-      };
+      return acceptTeamInvite(dependencies, input);
     },
   };
 };

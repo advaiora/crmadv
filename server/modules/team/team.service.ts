@@ -6,7 +6,15 @@ import { SYSTEM_ROLE_NAME } from '../../auth/rbac-catalog.js';
 import { badRequest, conflict, forbidden, notFound } from '../../core/errors.js';
 import { prisma } from '../../prisma.js';
 import { userRepository } from '../../repositories/user.repository.js';
+import {
+  assertMembershipDestroyable,
+  requireWorkspaceMemberById,
+} from './team-membership.guards.js';
 import { teamRepository, type TeamMemberRecord } from './team.repository.js';
+
+// Ri-esportata: le guardie vivono in un file loro (vedi la nota li dentro), ma
+// chi le cerca dal servizio del Team le trova lo stesso.
+export { assertMembershipDestroyable };
 
 const createMemberSchema = z
   .object({
@@ -139,18 +147,6 @@ const parseAssignRolesPayload = (value: unknown) => {
   return parsed.data;
 };
 
-const requireWorkspaceMemberById = async (workspaceId: string, memberId: string) => {
-  const member = await teamRepository.findMemberById(workspaceId, memberId);
-  if (!member) {
-    throw notFound('Team member not found', {
-      workspaceId,
-      memberId,
-    });
-  }
-
-  return member;
-};
-
 const resolveRoleNameOrThrow = (roleName: string | undefined) => {
   if (!roleName) {
     return SYSTEM_ROLE_NAME.viewer;
@@ -225,11 +221,22 @@ export const teamService = {
 
     const existingMembership = await teamRepository.findMembershipByUserId(workspaceId, targetUser.id);
     if (existingMembership) {
-      throw conflict('User is already a member of this workspace', {
-        workspaceId,
-        userId: targetUser.id,
-        memberId: existingMembership.id,
-      });
+      // Due conflitti diversi, e vanno detti diversi (CRMA-130). Chi e' nel
+      // Cestino non compare piu' nella lista Team: rispondergli «e' gia' un
+      // membro» lo manda a cercarlo dove giustamente non c'e'. La via d'uscita
+      // e' il ripristino dal Cestino, non un secondo inserimento — che
+      // sbatterebbe comunque sull'unicita' di (workspaceId, userId).
+      throw conflict(
+        existingMembership.deletedAt
+          ? 'User is in the trash for this workspace: restore the membership instead of creating a new one'
+          : 'User is already a member of this workspace',
+        {
+          workspaceId,
+          userId: targetUser.id,
+          memberId: existingMembership.id,
+          trashed: Boolean(existingMembership.deletedAt),
+        },
+      );
     }
 
     const nextRoleName = resolveRoleNameOrThrow(parsedPayload.roleName);
@@ -403,6 +410,20 @@ export const teamService = {
     };
   },
 
+  /**
+   * Sposta un membro nel cestino (CRMA-165).
+   *
+   * Il permesso e la rotta non cambiano: chi poteva rimuovere puo' ancora, e
+   * cio' che cambia e' che la riga adesso resta. Le tre guardie stanno in
+   * `assertMembershipDestroyable`, condivise con la futura `purge`.
+   *
+   * ⚠️ Le assegnazioni di ruolo (`UserRole`) NON vengono toccate, ed e' la
+   * regola 1 di `server/core/soft-delete.ts`: cestinare non cancella niente, e
+   * un membro ripristinato deve tornare con i ruoli che aveva. Chi cestina il
+   * proprio accesso non se lo tiene comunque, perche' la catena di accesso al
+   * workspace guarda `deletedAt` prima dei ruoli (CRMA-157,
+   * `server/core/membership-access.ts`): la riga resta, l'accesso no.
+   */
   removeMember: async ({
     workspaceId,
     actorUserId,
@@ -412,35 +433,16 @@ export const teamService = {
     actorUserId: string;
     memberId: string;
   }): Promise<RemoveMemberResult> => {
-    const member = await requireWorkspaceMemberById(workspaceId, memberId);
-    const actorIsSuperadmin = await teamRepository.isSuperadmin(workspaceId, actorUserId);
-    if (!actorIsSuperadmin) {
-      throw forbidden('Only Superadmin can remove team members');
-    }
+    const member = await assertMembershipDestroyable({ workspaceId, actorUserId, memberId });
 
-    if (member.userId === actorUserId) {
-      throw forbidden('You cannot remove your own membership');
-    }
-
-    const targetIsActiveSuperadmin =
-      member.status === 'ACTIVE'
-      && member.roles.some((role) => role.isSuperadmin);
-
-    if (targetIsActiveSuperadmin) {
-      const activeSuperadminCount = await teamRepository.countActiveSuperadmins(workspaceId);
-      if (activeSuperadminCount <= 1) {
-        throw forbidden('Cannot remove the last active Superadmin in workspace', {
-          workspaceId,
-          memberId,
-        });
-      }
-    }
-
-    const deleted = await prisma.$transaction((tx) =>
-      teamRepository.deleteMember(workspaceId, memberId, member.userId, tx),
+    const trashed = await teamRepository.markMemberTrashed(
+      workspaceId,
+      memberId,
+      member.userId,
+      actorUserId,
     );
 
-    if (!deleted) {
+    if (!trashed) {
       throw notFound('Team member not found', {
         workspaceId,
         memberId,

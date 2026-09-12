@@ -1,4 +1,5 @@
 import { prisma } from '../../prisma.js';
+import { activeMember } from '../../core/membership-access.js';
 
 const CHECKLIST_INCOMPLETE_STATES = ['pending', 'not_started', 'in_progress'] as const;
 
@@ -752,12 +753,12 @@ export const dashboardRepository = {
           assignedToUserId: null,
         },
       }),
+      // L'organico di "Carico del Team": chi c'e' adesso, cestinati esclusi
+      // (CRMA-130). E' questa lettura che decide chi compare come riga anche a
+      // zero attivita' — chi e' nel Cestino non deve piu' comparirci.
       (includeAllUsers || includeAssignmentData)
         ? prisma.membership.findMany({
-            where: {
-              workspaceId,
-              status: 'ACTIVE',
-            },
+            where: activeMember({ workspaceId }),
             select: {
               userId: true,
               status: true,
@@ -803,6 +804,19 @@ export const dashboardRepository = {
     }
 
     const trackedUserIdList = Array.from(trackedUserIds);
+    // ⚠️ Qui NON va il filtro del Cestino, ed e' una scelta, non una svista
+    // (CRMA-130, e la nota finale della mappa CRMA-45).
+    //
+    // Questa lettura non produce un elenco di persone: risolve i NOMI di id che
+    // sono gia' stati raccolti sopra dalle checklist esistenti. Sono etichette
+    // storiche. Filtrandole, le attivita' di chi e' finito nel Cestino
+    // resterebbero nei conteggi ma perderebbero il nome, e il Carico del Team
+    // mostrerebbe righe intestate a un identificativo — cioe' il lavoro fatto
+    // diventerebbe illeggibile invece di restare attribuito.
+    //
+    // Chi c'e' adesso lo decide l'altra lettura, quella dell'organico, che il
+    // filtro ce l'ha: un cestinato non compare piu' come riga a zero attivita',
+    // ma il lavoro che ha gia' fatto continua a portare il suo nome.
     const memberships = trackedUserIdList.length > 0
       ? await prisma.membership.findMany({
           where: {

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Client } from '@prisma/client';
-import { buildCreateData, clientSelect } from './repository.js';
+import { markTrashed } from '../../core/soft-delete.js';
+import { buildCreateData, buildTrashClientWhere, clientSelect } from './repository.js';
 
 /**
  * Un cliente completo. Il tipo `Client` viene generato da `schema.prisma`, e
@@ -38,6 +39,8 @@ const CLIENTE_COMPLETO: Client = {
   customFields: {},
   createdAt: new Date('2026-09-09T09:00:00.000Z'),
   updatedAt: new Date('2026-09-09T09:00:00.000Z'),
+  deletedAt: null,
+  deletedByUserId: null,
 };
 
 /**
@@ -45,6 +48,25 @@ const CLIENTE_COMPLETO: Client = {
  * quando crea un cliente.
  */
 const COLONNE_AUTOMATICHE = new Set(['id', 'createdAt', 'updatedAt']);
+
+/**
+ * Le due colonne del Cestino (CRMA-29). Stanno nel modello — e quindi nel
+ * cliente completo qui sopra, altrimenti il legame col tipo `Client` si
+ * spezzerebbe proprio sulle colonne che questo ramo aggiunge — ma sono fuori
+ * dai due elenchi del giro ordinario, e per due ragioni diverse:
+ *
+ * - **non si scrivono alla creazione**: un cliente non nasce nel cestino. Le
+ *   scrive solo il gesto «cestina» (`markTrashed`, provato in fondo a questo
+ *   file), mai `buildCreateData`. E' una regola che non deve cambiare, quindi
+ *   sotto c'e' un test che la fissa invece di lasciarla a questa eccezione.
+ * - **non si rileggono in `clientSelect`**: le letture ordinarie dei clienti
+ *   escludono i cestinati (CRMA-127), quindi li' `deletedAt` sarebbe `null` per
+ *   tutti e non direbbe niente a nessuno. Chi ha bisogno di sapere *quando* e
+ *   *da chi* e' la pagina Cestino, che legge con `onlyDeleted` e con un elenco
+ *   di colonne suo (CRMA-135). Se un giorno servissero anche qui, si tolgono da
+ *   questa eccezione: e' una decisione da prendere, non una svista da sanare.
+ */
+const COLONNE_DEL_CESTINO = new Set(['deletedAt', 'deletedByUserId']);
 
 // Le query del repository chiedono al database un elenco ESPLICITO di colonne.
 // Una colonna che sta nello schema ma non nell'elenco non arriva mai a chi
@@ -54,6 +76,10 @@ const COLONNE_AUTOMATICHE = new Set(['id', 'createdAt', 'updatedAt']);
 // colonne aggiunte a `Client` da quando l'elenco esiste.
 test('ogni colonna del modello Client e\' chiesta al database', () => {
   for (const colonna of Object.keys(CLIENTE_COMPLETO)) {
+    if (COLONNE_DEL_CESTINO.has(colonna)) {
+      continue;
+    }
+
     assert.equal(
       (clientSelect as Record<string, true>)[colonna],
       true,
@@ -96,13 +122,43 @@ test('la creazione di un cliente scrive tutte le colonne non automatiche', () =>
   });
 
   for (const colonna of Object.keys(CLIENTE_COMPLETO)) {
-    if (COLONNE_AUTOMATICHE.has(colonna)) {
+    if (COLONNE_AUTOMATICHE.has(colonna) || COLONNE_DEL_CESTINO.has(colonna)) {
       continue;
     }
 
     assert.ok(
       colonna in dati,
       `la colonna "${colonna}" non viene scritta quando si crea un cliente`,
+    );
+  }
+});
+
+// L'altra meta' dell'eccezione qui sopra: saltare le colonne del Cestino nel
+// test precedente dice «non e' un guasto se mancano», e da solo lascerebbe
+// passare anche il contrario — un cliente che nasce gia' cestinato, invisibile
+// dal momento in cui viene creato e senza niente che lo spieghi. Quindi la
+// regola si prova, invece di restare affidata a un `continue`.
+test('un cliente non nasce nel cestino', () => {
+  const dati = buildCreateData('ws-1', {
+    type: 'person',
+    name: 'Mario Bianchi',
+    email: null,
+    phone: null,
+    vatNumber: null,
+    taxCode: null,
+    street: null,
+    city: null,
+    zip: null,
+    province: null,
+    country: null,
+    notes: null,
+    tags: [],
+  });
+
+  for (const colonna of COLONNE_DEL_CESTINO) {
+    assert.ok(
+      !(colonna in dati),
+      `"${colonna}" non deve essere scritta alla creazione: la scrive solo il gesto «cestina»`,
     );
   }
 });
@@ -163,4 +219,41 @@ test('tutto cio\' che si scrive alla creazione viene anche riletto', () => {
       `"${colonna}" si scrive ma non si rilegge`,
     );
   }
+});
+
+/**
+ * Il gesto che cestina un cliente (CRMA-165).
+ *
+ * Prima di questo compito `clients.delete` faceva sparire la riga; adesso la
+ * lascia dov'e' e le scrive sopra chi e quando. Quello che si prova qui e' la
+ * clausola, perche' e' la parte che puo' sbagliarsi senza che nessuno se ne
+ * accorga: una scrittura che esce dal workspace, o che ricestina una riga
+ * gia' cestinata, non fa rumore.
+ */
+test('cestinare un cliente resta dentro il suo workspace', () => {
+  const where = buildTrashClientWhere('ws-1', 'cli-1');
+
+  assert.equal(where.workspaceId, 'ws-1');
+  assert.equal(where.id, 'cli-1');
+});
+
+test('un cliente gia nel cestino non si ricestina: il secondo gesto non trova niente', () => {
+  // Senza questo filtro la seconda cancellazione riscriverebbe `deletedAt` e
+  // `deletedByUserId`, cioe' cancellerebbe la traccia di chi aveva buttato il
+  // cliente per primo — ed e' proprio quella la traccia che serve a
+  // ripristinarlo.
+  assert.equal(buildTrashClientWhere('ws-1', 'cli-1').deletedAt, null);
+});
+
+test('cestinare scrive chi e quando, e non tocca nient altro', () => {
+  const istante = new Date('2026-09-11T10:00:00.000Z');
+  const dati = markTrashed('user-7', istante);
+
+  assert.deepEqual(dati, {
+    deletedAt: istante,
+    deletedByUserId: 'user-7',
+  });
+  // La riga non perde niente: nessun campo del cliente compare fra quelli
+  // scritti. E' la regola 1 del Cestino — cestinare non cancella.
+  assert.deepEqual(Object.keys(dati).sort(), ['deletedAt', 'deletedByUserId']);
 });

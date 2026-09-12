@@ -9,6 +9,7 @@ import {
   type WorkspaceSystemRoleName,
 } from './rbac-catalog.js';
 import { badRequest, forbidden, notFound } from '../core/errors.js';
+import { activeMember } from '../core/membership-access.js';
 export { REGISTRABLE_WORKSPACE_ROLE_NAMES, SYSTEM_ROLE_NAME };
 export type { WorkspaceSystemRoleName } from './rbac-catalog.js';
 
@@ -189,15 +190,15 @@ const syncRolePermissions = async ({
   });
 };
 
+// Conta i membri veri: e' il numero che decide «primo utente del workspace ->
+// Superadmin». I cestinati lo gonfierebbero, e un workspace svuotato non
+// promuoverebbe piu' nessuno (CRMA-157).
 const listWorkspaceMembershipCount = (
   tx: Prisma.TransactionClient,
   workspaceId: string,
 ) =>
   tx.membership.count({
-    where: {
-      workspaceId,
-      status: 'ACTIVE',
-    },
+    where: activeMember({ workspaceId }),
   });
 
 const getHighestSystemRoleName = (
@@ -262,12 +263,10 @@ const ensureTargetIsWorkspaceMember = async ({
   workspaceId: string;
   targetUserId: string;
 }) => {
+  // Senza il filtro del Cestino si potrebbe assegnare un ruolo a una persona
+  // che sta nel cestino (CRMA-157).
   const membership = await tx.membership.findFirst({
-    where: {
-      workspaceId,
-      userId: targetUserId,
-      status: 'ACTIVE',
-    },
+    where: activeMember({ workspaceId, userId: targetUserId }),
     select: {
       id: true,
     },

@@ -5,6 +5,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { signAccessToken } from '../../auth/jwt.js';
+import { activeMember } from '../../core/membership-access.js';
 import { prisma } from '../../prisma.js';
 import { workspaceBrandingService } from '../../services/workspace-branding.service.js';
 import { getUniqueTargetFields, isUniqueConstraintError, workspaceSelect } from './auth.shared.js';
@@ -21,12 +22,14 @@ export type MembershipRecord = {
   };
 };
 
+// Le membership che l'utente puo' davvero usare: il login, l'aggiornamento del
+// profilo e `/auth/me` partono tutti da qui. Senza il filtro del Cestino una
+// persona tolta da un workspace farebbe login e si ritroverebbe dentro
+// (CRMA-157). Con il filtro, `pickActiveMembership` ripiega da solo su un altro
+// workspace se ce n'e' uno, e se non ce n'e' nessuno la sessione cade da sola.
 export const listMemberships = (client: Prisma.TransactionClient | typeof prisma, userId: string) =>
   client.membership.findMany({
-    where: {
-      userId,
-      status: 'ACTIVE',
-    },
+    where: activeMember({ userId }),
     orderBy: {
       createdAt: 'asc',
     },

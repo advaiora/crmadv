@@ -58,7 +58,24 @@ const toMessagePreview = (value: string) => {
   return `${normalized.slice(0, 117)}...`;
 };
 
-const ensurePeer = async (workspaceId: string, userId: string, peerUserId: string) => {
+/**
+ * Trova l'altro capo della conversazione.
+ *
+ * `allowTrashed` e' la regola di questo compito messa in una riga: **leggere**
+ * una conversazione con un contatto cestinato si puo' (la cronologia non si
+ * cancella), **scriverci** no. Chi chiama dichiara quale dei due sta facendo,
+ * invece di lasciarlo decidere al filtro del repository.
+ *
+ * La riga si chiede sempre `includeTrashed: true` e si decide qui: cosi' un
+ * contatto nel cestino risponde "non puoi scrivergli" invece di "non esiste",
+ * che sarebbe una bugia e manderebbe chi legge a cercare un guasto altrove.
+ */
+const ensurePeer = async (
+  workspaceId: string,
+  userId: string,
+  peerUserId: string,
+  options: { allowTrashed: boolean },
+) => {
   const normalizedPeerUserId = peerUserId.trim();
   if (!normalizedPeerUserId) {
     throw badRequest('userId is required');
@@ -68,9 +85,15 @@ const ensurePeer = async (workspaceId: string, userId: string, peerUserId: strin
     throw badRequest('Cannot open a conversation with yourself');
   }
 
-  const peer = await messagingRepository.getWorkspaceMember(workspaceId, normalizedPeerUserId);
+  const peer = await messagingRepository.getWorkspaceMember(workspaceId, normalizedPeerUserId, {
+    includeTrashed: true,
+  });
   if (!peer) {
     throw notFound('Workspace member not found');
+  }
+
+  if (peer.isTrashed && !options.allowTrashed) {
+    throw badRequest('Cannot send messages to a contact in the trash');
   }
 
   return peer;
@@ -245,7 +268,10 @@ export const messagingService = {
     peerUserId: string;
     query: unknown;
   }) {
-    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId);
+    // Lettura: un contatto cestinato si apre ancora, la cronologia resta.
+    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId, {
+      allowTrashed: true,
+    });
     const parsedQuery = this.parseConversationQuery(input.query);
     const limit = parsedQuery.limit ?? DEFAULT_MESSAGES_LIMIT;
     const before = parsedQuery.before ? new Date(parsedQuery.before) : undefined;
@@ -294,7 +320,12 @@ export const messagingService = {
     peerUserId: string;
     payload: unknown;
   }) {
-    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId);
+    // Scrittura: qui il cestino chiude. Il picker non lo propone piu', ma
+    // l'indirizzo della conversazione resta raggiungibile a mano, ed e' da li'
+    // che un messaggio nuovo arriverebbe a un contatto cestinato.
+    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId, {
+      allowTrashed: false,
+    });
     const payload = this.parseSendMessagePayload(input.payload);
 
     const message = await messagingRepository.createMessage({
@@ -323,7 +354,12 @@ export const messagingService = {
     userId: string;
     peerUserId: string;
   }) {
-    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId);
+    // Lettura: segnare come letta una conversazione che si puo' ancora aprire
+    // deve restare possibile anche se il contatto e' finito nel cestino,
+    // altrimenti i suoi non-letti resterebbero appesi per sempre.
+    const peer = await ensurePeer(input.workspaceId, input.userId, input.peerUserId, {
+      allowTrashed: true,
+    });
     const result = await messagingRepository.markConversationAsRead({
       workspaceId: input.workspaceId,
       userId: input.userId,
@@ -333,6 +369,44 @@ export const messagingService = {
     return {
       peer,
       updatedCount: result.count,
+    };
+  },
+
+  /**
+   * Sposta un messaggio nel cestino (CRMA-165).
+   *
+   * E' l'unica delle quattro entita' del perimetro per cui il gesto non
+   * esisteva affatto: fino a oggi un messaggio interno, una volta inviato, non
+   * si poteva togliere in nessun modo.
+   *
+   * Il 404 quando il messaggio non e' tuo e' voluto e non e' un 403
+   * mascherato: rispondere «esiste ma non e' tuo» direbbe a chiunque, provando
+   * un id alla volta, quali conversazioni esistono in azienda. Chi cestina un
+   * messaggio proprio vede la stessa risposta che vedrebbe se l'id fosse
+   * inventato, ed e' quello che deve succedere.
+   */
+  async trashMessage(input: {
+    workspaceId: string;
+    userId: string;
+    messageId: string;
+  }) {
+    const messageId = input.messageId.trim();
+    if (!messageId) {
+      throw badRequest('messageId is required');
+    }
+
+    const trashed = await messagingRepository.markMessageTrashed({
+      workspaceId: input.workspaceId,
+      messageId,
+      actorUserId: input.userId,
+    });
+
+    if (!trashed) {
+      throw notFound('Message not found');
+    }
+
+    return {
+      messageId,
     };
   },
 
@@ -394,8 +468,13 @@ export const messagingService = {
     return { attachment: mapAttachment(attachment) };
   },
 
-  // Byte veri di un allegato, per il download. Due filtri, ENTRAMBI necessari:
-  // il workspace della riga e l'appartenenza alla conversazione.
+  // Byte veri di un allegato, per il download. TRE filtri, tutti necessari:
+  // il workspace della riga, l'appartenenza alla conversazione, e — da CRMA-169
+  // — il fatto che il messaggio padre non sia nel cestino. Il terzo non si vede
+  // qui sotto perche' vive nel `where` del repository
+  // (`buildAttachmentBinaryWhere`): un messaggio cestinato non torna, quindi
+  // `row` e' `null` e si esce dal primo `if`. Chi ritira un messaggio con dentro
+  // un documento si aspetta di aver ritirato anche il documento.
   async getAttachmentFile(input: {
     workspaceId: string;
     userId: string;
@@ -418,7 +497,11 @@ export const messagingService = {
   },
 
   // Cancella un allegato. Lo puo' fare chi l'ha caricato, che per costruzione e' il
-  // mittente del messaggio.
+  // mittente del messaggio — e solo finche' il messaggio non e' nel cestino
+  // (CRMA-169: il filtro sta in `buildAttachmentForDeleteWhere`, quindi qui si
+  // esce dal `notFound` senza un ramo in piu'). Il motivo non e' di permessi: e'
+  // che il Cestino deve poter ripristinare un messaggio INTERO, e una cancella-
+  // zione fatta mentre era nascosto sarebbe irreversibile e invisibile.
   async removeAttachment(input: {
     workspaceId: string;
     userId: string;

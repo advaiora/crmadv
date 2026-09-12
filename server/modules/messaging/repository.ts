@@ -1,10 +1,18 @@
 import { prisma } from '../../prisma.js';
+import { NOT_DELETED, isTrashed, markTrashed, notDeleted } from '../../core/soft-delete.js';
 
 export type WorkspaceMember = {
   userId: string;
   name: string | null;
   email: string;
   role: string;
+  /**
+   * Vero se il contatto e' nel Cestino. Non e' un dettaglio interno: la
+   * conversazione con un cestinato resta leggibile (vedi le clausole qui
+   * sotto), quindi chi la apre deve poter dire a schermo perche' quel nome
+   * non compare piu' fra i contatti.
+   */
+  isTrashed: boolean;
 };
 
 type ListWorkspaceMembersInput = {
@@ -42,6 +50,12 @@ type MarkConversationAsReadInput = {
   peerUserId: string;
 };
 
+type TrashMessageInput = {
+  workspaceId: string;
+  messageId: string;
+  actorUserId: string;
+};
+
 type CreateAttachmentInput = {
   workspaceId: string;
   messageId: string;
@@ -66,6 +80,7 @@ const ATTACHMENT_SELECT = {
 
 const mapMembershipRecordToMember = (item: {
   userId: string;
+  deletedAt: Date | null;
   user: {
     id: string;
     name: string | null;
@@ -77,55 +92,287 @@ const mapMembershipRecordToMember = (item: {
   name: item.user.name,
   email: item.user.email,
   role: item.user.role,
+  isTrashed: isTrashed(item),
+});
+
+const MEMBERSHIP_SELECT = {
+  userId: true,
+  deletedAt: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  },
+} as const;
+
+/**
+ * Il `where` del picker "nuova conversazione" (CRMA-133).
+ *
+ * ⚠️ `status: 'ACTIVE'` NON basta a escludere un cestinato, ed e' il punto in
+ * cui il filtro sarebbe sfuggito: cestinare non cambia lo stato della
+ * membership — la riga resta `ACTIVE` e si nasconde solo per la `deletedAt`
+ * (vedi `server/core/soft-delete.ts`). Senza `notDeleted` qui, un contatto
+ * messo nel cestino continuerebbe a comparire fra quelli con cui iniziare una
+ * conversazione nuova.
+ *
+ * E' una funzione a se', invece che un oggetto scritto dentro la query, perche'
+ * cosi' il filtro si puo' provare senza database: e' quello che fa
+ * `repository.test.ts`.
+ */
+export const buildWorkspaceMembersWhere = (input: ListWorkspaceMembersInput) =>
+  notDeleted({
+    workspaceId: input.workspaceId,
+    status: 'ACTIVE' as const,
+    ...(input.excludeUserId
+      ? {
+          userId: {
+            not: input.excludeUserId,
+          },
+        }
+      : {}),
+    ...(input.query
+      ? {
+          OR: [
+            {
+              user: {
+                name: {
+                  contains: input.query,
+                  mode: 'insensitive' as const,
+                },
+              },
+            },
+            {
+              user: {
+                email: {
+                  contains: input.query,
+                  mode: 'insensitive' as const,
+                },
+              },
+            },
+          ],
+        }
+      : {}),
+  });
+
+/**
+ * Il `where` per leggere UN contatto preciso.
+ *
+ * `includeTrashed` esiste per la regola centrale di questo compito: il picker
+ * esclude i cestinati, ma la conversazione gia' scambiata con loro resta
+ * leggibile. Le due letture chiedono la stessa riga con due domande diverse, e
+ * il chiamante dichiara quale sta facendo (vedi `ensurePeer` nel service).
+ */
+export const buildWorkspaceMemberWhere = (
+  workspaceId: string,
+  userId: string,
+  options: { includeTrashed?: boolean } = {},
+) => {
+  const base = {
+    workspaceId,
+    userId,
+    status: 'ACTIVE' as const,
+  };
+
+  return options.includeTrashed ? base : notDeleted(base);
+};
+
+/**
+ * Il `where` della conversazione aperta.
+ *
+ * Qui `notDeleted` filtra i MESSAGGI cestinati uno per uno, non il contatto: un
+ * messaggio buttato via non si rilegge, ma la conversazione con una persona
+ * finita nel cestino resta intera. Sono due cestini diversi che cadono sulla
+ * stessa schermata, ed e' la distinzione da non perdere rileggendo questo file.
+ */
+export const buildConversationMessagesWhere = (input: ListConversationMessagesInput) =>
+  notDeleted({
+    workspaceId: input.workspaceId,
+    OR: [
+      {
+        senderUserId: input.userId,
+        recipientUserId: input.peerUserId,
+      },
+      {
+        senderUserId: input.peerUserId,
+        recipientUserId: input.userId,
+      },
+    ],
+    ...(input.before
+      ? {
+          createdAt: {
+            lt: input.before,
+          },
+        }
+      : {}),
+  });
+
+/**
+ * Il `where` della fotografia che alimenta anteprima e non-letti della lista
+ * contatti — e, di rimbalzo, il pallino sulla campanella in `TopNav.jsx`.
+ *
+ * Il conteggio dei non-letti non ha una query sua: esce di qui. Quindi un
+ * messaggio cestinato smette di contare come "nuovo" perche' lo esclude questo
+ * filtro, e un contatto cestinato smette di contare perche' non entra
+ * nemmeno nell'elenco dei `peerUserIds` (lo esclude
+ * `buildWorkspaceMembersWhere`).
+ */
+export const buildConversationMessagesForPeersWhere = (
+  input: ListConversationMessagesForUserAndPeersInput,
+) =>
+  notDeleted({
+    workspaceId: input.workspaceId,
+    OR: [
+      {
+        senderUserId: input.userId,
+        recipientUserId: {
+          in: input.peerUserIds,
+        },
+      },
+      {
+        recipientUserId: input.userId,
+        senderUserId: {
+          in: input.peerUserIds,
+        },
+      },
+    ],
+  });
+
+/**
+ * Il `where` di "segna come letti".
+ *
+ * Un messaggio cestinato non si vede, quindi non si puo' nemmeno essere letto:
+ * senza `notDeleted` questa `updateMany` timbrerebbe `readAt` su righe che
+ * nessuno ha aperto, e un ripristino le riporterebbe indietro gia' lette.
+ */
+export const buildMarkConversationAsReadWhere = (input: MarkConversationAsReadInput) =>
+  notDeleted({
+    workspaceId: input.workspaceId,
+    senderUserId: input.peerUserId,
+    recipientUserId: input.userId,
+    readAt: null,
+  });
+
+/**
+ * Il `where` del gesto «cestina messaggio» (CRMA-165).
+ *
+ * Quattro condizioni, e nessuna e' di troppo:
+ *
+ * 1. `id` — il messaggio indicato;
+ * 2. `workspaceId` — la regola di sempre: nessuna scrittura esce dall'azienda
+ *    di chi la chiede;
+ * 3. `senderUserId: actorUserId` — **cestina solo chi ha scritto**. La riga e'
+ *    una sola e condivisa fra i due capi della conversazione, quindi metterla
+ *    nel cestino la toglie a tutti e due: permetterlo anche a chi l'ha
+ *    ricevuta vorrebbe dire far cancellare a qualcuno le parole di un altro.
+ *    Se un domani servira' anche il "nascondi solo a me" del destinatario,
+ *    serve una seconda colonna, non un allargamento di questo filtro;
+ * 4. `notDeleted` — un messaggio gia' cestinato non si ricestina, o il secondo
+ *    gesto riscriverebbe data e autore del primo.
+ *
+ * ⚠️ Questo `where` non e' il controllo del permesso e non lo sostituisce:
+ * `messages.delete` dice se puoi cestinare messaggi, questo dice **quali**.
+ * Servono tutti e due, e il secondo e' quello che tiene anche se il primo un
+ * giorno venisse assegnato a un ruolo in piu'.
+ */
+export const buildTrashMessageWhere = (input: TrashMessageInput) =>
+  notDeleted({
+    id: input.messageId,
+    workspaceId: input.workspaceId,
+    senderUserId: input.actorUserId,
+  });
+
+// --- I QUATTRO `where` degli allegati davanti al Cestino (CRMA-169) ---
+//
+// Quattro sono i modi in cui si tocca un allegato — allegarlo, elencarlo nella
+// conversazione, scaricarlo, toglierlo — e tutti e quattro guardano il MESSAGGIO
+// PADRE. Il motivo e' scritto qui una volta sola invece che ripetuto su ognuno:
+//
+// L'allegato non ha una `deletedAt` propria e non deve averla: e' la regola 2 di
+// `server/core/soft-delete.ts` — «un figlio si nasconde guardando il padre». Due
+// date da tenere allineate sono due date che prima o poi divergono, e qui
+// divergerebbero nel modo peggiore: un messaggio ripristinato tornerebbe senza i
+// suoi allegati, oppure — il caso che ha aperto questo compito — un messaggio
+// cestinato resterebbe con i suoi allegati SCARICABILI.
+//
+// Il buco era reale e non era colpa di nessuno dei due lavori: gli allegati
+// (CRMA-30 / CRMA-138) sono nati su `main`, dove la colonna `deletedAt` dei
+// messaggi non esisteva ancora; il Cestino e' nato su questo ramo, dove gli
+// allegati non c'erano. Si sono incontrati solo al merge, ed e' quello il punto
+// in cui il filtro andava aggiunto.
+//
+// ⚠️ La cascata del database NON copre questo caso, ed e' giusto cosi':
+// `WorkspaceMessageAttachment.message` e' `onDelete: Cascade`, che spara solo
+// sull'eliminazione definitiva. Se sparasse anche cestinando, il Cestino non
+// potrebbe piu' ripristinare un messaggio intero.
+//
+// Sono funzioni a se' e non oggetti scritti dentro le query per la stessa
+// ragione dei filtri di CRMA-133: cosi' si possono provare senza database
+// (`repository.attachments.trash.test.ts`).
+
+/**
+ * 1/4 — Il `where` del caricamento: il messaggio a cui si sta allegando.
+ *
+ * Unico dei quattro in cui il filtro sta sul messaggio stesso (`notDeleted`) e
+ * non su una relazione, perche' qui e' il messaggio che si legge. Serve per la
+ * stessa ragione degli altri tre: allegare a un messaggio cestinato vorrebbe
+ * dire scrivere una riga che nessuno vedra' mai piu' — il messaggio non compare
+ * nella conversazione — e che ricomparirebbe a sorpresa il giorno del
+ * ripristino.
+ */
+export const buildMessageForAttachmentWhere = (input: {
+  workspaceId: string;
+  messageId: string;
+}) =>
+  notDeleted({
+    id: input.messageId,
+    workspaceId: input.workspaceId,
+  });
+
+/**
+ * 2/4 — Il `where` degli allegati mostrati nella conversazione aperta.
+ *
+ * Oggi gli id che arrivano qui escono gia' da `listConversationMessages`, che
+ * filtra i cestinati per conto suo: il filtro sarebbe ridondante. Ci sta lo
+ * stesso perche' quella ridondanza e' l'unica cosa che regge se un domani
+ * qualcuno chiamera' questa lettura da un altro punto — ed e' esattamente cosi'
+ * che il buco di questo compito e' nato.
+ */
+export const buildAttachmentsForMessagesWhere = (messageIds: string[]) => ({
+  messageId: { in: messageIds },
+  message: NOT_DELETED,
+});
+
+/** 3/4 — Il `where` del download (`GET /messages/attachments/:id/file`). */
+export const buildAttachmentBinaryWhere = (attachmentId: string) => ({
+  id: attachmentId,
+  binary: { isNot: null },
+  message: NOT_DELETED,
+});
+
+/**
+ * 4/4 — Il `where` della rimozione di un allegato.
+ *
+ * Porta lo stesso filtro degli altri tre, e la conseguenza e' voluta: su un
+ * messaggio cestinato la rimozione risponde «non trovato» invece di eseguire.
+ * Lasciarla passare toglierebbe per sempre un allegato che il Cestino deve
+ * poter riportare indietro **intero** — e lo toglierebbe senza che nessuno
+ * possa vederlo, visto che un messaggio cestinato non compare piu' nella
+ * conversazione. Chi vuole davvero disfarsene ha la strada giusta:
+ * ripristinare il messaggio, togliere l'allegato, ricestinare.
+ */
+export const buildAttachmentForDeleteWhere = (attachmentId: string) => ({
+  id: attachmentId,
+  message: NOT_DELETED,
 });
 
 export const messagingRepository = {
   async listWorkspaceMembers(input: ListWorkspaceMembersInput) {
     const items = await prisma.membership.findMany({
-      where: {
-        workspaceId: input.workspaceId,
-        status: 'ACTIVE',
-        ...(input.excludeUserId
-          ? {
-              userId: {
-                not: input.excludeUserId,
-              },
-            }
-          : {}),
-        ...(input.query
-          ? {
-              OR: [
-                {
-                  user: {
-                    name: {
-                      contains: input.query,
-                      mode: 'insensitive',
-                    },
-                  },
-                },
-                {
-                  user: {
-                    email: {
-                      contains: input.query,
-                      mode: 'insensitive',
-                    },
-                  },
-                },
-              ],
-            }
-          : {}),
-      },
-      select: {
-        userId: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
+      where: buildWorkspaceMembersWhere(input),
+      select: MEMBERSHIP_SELECT,
       orderBy: {
         createdAt: 'asc',
       },
@@ -139,24 +386,14 @@ export const messagingRepository = {
     });
   },
 
-  async getWorkspaceMember(workspaceId: string, userId: string) {
+  async getWorkspaceMember(
+    workspaceId: string,
+    userId: string,
+    options: { includeTrashed?: boolean } = {},
+  ) {
     const membership = await prisma.membership.findFirst({
-      where: {
-        workspaceId,
-        userId,
-        status: 'ACTIVE',
-      },
-      select: {
-        userId: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
+      where: buildWorkspaceMemberWhere(workspaceId, userId, options),
+      select: MEMBERSHIP_SELECT,
     });
 
     if (!membership) {
@@ -168,26 +405,7 @@ export const messagingRepository = {
 
   listConversationMessages(input: ListConversationMessagesInput) {
     return prisma.workspaceMessage.findMany({
-      where: {
-        workspaceId: input.workspaceId,
-        OR: [
-          {
-            senderUserId: input.userId,
-            recipientUserId: input.peerUserId,
-          },
-          {
-            senderUserId: input.peerUserId,
-            recipientUserId: input.userId,
-          },
-        ],
-        ...(input.before
-          ? {
-              createdAt: {
-                lt: input.before,
-              },
-            }
-          : {}),
-      },
+      where: buildConversationMessagesWhere(input),
       orderBy: [
         {
           createdAt: 'desc',
@@ -212,23 +430,7 @@ export const messagingRepository = {
     input: ListConversationMessagesForUserAndPeersInput,
   ) {
     return prisma.workspaceMessage.findMany({
-      where: {
-        workspaceId: input.workspaceId,
-        OR: [
-          {
-            senderUserId: input.userId,
-            recipientUserId: {
-              in: input.peerUserIds,
-            },
-          },
-          {
-            recipientUserId: input.userId,
-            senderUserId: {
-              in: input.peerUserIds,
-            },
-          },
-        ],
-      },
+      where: buildConversationMessagesForPeersWhere(input),
       orderBy: [
         {
           createdAt: 'desc',
@@ -270,16 +472,31 @@ export const messagingRepository = {
 
   markConversationAsRead(input: MarkConversationAsReadInput) {
     return prisma.workspaceMessage.updateMany({
-      where: {
-        workspaceId: input.workspaceId,
-        senderUserId: input.peerUserId,
-        recipientUserId: input.userId,
-        readAt: null,
-      },
+      where: buildMarkConversationAsReadWhere(input),
       data: {
         readAt: new Date(),
       },
     });
+  },
+
+  /**
+   * Sposta un messaggio nel cestino (CRMA-165).
+   *
+   * ⚠️ `deletedByUserId` prende sempre l'id vero di chi ha premuto, mai un id
+   * di servizio e mai `null`: su questa entita' quel campo e' meta' del
+   * controllo di accesso al Cestino — la pagina rilegge i messaggi cestinati
+   * con «partecipo alla conversazione **e** li ho cestinati io» — e non
+   * un'etichetta da riempire per fare bella figura nel registro. Un `null` li'
+   * dentro non e' un dato mancante: e' una riga che non appartiene a nessuno e
+   * che quindi nessuno potra' piu' ripristinare.
+   */
+  async markMessageTrashed(input: TrashMessageInput) {
+    const trashed = await prisma.workspaceMessage.updateMany({
+      where: buildTrashMessageWhere(input),
+      data: markTrashed(input.actorUserId),
+    });
+
+    return trashed.count > 0;
   },
 
   // --- Allegati (A1 punto 8a) ---
@@ -288,10 +505,7 @@ export const messagingRepository = {
   // chiama deve poter verificare workspace E appartenenza prima di scrivere.
   findMessageForAttachment(workspaceId: string, messageId: string) {
     return prisma.workspaceMessage.findFirst({
-      where: {
-        id: messageId,
-        workspaceId,
-      },
+      where: buildMessageForAttachmentWhere({ workspaceId, messageId }),
       select: {
         id: true,
         workspaceId: true,
@@ -334,9 +548,7 @@ export const messagingRepository = {
     }
 
     return prisma.workspaceMessageAttachment.findMany({
-      where: {
-        messageId: { in: messageIds },
-      },
+      where: buildAttachmentsForMessagesWhere(messageIds),
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       select: ATTACHMENT_SELECT,
     });
@@ -346,10 +558,7 @@ export const messagingRepository = {
   // workspace e di appartenenza la fa il service: qui si legge e basta.
   findAttachmentBinary(attachmentId: string) {
     return prisma.workspaceMessageAttachment.findFirst({
-      where: {
-        id: attachmentId,
-        binary: { isNot: null },
-      },
+      where: buildAttachmentBinaryWhere(attachmentId),
       select: {
         id: true,
         workspaceId: true,
@@ -369,7 +578,7 @@ export const messagingRepository = {
 
   findAttachmentForDelete(attachmentId: string) {
     return prisma.workspaceMessageAttachment.findFirst({
-      where: { id: attachmentId },
+      where: buildAttachmentForDeleteWhere(attachmentId),
       select: {
         id: true,
         workspaceId: true,

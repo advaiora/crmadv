@@ -6,6 +6,7 @@ import {
   type WorkspaceRegistrationRoleAssignment,
 } from '../auth/workspace-bootstrap.js';
 import { badRequest, conflict, unauthorized } from '../core/errors.js';
+import { activeMember } from '../core/membership-access.js';
 
 const googleClient = new OAuth2Client();
 const workspaceSlugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -309,11 +310,10 @@ export const resolveOrCreateWorkspaceForGoogle = async ({
   workspaceInput,
 }: ResolveWorkspaceInput): Promise<ResolveWorkspaceResult> => {
   if (mode === 'login') {
+    // Stessa cecita' del login con password, stessa correzione: una membership
+    // cestinata non e' un workspace su cui atterrare (CRMA-157).
     const membership = await tx.membership.findFirst({
-      where: {
-        userId,
-        status: 'ACTIVE',
-      },
+      where: activeMember({ userId }),
       orderBy: {
         createdAt: 'desc',
       },

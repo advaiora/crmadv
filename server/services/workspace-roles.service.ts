@@ -144,8 +144,14 @@ export const workspaceRolesService = {
 
     const existingRole = await roleRepository.findRoleByName(workspaceId, payload.name);
     if (existingRole) {
+      // `inTrash` esiste perche' senza di lui questo errore e' un vicolo cieco:
+      // il nome e' occupato da un ruolo che chi sta creando NON vede da nessuna
+      // parte (CRMA-132). Il vincolo di unicita' vale anche sulle righe nel
+      // cestino, quindi il nome si libera eliminando definitivamente il ruolo —
+      // o rinominandolo dopo averlo ripristinato.
       throw badRequest('Role name already exists in workspace', {
         name: payload.name,
+        ...(existingRole.deletedAt ? { inTrash: true } : {}),
       });
     }
 
@@ -186,8 +192,11 @@ export const workspaceRolesService = {
 
     const roleWithSameName = await roleRepository.findRoleByName(workspaceId, payload.name);
     if (roleWithSameName && roleWithSameName.id !== roleId) {
+      // Come in `createRole`: il nome puo' essere occupato da un ruolo nel
+      // cestino, e senza `inTrash` il rifiuto e' inspiegabile.
       throw badRequest('Role name already exists in workspace', {
         name: payload.name,
+        ...(roleWithSameName.deletedAt ? { inTrash: true } : {}),
       });
     }
 
@@ -224,7 +233,26 @@ export const workspaceRolesService = {
     };
   },
 
-  async deleteRole(workspaceId: string, roleId: string) {
+  /**
+   * Sposta il ruolo nel cestino (CRMA-165).
+   *
+   * Le due guardie restano intatte: un ruolo di sistema non si tocca, un ruolo
+   * ancora assegnato a qualcuno nemmeno.
+   *
+   * ⚠️ «Assegnato a qualcuno» da CRMA-132 vuol dire **a qualcuno che e' ancora
+   * dentro il workspace**: un ruolo appeso soltanto a persone cestinate si
+   * cestina, perche' quelle assegnazioni non danno piu' niente a nessuno. Non e'
+   * un dettaglio di conteggio — e' il motivo per cui qui, a differenza di quanto
+   * diceva questo commento fino al 12/9/2026, nel cestino puo' finire un ruolo su
+   * cui qualche `UserRole` e' ancora appesa. Resta comunque niente da ricucire al
+   * ripristino: nessuna cascata parte, quindi quelle righe sono ancora li'
+   * (`role.repository.ts`, `buildRoleAssignmentsWhere`).
+   *
+   * `actorUserId` e' un parametro nuovo, e non e' un dettaglio di registro: e'
+   * il valore che finisce in `deletedByUserId`, cioe' il nome che la pagina
+   * Cestino mostra accanto alla riga.
+   */
+  async deleteRole(workspaceId: string, roleId: string, actorUserId: string) {
     const role = await roleRepository.findRoleById(workspaceId, roleId);
     if (!role) {
       throw notFound('Role not found');
@@ -245,7 +273,10 @@ export const workspaceRolesService = {
       });
     }
 
-    await roleRepository.deleteRole(workspaceId, roleId);
+    const trashed = await roleRepository.markRoleTrashed(workspaceId, roleId, actorUserId);
+    if (!trashed) {
+      throw notFound('Role not found');
+    }
 
     return {
       role: {
@@ -285,6 +316,10 @@ export const workspaceRolesService = {
   async assignUserRoles(workspaceId: string, targetUserId: string, body: unknown, actorUserId: string) {
     const payload = this.parseAssignRolesPayload(body);
 
+    // ⚠️ Questa riga e' anche la guardia che impedisce di assegnare un ruolo a
+    // una persona nel cestino (CRMA-132): `isMember` chiede membership ATTIVA e
+    // non cestinata (CRMA-157), quindi un utente cestinato esce da qui con un
+    // 404. Non e' un controllo di comodo da saltare per risparmiare una query.
     const isMember = await membershipRepository.isMember(targetUserId, workspaceId);
     if (!isMember) {
       throw notFound('User is not a member of the workspace', {
@@ -353,6 +388,8 @@ export const workspaceRolesService = {
   ) {
     const requestedRoleIds = Array.from(new Set(this.parseCustomRoleIds(body)));
 
+    // Come in `assignUserRoles`: qui dentro c'e' anche il rifiuto per una
+    // persona nel cestino (CRMA-132 / CRMA-157).
     const isMember = await membershipRepository.isMember(targetUserId, workspaceId);
     if (!isMember) {
       throw notFound('User is not a member of the workspace', {
@@ -365,6 +402,9 @@ export const workspaceRolesService = {
       const roles = await roleRepository.listRolesByIds(workspaceId, requestedRoleIds);
       const rolesById = new Map(roles.map((role) => [role.id, role]));
 
+      // Qui finisce anche un ruolo nel cestino: `listRolesByIds` non lo trova
+      // (CRMA-132), quindi risulta sconosciuto — che e' la risposta giusta, un
+      // ruolo cestinato non e' assegnabile quanto un id inventato.
       const missingRoleIds = requestedRoleIds.filter((roleId) => !rolesById.has(roleId));
       if (missingRoleIds.length > 0) {
         throw badRequest('Unknown role ids for this workspace', {

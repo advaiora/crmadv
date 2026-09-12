@@ -140,7 +140,11 @@ const workspaceRolesRoute: FastifyPluginAsync = async (app) => {
 
       await requirePermission(user.id, workspace.id, MANAGE_ROLES_PERMISSION);
 
-      const { role } = await workspaceRolesService.deleteRole(workspace.id, request.params.roleId);
+      const { role } = await workspaceRolesService.deleteRole(
+        workspace.id,
+        request.params.roleId,
+        user.id,
+      );
 
       await audit.log({
         event: 'role.delete',

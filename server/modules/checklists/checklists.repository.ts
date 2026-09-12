@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma.js';
+import { activeMember } from '../../core/membership-access.js';
 
 const PROJECT_TABLE = 'Project';
 const PIPELINE_STAGE_TABLE = 'PipelineStage';
@@ -1019,11 +1020,7 @@ export const checklistsRepository = {
     tx?: Prisma.TransactionClient,
   ) {
     return withClient(tx).membership.findFirst({
-      where: {
-        workspaceId,
-        userId,
-        status: 'ACTIVE',
-      },
+      where: activeMember({ workspaceId, userId }),
       select: {
         userId: true,
         user: {
@@ -1039,10 +1036,7 @@ export const checklistsRepository = {
 
   listActiveWorkspaceMembers(workspaceId: string, tx?: Prisma.TransactionClient) {
     return withClient(tx).membership.findMany({
-      where: {
-        workspaceId,
-        status: 'ACTIVE',
-      },
+      where: activeMember({ workspaceId }),
       select: {
         userId: true,
         user: {
