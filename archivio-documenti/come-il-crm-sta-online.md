@@ -151,6 +151,36 @@ Se invece **sono** cambiati `package.json` o `prisma/`, servono anche l'installa
 delle dipendenze e l'applicazione delle migrazioni, e non e' piu' un'operazione da due
 comandi: va concordata.
 
+### ⚠️ Una volta sola: `TEAM_INVITE_TOKEN_SECRET` va messa PRIMA dell'aggiornamento
+
+Vale per l'aggiornamento che porta online il lavoro CRMA-180 (11/9/2026), e per ogni
+server che non ha ancora quella riga nel proprio `.env`.
+
+Fino a quel lavoro il segreto che firma l'impronta dei link d'invito **poteva mancare**:
+il codice ripiegava su `AUTH_JWT_SECRET`. Da CRMA-180 il ripiego non c'e' piu' e la
+variabile e' obbligatoria: **senza, l'API non parte** e lo dice con un errore esplicito.
+
+Due cose da fare, in quest'ordine, e nessuna delle due e' rinviabile a dopo il riavvio:
+
+1. Nel `.env` di produzione si aggiunge la riga
+
+   ```env
+   TEAM_INVITE_TOKEN_SECRET=<il valore ATTUALE di AUTH_JWT_SECRET>
+   ```
+
+   ⚠️ **Proprio quel valore, non uno nuovo.** Gli inviti gia' spediti e non ancora
+   accettati hanno in banca dati un'impronta calcolata con `AUTH_JWT_SECRET`: se qui ci
+   si mette una chiave diversa, quelle impronte non corrispondono piu' e **ogni link
+   d'invito in sospeso smette di funzionare**, rispondendo *«Invito non valido o
+   scaduto»*. Non si vede da nessuna parte, se non quando la persona invitata prova.
+2. Solo dopo si porta la cartella alla versione nuova e si riavvia `crmadv-api`.
+
+**Dare al segreto degli inviti una chiave sua, diversa da quella delle sessioni, e' un
+terzo momento**, da fare quando non ci sono inviti in sospeso (o accettando di
+invalidarli e dicendolo a chi li ha ricevuti). Da quel momento in poi ruotare
+`AUTH_JWT_SECRET` — cosa che si fa dopo un sospetto trapelamento — non tocca piu' gli
+inviti aperti: e' esattamente il motivo per cui il ripiego e' stato tolto.
+
 ### Come si verifica che l'aggiornamento sia andato
 
 Un solo controllo, e va letto per intero:
@@ -170,9 +200,17 @@ Guardare solo "ha risposto" fa concludere che vada tutto bene quando non e' cosi
 ## 6. Le chiavi della tua postazione locale te le generi tu
 
 ⚠️ **Non copiare le chiavi di produzione sul tuo PC.** Ti servono chiavi **tue**, diverse,
-generate da te. Sono due, e si generano in PowerShell con un comando ciascuna.
+generate da te. Sono tre, e si generano in PowerShell con un comando ciascuna.
 
 **`AUTH_JWT_SECRET`** — firma i token di accesso, serve almeno 16 caratteri:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**`TEAM_INVITE_TOKEN_SECRET`** — firma l'impronta dei link d'invito al Team, serve almeno
+16 caratteri. Stesso comando, ma **il valore dev'essere diverso** da quello sopra: tenerle
+separate serve a poter ruotare l'una senza toccare l'altra.
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"

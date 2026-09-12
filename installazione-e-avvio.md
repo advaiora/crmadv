@@ -166,6 +166,7 @@ senza le quali l'API **non parte**:
 ```env
 DATABASE_URL="postgresql://postgres:LA-TUA-PASSWORD@localhost:5432/crm_advaiora"
 AUTH_JWT_SECRET=
+TEAM_INVITE_TOKEN_SECRET=
 ENCRYPTION_KEY=
 ```
 
@@ -178,13 +179,20 @@ VITE_API_URL="http://localhost:4000"
 APP_BASE_URL="http://localhost:5173"
 ```
 
-### Le due chiavi te le generi tu
+### Le tre chiavi te le generi tu
 
 ⚠️ **Non copiare le chiavi di produzione.** Ti servono chiavi tue, diverse. Si
 generano con un comando ciascuna, e vanno lanciati **dopo** essere entrato nella
 cartella del progetto:
 
 `AUTH_JWT_SECRET` (firma i token di accesso, minimo 16 caratteri):
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+`TEAM_INVITE_TOKEN_SECRET` (firma l'impronta dei link d'invito al Team, minimo 16
+caratteri — stesso comando, valore diverso: sono due chiavi distinte apposta):
 
 ```powershell
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -427,6 +435,8 @@ Controlla in quest'ordine:
 - PostgreSQL avviato
 - database `crm_advaiora` esistente
 - `AUTH_JWT_SECRET` lungo almeno 16 caratteri
+- `TEAM_INVITE_TOKEN_SECRET` lungo almeno 16 caratteri (dall'11/9/2026 e' obbligatorio:
+  se il tuo `.env` e' piu' vecchio, questa riga non c'e' e l'API si ferma dicendolo)
 - `ENCRYPTION_KEY` da 32 byte esatti (32 caratteri di testo, oppure 32 byte in base64)
 
 **Il frontend parte ma le chiamate API falliscono.** Verifica che anche

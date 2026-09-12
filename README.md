@@ -12,6 +12,7 @@ Add these environment variables before using Google authentication:
   - `GOOGLE_CLIENT_ID=<google-oauth-client-id>`
   - `AUTH_JWT_SECRET=<strong-secret-min-16-chars>`
   - `AUTH_JWT_EXPIRES_IN_SECONDS=604800` (optional)
+  - `TEAM_INVITE_TOKEN_SECRET=<strong-secret-min-16-chars>` (mandatory since 2026-09-11: the API refuses to start without it, and it should be different from `AUTH_JWT_SECRET`)
   - `DATABASE_URL=<postgresql://...>`
   - `API_HOST=0.0.0.0`
   - `API_PORT=4000`

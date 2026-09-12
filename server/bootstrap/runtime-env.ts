@@ -11,6 +11,8 @@ const AUTH_JWT_EXPIRES_IN_KEY = 'AUTH_JWT_EXPIRES_IN_SECONDS';
 const DEFAULT_AUTH_JWT_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
 const ENCRYPTION_KEY_ENV_KEY = 'ENCRYPTION_KEY';
 const ENCRYPTION_KEY_LENGTH_BYTES = 32;
+const TEAM_INVITE_TOKEN_SECRET_KEY = 'TEAM_INVITE_TOKEN_SECRET';
+const MIN_SECRET_LENGTH = 16;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
 export type RuntimeEnvOptions = {
@@ -27,6 +29,9 @@ export type RuntimeEnv = {
   auth: {
     jwtSecret: string;
     jwtExpiresInSeconds: number;
+  };
+  team: {
+    inviteTokenSecret: string;
   };
   prisma: {
     previousEngineType: string | null;
@@ -177,8 +182,30 @@ const validateAuthJwtSecret = (rawSecret: string | undefined | null) => {
   }
 
   const secret = String(rawSecret).trim();
-  if (secret.length < 16) {
+  if (secret.length < MIN_SECRET_LENGTH) {
     throw new Error('Invalid AUTH_JWT_SECRET: expected at least 16 characters.');
+  }
+
+  return secret;
+};
+
+// Il segreto degli inviti e' obbligatorio e non ripiega piu' su AUTH_JWT_SECRET:
+// il motivo sta in server/modules/team/team-invite.tokens.ts. Si valida qui, allo
+// stesso modo di AUTH_JWT_SECRET, cosi' la mancanza si vede all'avvio e non alla
+// prima persona che prova a entrare con un link d'invito.
+// ⚠️ Passaggio: su un ambiente che finora usava il ripiego, il valore da mettere
+//    la prima volta e' quello ATTUALE di AUTH_JWT_SECRET - altrimenti gli inviti
+//    gia' spediti smettono di essere validi.
+const validateTeamInviteTokenSecret = (rawSecret: string | undefined | null) => {
+  if (isBlank(rawSecret)) {
+    throw new Error(
+      'Missing TEAM_INVITE_TOKEN_SECRET. Define a dedicated invite token secret in .env. On an environment that used to fall back on AUTH_JWT_SECRET, set it to the current value of AUTH_JWT_SECRET, otherwise every pending invite stops working.',
+    );
+  }
+
+  const secret = String(rawSecret).trim();
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error('Invalid TEAM_INVITE_TOKEN_SECRET: expected at least 16 characters.');
   }
 
   return secret;
@@ -258,6 +285,7 @@ export const loadAndValidateRuntimeEnv = (options: RuntimeEnvOptions = {}): Runt
   const apiPort = validateApiPort(env.API_PORT);
   const authJwtSecret = validateAuthJwtSecret(env[AUTH_JWT_SECRET_KEY]);
   const authJwtExpiresInSeconds = validateAuthJwtExpiresInSeconds(env[AUTH_JWT_EXPIRES_IN_KEY]);
+  const teamInviteTokenSecret = validateTeamInviteTokenSecret(env[TEAM_INVITE_TOKEN_SECRET_KEY]);
   validateEncryptionKey(env[ENCRYPTION_KEY_ENV_KEY]);
   const prismaEngine = normalizePrismaEngineType(env, databaseUrl);
 
@@ -277,6 +305,9 @@ export const loadAndValidateRuntimeEnv = (options: RuntimeEnvOptions = {}): Runt
     auth: {
       jwtSecret: authJwtSecret,
       jwtExpiresInSeconds: authJwtExpiresInSeconds,
+    },
+    team: {
+      inviteTokenSecret: teamInviteTokenSecret,
     },
     prisma: {
       previousEngineType: prismaEngine.previousEngineType,
