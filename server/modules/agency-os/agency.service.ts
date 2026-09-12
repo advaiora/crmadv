@@ -12,7 +12,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { badRequest, forbidden, internalServerError, notFound } from '../../core/errors.js';
 import { requestContext } from '../../core/request-context.js';
 import { agencyRepository } from './agency.repository.js';
-import { aiUsageRepository } from '../../repositories/ai-usage.repository.js';
+import {
+  aiUsageRepository,
+  type AiUsageFilter,
+} from '../../repositories/ai-usage.repository.js';
 import { aiBudgetRepository, AI_BUDGET_DEFAULT_USER } from '../../repositories/ai-budget.repository.js';
 import { aiConversationRepository, type ConversationMessageInput } from '../../repositories/ai-conversation.repository.js';
 import { broadcastToConversation } from '../realtime/hub.js';
@@ -8407,7 +8410,7 @@ export const agencyService = {
 
     // Dati mostrati: rispettano i filtri attivi. Opzioni dei menu: sull'intero
     // periodo del workspace, così cambiare filtro non fa sparire le scelte.
-    const dataFilter = {
+    const dataFilter: AiUsageFilter = {
       since,
       workspaceId: input.workspaceId,
       userId: input.userId,
@@ -8415,7 +8418,7 @@ export const agencyService = {
       functionName: input.functionName,
       projectId: input.projectId,
     };
-    const periodFilter = { since, workspaceId: input.workspaceId };
+    const periodFilter: AiUsageFilter = { since, workspaceId: input.workspaceId };
 
     const [
       groupedUser,
@@ -8487,7 +8490,10 @@ export const agencyService = {
     for (const row of groupedProject) if (row.projectId) projectIds.add(row.projectId);
     for (const row of periodProjects) if (row.projectId) projectIds.add(row.projectId);
     for (const log of recent) if (log.projectId) projectIds.add(log.projectId);
-    const projectRows = projectIds.size > 0 ? await aiUsageRepository.projectsByIds([...projectIds]) : [];
+    const projectRows =
+      projectIds.size > 0
+        ? await aiUsageRepository.projectsByIds(input.workspaceId, [...projectIds])
+        : [];
     const projectNameById = new Map(projectRows.map((project) => [project.id, project.name]));
     const projectLabel = (projectId: string | null) => {
       if (!projectId) {
