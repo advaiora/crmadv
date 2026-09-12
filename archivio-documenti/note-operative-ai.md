@@ -1731,3 +1731,21 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Il segnale d'allarme è proprio quel messaggio ("Another git process seems to be running..."): quando compare, non si continua come se nulla fosse — si rilegge subito il branch attivo.
 - Il danno è recuperabile solo se il ramo sovrascritto era già stato pushato: la correzione è `git reset --hard origin/<ramo-A>` una volta tornati su di esso, e poi si ricontrollano **tutti** i rami già toccati nella sessione (`git rev-parse <ramo>` contro `git rev-parse origin/<ramo>`), non solo quello appena scoperto rotto — qui erano già sei, e sono risultati tutti intatti solo perché il controllo è stato fatto su tutti insieme.
 - Prova: CRMA-199, ramo `cronista/crma-193-nota-connection-string-produzione` sovrascritto per un istante dal commit di `cronista/crma-188-roadmap-stepup-secret-e-smoke-test`, corretto con `git reset --hard origin/cronista/crma-193-...` e verificato confrontando tutti i rami locali già processati con i rispettivi `origin/`.
+
+## 121. Un test che legge l'ambiente invece di dichiararlo cambia colore a seconda di chi lo lancia — e il rosso lo prende l'agent, non la persona
+
+**Contesto:** 12/9/2026, CRMA-205. Tre test di `server/modules/team/team-invite.service.test.ts` erano rossi su `origin/main` quando li lanciava un agent Paperclip e verdi quando li lanciava una persona al PC. Il codice sotto prova (`resolveInviteBaseUrl`) cerca quattro variabili di indirizzo pubblico e, se non ne trova nessuna, ripiega su `http://localhost:5173` **solo fuori produzione**; in produzione torna `null` e il link d'invito non e' componibile. Gli agent girano con `NODE_ENV=production`. I test non impostavano ne' quelle variabili ne' `NODE_ENV`.
+
+**Errore:** due errori incastrati, e il secondo costa piu' del primo.
+1. Scrivere un test che **eredita** dall'ambiente la condizione che sta provando, invece di **dichiararla** nel proprio setup.
+2. Trovando quei rossi su un ramo, concluderne che fosse il ramo a essere rotto: e' nato l'allarme «PR #62 si unisce con tre rossi dentro», su una pull request che quel file di test non lo toccava nemmeno.
+
+Un effetto collaterale che nessuno aveva visto: senza link il notificatore delle email non veniva **mai chiamato**, quindi il test «l'invito dice se l'email e' partita davvero» negli ambienti degli agent non provava piu' niente pur risultando rosso per un altro motivo.
+
+**Modo corretto:**
+- Un test che dipende da una variabile d'ambiente **la imposta da se'**, con ripristino in coda — e non solo quella che gli serve: **azzera tutte le alternative della catena**, altrimenti una macchina che ne ha impostata un'altra continua a decidere l'esito. Il modello nel repository e' l'helper `withEnv` di `server/modules/team/team-invite.tokens.test.ts`.
+- **La prova che il difetto e' chiuso e' lanciare lo stesso file due volte**, con e senza `NODE_ENV=production`, e pretendere lo stesso numero: un solo colore non dimostra niente, perche' e' proprio la differenza fra i due ambienti che si sta correggendo.
+- **Quando un rosso compare solo nei run automatici, la prima ipotesi e' l'ambiente, non il ramo.** Si rilancia lo stesso file con `NODE_ENV=` e si confronta: se il colore cambia, il ramo non c'entra. Costa dieci secondi ed evita di dichiarare rotta la pull request di qualcun altro.
+- Mentre ci si passa, **si irrobustisce l'asserzione**: confrontare il link intero invece di cercarci dentro il solo token fa vedere subito un ritorno alla dipendenza dall'ambiente.
+
+**Prova:** PR #93 (ramo `crma-205-test-invito-node-env`). Prima: 15 pass / 3 fail con `NODE_ENV=production`, 18/0 senza. Dopo: 18/0 in entrambi i casi, e 18/0 anche con `TEAM_INVITE_BASE_URL` e `APP_BASE_URL` impostate a valori sbagliati nell'ambiente. Suite server intera con `NODE_ENV=production`: da 554/3 a 557/0, identica alla base con `NODE_ENV=`.
