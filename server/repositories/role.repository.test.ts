@@ -9,6 +9,8 @@ import {
   buildRoleNameWhere,
   buildTrashRoleWhere,
   buildUserCustomRolesWhere,
+  replaceUserCustomRolesWith,
+  type UserRoleWriter,
 } from './role.repository.js';
 
 /**
@@ -106,6 +108,94 @@ test("il controllo sul nome NON filtra il cestino, ed e' l'unica lettura che non
   assert.equal(where.workspaceId, WORKSPACE_ID);
   assert.equal(where.name, 'Commerciale');
   assert.ok(!('deletedAt' in where));
+});
+
+/**
+ * La riscrittura delle assegnazioni personalizzate (CRMA-204).
+ *
+ * Questi tre test non guardano una clausola: chiamano la funzione vera con un
+ * finto `tx` e leggono **cosa ha chiesto al database**. La differenza conta,
+ * perche' il difetto che hanno il compito di tenere chiuso e' di quelli che non
+ * fanno fallire niente: un `deleteMany` piu' largo del dovuto cancella righe in
+ * silenzio, e un test sulla sola clausola resterebbe verde mentre qualcuno
+ * riscrive il `where` dentro la query (che e' esattamente com'era nato il
+ * difetto).
+ */
+
+const fakeTx = () => {
+  const chiamate: { deleteMany: unknown[]; createMany: unknown[] } = {
+    deleteMany: [],
+    createMany: [],
+  };
+
+  const tx: UserRoleWriter = {
+    userRole: {
+      deleteMany: async (args) => {
+        chiamate.deleteMany.push(args);
+        return { count: 0 };
+      },
+      createMany: async (args) => {
+        chiamate.createMany.push(args);
+        return { count: 0 };
+      },
+    },
+  };
+
+  return { tx, chiamate };
+};
+
+test('riscrivere i ruoli di una persona non tocca le assegnazioni verso un ruolo cestinato', async () => {
+  // Il giro che il rilievo descriveva: la scheda mostra «Marketing», l'admin
+  // salva, e l'assegnazione a «Contabile» — cestinato, quindi mai mostrata —
+  // spariva insieme alle altre. Il `where` della cancellazione deve essere lo
+  // stesso della lettura, cioe' cancellare solo cio' che si e' fatto vedere.
+  const { tx, chiamate } = fakeTx();
+
+  await replaceUserCustomRolesWith(tx, WORKSPACE_ID, USER_ID, ['role-marketing']);
+
+  assert.equal(chiamate.deleteMany.length, 1);
+  assert.deepEqual(chiamate.deleteMany[0], {
+    where: buildUserCustomRolesWhere(WORKSPACE_ID, USER_ID),
+  });
+  // Scritto anche per esteso: se un giorno `buildUserCustomRolesWhere` perdesse
+  // il filtro, l'asserzione qui sopra continuerebbe a combaciare con se stessa.
+  assert.deepEqual(chiamate.deleteMany[0], {
+    where: {
+      workspaceId: WORKSPACE_ID,
+      userId: USER_ID,
+      role: { isSystem: false, deletedAt: null },
+    },
+  });
+});
+
+test('riscrivere i ruoli reinserisce solo quelli richiesti, e regge la riga sopravvissuta', async () => {
+  const { tx, chiamate } = fakeTx();
+
+  await replaceUserCustomRolesWith(tx, WORKSPACE_ID, USER_ID, [
+    'role-marketing',
+    'role-commerciale',
+  ]);
+
+  assert.deepEqual(chiamate.createMany, [
+    {
+      data: [
+        { workspaceId: WORKSPACE_ID, userId: USER_ID, roleId: 'role-marketing' },
+        { workspaceId: WORKSPACE_ID, userId: USER_ID, roleId: 'role-commerciale' },
+      ],
+      // Serve al giro del Cestino: se il ruolo cestinato viene ripristinato e
+      // poi riassegnato, la riga rimasta a database farebbe saltare l'inserimento.
+      skipDuplicates: true,
+    },
+  ]);
+});
+
+test('svuotare i ruoli personalizzati non chiama il reinserimento', async () => {
+  const { tx, chiamate } = fakeTx();
+
+  await replaceUserCustomRolesWith(tx, WORKSPACE_ID, USER_ID, []);
+
+  assert.equal(chiamate.deleteMany.length, 1);
+  assert.deepEqual(chiamate.createMany, []);
 });
 
 test('un ruolo assegnato solo a persone cestinate risulta libero', () => {

@@ -1,5 +1,5 @@
 import { heldByActiveMember } from '../core/membership-access.js';
-import { NOT_DELETED, markTrashed, notDeleted } from '../core/soft-delete.js';
+import { markTrashed, notDeleted } from '../core/soft-delete.js';
 import { prisma } from '../prisma.js';
 
 type RolePermissionRecord = {
@@ -92,12 +92,82 @@ export const buildRoleAssignmentsWhere = (workspaceId: string, roleId: string) =
  * I ruoli personalizzati di una persona: quelli di sistema no (li gestisce il
  * ruolo base), e quelli nel cestino nemmeno — non devono comparire nella scheda
  * di nessuno, come non compaiono nel catalogo.
+ *
+ * ⚠️ Questa clausola governa **la lettura e la riscrittura insieme** (CRMA-204),
+ * e il fatto che sia una sola e' la correzione, non un risparmio di righe.
+ * Finche' `replaceUserCustomRoles` cancellava con un `where` suo — piu' largo di
+ * questo, perche' senza il filtro sul cestino — la scheda di una persona
+ * mostrava N assegnazioni e il salvataggio ne distruggeva N+1: quella verso un
+ * ruolo cestinato spariva senza che nessuno l'avesse vista ne' scelta, e
+ * ripristinando il ruolo dal Cestino non tornava. Tenendole la stessa clausola,
+ * **si cancella esattamente cio' che si e' mostrato**, e la promessa scritta
+ * sopra in `buildRoleAssignmentsWhere` («se poi quella persona viene riammessa,
+ * torna con l'assegnazione intatta») resta vera anche se nel frattempo qualcuno
+ * le ha cambiato i ruoli.
  */
 export const buildUserCustomRolesWhere = (workspaceId: string, userId: string) => ({
   workspaceId,
   userId,
   role: notDeleted({ isSystem: false }),
 });
+
+/**
+ * Il minimo che serve alla riscrittura delle assegnazioni: le due scritture su
+ * `UserRole`, e nient'altro del client Prisma.
+ *
+ * E' dichiarato cosi', invece di prendere il `Prisma.TransactionClient` intero,
+ * perche' il test possa passare un finto `tx` e **leggere cosa gli e' stato
+ * chiesto** senza un database. Non e' un vezzo: la clausola del `deleteMany` e'
+ * l'unica parte di questo giro che puo' sbagliarsi restando verde — cancellare
+ * piu' del dovuto non fa fallire niente, fa solo sparire delle righe — e senza
+ * questa cucitura il solo modo di provarla sarebbe fidarsi della lettura.
+ *
+ * I parametri sono larghi (`object`) perche' il `tx` vero di Prisma, che e'
+ * generico, possa passare di qui. Non si perde il controllo dei tipi sulla
+ * clausola: `buildUserCustomRolesWhere` e' la stessa che va alle due letture qui
+ * sotto, e quelle i tipi veri di Prisma ce l'hanno.
+ */
+export type UserRoleWriter = {
+  userRole: {
+    deleteMany(args?: { where?: object }): Promise<unknown>;
+    createMany(args?: { data?: object; skipDuplicates?: boolean }): Promise<unknown>;
+  };
+};
+
+/**
+ * Riscrive i ruoli personalizzati di una persona (CRMA-204).
+ *
+ * Cancella **solo** le assegnazioni che la scheda mostra — stessa clausola
+ * della lettura, `buildUserCustomRolesWhere` — e reinserisce quelle richieste.
+ * Le assegnazioni verso un ruolo nel cestino non le tocca: restano a database e
+ * tornano vive se quel ruolo viene ripristinato. `skipDuplicates` regge il caso
+ * in cui, ripristinato il ruolo, qualcuno lo riassegni: la riga sopravvissuta
+ * non da' fastidio a nessuno.
+ *
+ * Il chiamante deve aver gia' verificato che `roleIds` siano ruoli vivi e non di
+ * sistema (lo fa `workspace-roles.service.ts`).
+ */
+export const replaceUserCustomRolesWith = async (
+  tx: UserRoleWriter,
+  workspaceId: string,
+  userId: string,
+  roleIds: string[],
+): Promise<void> => {
+  await tx.userRole.deleteMany({
+    where: buildUserCustomRolesWhere(workspaceId, userId),
+  });
+
+  if (roleIds.length > 0) {
+    await tx.userRole.createMany({
+      data: roleIds.map((roleId) => ({
+        workspaceId,
+        userId,
+        roleId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+};
 
 export const roleRepository = {
   async listRolesWithPermissions(workspaceId: string): Promise<RoleRecord[]> {
@@ -397,28 +467,7 @@ export const roleRepository = {
     userId: string,
     roleIds: string[],
   ): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      await tx.userRole.deleteMany({
-        where: {
-          workspaceId,
-          userId,
-          role: {
-            isSystem: false,
-          },
-        },
-      });
-
-      if (roleIds.length > 0) {
-        await tx.userRole.createMany({
-          data: roleIds.map((roleId) => ({
-            workspaceId,
-            userId,
-            roleId,
-          })),
-          skipDuplicates: true,
-        });
-      }
-    });
+    await prisma.$transaction((tx) => replaceUserCustomRolesWith(tx, workspaceId, userId, roleIds));
   },
 
   async countRolesByIds(workspaceId: string, roleIds: string[]): Promise<number> {
@@ -428,46 +477,6 @@ export const roleRepository = {
 
     return prisma.role.count({
       where: buildLiveRolesByIdsWhere(workspaceId, roleIds),
-    });
-  },
-
-  async listUserRoleIds(workspaceId: string, userId: string): Promise<string[]> {
-    const userRoles = await prisma.userRole.findMany({
-      where: {
-        workspaceId,
-        userId,
-        role: NOT_DELETED,
-      },
-      select: {
-        roleId: true,
-      },
-      orderBy: {
-        roleId: 'asc',
-      },
-    });
-
-    return userRoles.map((userRole) => userRole.roleId);
-  },
-
-  async replaceUserRoles(workspaceId: string, userId: string, roleIds: string[]): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      await tx.userRole.deleteMany({
-        where: {
-          workspaceId,
-          userId,
-        },
-      });
-
-      if (roleIds.length > 0) {
-        await tx.userRole.createMany({
-          data: roleIds.map((roleId) => ({
-            workspaceId,
-            userId,
-            roleId,
-          })),
-          skipDuplicates: true,
-        });
-      }
     });
   },
 };
