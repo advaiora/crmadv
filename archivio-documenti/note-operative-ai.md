@@ -1623,3 +1623,15 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - GitHub vieta di approvare la propria pull request. Se le PR degli agent sono aperte dallo stesso utente che dovrebbe approvarle, **pretendere 1 approvazione obbligatoria fermerebbe ogni unione automatica** (corsia B compresa): nessuno potrebbe mai approvarla.
 - Prima di proporre a una persona una regola di approvazione sul ruleset, controllare `user.login` di una pull request recente aperta da un agente e confrontarlo con l'elenco dei collaboratori (`GET /repos/{owner}/{repo}/collaborators`).
 - Prova: PR #71 su `crmadv`, `user.login: advaiora`.
+
+---
+
+## 112. La soglia delle 500 righe la supera il merge, non un ramo preso da solo
+
+**Contesto:** 10/9/2026, chiudendo CRMA-169 (allegati scaricabili dopo il cestino), unendo `origin/main` dentro il ramo lungo `backend/crma-29-cestino`. Due rami separati lavoravano sullo stesso modulo (`server/modules/messaging/`) senza incontrarsi.
+
+**Errore:** guardare la soglia delle 500 righe solo sul proprio ramo. Su `main` `repository.ts` era a 393 righe e `service.ts` a 440: entrambi sotto soglia, e nessuno dei due lavori li sforava da solo. Dopo il merge erano a 602 e 523 — la soglia l'ha superata la somma, e nessun autore dei due rami se n'e' accorto mentre scriveva, perche' nessuno dei due vedeva l'altro ramo.
+
+**Modo corretto:**
+- Quando si unisce `main` dentro un ramo lungo che tocca un modulo condiviso, misurare le righe dei file **dopo** la risoluzione del merge, non fidarsi del conteggio visto prima di unire.
+- Se la soglia risulta superata dal merge, non spezzare il file di passaggio (vale la regola di sempre sui mostri): si annota in roadmap con la causa vera ("somma di due lavori nati separati"), non si tratta come un difetto del proprio ramo.
