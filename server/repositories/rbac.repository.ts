@@ -36,10 +36,44 @@ export const buildEffectiveUserRoleWhere = <T extends object>(
   userId,
   workspaceId,
   ...heldByActiveMember(workspaceId),
+  ...towardLiveRole(roleWhere),
+});
+
+/**
+ * Il capo «ruolo» del filtro, da solo: un'assegnazione vale se il ruolo verso cui
+ * punta non e' nel cestino. Sta in una funzione perche' lo vogliono in due, e i
+ * due non vogliono la stessa altra meta' (vedi `buildGrantingUserRoleWhere`).
+ */
+const towardLiveRole = <T extends object>(roleWhere: T = {} as T) => ({
   role: {
     ...roleWhere,
     ...NOT_DELETED,
   },
+});
+
+/**
+ * Le assegnazioni di una persona che le **concedono ancora qualcosa**, per chi
+ * deve contarle invece di leggerle (CRMA-132, rilievo del Guardiano su CRMA-131).
+ *
+ * Esiste separato da `buildEffectiveUserRoleWhere` per una differenza voluta:
+ * qui **non c'e' il filtro sulla membership**, e non e' una dimenticanza.
+ *
+ * Il chiamante e' l'auto-riparazione dell'accesso al workspace
+ * (`ensureWorkspaceAccessDefaults`), che sul conteggio zero **scrive**: assegna un
+ * ruolo di ripiego, e in un workspace con un solo membro attivo quel ripiego e'
+ * **Superadmin**. Con il filtro sulla membership dentro, una persona cestinata
+ * arriverebbe al conteggio zero e uscirebbe da quella riparazione con
+ * un'assegnazione nuova — cestinata e Superadmin insieme, pronta al ripristino.
+ * Un filtro in piu' che apre una strada invece di chiuderla.
+ *
+ * Che la persona sia ancora dentro il workspace lo decide chi chiama, prima e
+ * altrove: `listMemberships` legge solo le membership attive e non cestinate
+ * (CRMA-157), quindi al conteggio non arriva nessun cestinato.
+ */
+export const buildGrantingUserRoleWhere = (userId: string, workspaceId: string) => ({
+  userId,
+  workspaceId,
+  ...towardLiveRole(),
 });
 
 export const rbacRepository = {

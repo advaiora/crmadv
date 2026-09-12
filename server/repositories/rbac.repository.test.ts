@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildEffectiveUserRoleWhere } from './rbac.repository.js';
+import { buildEffectiveUserRoleWhere, buildGrantingUserRoleWhere } from './rbac.repository.js';
 
 /**
  * Le assegnazioni di chi va nel cestino (CRMA-132).
@@ -94,4 +94,34 @@ test('la condizione composta di hasPermission sopravvive al filtro', () => {
 
   assert.equal(where.role.rolePermissions.some.permission.key, 'clients.view');
   assert.equal(where.role.deletedAt, null);
+});
+
+/**
+ * Il conteggio dell'auto-riparazione (rilievo del Guardiano su CRMA-131).
+ *
+ * Chi conta le assegnazioni per decidere se ripararne l'assenza deve contare le
+ * stesse che il resto del codice considera valide, altrimenti i due si
+ * contraddicono: zero permessi in lettura, «ne ha gia' uno» in scrittura.
+ */
+
+test('il conteggio non conta le assegnazioni verso un ruolo cestinato', () => {
+  // Senza questo, chi ha come unica assegnazione un ruolo cestinato resta con
+  // zero permessi e nessuna riparazione: il conteggio vede 1.
+  const where = buildGrantingUserRoleWhere(USER_ID, WORKSPACE_ID);
+
+  assert.equal(where.userId, USER_ID);
+  assert.equal(where.workspaceId, WORKSPACE_ID);
+  assert.equal(where.role.deletedAt, null);
+});
+
+test('il conteggio NON filtra la membership, e non e una dimenticanza', () => {
+  // Differenza voluta rispetto a `buildEffectiveUserRoleWhere`, fissata qui
+  // perche' e' controintuitiva e il prossimo che «uniforma i filtri» la trovi.
+  //
+  // Su conteggio zero il chiamante SCRIVE: assegna un ruolo di ripiego, che in un
+  // workspace con un solo membro attivo e' Superadmin. Con il filtro sulla
+  // membership dentro, una persona cestinata arriverebbe a zero e ne uscirebbe
+  // cestinata e Superadmin insieme. Che sia ancora dentro il workspace lo decide
+  // `listMemberships`, prima e altrove (CRMA-157).
+  assert.ok(!('user' in buildGrantingUserRoleWhere(USER_ID, WORKSPACE_ID)));
 });
