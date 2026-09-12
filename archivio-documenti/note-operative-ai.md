@@ -1638,11 +1638,25 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 113. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
+## 113. Piu' pull request che aggiungono note allo stesso file, nello stesso punto, scelgono lo stesso numero senza saperlo
+
+**Contesto:** 11/9/2026, CRMA-170 (coda unioni corsia B). Tre pull request (#60, #66, #68) modificavano tutte `archivio-documenti/note-operative-ai.md`, ciascuna aggiungendo una o due note in coda al file con lo stesso numero (tutte partivano da "## 105.", scritte prima che le altre fossero unite).
+
+**Errore:** unendole in sequenza su `main`, la seconda e la terza sono arrivate `dirty` con un conflitto di contenuto reale (non solo di riga): due blocchi "## 105." diversi nello stesso punto del file. GitHub non lo segnala come "richiede consenso umano", ma come `mergeable_state` `dirty` ordinario — la stessa forma di qualunque altro conflitto di codice.
+
+**Modo corretto:**
+- Un conflitto di questo tipo su `note-operative-ai.md` non e' una decisione di prodotto: si risolve rinumerando in sequenza il blocco che arriva dopo (qui: la nota della seconda PR e' diventata 106, quelle della terza 107 e 108), senza toccare il contenuto delle note stesse.
+- Prima di rinumerare, controllare che il testo della nota non contenga un riferimento a se stessa per numero (es. "vedi nota #105 qui sopra"): in questo caso non ce n'erano, ma se ci fossero andrebbero aggiornati insieme al numero.
+- Quando piu' pull request aggiungono note allo stesso file nello stesso punto (fine del file), unirle **senza fidarsi del numero scritto nel branch**: il numero giusto si decide al momento dell'unione, guardando qual e' l'ultima nota gia' su `main`.
+- Prova: PR #66 e #68 su CRMA-170, entrambe arrivate `dirty` con lo stesso conflitto dopo l'unione di #60 e poi di #66; risolte con `git merge-tree` per individuare il conflitto e un merge locale con rinumerazione, poi push sul ramo della PR e nuova unione.
+
+---
+
+## 114. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
 
 **Contesto:** 11/9/2026, CRMA-159 (controllo sui segreti). Verificare che GitHub **valuti davvero** un'espressione `${{ }}` in un campo che decide un comportamento di sicurezza (`cancel-in-progress`), non che la accetti soltanto come stringa.
 
-**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#114**, gemella di questa).
+**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#115**, gemella di questa).
 
 **Errore, seconda meta' — come non si butta via la prova dopo averla costruita:** cancellare **le tracce dei giri** insieme ai rami, per pulizia. I rami vanno cancellati; i giri no. Il giro **e' la prova**: cancellato lui, chi revisiona dopo trova un'affermazione senza riscontro e deve rifare la misura da capo. E' successo davvero qui: la sonda a due arm che dimostrava che GitHub valuta l'espressione era corretta e ben disegnata, ma i suoi quattro giri erano stati cancellati — quindi il Guardiano ha dovuto rieseguirla per intero (due rami, quattro push, tre minuti di attesa), e nel farlo ha dovuto **spingere di nuovo su un repository pubblico**, il gesto che si voleva fare una volta sola.
 
@@ -1653,10 +1667,10 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 
 ---
 
-## 114. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
+## 115. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
 
 **Contesto:** 11/9/2026, CRMA-159. Iniettare un guasto in un file che contiene la propria correzione non ancora committata, per provare che un test la rilevi davvero.
 
-**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#113**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
+**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#114**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
 
 **Modo corretto:** committare la correzione **prima** di iniettare il guasto, oppure ripristinare da una copia separata (mai dall'ultimo commit se contiene una correzione non committata); e dopo il ripristino **rileggere** la riga corretta invece di fidarsi del colore del banco.
