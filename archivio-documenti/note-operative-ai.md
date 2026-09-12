@@ -1649,3 +1649,28 @@ git log --all --diff-filter=A --name-only --pretty=format: -- archivio-documenti
 - Prima di rinumerare, controllare che il testo della nota non contenga un riferimento a se stessa per numero (es. "vedi nota #105 qui sopra"): in questo caso non ce n'erano, ma se ci fossero andrebbero aggiornati insieme al numero.
 - Quando piu' pull request aggiungono note allo stesso file nello stesso punto (fine del file), unirle **senza fidarsi del numero scritto nel branch**: il numero giusto si decide al momento dell'unione, guardando qual e' l'ultima nota gia' su `main`.
 - Prova: PR #66 e #68 su CRMA-170, entrambe arrivate `dirty` con lo stesso conflitto dopo l'unione di #60 e poi di #66; risolte con `git merge-tree` per individuare il conflitto e un merge locale con rinumerazione, poi push sul ramo della PR e nuova unione.
+
+---
+
+## 114. Una prova di sicurezza a due bracci si costruisce con valori diversi che pretendono esiti diversi — e poi non si cancella insieme al ramo
+
+**Contesto:** 11/9/2026, CRMA-159 (controllo sui segreti). Verificare che GitHub **valuti davvero** un'espressione `${{ }}` in un campo che decide un comportamento di sicurezza (`cancel-in-progress`), non che la accetti soltanto come stringa.
+
+**Errore, prima meta' — come si costruisce la prova:** un giro solo, verde, dice soltanto che lo YAML e' stato **accettato**, non che il valore sia stato **valutato**: se venisse trattato come stringa sempre vera la correzione sarebbe cosmetica, con l'aggravante che tutti la crederebbero fatta. Un arm solo non distingue mai "valutata bene" da "sempre vera" — stesso guasto di un banco senza iniezione di guasto (vedi nota **#115**, gemella di questa).
+
+**Errore, seconda meta' — come non si butta via la prova dopo averla costruita:** cancellare **le tracce dei giri** insieme ai rami, per pulizia. I rami vanno cancellati; i giri no. Il giro **e' la prova**: cancellato lui, chi revisiona dopo trova un'affermazione senza riscontro e deve rifare la misura da capo. E' successo davvero qui: la sonda a due arm che dimostrava che GitHub valuta l'espressione era corretta e ben disegnata, ma i suoi quattro giri erano stati cancellati — quindi il Guardiano ha dovuto rieseguirla per intero (due rami, quattro push, tre minuti di attesa), e nel farlo ha dovuto **spingere di nuovo su un repository pubblico**, il gesto che si voleva fare una volta sola.
+
+**Modo corretto:**
+- Costruire la sonda con **due arm che differiscono solo nel valore confrontato**, e pretendere **due esiti diversi**: solo cosi' si distingue "l'espressione e' stata valutata" da "il campo accetta qualunque stringa".
+- Dopo, separare i due gesti che sembrano lo stesso e non lo sono: **il ramo di prova si cancella sempre** — non serve piu' a niente e sporca l'elenco; **la traccia del giro si cancella solo se contiene qualcosa da non lasciare in giro**, cioe' praticamente solo il valore di un segreto finito nel registro (nota **#87**). Se il commit di prova non contiene segreti, il giro **si lascia**, e si cita per numero nel commento di chiusura.
+- La regola in una riga: si ripulisce cio' che puo' fare danno, non cio' che costituisce la prova. Il metro non e' "e' roba mia usa-e-getta", e' "qualcuno dovra' ricontrollare questa affermazione senza credermi sulla parola".
+
+---
+
+## 115. `git checkout -- <file>` su un file che contiene un'iniezione di guasto cancella anche la correzione non ancora committata
+
+**Contesto:** 11/9/2026, CRMA-159. Iniettare un guasto in un file che contiene la propria correzione non ancora committata, per provare che un test la rilevi davvero.
+
+**Errore:** ripristinare col `checkout` dopo l'iniezione. `git checkout -- <file>` non annulla l'iniezione: riporta il file all'**ultimo commit**, cioe' cancella anche la correzione che non era ancora committata. Il banco torna verde e sembra a posto, perche' verde e' anche lo stato "la correzione non c'e' piu'" — la stessa famiglia di guasto di un banco incompleto che e' verde per caso, qui sul lato del ripristino invece che dell'iniezione (vedi nota **#114**, gemella di questa: quella dice come si costruisce la prova, questa come non la si rovina ripristinando).
+
+**Modo corretto:** committare la correzione **prima** di iniettare il guasto, oppure ripristinare da una copia separata (mai dall'ultimo commit se contiene una correzione non committata); e dopo il ripristino **rileggere** la riga corretta invece di fidarsi del colore del banco.
