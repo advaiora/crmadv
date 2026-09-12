@@ -20,26 +20,38 @@ export type AiUsageLogInput = {
   status: string;
 };
 
-// Filtri applicabili alle aggregazioni dei consumi AI. Tutti opzionali:
-// `since` limita al periodo, gli altri restringono per workspace/utente/modello/
-// funzione/progetto. `workspaceId` serve alla vista consumi per-workspace di Agency
-// (la Console piattaforma lo lascia assente per aggregare su tutti i workspace).
+// Filtri delle aggregazioni dei consumi AI per UN workspace. `workspaceId` e'
+// obbligatorio di proposito: fino al 11/9/2026 era facoltativo, e chi lo
+// dimenticava non otteneva un errore ma i dati di TUTTI i workspace — un difetto
+// che sbaglia nella direzione permissiva invece che in quella restrittiva
+// (rilievo CRMA-179 dell'audit di sicurezza CRMA-34). Adesso ometterlo non
+// compila. Gli altri campi restano facoltativi: restringono e basta.
 export type AiUsageFilter = {
+  workspaceId: string;
   since?: Date;
-  workspaceId?: string;
   userId?: string;
   model?: string;
   functionName?: string;
   projectId?: string;
 };
 
-const buildWhere = (filter: AiUsageFilter): Prisma.AiUsageLogWhereInput => {
+// Filtri della vista cross-workspace, che esiste per un solo chiamante: la
+// Console di piattaforma (`platform-admin.service.ts`, rotte protette dal guard
+// `requirePlatformAdmin`). `allWorkspaces: true` non e' decorativo — e' il modo
+// in cui la scelta di NON filtrare per workspace si legge al punto di chiamata e
+// in revisione, invece di essere un campo mancante che nessuno nota.
+export type AiUsageCrossWorkspaceFilter = Omit<AiUsageFilter, 'workspaceId'> & {
+  allWorkspaces: true;
+};
+
+// Parte comune dei due costruttori: solo i filtri che restringono. Il workspace
+// non sta qui apposta, perche' e' l'unico che decide il perimetro dei dati.
+const buildCommonWhere = (
+  filter: Omit<AiUsageFilter, 'workspaceId'>,
+): Prisma.AiUsageLogWhereInput => {
   const where: Prisma.AiUsageLogWhereInput = {};
   if (filter.since) {
     where.createdAt = { gte: filter.since };
-  }
-  if (filter.workspaceId) {
-    where.workspaceId = filter.workspaceId;
   }
   if (filter.userId) {
     where.userId = filter.userId;
@@ -56,16 +68,31 @@ const buildWhere = (filter: AiUsageFilter): Prisma.AiUsageLogWhereInput => {
   return where;
 };
 
+// Perimetro di UN workspace. `workspaceId` si scrive sempre, non "se c'e'".
+// Esportata solo perche' il test possa verificarlo.
+export const buildWhere = (filter: AiUsageFilter): Prisma.AiUsageLogWhereInput => ({
+  ...buildCommonWhere(filter),
+  workspaceId: filter.workspaceId,
+});
+
+// Perimetro di TUTTI i workspace: nessun filtro di appartenenza, per disegno.
+// Esportata solo perche' il test possa verificarlo.
+export const buildCrossWorkspaceWhere = (
+  filter: AiUsageCrossWorkspaceFilter,
+): Prisma.AiUsageLogWhereInput => buildCommonWhere(filter);
+
 export const aiUsageRepository = {
   create(data: AiUsageLogInput) {
     return prisma.aiUsageLog.create({ data });
   },
 
-  // Aggregato per workspace nel periodo/filtri indicati.
-  aggregateByWorkspace(filter: AiUsageFilter = {}) {
+  // Aggregato per workspace nel periodo/filtri indicati. E' cross-workspace per
+  // costruzione (raggruppa PER workspace: scoparlo a uno solo non avrebbe senso),
+  // quindi chiede il filtro che lo dichiara.
+  aggregateByWorkspace(filter: AiUsageCrossWorkspaceFilter) {
     return prisma.aiUsageLog.groupBy({
       by: ['workspaceId'],
-      where: buildWhere(filter),
+      where: buildCrossWorkspaceWhere(filter),
       _sum: { costUsd: true, inputTokens: true, outputTokens: true },
       _count: { _all: true },
       _max: { createdAt: true },
@@ -73,7 +100,7 @@ export const aiUsageRepository = {
   },
 
   // Aggregato per utente nel periodo/filtri indicati (userId può essere null).
-  aggregateByUser(filter: AiUsageFilter = {}) {
+  aggregateByUser(filter: AiUsageFilter) {
     return prisma.aiUsageLog.groupBy({
       by: ['userId'],
       where: buildWhere(filter),
@@ -86,7 +113,7 @@ export const aiUsageRepository = {
   // Aggregato per funzione AI nel periodo/filtri indicati. Alimenta la vista
   // consumi per-workspace (rendiconto per funzione) e, in prospettiva, le stime
   // di costo mostrate sui pulsanti AI.
-  aggregateByFunction(filter: AiUsageFilter = {}) {
+  aggregateByFunction(filter: AiUsageFilter) {
     return prisma.aiUsageLog.groupBy({
       by: ['functionName'],
       where: buildWhere(filter),
@@ -99,7 +126,7 @@ export const aiUsageRepository = {
   // Aggregato per progetto nel periodo/filtri indicati. projectId e' null per le
   // chiamate senza contesto di progetto (chat generale, ecc.): quelle finiscono
   // tutte in un unico gruppo, che la vista mostra come "Senza progetto".
-  aggregateByProject(filter: AiUsageFilter = {}) {
+  aggregateByProject(filter: AiUsageFilter) {
     return prisma.aiUsageLog.groupBy({
       by: ['projectId'],
       where: buildWhere(filter),
@@ -109,21 +136,32 @@ export const aiUsageRepository = {
     });
   },
 
-  // Nomi dei progetti citati dal registro, per etichettare gli aggregati.
-  projectsByIds(ids: string[]) {
+  // Nomi dei progetti citati dal registro, per etichettare gli aggregati. Il
+  // workspace si chiede anche qui: gli `ids` arrivano gia' da un groupBy scopato,
+  // ma farne dipendere la sicurezza sarebbe un accordo non scritto in piu'.
+  projectsByIds(workspaceId: string, ids: string[]) {
     if (ids.length === 0) {
       return Promise.resolve([] as Array<{ id: string; name: string }>);
     }
     return prisma.project.findMany({
-      where: { id: { in: ids } },
+      where: { workspaceId, id: { in: ids } },
       select: { id: true, name: true },
     });
   },
 
-  // Totali complessivi (tutti i workspace) nel periodo/filtri indicati.
-  totals(filter: AiUsageFilter = {}) {
+  // Totali del workspace nel periodo/filtri indicati.
+  totals(filter: AiUsageFilter) {
     return prisma.aiUsageLog.aggregate({
       where: buildWhere(filter),
+      _sum: { costUsd: true, inputTokens: true, outputTokens: true },
+      _count: { _all: true },
+    });
+  },
+
+  // Totali complessivi su TUTTI i workspace: solo per la Console di piattaforma.
+  totalsAcrossWorkspaces(filter: AiUsageCrossWorkspaceFilter) {
+    return prisma.aiUsageLog.aggregate({
+      where: buildCrossWorkspaceWhere(filter),
       _sum: { costUsd: true, inputTokens: true, outputTokens: true },
       _count: { _all: true },
     });
@@ -177,7 +215,7 @@ export const aiUsageRepository = {
   },
 
   // Valori distinti per popolare i menu dei filtri (nel periodo).
-  distinctModels(filter: AiUsageFilter = {}) {
+  distinctModels(filter: AiUsageFilter) {
     return prisma.aiUsageLog.findMany({
       where: buildWhere(filter),
       distinct: ['model'],
@@ -186,7 +224,7 @@ export const aiUsageRepository = {
     });
   },
 
-  distinctFunctions(filter: AiUsageFilter = {}) {
+  distinctFunctions(filter: AiUsageFilter) {
     return prisma.aiUsageLog.findMany({
       where: buildWhere(filter),
       distinct: ['functionName'],
@@ -195,6 +233,12 @@ export const aiUsageRepository = {
     });
   },
 
+  // Nomi/email degli utenti citati dal registro. NON si filtra per workspace, ed
+  // e' una scelta: `User` non ha una colonna `workspaceId` (l'appartenenza passa
+  // da `Membership`), e filtrare per membership cancellerebbe il nome di chi e'
+  // stato rimosso dal workspace — proprio da un rendiconto di spesa, che esiste
+  // per dire chi ha speso. Gli `ids` arrivano sempre da aggregati ormai scopati
+  // per workspace, quindi il perimetro lo decide comunque il chiamante.
   usersByIds(ids: string[]) {
     return prisma.user.findMany({
       where: { id: { in: ids } },
